@@ -23,6 +23,9 @@ from services.interview_service import InterviewService
 from services.github_service import GitHubService
 from services.fake_detection_service import FakeDetectionService
 from services.pdf_generator_service import PDFGeneratorService
+from fastapi import Request, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from typing import Optional, Annotated
 
 logger = structlog.get_logger(__name__)
 security = HTTPBearer(auto_error=False)
@@ -80,19 +83,33 @@ def get_pdf_service() -> PDFGeneratorService:
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
+
 async def get_current_user(
+    request: Request,
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)],
     user_repo: UserRepository = Depends(get_user_repo),
 ) -> UserModel:
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired authentication credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
-    if not credentials:
+
+    token = None
+
+    # 1. Try cookie first (NEW SYSTEM)
+    if request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
+
+    # 2. Fallback to header (OLD SYSTEM / Swagger)
+    elif credentials:
+        token = credentials.credentials
+
+    if not token:
         raise credentials_exception
 
-    payload = decode_token(credentials.credentials)
+    payload = decode_token(token)
+
     if not payload or not verify_token_type(payload, "access"):
         raise credentials_exception
 
@@ -102,16 +119,15 @@ async def get_current_user(
 
     user = await user_repo.get_by_id(user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found")
 
     if user.status != "active":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail=f"Account is {user.status}. Contact support.",
         )
 
     return user
-
 
 async def get_current_active_user(
     current_user: Annotated[UserModel, Depends(get_current_user)]
