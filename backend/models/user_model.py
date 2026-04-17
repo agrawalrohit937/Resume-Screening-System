@@ -25,7 +25,7 @@ class UserStatus(str, Enum):
 class UserModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     email: EmailStr
-    hashed_password: str
+    hashed_password: Optional[str] = None
     full_name: str
     role: UserRole = UserRole.CANDIDATE
     status: UserStatus = UserStatus.ACTIVE
@@ -38,6 +38,7 @@ class UserModel(BaseModel):
     last_login: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    refresh_token: Optional[str] = None
 
     class Config:
         populate_by_name = True

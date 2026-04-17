@@ -20,38 +20,56 @@ import Interview from './pages/Interview'
 import Enhance from './pages/Enhance'
 import GitHub from './pages/GitHub'
 import FakeDetect from './pages/FakeDetect'
+// import LiveInterviewV2 from './pages/LiveInterviewV2'
 
 // New pages (add these)
 import LiveInterview from './pages/LiveInterview'
 import Gamification from './pages/Gamification'
 import InterviewAnalytics from './pages/InterviewAnalytics'
-
 function ProtectedRoute({ children }) {
-  const { loading } = useAuth()
+  const { user, loading } = useAuth()
+
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="flex flex-col items-center gap-5">
+
         {/* Triple ring loader */}
         <div className="relative w-16 h-16">
           <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin"/>
-          <div className="absolute inset-2 rounded-full border-4 border-violet-100 border-b-violet-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.4s' }}/>
-          <div className="absolute inset-4 rounded-full border-2 border-indigo-200 border-t-indigo-400 animate-spin" style={{ animationDuration: '2s' }}/>
+          <div
+            className="absolute inset-2 rounded-full border-4 border-violet-100 border-b-violet-500 animate-spin"
+            style={{ animationDirection: 'reverse', animationDuration: '1.4s' }}
+          />
+          <div
+            className="absolute inset-4 rounded-full border-2 border-indigo-200 border-t-indigo-400 animate-spin"
+            style={{ animationDuration: '2s' }}
+          />
         </div>
-        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#94A3B8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+
+        <p
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            color: '#94A3B8',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase'
+          }}
+        >
           Loading CareerAI...
         </p>
+
       </div>
     </div>
   )
-  const hasToken = !!localStorage.getItem('access_token')
-  return hasToken ? children : <Navigate to="/login" replace />
+  return user ? children : <Navigate to="/login" replace />
 }
 
 function PublicRoute({ children }) {
-  const { loading } = useAuth()
+  const { user, loading } = useAuth()
+
   if (loading) return null
-  const hasToken = !!localStorage.getItem('access_token')
-  return hasToken ? <Navigate to="/dashboard" replace /> : children
+
+  return user ? <Navigate to="/dashboard" replace /> : children
 }
 
 export default function App() {
@@ -101,6 +119,7 @@ export default function App() {
             <Route path="live-interview" element={<LiveInterview />} />
             <Route path="gamification" element={<Gamification />} />
             <Route path="interview-analytics" element={<InterviewAnalytics />} />
+            {/* <Route path="live-interview-v2" element={<LiveInterviewV2 />} /> */}
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

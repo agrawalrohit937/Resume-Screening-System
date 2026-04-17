@@ -16,7 +16,7 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=2, max_length=100)
     role: UserRole = UserRole.CANDIDATE
-    phone: Optional[str] = Field(default=None, pattern=r"^\+?[\d\s\-()]{7,20}$")
+    phone: Optional[str] = None
     linkedin_url: Optional[str] = None
     github_username: Optional[str] = None
 

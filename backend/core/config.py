@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = Field(default="development", pattern="^(development|staging|production)$")
-
+    ENV: str = "development"
     # ── MongoDB ───────────────────────────────────────────────────────────────
     MONGO_URI: str = "mongodb://localhost:27017"
     MONGO_DB_NAME: str = "ai_career_platform"
@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     MISTRAL_API_KEY: Optional[str]
     GAMIFICATION_ENABLED: bool = True
     LEADERBOARD_SIZE: int = 50
-
+    GOOGLE_CLIENT_ID: str = "1032374161774-fu7okbh4l4cg1bt30t8o47p1ttto95dg.apps.googleusercontent.com"
     @field_validator("BERT_SCORE_WEIGHT", "TFIDF_SCORE_WEIGHT")
     @classmethod
     def weights_must_sum_to_one(cls, v, info):
