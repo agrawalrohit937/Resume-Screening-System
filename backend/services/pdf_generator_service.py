@@ -18,6 +18,51 @@ from reportlab.platypus import (
 )
 
 from models.resume_model import ResumeModel
+from core.config import settings
+
+from ftplib import FTP
+import os
+
+
+def upload_to_ftp(local_file_path, remote_filename):
+    try:
+        print("🔌 Connecting FTP...")
+
+        ftp = FTP()
+        ftp.connect(settings.FTP_HOST, settings.FTP_PORT, timeout=20)
+        ftp.login(settings.FTP_USERNAME, settings.FTP_PASSWORD)
+        ftp.set_pasv(True)
+
+        print("📂 Current dir:", ftp.pwd())
+
+        # ✅ go to correct web root
+        ftp.cwd("domains/generativeaix.com/public_html")
+        print("📂 After entering public_html:", ftp.pwd())
+
+        folders = ftp.nlst()
+        print("📁 Folders:", folders)
+
+        if "ats_resume" not in folders:
+            ftp.mkd("ats_resume")
+
+        ftp.cwd("ats_resume")
+        print("📂 Final dir:", ftp.pwd())
+
+        print("⬆ Uploading:", remote_filename)
+
+        with open(local_file_path, "rb") as f:
+            ftp.storbinary(f"STOR {remote_filename}", f)
+
+        ftp.quit()
+
+        url = f"{settings.FTP_BASE_URL}/ats_resume/{remote_filename}"
+        print("✅ Uploaded URL:", url)
+
+        return url
+
+    except Exception as e:
+        print("🔥 FTP ERROR:", str(e))
+        raise Exception(f"FTP upload failed: {str(e)}")
 
 logger = structlog.get_logger(__name__)
 
@@ -217,11 +262,20 @@ class PDFGeneratorService:
 
         # Write to disk
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
         with open(output_path, "wb") as f:
             f.write(pdf_bytes)
 
         logger.info("PDF generated", path=output_path, size=len(pdf_bytes))
-        return output_path
+
+        # upload AFTER file closed
+        filename = os.path.basename(output_path)
+        pdf_url = upload_to_ftp(output_path, filename)
+
+        if not pdf_url:
+            raise Exception("FTP upload failed")
+
+        return pdf_url
 
     def _build_styles(self) -> dict:
         base = getSampleStyleSheet()

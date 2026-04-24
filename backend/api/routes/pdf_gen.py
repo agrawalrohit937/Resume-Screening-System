@@ -4,6 +4,7 @@ PDF Generator Routes — Generate ATS-friendly resume PDF
 
 import os
 import uuid
+from aiohttp import payload
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -49,38 +50,20 @@ async def generate_resume_pdf(
     output_filename = f"resume_{uuid.uuid4().hex[:8]}.pdf"
     output_path = os.path.join(output_dir, output_filename)
 
-    await pdf_service.generate_resume_pdf(resume, output_path, template=payload.template)
+    pdf_url = await pdf_service.generate_resume_pdf(
+    resume, output_path, template=payload.template
+    )
+    # SAVE PDF URL IN DB
+    await resume_repo.update(
+        payload.resume_id,
+        {
+            "file_url": pdf_url
+        }
+    )
 
     return {
         "success": True,
         "resume_id": payload.resume_id,
-        "download_path": f"/api/v1/pdf/download/{current_user.id}/{output_filename}",
-        "filename": output_filename,
-        "template": payload.template,
+        "pdf_url": pdf_url,  
         "message": "PDF generated successfully.",
     }
-
-
-@router.get("/download/{user_id}/{filename}")
-async def download_pdf(
-    user_id: str,
-    filename: str,
-    current_user: UserModel = Depends(get_current_user),
-):
-    """Download a generated resume PDF."""
-    if str(current_user.id) != user_id and current_user.role.value not in ("admin", "recruiter"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
-
-    # Sanitize filename to prevent path traversal
-    safe_filename = os.path.basename(filename)
-    file_path = os.path.join(settings.UPLOAD_DIR, "generated", user_id, safe_filename)
-
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
-
-    return FileResponse(
-        path=file_path,
-        media_type="application/pdf",
-        filename=safe_filename,
-        headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
-    )

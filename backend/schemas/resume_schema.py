@@ -25,6 +25,7 @@ class ResumeDetailResponse(BaseModel):
     filename: str
     original_filename: str
     file_type: str
+    file_url: Optional[str] = None
     file_size_bytes: int
     status: ResumeStatus
     parsed_data: Optional[ParsedResumeData]

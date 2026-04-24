@@ -115,7 +115,7 @@ async def bulk_match(
     for i, (resume, bert_score) in enumerate(zip(parsed_resumes, bert_scores)):
         from utils.nlp_utils import get_tfidf_similarity
         tfidf_score = get_tfidf_similarity(resume.parsed_data.raw_text, payload.job_description)
-        final_score = round(0.6 * bert_score + 0.4 * tfidf_score, 4)
+        final_score = round(0.75 * bert_score + 0.25 * tfidf_score, 4)
 
         from utils.validators import score_to_label
         results.append(BulkATSResultItem(

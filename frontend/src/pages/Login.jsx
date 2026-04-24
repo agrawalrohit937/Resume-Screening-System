@@ -21,7 +21,8 @@ export default function Login() {
   const onSubmit = async ({ email, password }) => {
     setLoading(true)
     try {
-      await login(email, password)
+      // Pass 'selectedRole' as the third argument here
+      await login(email, password, selectedRole) 
       toast.success('Welcome back! 🚀')
       navigate('/dashboard')
     } catch (err) {
@@ -150,7 +151,7 @@ export default function Login() {
                     <input type="checkbox" className="accent-[#2E9BDA] w-4 h-4" />
                     Remember me
                   </label>
-                  <Link to="/forgot-password" university className="text-[#2E9BDA] hover:underline font-medium">
+                  <Link to="/forgot-password" className="text-[#2E9BDA] hover:underline font-medium">
                     Forgot Password?
                   </Link>
                 </div>

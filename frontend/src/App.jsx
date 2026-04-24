@@ -18,7 +18,7 @@ import LiveInterview      from './pages/LiveInterview'
 import LiveInterviewV2    from './pages/LiveInterviewV2'
 import Gamification       from './pages/Gamification'
 import InterviewAnalytics from './pages/InterviewAnalytics'
-
+import RecruiterDashboard from './pages/RecruiterDashboard'
 // ── Loading spinner ─────────────────────────────────────────────────────────
 function Loader() {
   return (
@@ -108,10 +108,10 @@ export default function App() {
 
             {/* Gamification */}
             <Route path="gamification"         element={<Gamification />} />
+                      {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="recruiter" element={<RecruiterDashboard />}/>
           </Route>
-
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
