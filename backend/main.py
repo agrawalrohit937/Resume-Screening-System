@@ -67,7 +67,7 @@ def create_application() -> FastAPI:
             "http://127.0.0.1:5173",
             "https://resume-screening-system-lyart.vercel.app",
         ],
-        allow_credentials=false,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
