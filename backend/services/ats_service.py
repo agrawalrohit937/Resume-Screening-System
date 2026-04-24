@@ -1,6 +1,6 @@
 """
 ATS Service — Hybrid TF-IDF + BERT scoring engine
-final_score = 0.6 * BERT + 0.4 * TF-IDF
+final_score = 0.75 * BERT + 0.25 * TF-IDF
 """
 
 import time
@@ -31,7 +31,7 @@ def _get_bert_model() -> SentenceTransformer:
     if _bert_model is None:
         logger.info("Loading BERT model", model=settings.BERT_MODEL_NAME)
         _bert_model = SentenceTransformer(settings.BERT_MODEL_NAME)
-        logger.info("BERT model loaded ✅")
+        logger.info("BERT model loaded ------")
     return _bert_model
 
 

@@ -14,6 +14,7 @@ All endpoints require recruiter or admin role.
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from annotated_types import doc
 import structlog
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -27,7 +28,7 @@ from repositories.resume_repo import ResumeRepository
 from services.ats_service import ATSService
 from services.github_service import GitHubService
 from models.resume_model import ResumeModel
-
+from fastapi.responses import RedirectResponse
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -63,22 +64,36 @@ async def search_candidates(
     Returns ranked candidate list with enriched profile data.
     Expensive for large datasets — results are computed on-the-fly (no caching).
     """
-    # Fetch all parsed resumes from DB
+    # Fetch parsed resumes from DB
     cursor = resume_repo.collection.find(
-        {"status": "parsed"},
-        limit=200,
+        {
+            "status": "parsed",
+            "is_primary": True   # ONLY latest resumes
+        },
+        limit=min(payload.max_results * 5, 100)
     )
-    raw_resumes = await cursor.to_list(length=200)
+    raw_resumes = await cursor.to_list(length=min(payload.max_results * 5, 100)) # fetch into memory for processing   
 
     candidates = []
+    seen_users = set()
     for doc in raw_resumes:
+        user_id = doc.get("user_id")
+        # 🚨 Skip duplicate users
+        if user_id in seen_users:
+            continue
+        seen_users.add(user_id)
         doc["_id"] = str(doc["_id"])
         # Skip resumes with no parsed text
-        if not doc.get("parsed_data") or not doc.get("raw_text"):
-            continue
         parsed = doc.get("parsed_data", {})
+
+        if not parsed or not parsed.get("raw_text"):
+            continue
+
         skills = parsed.get("technical_skills", []) or parsed.get("skills", [])
-        resume_obj = ResumeModel(**doc)
+        try:
+            resume_obj = ResumeModel(**doc)
+        except Exception:
+            continue
 
         # Score against JD using ATS service
         try:
@@ -97,6 +112,8 @@ async def search_candidates(
         tfidf_score  = score_result.get("tfidf_score", 0.0)
         matched      = score_result.get("matched_skills", [])
         missing      = score_result.get("missing_skills",  [])
+        skill_boost = len(matched) / max(len(payload.required_skills), 1)
+        final_score += 0.1 * skill_boost
         recommendation = _label(final_score)
 
         if final_score < payload.min_score:
@@ -112,38 +129,35 @@ async def search_candidates(
         except Exception:
             pass
 
-        github_username = parsed.get("github_username") or _extract_github(doc.get("raw_text", ""))
+        contact = parsed.get("contact_info", {})
+
+        github_username = parsed.get("github_username") or _extract_github(parsed.get("raw_text", ""))
 
         candidates.append({
-            "resume_id":      doc["_id"],
-            "user_id":        user_id,
-            "filename":       doc.get("original_filename", "resume.pdf"),
-            "file_type":      doc.get("file_type", "pdf"),
-            "file_path":      doc.get("file_path", ""),
+            "resume_id": doc["_id"],
+            "user_id": user_id,
+            "filename": doc.get("original_filename", "resume.pdf"),
+            "file_type": doc.get("file_type", "pdf"),
+            "file_url": doc.get("file_url") or None,
 
-            # Candidate identity
-            "name":           parsed.get("name") or (user_doc.get("full_name") if user_doc else ""),
-            "email":          parsed.get("email") or (user_doc.get("email") if user_doc else ""),
-            "phone":          parsed.get("phone", ""),
-            "location":       parsed.get("location", ""),
-            "linkedin":       parsed.get("linkedin_url", ""),
+            "name": parsed.get("full_name") or (user_doc.get("full_name") if user_doc else ""),
+            "email": user_doc.get("email") if user_doc else contact.get("email", ""),
+            "phone": contact.get("phone", ""),
+            "linkedin": contact.get("linkedin", ""),
+            "location": parsed.get("location", ""),
             "github_username": github_username,
             "experience_years": parsed.get("total_experience_years", 0),
-            "education":      (parsed.get("education") or [{}])[0].get("degree", "") if parsed.get("education") else "",
 
-            # Skills
-            "skills":         skills[:20],
+            "skills": skills[:20],
             "matched_skills": matched[:15],
             "missing_skills": missing[:10],
 
-            # Scores
-            "final_score":    round(final_score, 3),
-            "bert_score":     round(bert_score, 3),
-            "tfidf_score":    round(tfidf_score, 3),
+            "final_score": round(final_score, 3),
+            "bert_score": round(bert_score, 3),
+            "tfidf_score": round(tfidf_score, 3),
             "recommendation": recommendation,
-            "keyword_match_rate": score_result.get("keyword_match_rate", 0.0),
 
-            "uploaded_at":    doc.get("created_at", ""),
+            "uploaded_at": doc.get("created_at", ""),
         })
 
     # Sort by score descending
@@ -192,52 +206,62 @@ async def get_candidate_detail(
         pass
 
     parsed = doc.get("parsed_data", {}) or {}
+    contact = parsed.get("contact_info", {})
     return {
         "resume_id":    doc["_id"],
         "filename":     doc.get("original_filename"),
         "file_type":    doc.get("file_type"),
+        "file_url": doc.get("file_url"),
         "parsed_data":  parsed,
         "candidate": {
-            "name":     parsed.get("name") or (user_doc.get("full_name") if user_doc else ""),
-            "email":    parsed.get("email") or (user_doc.get("email") if user_doc else ""),
-            "phone":    parsed.get("phone", ""),
+
+            "name": parsed.get("full_name") or (user_doc.get("full_name") if user_doc else ""),
+            "email": user_doc.get("email") if user_doc else contact.get("email", ""),
+            "phone": contact.get("phone", ""),
+            "linkedin": contact.get("linkedin", ""),
             "location": parsed.get("location", ""),
-            "linkedin": parsed.get("linkedin_url", ""),
-            "github_username": parsed.get("github_username") or _extract_github(doc.get("raw_text", "")),
+            "github_username": parsed.get("github_username") or _extract_github(parsed.get("raw_text", "")),
         },
         "uploaded_at":  doc.get("created_at"),
     }
 
-
-# ── GET /recruiter/resume/{resume_id}/download ────────────────────────────────
 @router.get("/resume/{resume_id}/download")
 async def download_resume(
     resume_id: str,
-    user:      UserModel = Depends(get_recruiter_or_admin),
+    user: UserModel = Depends(get_recruiter_or_admin),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
 ):
-    """Download a candidate's original resume file."""
     try:
         doc = await resume_repo.collection.find_one({"_id": ObjectId(resume_id)})
     except Exception:
         raise HTTPException(status_code=404, detail="Resume not found")
+
     if not doc:
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    file_path = doc.get("file_path", "")
-    if not file_path:
-        raise HTTPException(status_code=404, detail="Resume file not available")
+    # 1. Try ATS enhanced resume
+    ats_url = doc.get("file_url")
 
-    import os
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Resume file not found on disk")
+    if ats_url:
+        return RedirectResponse(url=ats_url)
 
-    return FileResponse(
-        path=file_path,
-        filename=doc.get("original_filename", "resume.pdf"),
-        media_type="application/octet-stream",
-    )
+    # 2. Fallback → original resume
+    original_path = doc.get("storage_path")
 
+    if original_path:
+        import os
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        file_path = os.path.join(BASE_DIR, original_path)
+
+        if os.path.exists(file_path):
+            return FileResponse(
+                path=file_path,
+                filename=doc.get("original_filename", "resume.pdf"),
+                media_type="application/octet-stream",
+            )
+
+    # nothing available
+    raise HTTPException(status_code=404, detail="No resume available")
 
 # ── POST /recruiter/github-preview ────────────────────────────────────────────
 @router.post("/github-preview")

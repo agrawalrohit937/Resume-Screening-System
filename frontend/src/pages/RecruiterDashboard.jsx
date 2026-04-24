@@ -204,13 +204,32 @@ function CandidateCard({ c, idx }) {
 
   const download = async () => {
     try {
-      toast('Generating PDF…', { icon:'⏳' })
-      const { data } = await generatePDF({ resume_id: c.resume_id, template:'ats_friendly' })
-      if (data.download_url) window.open(data.download_url, '_blank')
-      else toast.error('PDF not available for this resume')
-    } catch { toast.error('Download failed') }
-  }
+      // if already URL hai → direct open
+      if (c.file_url) {
+        window.open(c.file_url, '_blank')
+        return
+      }
 
+      // warna generate karo
+      toast('Generating PDF…', { icon: '⏳' })
+
+      const { data } = await generatePDF({
+        resume_id: c.resume_id,
+        template: 'modern'
+      })
+
+      const url = data.pdf_url || data.download_url
+
+      if (url) {
+        window.open(url, '_blank')
+      } else {
+        toast.error('PDF not available')
+      }
+
+    } catch {
+      toast.error('Download failed')
+    }
+  }
   return (
     <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }}
       transition={{ delay: idx * 0.04, duration:0.35, ease:[0.16,1,0.3,1] }}
@@ -591,7 +610,7 @@ export default function RecruiterDashboard() {
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
               {summary && (
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                  {[['Total', data.total_candidates,'#6366F1','#EFF6FF'],
+                  {[['Total', candidates.length,'#6366F1','#EFF6FF'],
                     ['Strong', summary.strong_matches,'#10B981','#ECFDF5'],
                     ['Good',   summary.good_matches,'#6366F1','#EFF6FF'],
                     ['Weak',   summary.poor_matches,'#F43F5E','#FFF1F2'],

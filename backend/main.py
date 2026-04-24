@@ -94,7 +94,6 @@ def create_application() -> FastAPI:
 
     # ── Health (no prefix) ────────────────────────────────────────────────────
     app.include_router(health.router, tags=["Health"])
-
     # ── Auth & Core ───────────────────────────────────────────────────────────
     app.include_router(auth.router,         prefix=f"{p}/auth",        tags=["Auth"])
     app.include_router(resume.router,       prefix=f"{p}/resume",      tags=["Resume"])
@@ -108,19 +107,10 @@ def create_application() -> FastAPI:
     app.include_router(analytics.router,    prefix=f"{p}/analytics",   tags=["Analytics"])
     app.include_router(fake_detect_router,  prefix=f"{p}/fake-detect", tags=["Fake Detect"])
     app.include_router(github.router,       prefix=f"{p}/github",      tags=["GitHub"])
-
-    # ── Interview (existing + AI upgrade, SAME prefix) ────────────────────────
-    # existing static interview routes
-    # app.include_router(interview.router,      prefix=f"{p}/interview",   tags=["Interview"])
-    # AI-powered interview routes (generate, feedback, WS, gamification)
-    # app.include_router(interview_ai_router,   prefix=f"{p}/interview",   tags=["AI Interview"])
     app.include_router(interview.router, prefix=f"{p}/interview", tags=["Interview"])
-    # app.include_router(live_interview_router, prefix=f"{p}/live-interview", tags=["Live Interview"])
     app.include_router(interview_ai_router, prefix=f"{p}/interview", tags=["AI Interview"])
     app.include_router(live_interview_router, prefix=f"{p}/live-interview", tags=["Live Interview"])
-    # ── Interview Analytics ────────────────────────────────────────────────────
-    app.include_router(interview_analytics_router,
-                       prefix=f"{p}/interview-analytics", tags=["Interview Analytics"])
+    app.include_router(interview_analytics_router, prefix=f"{p}/interview-analytics", tags=["Interview Analytics"])
     app.include_router(recruiter_router, prefix="/api/v1/recruiter", tags=["Recruiter"])
 
     # ── Prometheus ────────────────────────────────────────────────────────────

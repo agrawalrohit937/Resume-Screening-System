@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Any
 import structlog
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
+from datetime import datetime, timezone
 
 logger = structlog.get_logger(__name__)
 
@@ -282,3 +283,16 @@ class GamificationService:
                 "top_badge": doc["badges"][-1] if doc.get("badges") else None,
             })
         return result
+    
+    async def mark_daily_activity(self, user_id: str):
+        now = datetime.now(timezone.utc)
+        profile = await self.get_profile(user_id)
+
+        # Update streak
+        streak_result = await self._update_streak(user_id, profile, now)
+
+        # Give daily points (only once per day)
+        if streak_result["new_streak"] == 1 or streak_result["streak_bonus"] > 0:
+            await self.award_points(user_id, "daily_practice", 25)
+
+        return streak_result

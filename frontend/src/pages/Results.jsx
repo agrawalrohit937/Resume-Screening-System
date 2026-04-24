@@ -533,67 +533,101 @@ const onResumeDrop = useCallback(async (accepted) => {
   }
 
   // ── Download PDF ──────────────────────────────────────────────────────────
-const handleDownloadPDF = async () => {
-  try {
-    setGeneratingPDF(true)
+// const handleDownloadPDF = async () => {
+//   try {
+//     setGeneratingPDF(true)
 
-    const resumeId = result?.resume_id || result?.id || '';
-    console.log('[PDF] Using resume_id:', resumeId, 'Full result:', result);
+//     const resumeId = result?.resume_id || result?.id || '';
+//     console.log('[PDF] Using resume_id:', resumeId, 'Full result:', result);
 
-    if (!resumeId) {
-      toast.error('No resume found. Please run analysis first.');
-      return;
+//     if (!resumeId) {
+//       toast.error('No resume found. Please run analysis first.');
+//       return;
+//     }
+
+//     // Generate PDF
+//     const res = await generatePDF({ resume_id: resumeId, template: "modern" });
+//     console.log('[PDF] SUCCESS response:', res.data);
+
+//     const downloadUrl = res.data.download_path;
+//     console.log('[PDF] Downloading via API:', downloadUrl);
+    
+//     // Fix double /api/v1 prefix (backend returns full path, api adds baseURL)
+//     const cleanUrl = downloadUrl.replace('/api/v1', '');
+//     console.log('[PDF] Clean URL:', cleanUrl);
+
+//     // Download with auth token via API
+//     const blobResponse = await api.get(cleanUrl, { 
+//       responseType: 'blob',
+//       timeout: 30000 
+//     });
+    const handleDownloadPDF = async () => {
+      try {
+        setGeneratingPDF(true)
+
+        const resumeId = result?.resume_id || result?.id
+
+        if (!resumeId) {
+          toast.error('No resume found')
+          return
+        }
+
+        const { data } = await generatePDF({
+          resume_id: resumeId,
+          template: "modern"
+        })
+
+        console.log("PDF URL:", data.pdf_url)
+
+        // 🔥 DIRECT OPEN (NO BLOB, NO DOWNLOAD API)
+        // window.open(data.pdf_url, "_blank")
+        window.open(data.pdf_url + "?fl_attachment=true", "_blank")
+
+        toast.success("✅ PDF opened successfully!")
+
+      } catch (err) {
+        console.error(err)
+
+        const detail = err.response?.data?.detail
+        toast.error(detail || "PDF generation failed")
+
+      } finally {
+        setGeneratingPDF(false)
+      }
     }
 
-    // Generate PDF
-    const res = await generatePDF({ resume_id: resumeId, template: "modern" });
-    console.log('[PDF] SUCCESS response:', res.data);
+//     // Create download link
+//     const blob = new Blob([blobResponse.data], { type: 'application/pdf' });
+//     const url = window.URL.createObjectURL(blob);
+//     const a = document.createElement('a');
+//     a.href = url;
+//     a.download = `enhanced-resume-${Date.now()}.pdf`;
+//     document.body.appendChild(a);
+//     a.click();
+//     window.URL.revokeObjectURL(url);
+//     document.body.removeChild(a);
 
-    const downloadUrl = res.data.download_path;
-    console.log('[PDF] Downloading via API:', downloadUrl);
+//     toast.success('✅ PDF downloaded!');
+//     console.log('[PDF] Download complete');
+
+//   } catch (err) {
+//     console.error('[PDF] FULL ERROR:', err);
+//     console.error('[PDF] Response:', err.response?.data);
     
-    // Fix double /api/v1 prefix (backend returns full path, api adds baseURL)
-    const cleanUrl = downloadUrl.replace('/api/v1', '');
-    console.log('[PDF] Clean URL:', cleanUrl);
-
-    // Download with auth token via API
-    const blobResponse = await api.get(cleanUrl, { 
-      responseType: 'blob',
-      timeout: 30000 
-    });
-
-    // Create download link
-    const blob = new Blob([blobResponse.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `enhanced-resume-${Date.now()}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-
-    toast.success('✅ PDF downloaded!');
-    console.log('[PDF] Download complete');
-
-  } catch (err) {
-    console.error('[PDF] FULL ERROR:', err);
-    console.error('[PDF] Response:', err.response?.data);
-    
-    const detail = err.response?.data?.detail;
-    if (detail === "Invalid or expired authentication credentials") {
-      toast.error('Session expired. Please login again.');
-      localStorage.clear();
-      window.location.href = '/login?expired=true';
-    } else if (detail?.includes('not found')) {
-      toast.error('Resume not found. Try re-uploading.');
-    } else {
-      toast.error(detail || 'PDF generation failed');
-    }
-  } finally {
-    setGeneratingPDF(false);
-  }
-}
+//     const detail = err.response?.data?.detail;
+//     if (detail === "Invalid or expired authentication credentials") {
+//       toast.error('Session expired. Please login again.');
+//       localStorage.clear();
+//       window.location.href = '/login?expired=true';
+//     } else if (detail?.includes('not found')) {
+//       toast.error('Resume not found. Try re-uploading.');
+//     } else {
+//       toast.error(detail || 'PDF generation failed');
+//     }
+//   } finally {
+//     setGeneratingPDF(false);
+//   }
+// }
 
   const rid = resumeId || savedResumes[0]?.id
   const TABS = ['Keywords', 'Skills', 'Roadmap & Resources']

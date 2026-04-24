@@ -87,6 +87,7 @@ class ResumeModel(BaseModel):
     file_type: str  # pdf | docx
     file_size_bytes: int
     storage_path: str
+    file_url: Optional[str] = None
     status: ResumeStatus = ResumeStatus.PENDING
     parsed_data: Optional[ParsedResumeData] = None
     parse_error: Optional[str] = None

@@ -21,7 +21,8 @@ export default function Login() {
   const onSubmit = async ({ email, password }) => {
     setLoading(true)
     try {
-      await login(email, password)
+      // Pass 'selectedRole' as the third argument here
+      await login(email, password, selectedRole) 
       toast.success('Welcome back! 🚀')
       navigate('/dashboard')
     } catch (err) {

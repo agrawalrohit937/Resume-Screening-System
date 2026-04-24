@@ -108,11 +108,10 @@ export default function App() {
 
             {/* Gamification */}
             <Route path="gamification"         element={<Gamification />} />
+                      {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="recruiter" element={<RecruiterDashboard />}/>
           </Route>
-
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          <Route path="recruiter" element={<RecruiterDashboard />}/>
         </Routes>
       </BrowserRouter>
     </AuthProvider>

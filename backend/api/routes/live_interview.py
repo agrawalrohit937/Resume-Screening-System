@@ -19,11 +19,19 @@ from api.deps import get_current_user, get_database
 from models.user_model import UserModel
 from services.live_interview_service import LiveInterviewService
 from services.evaluation_service import EvaluationService
+from services.gamification_service import GamificationService
+
+from config.db import get_database
+from fastapi import Depends
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 _eval_svc = EvaluationService()
+
+
+def get_gamification_service(db=Depends(get_database)) -> GamificationService:
+    return GamificationService(db)
 
 
 def get_svc(db=Depends(get_database)) -> LiveInterviewService:
@@ -66,6 +74,7 @@ async def create_session(
     payload: CreateSessionRequest,
     user:    UserModel = Depends(get_current_user),
     svc:     LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     data = await svc.create_session(
         user_id=str(user.id),
@@ -74,6 +83,8 @@ async def create_session(
         interview_type=payload.interview_type,
         num_questions=payload.num_questions,
     )
+    
+    await gamification.mark_daily_activity(str(user.id))
     return {"success": True, **data}
 
 
@@ -163,6 +174,7 @@ async def complete_session(
     payload:    CompleteSessionRequest,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     """Finalize session — compute aggregated stats + AI summary report."""
     session = await svc.get_session(session_id, str(user.id))
@@ -183,6 +195,13 @@ async def complete_session(
     avg_conf  = sum(conf) / len(conf)   if conf   else 0
     avg_clar  = sum(clar) / len(clar)   if clar   else 0
     avg_relev = sum(relev) / len(relev) if relev  else 0
+
+    questions_answered = len(answers)
+    await gamification.process_interview_result(
+        user_id=str(user.id),
+        interview_score=round(avg_score / 10.0, 2),
+        questions_answered=questions_answered,
+    )
 
     # Generate AI summary
     qa_pairs = [{"question": a["question_text"], "answer": a["user_answer"], "score": a.get("ai_score",0)} for a in answers]

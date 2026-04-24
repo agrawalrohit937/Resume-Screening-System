@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     ALLOWED_FILE_TYPES: List[str] = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     UPLOAD_DIR: str = "./uploads"
 
+    # ── FTP (Hostinger) ───────────────────────────────────────────────────────
+    FTP_HOST: str
+    FTP_USERNAME: str
+    FTP_PASSWORD: str
+    FTP_PORT: int = 21
+    FTP_BASE_URL: str
+    # CLOUDINARY_CLOUD_NAME: str
+    # CLOUDINARY_API_KEY: str
+    # CLOUDINARY_API_SECRET: str
+
     # ── NLP / ML ──────────────────────────────────────────────────────────────
     BERT_MODEL_NAME: str = "all-MiniLM-L6-v2"
     BERT_SCORE_WEIGHT: float = 0.6

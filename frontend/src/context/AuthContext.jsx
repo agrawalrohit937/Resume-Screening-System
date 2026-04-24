@@ -58,10 +58,10 @@ export function AuthProvider({ children }) {
   }, [])
 
   // 🔐 LOGIN ✅ FIXED
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password })
+  const login = async (email, password, role = 'candidate') => {
+    // Send the role to the backend so it knows which mode is being accessed
+    const { data } = await api.post('/auth/login', { email, password, role })
 
-    // ✅ correct tokens
     localStorage.setItem("access_token", data.access_token)
     localStorage.setItem("refresh_token", data.refresh_token)
 

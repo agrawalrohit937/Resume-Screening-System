@@ -231,7 +231,7 @@ docker compose down
 ## 🧠 ATS Scoring Formula
 
 ```
-final_score = 0.6 × BERT_similarity + 0.4 × TF-IDF_similarity
+final_score = 0.75 × BERT_similarity + 0.25 × TF-IDF_similarity
 ```
 
 **Component Breakdown:**
