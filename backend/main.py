@@ -60,12 +60,12 @@ def create_application() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        # allow_origins=[
-        #     "http://localhost:5173",
-        #     "http://127.0.0.1:5173",
-        #     "https://resume-screening-system-lyart.vercel.app",
-        # ],
-        allow_origins=["*"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://resume-screening-system-lyart.vercel.app",
+            "https://resume-screening-system-hb2d.onrender.com"
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -124,5 +124,13 @@ app = create_application()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000,
-                reload=settings.DEBUG, workers=1 if settings.DEBUG else 4)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=port,
+        reload=settings.DEBUG, 
+        workers=1 if settings.DEBUG else 4
+    )
