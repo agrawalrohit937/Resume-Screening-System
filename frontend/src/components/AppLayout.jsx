@@ -38,8 +38,8 @@ function Topbar({ collapsed, onMenuToggle }) {
           </svg>
         </button>
         <motion.div key={pathname} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 14, color: '#0F172A', lineHeight: 1.2 }}>{meta.title}</p>
-          {meta.sub && <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#94A3B8', letterSpacing: '0.05em' }}>{meta.sub}</p>}
+          <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 14, color: '#0F172A', lineHeight: 1.2 }}>{meta.title}</p>
+          {meta.sub && <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, color: '#94A3B8', letterSpacing: '0.05em', fontWeight: 500 }}>{meta.sub}</p>}
         </motion.div>
       </div>
 
@@ -47,7 +47,7 @@ function Topbar({ collapsed, onMenuToggle }) {
         {/* Online pill */}
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#059669', letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase' }}>Online</span>
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, color: '#059669', letterSpacing: '0.08em', fontWeight: 600, textTransform: 'uppercase' }}>Online</span>
         </div>
 
         {/* User badge */}
@@ -58,7 +58,7 @@ function Topbar({ collapsed, onMenuToggle }) {
           </div>
           <div className="hidden md:block">
             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: '#1E293B', lineHeight: 1.2 }}>{user?.full_name?.split(' ')[0]}</p>
-            <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#94A3B8', textTransform: 'capitalize' }}>{user?.role}</p>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, color: '#94A3B8', textTransform: 'capitalize', fontWeight: 500 }}>{user?.role}</p>
           </div>
         </div>
       </div>

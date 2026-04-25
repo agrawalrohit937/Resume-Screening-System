@@ -57,7 +57,7 @@ export function PageHeader({ title, subtitle, badge, action, gradient }) {
                   <span className="font-mono text-white/70 text-xs tracking-widest uppercase">{badge}</span>
                 </div>
               )}
-              <h1 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 30, color: 'white', lineHeight: 1.2, marginBottom: 6 }}>{title}</h1>
+              <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 30, color: 'white', lineHeight: 1.2, marginBottom: 6 }}>{title}</h1>
               {subtitle && <p className="text-white/70 text-sm font-body">{subtitle}</p>}
             </div>
             {action && <div>{action}</div>}
@@ -67,7 +67,7 @@ export function PageHeader({ title, subtitle, badge, action, gradient }) {
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
             {badge && <p className="text-xs font-mono text-indigo-500 uppercase tracking-widest mb-1">{badge}</p>}
-            <h1 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 26, color: '#0F172A', lineHeight: 1.2 }}>{title}</h1>
+            <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 26, color: '#0F172A', lineHeight: 1.2 }}>{title}</h1>
             {subtitle && <p className="text-slate-400 text-sm font-body mt-1">{subtitle}</p>}
           </div>
           {action && <div>{action}</div>}
@@ -97,7 +97,7 @@ export function StatCard({ icon, label, value, sub, color, bg, trend, delay = 0 
           {icon}
         </div>
         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono mb-1">{label}</p>
-        <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 32, color, lineHeight: 1 }}>{value}</p>
+        <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 32, color, lineHeight: 1 }}>{value}</p>
         {sub && <p className="text-xs text-slate-400 font-body mt-1.5">{sub}</p>}
         {trend && (
           <div className={`flex items-center gap-1 mt-2 text-xs font-mono font-bold ${trend.up ? 'text-emerald-600' : 'text-rose-500'}`}>
@@ -142,7 +142,7 @@ export function EmptyState({ icon = '📭', title, description, action }) {
         {icon}
       </motion.div>
       <div>
-        <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 18, color: '#1E293B', marginBottom: 6 }}>{title}</p>
+        <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 18, color: '#1E293B', marginBottom: 6 }}>{title}</p>
         {description && <p className="text-sm text-slate-400 font-body max-w-xs">{description}</p>}
       </div>
       {action && <div className="mt-2">{action}</div>}

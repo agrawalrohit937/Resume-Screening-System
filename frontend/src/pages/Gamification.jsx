@@ -36,7 +36,7 @@ function LevelBar({ level_info }) {
         <div className="flex items-center gap-2">
           <span className="text-2xl">{icon}</span>
           <div>
-            <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>{name}</p>
+            <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>{name}</p>
             <p className="text-xs font-mono text-slate-400">Level {level}</p>
           </div>
         </div>
@@ -99,7 +99,7 @@ export default function Gamification() {
         <div className="relative flex items-center justify-between flex-wrap gap-5">
           <div>
             <p className="font-mono text-indigo-300 text-xs tracking-widest uppercase mb-2">🏆 Career Achievements</p>
-            <h1 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 32, color: 'white', lineHeight: 1.2, marginBottom: 8 }}>
+            <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 32, color: 'white', lineHeight: 1.2, marginBottom: 8 }}>
               Your Rewards Hub
             </h1>
             <p className="text-indigo-200 text-sm font-body">Track points, unlock badges, climb the leaderboard</p>
@@ -107,13 +107,13 @@ export default function Gamification() {
           {profile && (
             <div className="flex items-center gap-5">
               <div className="text-center">
-                <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 36, color: '#FCD34D' }}>
+                <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 36, color: '#FCD34D' }}>
                   {(profile.total_points || 0).toLocaleString()}
                 </p>
                 <p className="text-indigo-300 text-xs font-mono">Total Points</p>
               </div>
               <div className="text-center">
-                <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 36, color: '#FB923C' }}>
+                <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 36, color: '#FB923C' }}>
                   {profile.current_streak || 0}🔥
                 </p>
                 <p className="text-indigo-300 text-xs font-mono">Day Streak</p>
@@ -139,7 +139,7 @@ export default function Gamification() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Level & Progress */}
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 17, color: '#1E293B' }}>Level Progress</h3>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 17, color: '#1E293B' }}>Level Progress</h3>
               <LevelBar level_info={profile.level_info}/>
               <div className="divider"/>
               <div>
@@ -147,13 +147,13 @@ export default function Gamification() {
                 <StreakCalendar streak={profile.current_streak || 0}/>
                 <div className="flex items-center gap-4 mt-3">
                   <div>
-                    <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 18, color: '#F59E0B' }}>
+                    <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 18, color: '#F59E0B' }}>
                       {profile.current_streak || 0} days
                     </p>
                     <p className="text-xs text-slate-400 font-mono">Current streak</p>
                   </div>
                   <div>
-                    <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 18, color: '#6366F1' }}>
+                    <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 18, color: '#6366F1' }}>
                       {profile.longest_streak || 0} days
                     </p>
                     <p className="text-xs text-slate-400 font-mono">Best streak</p>
@@ -178,7 +178,7 @@ export default function Gamification() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-400 font-mono">{label}</p>
-                    <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 20, color }}>{val}</p>
+                    <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 20, color }}>{val}</p>
                   </div>
                 </motion.div>
               ))}
@@ -188,7 +188,7 @@ export default function Gamification() {
           {/* Recent badges */}
           {profile.badges?.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 17, color: '#1E293B', marginBottom: 16 }}>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 17, color: '#1E293B', marginBottom: 16 }}>
                 Recent Badges
               </h3>
               <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
@@ -202,7 +202,7 @@ export default function Gamification() {
           {/* Points history */}
           {profile.recent_points?.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 17, color: '#1E293B', marginBottom: 12 }}>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 17, color: '#1E293B', marginBottom: 12 }}>
                 Recent Points Activity
               </h3>
               <div className="space-y-2">
@@ -230,7 +230,7 @@ export default function Gamification() {
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 20, color: '#1E293B' }}>Badge Collection</h3>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 20, color: '#1E293B' }}>Badge Collection</h3>
               <p className="text-sm text-slate-400 font-body mt-0.5">
                 {earnedBadgeIds.size} / {badgeCatalog.length} earned
               </p>
@@ -272,13 +272,13 @@ export default function Gamification() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 20, color: '#1E293B' }}>Global Leaderboard</h3>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 20, color: '#1E293B' }}>Global Leaderboard</h3>
               <p className="text-sm text-slate-400 font-body mt-0.5">Top performers by total points</p>
             </div>
             {myRank && (
               <div className="px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-xl">
                 <p className="text-xs font-mono text-indigo-500 uppercase tracking-wide">Your Rank</p>
-                <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 22, color: '#4F46E5', lineHeight: 1 }}>#{myRank}</p>
+                <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 22, color: '#4F46E5', lineHeight: 1 }}>#{myRank}</p>
               </div>
             )}
           </div>

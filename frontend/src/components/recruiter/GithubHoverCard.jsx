@@ -48,7 +48,7 @@ function ScoreRing({ score, size = 44, stroke = 3.5 }) {
           transition={{ duration: 1.2, ease: 'easeOut' }}
         />
       </svg>
-      <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: size * 0.28, color }}>
+      <span style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: size * 0.28, color }}>
         {p}
       </span>
     </div>
@@ -268,7 +268,7 @@ export default function GithubHoverCard({ username }) {
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
-                      fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: '#F8FAFC',
+                      fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#F8FAFC',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3
                     }}>
                       {profile.name || username}

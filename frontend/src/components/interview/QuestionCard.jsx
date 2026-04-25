@@ -82,7 +82,7 @@ export default function QuestionCard({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
           style={{
-            fontFamily: "'Sora', sans-serif",
+            fontFamily: "'Poppins', sans-serif",
             fontWeight: 600,
             fontSize: 19,
             color: '#0F172A',

@@ -87,7 +87,7 @@ function KeywordsTab({ result }) {
       <div style={{ padding:'16px 20px', borderRadius:16, background:'#F8FAFC', border:'1px solid #E2E8F0' }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
           <span style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:600, color:'#475569' }}>Keyword Match Rate</span>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontSize:16, fontWeight:800, color: scoreColor(rate) }}>{rate}%</span>
+          <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:16, fontWeight:800, color: scoreColor(rate) }}>{rate}%</span>
         </div>
         <AnimatedBar value={rate} color={scoreColor(rate)} height={10}/>
         <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', marginTop:8 }}>
@@ -185,7 +185,7 @@ function SkillsTab({ result }) {
               return (
                 <div key={i} style={{ padding:'12px 14px', borderRadius:14, background:impCfg.bg, border:`1px solid ${impCfg.border}` }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:5 }}>
-                    <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#1E293B', textTransform:'capitalize' }}>{g.skill}</span>
+                    <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#1E293B', textTransform:'capitalize' }}>{g.skill}</span>
                     <span style={{ fontSize:10, fontWeight:600, padding:'2px 7px', borderRadius:20,
                       background:`${impCfg.text}18`, color:impCfg.text, fontFamily:"'Inter',sans-serif",
                       whiteSpace:'nowrap', marginLeft:4 }}>{impCfg.badge}</span>
@@ -290,7 +290,7 @@ function RoadmapTab({ result }) {
                 <div key={skill} style={{ padding:'14px 16px', borderRadius:14, background:'white', border:'1px solid #E2E8F0', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
                     <span style={{ width:6, height:6, borderRadius:'50%', background:'#6366F1', display:'inline-block' }}/>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontSize:14, fontWeight:700, color:'#1E293B', textTransform:'capitalize' }}>{skill}</p>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:'#1E293B', textTransform:'capitalize' }}>{skill}</p>
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {tutorials.map((t, ti) => (
@@ -352,7 +352,7 @@ function ScoreHero({ result }) {
       <div style={{ flex:1, minWidth:180 }}>
         <span style={{ display:'inline-block', padding:'4px 14px', borderRadius:20, marginBottom:10,
           background:`${cfg.text}12`, border:`1px solid ${cfg.border}`,
-          fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:cfg.text }}>
+          fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:cfg.text }}>
           {cfg.label}
         </span>
         <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#374151', lineHeight:1.65, marginBottom:14 }}>
@@ -368,7 +368,7 @@ function ScoreHero({ result }) {
               border:'1px solid rgba(0,0,0,0.07)', textAlign:'center', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
               <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#94A3B8', marginBottom:2,
                 textTransform:'uppercase', letterSpacing:'0.08em' }}>{l}</p>
-              <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:18, color:c }}>{v}%</p>
+              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color:c }}>{v}%</p>
             </div>
           ))}
         </div>
@@ -595,7 +595,7 @@ const onResumeDrop = useCallback(async (accepted) => {
 
       {/* ── Page Header ── */}
       <motion.div initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }}>
-        <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:26, color:'#0F172A', marginBottom:5 }}>
+        <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:26, color:'#0F172A', marginBottom:5 }}>
           ATS Resume Analyzer
         </h1>
         <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'#64748B' }}>
@@ -615,7 +615,7 @@ const onResumeDrop = useCallback(async (accepted) => {
           <div style={{ width:32, height:32, borderRadius:10, background:'#EFF6FF', border:'1px solid #C7D2FE',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>📋</div>
           <div>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A' }}>Analyze Your Resume</p>
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A' }}>Analyze Your Resume</p>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8' }}>Fill all sections · analysis takes ~10 seconds</p>
           </div>
         </div>
@@ -653,7 +653,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                           style={{ transition:'stroke-dashoffset 0.3s ease' }}/>
                       </svg>
                       <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-                        fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:13, color:'#6366F1' }}>{uploadProgress}%</div>
+                        fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:13, color:'#6366F1' }}>{uploadProgress}%</div>
                     </div>
                     <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:600, color:'#374151' }}>
                       {uploadProgress === 100 ? 'AI Parsing...' : 'Uploading...'}
@@ -662,7 +662,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                 ) : uploadDone ? (
                   <div>
                     <div style={{ fontSize:28, marginBottom:6 }}>✅</div>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>
                       {resumeFile?.name || savedResumes.find(r=>r.id===resumeId)?.original_filename || 'Resume ready'}
                     </p>
                     <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8', marginTop:3 }}>Parsed · Click to replace</p>
@@ -670,7 +670,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                 ) : (
                   <div>
                     <div style={{ fontSize:28, marginBottom:8 }}>📄</div>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
                       {resumeDrag ? 'Drop it here' : 'Drop PDF / DOCX here'}
                     </p>
                     <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8', marginTop:3 }}>or click to browse · max 10MB</p>
@@ -743,13 +743,13 @@ const onResumeDrop = useCallback(async (accepted) => {
                   {jdFile ? (
                     <>
                       <div style={{ fontSize:28 }}>✅</div>
-                      <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
+                      <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
                       <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8' }}>Click to replace</p>
                     </>
                   ) : (
                     <>
                       <div style={{ fontSize:28 }}>📎</div>
-                      <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
+                      <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
                         {jdDrag ? 'Drop JD file' : 'Upload JD Document'}
                       </p>
                       <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8' }}>PDF · DOCX · TXT</p>
@@ -800,7 +800,7 @@ const onResumeDrop = useCallback(async (accepted) => {
             whileTap={{ scale: analyzing ? 1 : 0.99 }}
             style={{
               width:'100%', padding:'14px 0', borderRadius:14, border:'none', cursor: analyzing ? 'not-allowed' : 'pointer',
-              fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'white',
+              fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'white',
               background: analyzing ? '#94A3B8' : 'linear-gradient(135deg,#1565C0 0%,#1976D2 50%,#2196F3 100%)',
               boxShadow: analyzing ? 'none' : '0 4px 16px rgba(21,101,192,0.38)',
               transition:'background 0.2s, box-shadow 0.2s',
@@ -841,7 +841,7 @@ const onResumeDrop = useCallback(async (accepted) => {
               <div style={{ position:'absolute', inset:16, borderRadius:'50%', border:'2px solid #FFFBEB', borderTopColor:'#F59E0B' }} className="animate-spin" style2={{ animationDuration:'2s' }}/>
             </div>
             <div>
-              <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>
+              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>
                 AI is scoring your resume
               </p>
               <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>
@@ -902,7 +902,7 @@ const onResumeDrop = useCallback(async (accepted) => {
               style={{ padding:'18px 24px', borderRadius:18, background:'linear-gradient(135deg,#EFF6FF 0%,#F0FDF4 100%)',
                 border:'1.5px solid #BFDBFE', display:'flex', flexWrap:'wrap', alignItems:'center', gap:16 }}>
               <div style={{ flex:1, minWidth:200 }}>
-                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#1E40AF', marginBottom:4 }}>
+                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#1E40AF', marginBottom:4 }}>
                   🎯 Ready to Test Your Skills?
                 </p>
                 <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#64748B' }}>
@@ -920,7 +920,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                   })}
                   style={{
                     padding:'11px 20px', borderRadius:12, border:'none', cursor:'pointer',
-                    fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'white',
+                    fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'white',
                     background:'linear-gradient(135deg,#1565C0,#2196F3)',
                     boxShadow:'0 4px 14px rgba(21,101,192,0.35)', transition:'all 0.2s',
                   }}
@@ -939,7 +939,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                   })}
                   style={{
                     padding:'11px 20px', borderRadius:12, border:'1.5px solid #1565C0', cursor:'pointer',
-                    fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#1565C0',
+                    fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#1565C0',
                     background:'white', transition:'all 0.2s',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background='#EFF6FF'; e.currentTarget.style.transform='scale(1.03)' }}
@@ -972,7 +972,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                 <div style={{ width:34, height:34, borderRadius:10, background:'#FEF3C7', border:'1px solid #FDE68A',
                   display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>✨</div>
                 <div>
-                  <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#92400E' }}>
+                  <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#92400E' }}>
                     AI Resume Enhancer
                   </p>
                   <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#B45309' }}>
@@ -984,7 +984,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                 <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:12,
                   background:'#ECFDF5', border:'1px solid #A7F3D0' }}>
                   <span style={{ fontSize:14 }}>✅</span>
-                  <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'#065F46' }}>
+                  <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#065F46' }}>
                     +{Math.round((enhanceResult.ats_improvement_estimate||0)*100)}% estimated improvement
                   </span>
                 </div>
@@ -1061,7 +1061,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                   whileTap={{ scale: enhancing ? 1 : 0.98 }}
                   style={{
                     padding:'13px 0', borderRadius:14, border:'none', cursor: enhancing ? 'not-allowed' : 'pointer',
-                    fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'white',
+                    fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'white',
                     background: enhancing ? '#94A3B8' : 'linear-gradient(135deg,#D97706,#F59E0B)',
                     boxShadow: enhancing ? 'none' : '0 4px 14px rgba(217,119,6,0.35)',
                     transition:'all 0.2s',
@@ -1085,7 +1085,7 @@ const onResumeDrop = useCallback(async (accepted) => {
                   style={{
                     padding:'13px 0', borderRadius:14, border:'none', 
                     cursor: generatingPDF || !result ? 'not-allowed' : 'pointer',
-                    fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'white',
+                    fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'white',
                     background: generatingPDF || !result ? '#94A3B8' : 'linear-gradient(135deg,#065F46,#059669)',
                     boxShadow: (generatingPDF || !result) ? 'none' : '0 4px 14px rgba(5,150,105,0.35)',
                     transition:'all 0.2s',

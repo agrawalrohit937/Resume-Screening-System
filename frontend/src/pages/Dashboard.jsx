@@ -45,7 +45,7 @@ function StatCard({ label, value, suffix = '', icon, delay = 0 }) {
         color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
         {label}
       </p>
-      <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 28,
+      <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 28,
         color: '#0F172A', margin: 0, lineHeight: 1 }}>
         {typeof value === 'number'
           ? <><AnimatedNumber value={value} suffix={suffix}/></>
@@ -79,7 +79,7 @@ function RecommendCard({ title, desc, cta, to, color, bg, border, icon, delay })
       }}/>
       <div style={{ fontSize: 36, lineHeight: 1 }}>{icon}</div>
       <div style={{ flex: 1 }}>
-        <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 15,
+        <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15,
           color: '#0F172A', margin: '0 0 6px' }}>{title}</p>
         <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B',
           margin: 0, lineHeight: 1.6 }}>{desc}</p>
@@ -87,7 +87,7 @@ function RecommendCard({ title, desc, cta, to, color, bg, border, icon, delay })
       <Link to={to} style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         padding: '8px 18px', borderRadius: 10, background: color, color: 'white',
-        fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600,
+        fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 600,
         textDecoration: 'none', border: 'none', cursor: 'pointer',
         boxShadow: `0 2px 8px ${color}44`, alignSelf: 'flex-start',
       }}>
@@ -152,7 +152,7 @@ function JourneyStep({ num, title, desc, active, done }) {
         }
       </div>
       <div style={{ textAlign: 'center' }}>
-        <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 12,
+        <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 12,
           color: active || done ? '#0F172A' : '#94A3B8', margin: '0 0 2px' }}>{num}. {title}</p>
         <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: '#94A3B8', margin: 0 }}>{desc}</p>
       </div>
@@ -179,7 +179,7 @@ function ResourceCard({ tag, tagColor, tagBg, time, title, desc, delay }) {
         }}>{tag}</span>
         <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: '#94A3B8' }}>{time} read</span>
       </div>
-      <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 14,
+      <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 14,
         color: '#0F172A', margin: '0 0 8px', lineHeight: 1.35 }}>{title}</p>
       <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#64748B',
         margin: 0, lineHeight: 1.6 }}>{desc}</p>
@@ -265,7 +265,7 @@ export default function Dashboard() {
                 Career Intelligence Active
               </span>
             </div>
-            <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 32,
+            <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 32,
               color: 'white', margin: '0 0 10px', lineHeight: 1.2 }}>
               {greeting}, {firstName} 👋
             </h2>
@@ -278,7 +278,7 @@ export default function Dashboard() {
               <Link to="/upload" style={{
                 padding: '10px 22px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.15)', color: 'white',
-                fontFamily: "'Sora',sans-serif", fontWeight: 600, fontSize: 13,
+                fontFamily: "'Poppins',sans-serif", fontWeight: 600, fontSize: 13,
                 textDecoration: 'none', border: '1px solid rgba(255,255,255,0.25)',
                 backdropFilter: 'blur(8px)', display: 'inline-flex', alignItems: 'center', gap: 7,
               }}>
@@ -287,7 +287,7 @@ export default function Dashboard() {
               <Link to="/results" style={{
                 padding: '10px 22px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.08)', color: BLUE[200],
-                fontFamily: "'Sora',sans-serif", fontWeight: 600, fontSize: 13,
+                fontFamily: "'Poppins',sans-serif", fontWeight: 600, fontSize: 13,
                 textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)',
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}>
@@ -322,7 +322,7 @@ export default function Dashboard() {
             padding: '24px', boxShadow: `0 1px 4px rgba(37,99,235,0.06)` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div>
-              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 3px' }}>
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 3px' }}>
                 Score Trend
               </p>
               <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#94A3B8', margin: 0 }}>
@@ -354,7 +354,7 @@ export default function Dashboard() {
             padding: '24px', boxShadow: `0 1px 4px rgba(37,99,235,0.06)` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div>
-              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 3px' }}>
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 3px' }}>
                 Top Skill Gaps
               </p>
               <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#94A3B8', margin: 0 }}>
@@ -395,7 +395,7 @@ export default function Dashboard() {
           <Link to="/results" style={{
             display: 'block', textAlign: 'center', marginTop: 18,
             padding: '9px 0', borderRadius: 12, background: BLUE[50],
-            border: `1px solid ${BLUE[200]}`, fontFamily: "'Sora',sans-serif",
+            border: `1px solid ${BLUE[200]}`, fontFamily: "'Poppins',sans-serif",
             fontSize: 13, fontWeight: 600, color: BLUE[700], textDecoration: 'none',
           }}>
             Run Skill Analysis →
@@ -406,7 +406,7 @@ export default function Dashboard() {
       {/* ── Recommended for You ── */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
         <div style={{ marginBottom: 16 }}>
-          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 4px' }}>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 4px' }}>
             Recommended for You
           </p>
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#94A3B8', margin: 0 }}>
@@ -456,7 +456,7 @@ export default function Dashboard() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.40 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
-              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 2px' }}>
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 2px' }}>
                 Recent Activity
               </p>
               <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#94A3B8', margin: 0 }}>
@@ -468,7 +468,7 @@ export default function Dashboard() {
             <div style={{ background: 'white', borderRadius: 20, border: `1px solid ${BLUE[100]}`,
               padding: '40px 24px', textAlign: 'center' }}>
               <div style={{ fontSize: 36, marginBottom: 10 }}>🎯</div>
-              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 15, color: '#1E293B', margin: '0 0 4px' }}>
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: '#1E293B', margin: '0 0 4px' }}>
                 No checks yet
               </p>
               <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#94A3B8', margin: '0 0 16px' }}>
@@ -476,7 +476,7 @@ export default function Dashboard() {
               </p>
               <Link to="/results" style={{
                 padding: '9px 22px', borderRadius: 12, background: BLUE[600],
-                color: 'white', fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600,
+                color: 'white', fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 600,
                 textDecoration: 'none', display: 'inline-block',
               }}>Start Matching →</Link>
             </div>
@@ -494,7 +494,7 @@ export default function Dashboard() {
               ))}
               <Link to="/analytics" style={{
                 display: 'block', textAlign: 'center', padding: '10px',
-                fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600,
+                fontFamily: "'Poppins',sans-serif", fontSize: 13, fontWeight: 600,
                 color: BLUE[600], textDecoration: 'none', marginTop: 4,
               }}>View All Activity →</Link>
             </div>
@@ -504,7 +504,7 @@ export default function Dashboard() {
         {/* AI Career Insight */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.44 }}>
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 2px' }}>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#0F172A', margin: '0 0 2px' }}>
               AI Career Insight
             </p>
             <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#94A3B8', margin: 0 }}>
@@ -530,7 +530,7 @@ export default function Dashboard() {
               justifyContent: 'center', fontSize: 26,
             }}>💡</div>
             <div>
-              <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 15,
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15,
                 color: '#0F172A', margin: '0 0 10px', lineHeight: 1.4 }}>
                 Complete your profile and upload your resume to get personalized AI insights and recommendations.
               </p>
@@ -551,7 +551,7 @@ export default function Dashboard() {
                     border: `1px solid ${st.border}`, display: 'flex', alignItems: 'center',
                     justifyContent: 'center', flexShrink: 0,
                   }}>
-                    <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 14, color: st.color }}>
+                    <span style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 14, color: st.color }}>
                       {pct}%
                     </span>
                   </div>
@@ -569,7 +569,7 @@ export default function Dashboard() {
             })}
             <Link to="/results" style={{
               width: '100%', textAlign: 'center', padding: '11px 0', borderRadius: 12,
-              background: BLUE[600], color: 'white', fontFamily: "'Sora',sans-serif",
+              background: BLUE[600], color: 'white', fontFamily: "'Poppins',sans-serif",
               fontSize: 13, fontWeight: 700, textDecoration: 'none', display: 'block',
               boxShadow: `0 4px 14px rgba(37,99,235,0.3)`, position: 'relative', zIndex: 1,
             }}>
@@ -584,7 +584,7 @@ export default function Dashboard() {
         style={{ background: 'white', borderRadius: 20, border: `1px solid ${BLUE[100]}`,
           padding: '28px 32px', boxShadow: `0 1px 4px rgba(37,99,235,0.06)` }}>
         <div style={{ marginBottom: 28 }}>
-          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 4px' }}>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 4px' }}>
             Your Career Journey
           </p>
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#94A3B8', margin: 0 }}>
@@ -614,7 +614,7 @@ export default function Dashboard() {
       {/* ── Career Resources ── */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
         <div style={{ marginBottom: 20 }}>
-          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 4px' }}>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 4px' }}>
             Career Resources
           </p>
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#94A3B8', margin: 0 }}>
@@ -662,7 +662,7 @@ export default function Dashboard() {
           borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none',
         }}/>
         <div>
-          <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 20, color: 'white', margin: '0 0 6px' }}>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 20, color: 'white', margin: '0 0 6px' }}>
             Ready to take your career to new heights?
           </p>
           <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: BLUE[300], margin: 0 }}>
@@ -672,7 +672,7 @@ export default function Dashboard() {
         <Link to="/gamification" style={{
           padding: '13px 28px', borderRadius: 14, display: 'inline-flex', alignItems: 'center', gap: 9,
           background: 'linear-gradient(135deg, #FBBF24, #F59E0B)',
-          color: 'white', fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 14,
+          color: 'white', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 14,
           textDecoration: 'none', boxShadow: '0 4px 16px rgba(251,191,36,0.45)',
           flexShrink: 0,
         }}>
@@ -688,7 +688,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
             <div style={{ width: 28, height: 28, borderRadius: 8, background: '#FFFBEB',
               border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>💡</div>
-            <p style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 15, color: '#0F172A', margin: 0 }}>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: '#0F172A', margin: 0 }}>
               AI Career Tips
             </p>
           </div>
@@ -702,7 +702,7 @@ export default function Dashboard() {
                   width: 22, height: 22, borderRadius: '50%', background: '#FDE68A',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
                 }}>
-                  <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 10, color: '#92400E' }}>
+                  <span style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 10, color: '#92400E' }}>
                     {i + 1}
                   </span>
                 </div>

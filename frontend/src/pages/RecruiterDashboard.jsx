@@ -95,13 +95,13 @@ function CandidateCard({ c, idx }) {
         {/* Top row: rank + name + score */}
         <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:12 }}>
           <div style={{ width:34, height:34, borderRadius:10, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-            fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:13,
+            fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:13,
             background: idx===0?'linear-gradient(135deg,#F59E0B,#D97706)':idx===1?'linear-gradient(135deg,#94A3B8,#64748B)':idx===2?'linear-gradient(135deg,#CD7F32,#A0522D)':'#F1F5F9',
             color: idx<=2?'white':'#94A3B8' }}>
             #{c.rank}
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'#0F172A',
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#0F172A',
               overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:2 }}>
               {c.name || 'Candidate'}
             </p>
@@ -115,7 +115,7 @@ function CandidateCard({ c, idx }) {
           <div style={{ textAlign:'center', flexShrink:0 }}>
             <div style={{ width:48, height:48, borderRadius:'50%', display:'flex', flexDirection:'column',
               alignItems:'center', justifyContent:'center', background:bg.bg, border:`2px solid ${bg.bd}` }}>
-              <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color, lineHeight:1 }}>{s}</span>
+              <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:15, color, lineHeight:1 }}>{s}</span>
               <span style={{ fontFamily:"'Inter',sans-serif", fontSize:7, color, fontWeight:700 }}>%</span>
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function RecruiterDashboard() {
           <div style={{ width:40, height:40, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
             fontSize:20, background:'linear-gradient(135deg,#1E40AF,#6366F1)', boxShadow:'0 4px 12px rgba(99,102,241,0.35)' }}>🏢</div>
           <div>
-            <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:24, color:'#0F172A', margin:0 }}>Recruiter Dashboard</h1>
+            <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:24, color:'#0F172A', margin:0 }}>Recruiter Dashboard</h1>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#64748B', margin:0 }}>
               Paste a JD → AI ranks all candidates by ATS score, skill match & experience
             </p>
@@ -289,7 +289,7 @@ export default function RecruiterDashboard() {
           <div style={{ width:30, height:30, borderRadius:10, background:'#DBEAFE', border:'1px solid #BFDBFE',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>📋</div>
           <div>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'#1E293B', margin:0 }}>Job Description</p>
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#1E293B', margin:0 }}>Job Description</p>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', margin:0 }}>Paste or upload the JD to rank all platform candidates</p>
           </div>
         </div>
@@ -348,11 +348,11 @@ export default function RecruiterDashboard() {
                 <input {...getInputProps()}/>
                 {jdFile ? (
                   <><div style={{ fontSize:26 }}>✅</div>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
                     <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8' }}>Click to replace</p></>
                 ) : (
                   <><div style={{ fontSize:30 }}>📎</div>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
                       {isDragActive?'Drop here':'Upload JD (PDF · DOCX · TXT)'}
                     </p></>
                 )}
@@ -392,7 +392,7 @@ export default function RecruiterDashboard() {
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
                 <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
                   textTransform:'uppercase', letterSpacing:'0.07em' }}>Min Score</label>
-                <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:14, color:'#6366F1' }}>{minScore}%</span>
+                <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:14, color:'#6366F1' }}>{minScore}%</span>
               </div>
               <input type="range" min={0} max={90} step={5} value={minScore}
                 onChange={e => setMinScore(Number(e.target.value))}
@@ -416,7 +416,7 @@ export default function RecruiterDashboard() {
           <motion.button onClick={runMatch} disabled={loading}
             whileHover={{ scale:loading?1:1.008 }} whileTap={{ scale:loading?1:0.99 }}
             style={{ width:'100%', padding:'13px 0', borderRadius:13, border:'none',
-              fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'white',
+              fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'white',
               cursor:loading?'not-allowed':'pointer',
               background:loading?'#94A3B8':'linear-gradient(135deg,#1E40AF,#4F46E5)',
               boxShadow:loading?'none':'0 4px 16px rgba(79,70,229,0.4)', transition:'all 0.2s' }}>
@@ -445,7 +445,7 @@ export default function RecruiterDashboard() {
               <div style={{ position:'absolute', inset:16, borderRadius:'50%', border:'2px solid #FFFBEB', borderTopColor:'#F59E0B' }} className="animate-spin"/>
             </div>
             <div>
-              <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>Ranking candidates</p>
+              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>Ranking candidates</p>
               <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>Running BERT + TF-IDF against all platform resumes…</p>
             </div>
           </motion.div>
@@ -470,7 +470,7 @@ export default function RecruiterDashboard() {
                     ['Avg', `${Math.round((summary.average_score||0)*100)}%`,'#F59E0B','#FFFBEB']
                   ].map(([l,v,c,bg]) => (
                     <div key={l} style={{ padding:'7px 14px', borderRadius:11, background:bg, border:`1px solid ${c}30`, textAlign:'center', minWidth:58 }}>
-                      <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:18, color:c, lineHeight:1 }}>{v}</p>
+                      <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color:c, lineHeight:1 }}>{v}</p>
                       <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', marginTop:1 }}>{l}</p>
                     </div>
                   ))}
@@ -496,7 +496,7 @@ export default function RecruiterDashboard() {
 
             {filtered.length === 0 ? (
               <div style={{ background:'white', borderRadius:20, border:'1px solid #E2E8F0', padding:'40px', textAlign:'center' }}>
-                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#94A3B8' }}>No candidates match this filter</p>
+                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#94A3B8' }}>No candidates match this filter</p>
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:14 }}>
@@ -513,7 +513,7 @@ export default function RecruiterDashboard() {
           style={{ background:'white', borderRadius:22, border:'1px solid #E2E8F0', padding:'60px 40px', textAlign:'center' }}>
           <motion.div animate={{ y:[0,-8,0] }} transition={{ repeat:Infinity, duration:3 }}
             style={{ fontSize:48, marginBottom:14 }}>🏢</motion.div>
-          <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:19, color:'#1E293B', marginBottom:8 }}>
+          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#1E293B', marginBottom:8 }}>
             Paste a JD to find top candidates
           </p>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'#94A3B8', maxWidth:400, margin:'0 auto 18px' }}>

@@ -37,7 +37,7 @@ function GazeIndicator({ dir, offsetX, offsetY }) {
           }}
         />
       </div>
-      <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, fontWeight:700,
+      <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:600,
         color: isCenter ? '#10B981' : '#F59E0B', textTransform:'uppercase', letterSpacing:'0.06em' }}>
         {dir === 'center' ? 'Focused' : `Looking ${dir}`}
       </span>
@@ -53,7 +53,7 @@ function EyeBar({ openness = 1 }) {
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
         <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#64748B', fontWeight:600 }}>Eye Openness</span>
-        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, fontWeight:700, color:c }}>{pct}%</span>
+        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:c }}>{pct}%</span>
       </div>
       <div style={{ height:6, background:'#F1F5F9', borderRadius:100, overflow:'hidden' }}>
         <motion.div animate={{ width:`${pct}%` }} transition={{ duration:0.4 }}
@@ -86,7 +86,7 @@ function HeadPoseDisplay({ yaw = 0, pitch = 0, roll = 0 }) {
               <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:2, background:'#CBD5E1', transform:'translateX(-50%)' }}/>
               <motion.div animate={{ width:`${pct}%` }} style={{ height:'100%', background:c, borderRadius:100 }} transition={{ duration:0.3 }}/>
             </div>
-            <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:c, marginTop:2, fontWeight:600, textAlign:'center' }}>{val.toFixed(0)}°</p>
+            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:c, marginTop:2, fontWeight:600, textAlign:'center' }}>{val.toFixed(0)}°</p>
           </div>
         )
       })}
@@ -113,7 +113,7 @@ function EmotionBadge({ emotion }) {
       <span style={{ fontSize:18 }}>{cfg.icon}</span>
       <div>
         <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#64748B', fontWeight:600 }}>Emotion</p>
-        <p style={{ fontFamily:"'Sora',sans-serif", fontSize:13, fontWeight:700, color:cfg.color }}>{cfg.label}</p>
+        <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:13, fontWeight:700, color:cfg.color }}>{cfg.label}</p>
       </div>
     </div>
   )
@@ -136,7 +136,7 @@ function ModelStatus({ mpReady, tfReady, faceApiReady }) {
         }}>
           <div style={{ width:5, height:5, borderRadius:'50%', background: ready ? '#10B981' : '#CBD5E1',
             boxShadow: ready ? '0 0 4px rgba(16,185,129,0.5)' : 'none' }}/>
-          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, fontWeight:600,
+          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:600,
             color: ready ? '#065F46' : '#94A3B8', letterSpacing:'0.04em' }}>
             {icon} {label}
           </span>
@@ -158,7 +158,7 @@ function ConfidenceMeter({ value = 1 }) {
         <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#64748B', fontWeight:600 }}>
           Interview Confidence
         </span>
-        <span style={{ fontFamily:"'Sora',sans-serif", fontSize:12, fontWeight:700, color:c }}>{label}</span>
+        <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:12, fontWeight:700, color:c }}>{label}</span>
       </div>
       <div style={{ height:8, background:'#F1F5F9', borderRadius:100, overflow:'hidden' }}>
         <motion.div animate={{ width:`${pct}%` }} transition={{ duration:0.6, ease:[0.16,1,0.3,1] }}
@@ -166,9 +166,9 @@ function ConfidenceMeter({ value = 1 }) {
             boxShadow:`0 0 8px ${c}50` }}/>
       </div>
       <div style={{ display:'flex', justifyContent:'space-between', marginTop:3 }}>
-        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#94A3B8' }}>0%</span>
-        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, fontWeight:700, color:c }}>{pct}%</span>
-        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#94A3B8' }}>100%</span>
+        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8' }}>0%</span>
+        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, color:c }}>{pct}%</span>
+        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8' }}>100%</span>
       </div>
     </div>
   )
@@ -232,7 +232,7 @@ export default function DetectionPanel({
           padding:'3px 8px', borderRadius:20, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(4px)' }}>
           <motion.div animate={{ opacity:[1,0.3,1] }} transition={{ repeat:Infinity, duration:1.5 }}
             style={{ width:5, height:5, borderRadius:'50%', background:'#F43F5E' }}/>
-          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'white', fontWeight:700, letterSpacing:'0.08em' }}>LIVE</span>
+          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'white', fontWeight:700, letterSpacing:'0.08em' }}>LIVE</span>
         </div>
 
         {/* Phone detection badge */}
@@ -240,7 +240,7 @@ export default function DetectionPanel({
           <motion.div initial={{ opacity:0, scale:0.8 }} animate={{ opacity:1, scale:1 }}
             style={{ position:'absolute', top:7, right:7, padding:'3px 8px', borderRadius:20,
               background:'rgba(244,63,94,0.85)', backdropFilter:'blur(4px)' }}>
-            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'white', fontWeight:700 }}>
+            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'white', fontWeight:700 }}>
               📱 {objectLabel}
             </span>
           </motion.div>
@@ -252,7 +252,7 @@ export default function DetectionPanel({
           <div style={{ width:5, height:5, borderRadius:'50%',
             background: faceCount === 0 ? '#F43F5E' : faceCount > 1 ? '#F59E0B' : '#10B981',
             boxShadow: `0 0 6px ${faceCount === 1 ? 'rgba(16,185,129,0.6)' : 'rgba(244,63,94,0.6)'}` }}/>
-          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'white', fontWeight:600 }}>
+          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'white', fontWeight:600 }}>
             {faceCount === 0 ? 'No face' : faceCount === 1 ? 'Face OK' : `${faceCount} faces`}
           </span>
         </div>
@@ -271,7 +271,7 @@ export default function DetectionPanel({
             <EyeBar openness={eyeOpenness}/>
             {lookAwayMs > 500 && (
               <div style={{ padding:'4px 8px', borderRadius:8, background:'#FFFBEB', border:'1px solid #FDE68A' }}>
-                <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#92400E', fontWeight:600 }}>
+                <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#92400E', fontWeight:600 }}>
                   Away: {(lookAwayMs/1000).toFixed(1)}s
                 </span>
               </div>
@@ -305,7 +305,7 @@ export default function DetectionPanel({
         border:`1.5px solid ${cheatPct > 60 ? '#FECDD3' : cheatPct > 30 ? '#FDE68A' : '#A7F3D0'}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:7 }}>
           <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#475569' }}>Integrity Score</span>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontSize:12, fontWeight:800,
+          <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:12, fontWeight:800,
             color: cheatPct > 60 ? '#B91C1C' : cheatPct > 30 ? '#92400E' : '#065F46' }}>
             {100 - cheatPct}%
           </span>
@@ -328,10 +328,11 @@ export default function DetectionPanel({
               }}/>
           ))}
         </div>
-        <p style={{ textAlign:'center', fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#64748B', marginTop:5, fontWeight:600 }}>
+        <p style={{ textAlign:'center', fontFamily:"'Inter',sans-serif", fontSize:10, color:'#64748B', marginTop:5, fontWeight:600 }}>
           {warningCount}/{maxWarnings} warnings
         </p>
       </div>
     </div>
   )
 }
+
