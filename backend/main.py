@@ -4,8 +4,6 @@ Entry Point — FastAPI Application Bootstrap
 """
 import time
 from contextlib import asynccontextmanager
-
-from nltk import app
 import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,11 +60,12 @@ def create_application() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "https://resume-screening-system-lyart.vercel.app",
-        ],
+        # allow_origins=[
+        #     "http://localhost:5173",
+        #     "http://127.0.0.1:5173",
+        #     "https://resume-screening-system-lyart.vercel.app",
+        # ],
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
