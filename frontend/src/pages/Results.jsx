@@ -3,6 +3,7 @@
  * Single-page flow: Upload Resume → Paste/Upload JD → Analyze → See Results → Enhance → Download PDF
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDropzone } from 'react-dropzone'
 import toast from 'react-hot-toast'
@@ -392,6 +393,8 @@ Requirements:
 • AWS cloud infrastructure experience`
 
 export default function Results() {
+  const navigate = useNavigate()
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [resumeFile,    setResumeFile]    = useState(null)   // uploaded File
   const [resumeId,      setResumeId]      = useState('')     // parsed resume id
@@ -892,6 +895,60 @@ const onResumeDrop = useCallback(async (accepted) => {
                 {activeTab === 2 && <RoadmapTab  result={result}/>}
               </motion.div>
             </AnimatePresence>
+
+            {/* ── Interview CTAs ── */}
+            <motion.div
+              initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
+              style={{ padding:'18px 24px', borderRadius:18, background:'linear-gradient(135deg,#EFF6FF 0%,#F0FDF4 100%)',
+                border:'1.5px solid #BFDBFE', display:'flex', flexWrap:'wrap', alignItems:'center', gap:16 }}>
+              <div style={{ flex:1, minWidth:200 }}>
+                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#1E40AF', marginBottom:4 }}>
+                  🎯 Ready to Test Your Skills?
+                </p>
+                <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#64748B' }}>
+                  Practice with AI interviews based on this role and your resume
+                </p>
+              </div>
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                <button
+                  onClick={() => navigate('/live-interview-v2', {
+                    state: {
+                      resume_id: result?.resume_id || resumeId,
+                      job_title: result?.job_title || jobTitle,
+                      job_description: jdText,
+                    }
+                  })}
+                  style={{
+                    padding:'11px 20px', borderRadius:12, border:'none', cursor:'pointer',
+                    fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'white',
+                    background:'linear-gradient(135deg,#1565C0,#2196F3)',
+                    boxShadow:'0 4px 14px rgba(21,101,192,0.35)', transition:'all 0.2s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform='scale(1.03)'}
+                  onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
+                >
+                  🎤 Live Interview
+                </button>
+                <button
+                  onClick={() => navigate('/interview', {
+                    state: {
+                      resume_id: result?.resume_id || resumeId,
+                      job_title: result?.job_title || jobTitle,
+                      job_description: jdText,
+                    }
+                  })}
+                  style={{
+                    padding:'11px 20px', borderRadius:12, border:'1.5px solid #1565C0', cursor:'pointer',
+                    fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#1565C0',
+                    background:'white', transition:'all 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background='#EFF6FF'; e.currentTarget.style.transform='scale(1.03)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background='white'; e.currentTarget.style.transform='scale(1)' }}
+                >
+                  🎤 Quick Practice
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { getResumes, generateInterview } from '../services/api'
+import api from '../services/api'
+import { useLocation } from 'react-router-dom'
 
 const TYPE_CFG = {
   technical: { badge: 'badge-indigo', dot: 'bg-indigo-400' },
@@ -81,15 +83,63 @@ function QuestionCard({ q, index, expanded, onToggle }) {
 }
 
 export default function Interview() {
+  const location = useLocation()
+  const navState = location.state || {}
+
   const [resumes, setResumes] = useState([])
   const [interview, setInterview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(null)
-  const { register, handleSubmit } = useForm({ defaultValues: { difficulty: 'medium', interview_type: 'mixed', num_questions: 10 } })
+  const [autoData, setAutoData] = useState(null)
+  const [fetchingAuto, setFetchingAuto] = useState(false)
+  const { register, handleSubmit, setValue } = useForm({ defaultValues: { difficulty: 'medium', interview_type: 'mixed', num_questions: 10 } })
 
   useEffect(() => {
     getResumes({ page_size: 20 }).then(r => setResumes((r.data.resumes || []).filter(r => r.status === 'parsed'))).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const loadAutoData = async () => {
+      if (navState?.resume_id && navState?.job_title) {
+        setAutoData({
+          resume_id: navState.resume_id,
+          job_title: navState.job_title,
+          job_description: navState.job_description || '',
+        })
+        return
+      }
+      setFetchingAuto(true)
+      try {
+        const { data: resumeList } = await getResumes({ page_size: 1, status: 'parsed' })
+        const latestResume = resumeList.resumes?.[0]
+        const { data: history } = await api.get('/ats/history', { params: { page_size: 1 } })
+        const latestResultItem = history.items?.[0]
+        let fullResult = null
+        if (latestResultItem?.result_id) {
+          const { data: full } = await api.get('/ats/result/' + latestResultItem.result_id)
+          fullResult = full
+        }
+        if (latestResume || fullResult) {
+          setAutoData({
+            resume_id: latestResume?.id || '',
+            job_title: fullResult?.job_title || '',
+            job_description: fullResult?.job_description || '',
+          })
+        }
+      } catch (err) {
+        console.warn('Auto-fetch failed:', err)
+      } finally {
+        setFetchingAuto(false)
+      }
+    }
+    loadAutoData()
+  }, [navState])
+
+  useEffect(() => {
+    if (autoData?.resume_id) setValue('resume_id', autoData.resume_id)
+    if (autoData?.job_title) setValue('job_title', autoData.job_title)
+    if (autoData?.job_description) setValue('job_description', autoData.job_description)
+  }, [autoData, setValue])
 
   const onSubmit = async (data) => {
     if (!data.resume_id) { toast.error('Select a resume first'); return }
@@ -119,18 +169,81 @@ export default function Interview() {
               <h3 className="font-display font-600 text-ink-800">Interview Setup</h3>
             </div>
 
-            <div>
-              <label className="label">Resume</label>
-              <select {...register('resume_id', { required: true })} className="input">
-                <option value="">— Select —</option>
-                {resumes.map(r => <option key={r.id} value={r.id}>{r.original_filename}</option>)}
-              </select>
-            </div>
+            {fetchingAuto && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                <svg className="w-4 h-4 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                <span className="text-xs text-slate-500 font-body">Fetching your latest resume and target role...</span>
+              </div>
+            )}
 
-            <div>
-              <label className="label">Target Role</label>
-              <input {...register('job_title')} placeholder="e.g. Senior Data Engineer" className="input"/>
-            </div>
+            {autoData && (
+              <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-mono font-700 text-indigo-600 uppercase tracking-wide">Auto-filled from your profile</p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setFetchingAuto(true)
+                      try {
+                        const { data: resumeList } = await getResumes({ page_size: 1, status: 'parsed' })
+                        const latestResume = resumeList.resumes?.[0]
+                        const { data: history } = await api.get('/ats/history', { params: { page_size: 1 } })
+                        const latestResultItem = history.items?.[0]
+                        let fullResult = null
+                        if (latestResultItem?.result_id) {
+                          const { data: full } = await api.get('/ats/result/' + latestResultItem.result_id)
+                          fullResult = full
+                        }
+                        setAutoData({
+                          resume_id: latestResume?.id || '',
+                          job_title: fullResult?.job_title || '',
+                          job_description: fullResult?.job_description || '',
+                        })
+                        toast.success('Data refreshed from DB')
+                      } catch (err) {
+                        toast.error('Refresh failed')
+                      } finally {
+                        setFetchingAuto(false)
+                      }
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                {autoData.resume_id && (
+                  <div>
+                    <label className="label text-xs opacity-70">Resume</label>
+                    <p className="text-sm font-body text-ink-800">{resumes.find(r => r.id === autoData.resume_id)?.original_filename || 'Selected resume'}</p>
+                  </div>
+                )}
+                {autoData.job_title && (
+                  <div>
+                    <label className="label text-xs opacity-70">Target Role</label>
+                    <p className="text-sm font-body text-ink-800 font-semibold">{autoData.job_title}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!autoData && (
+              <>
+                <div>
+                  <label className="label">Resume</label>
+                  <select {...register('resume_id', { required: true })} className="input">
+                    <option value="">— Select —</option>
+                    {resumes.map(r => <option key={r.id} value={r.id}>{r.original_filename}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Target Role</label>
+                  <input {...register('job_title')} placeholder="e.g. Senior Data Engineer" className="input"/>
+                </div>
+              </>
+            )}
 
             <div>
               <label className="label">Interview Type</label>
@@ -166,12 +279,6 @@ export default function Interview() {
               <select {...register('num_questions')} className="input">
                 {[5, 10, 15, 20, 25].map(n => <option key={n} value={n}>{n} questions (~{n * 4} min)</option>)}
               </select>
-            </div>
-
-            <div>
-              <label className="label">Job Description <span className="text-ink-300 font-body normal-case">(optional — improves targeting)</span></label>
-              <textarea {...register('job_description')} rows={4} placeholder="Paste JD for more relevant questions..."
-                className="input resize-none font-mono text-xs"/>
             </div>
 
             <button type="submit" disabled={loading || resumes.length === 0} className="btn-amber w-full py-3 text-base rounded-2xl">

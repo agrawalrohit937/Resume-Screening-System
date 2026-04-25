@@ -4,7 +4,7 @@
  *           per-question AI eval, reattempt, warnings system, final report
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 
@@ -18,6 +18,7 @@ import CheatingWarningModal            from '../components/detection/CheatingWar
 import AIAvatar from '../components/interview/AIAvatar'
 import InterviewReport from '../components/interview/InterviewReport'
 import { getResumes } from '../services/api'
+import api from '../services/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
@@ -293,6 +294,8 @@ const MAX_WARNINGS = 3
 
 export default function LiveInterviewV2() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const navState = location.state || {}
 
   // Session management
   const session = useInterviewSession()
@@ -481,7 +484,7 @@ export default function LiveInterviewV2() {
   // PHASE: SETUP
   // ════════════════════════════════════════════════════════════════
   if (session.phase === SESSION_PHASE.SETUP) {
-    return <SetupScreen onStart={session.createSession} loading={session.loading}/>
+    return <SetupScreen onStart={session.createSession} loading={session.loading} navState={navState}/>
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -1014,10 +1017,33 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
 }
 
 // ── Setup Screen ───────────────────────────────────────────────────────────────
-function SetupScreen({ onStart, loading }) {
+function SetupScreen({ onStart, loading, navState }) {
   const [form, setForm] = useState({
-    job_title: '', difficulty: 'medium', interview_type: 'mixed', num_questions: 8,
+    job_title: navState?.job_title || '', difficulty: 'medium', interview_type: 'mixed', num_questions: 8,
   })
+  const [autoData, setAutoData] = useState(null)
+  const [fetchingAuto, setFetchingAuto] = useState(false)
+
+  useEffect(() => {
+    if (navState?.job_title) {
+      setAutoData({ job_title: navState.job_title, job_description: navState.job_description || '' })
+      setForm(f => ({ ...f, job_title: navState.job_title }))
+      return
+    }
+    const loadAuto = async () => {
+      setFetchingAuto(true)
+      try {
+        const { data: history } = await api.get('/ats/history', { params: { page_size: 1 } })
+        const latest = history.items?.[0]
+        if (latest?.result_id) {
+          const { data: full } = await api.get('/ats/result/' + latest.result_id)
+          setAutoData({ job_title: full.job_title || '', job_description: full.job_description || '' })
+        }
+      } catch (err) { console.warn('Auto-fetch failed:', err) }
+      finally { setFetchingAuto(false) }
+    }
+    loadAuto()
+  }, [navState])
 
   return (
     <div style={{ maxWidth:680, margin:'0 auto', padding:'24px 16px' }}>
@@ -1042,22 +1068,62 @@ function SetupScreen({ onStart, loading }) {
         </div>
 
         <div style={{ padding:'32px 36px', display:'flex', flexDirection:'column', gap:18 }}>
-          {/* Job Title */}
-          <div>
-            <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:7 }}>
-              Target Role
-            </label>
-            <input
-              value={form.job_title}
-              onChange={e => setForm(f => ({ ...f, job_title:e.target.value }))}
-              placeholder="e.g. Senior Backend Engineer"
-              style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'2px solid #E2E8F0',
-                fontFamily:"'Inter',sans-serif", fontSize:14, color:'#1E293B', outline:'none', boxSizing:'border-box',
-                transition:'border-color 0.2s' }}
-              onFocus={e => e.target.style.borderColor='#6366F1'}
-              onBlur={e => e.target.style.borderColor='#E2E8F0'}
-            />
-          </div>
+          {fetchingAuto && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'#F8FAFC', border:'1px solid #E2E8F0', display:'flex', alignItems:'center', gap:8 }}>
+              <svg style={{ width:16, height:16 }} className="animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle style={{ opacity:0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path style={{ opacity:0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#64748B' }}>Fetching your target role...</span>
+            </div>
+          )}
+
+          {autoData && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'#EFF6FF', border:'1px solid #BFDBFE' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#4338CA' }}>Target Role (Auto-filled)</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setFetchingAuto(true)
+                    try {
+                      const { data: history } = await api.get('/ats/history', { params: { page_size: 1 } })
+                      const latest = history.items?.[0]
+                      if (latest?.result_id) {
+                        const { data: full } = await api.get('/ats/result/' + latest.result_id)
+                        setAutoData({ job_title: full.job_title || '', job_description: full.job_description || '' })
+                        setForm(f => ({ ...f, job_title: full.job_title || '' }))
+                        toast.success('Data refreshed')
+                      }
+                    } catch (err) { toast.error('Refresh failed') }
+                    finally { setFetchingAuto(false) }
+                  }}
+                  style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#4338CA', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}
+                >
+                  Refresh
+                </button>
+              </div>
+              <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'#1E293B' }}>{autoData.job_title}</p>
+            </div>
+          )}
+
+          {!autoData && (
+            <div>
+              <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:7 }}>
+                Target Role
+              </label>
+              <input
+                value={form.job_title}
+                onChange={e => setForm(f => ({ ...f, job_title:e.target.value }))}
+                placeholder="e.g. Senior Backend Engineer"
+                style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'2px solid #E2E8F0',
+                  fontFamily:"'Inter',sans-serif", fontSize:14, color:'#1E293B', outline:'none', boxSizing:'border-box',
+                  transition:'border-color 0.2s' }}
+                onFocus={e => e.target.style.borderColor='#6366F1'}
+                onBlur={e => e.target.style.borderColor='#E2E8F0'}
+              />
+            </div>
+          )}
 
           {/* Interview Type */}
           <div>
