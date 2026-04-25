@@ -4,8 +4,6 @@ Entry Point — FastAPI Application Bootstrap
 """
 import time
 from contextlib import asynccontextmanager
-
-from nltk import app
 import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
