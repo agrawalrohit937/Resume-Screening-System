@@ -28,7 +28,7 @@ from api.routes.interview_analytics import router as interview_analytics_router
 from api.routes.live_interview import router as live_interview_router
 from api.routes.recruiter_v2 import router as recruiter_router
 
-from backend.services.ats_service import _get_bert_model
+from services.ats_service import _get_bert_model
 from config.db import connect_db, disconnect_db
 from core.config import settings
 from core.logging import setup_logging
@@ -61,12 +61,12 @@ def create_application() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        # allow_origins=[
-        #     "http://localhost:5173",
-        #     "http://127.0.0.1:5173",
-        #     "https://resume-screening-system-lyart.vercel.app",
-        # ],
-        allow_origins=["*"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://resume-screening-system-lyart.vercel.app",
+            "https://resume-screening-system-hb2d.onrender.com"
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
