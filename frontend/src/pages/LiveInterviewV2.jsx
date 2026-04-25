@@ -4,7 +4,7 @@
  *           per-question AI eval, reattempt, warnings system, final report
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 
@@ -18,6 +18,7 @@ import CheatingWarningModal            from '../components/detection/CheatingWar
 import AIAvatar from '../components/interview/AIAvatar'
 import InterviewReport from '../components/interview/InterviewReport'
 import { getResumes } from '../services/api'
+import api from '../services/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
@@ -65,7 +66,7 @@ function WarningBanner({ event, warningCount, maxWarnings = 3, onDismiss }) {
       <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
         <span style={{ fontSize:22, flexShrink:0 }}>{cfg.icon}</span>
         <div style={{ flex:1 }}>
-          <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:colors.text, marginBottom:3 }}>
+          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:colors.text, marginBottom:3 }}>
             ⚠ Integrity Warning {warningCount}/{maxWarnings}
           </p>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:colors.text, lineHeight:1.5 }}>
@@ -266,7 +267,7 @@ function AnswerInput({ value, onChange, onSubmit, loading, questionTimer, diffCf
           style={{
             display:'flex', alignItems:'center', gap:8, padding:'9px 22px',
             borderRadius:12, border:'none', cursor: loading || value.trim().length < 5 ? 'not-allowed' : 'pointer',
-            fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:14, color:'white',
+            fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:14, color:'white',
             background: loading ? '#94A3B8' : 'linear-gradient(135deg,#1565C0,#2196F3)',
             boxShadow: loading ? 'none' : '0 3px 10px rgba(21,101,192,0.35)',
             transition:'all 0.2s', opacity: value.trim().length < 5 ? 0.6 : 1,
@@ -293,6 +294,8 @@ const MAX_WARNINGS = 3
 
 export default function LiveInterviewV2() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const navState = location.state || {}
 
   // Session management
   const session = useInterviewSession()
@@ -481,7 +484,7 @@ export default function LiveInterviewV2() {
   // PHASE: SETUP
   // ════════════════════════════════════════════════════════════════
   if (session.phase === SESSION_PHASE.SETUP) {
-    return <SetupScreen onStart={session.createSession} loading={session.loading}/>
+    return <SetupScreen onStart={session.createSession} loading={session.loading} navState={navState}/>
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -499,7 +502,7 @@ export default function LiveInterviewV2() {
             background:'linear-gradient(135deg,#EFF6FF 0%,#F8FAFC 50%,#EFF6FF 100%)' }}>
             <motion.div animate={{ y:[0,-8,0] }} transition={{ repeat:Infinity, duration:3, ease:'easeInOut' }}
               style={{ fontSize:52, marginBottom:16 }}>🤖</motion.div>
-            <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:26, color:'#0F172A', marginBottom:8 }}>
+            <h2 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:26, color:'#0F172A', marginBottom:8 }}>
               Interview Ready
             </h2>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'#64748B' }}>
@@ -518,7 +521,7 @@ export default function LiveInterviewV2() {
               ].map(({ icon, label, val }) => (
                 <div key={label} style={{ textAlign:'center', padding:'14px 8px', background:'#F8FAFC', borderRadius:14, border:'1px solid #E2E8F0' }}>
                   <div style={{ fontSize:24, marginBottom:4 }}>{icon}</div>
-                  <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:20, color:'#1E293B', lineHeight:1 }}>{val}</p>
+                  <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:20, color:'#1E293B', lineHeight:1 }}>{val}</p>
                   <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8', marginTop:2 }}>{label}</p>
                 </div>
               ))}
@@ -583,7 +586,7 @@ export default function LiveInterviewV2() {
             <button onClick={session.startSession}
               style={{
                 width:'100%', padding:'15px 0', borderRadius:14, border:'none',
-                fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'white', cursor:'pointer',
+                fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:16, color:'white', cursor:'pointer',
                 background:'linear-gradient(135deg,#1565C0 0%,#1976D2 50%,#2196F3 100%)',
                 boxShadow:'0 4px 16px rgba(21,101,192,0.4)',
               }}>
@@ -624,7 +627,7 @@ export default function LiveInterviewV2() {
           style={{ maxWidth:460, width:'100%', background:'white', borderRadius:24, padding:40, textAlign:'center',
             border:'2px solid #FECDD3', boxShadow:'0 16px 48px rgba(244,63,94,0.15)' }}>
           <div style={{ fontSize:56, marginBottom:16 }}>🚨</div>
-          <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:24, color:'#881337', marginBottom:12 }}>
+          <h2 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:24, color:'#881337', marginBottom:12 }}>
             Session Terminated
           </h2>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'#9F1239', lineHeight:1.6, marginBottom:24 }}>
@@ -637,7 +640,7 @@ export default function LiveInterviewV2() {
           </div>
           <button onClick={session.resetSession}
             style={{ width:'100%', padding:'13px 0', borderRadius:12, border:'none',
-              fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:14, color:'white', cursor:'pointer',
+              fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:14, color:'white', cursor:'pointer',
               background:'linear-gradient(135deg,#1565C0,#2196F3)', boxShadow:'0 4px 14px rgba(21,101,192,0.3)' }}>
             Start Fresh Interview
           </button>
@@ -733,7 +736,7 @@ export default function LiveInterviewV2() {
                   <div style={{ position:'absolute', inset:8, borderRadius:'50%', border:'2px solid #ECFDF5', borderBottomColor:'#10B981' }} className="animate-spin" style2={{ animationDirection:'reverse', animationDuration:'1.4s' }}/>
                   <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🤖</div>
                 </div>
-                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:20, color:'#1E293B', marginBottom:8 }}>AI is Evaluating</p>
+                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:20, color:'#1E293B', marginBottom:8 }}>AI is Evaluating</p>
                 <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>
                   Analyzing relevance · Checking clarity · Computing confidence score...
                 </p>
@@ -797,14 +800,14 @@ export default function LiveInterviewV2() {
 
                     {/* Question text */}
                     <div style={{ flex:1 }}>
-                      <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:17, color:'#0F172A', lineHeight:1.6, marginBottom:16 }}>
+                      <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:17, color:'#0F172A', lineHeight:1.6, marginBottom:16 }}>
                         {q.text}
                       </p>
                       {q.category === 'behavioral' && (
                         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
                           {['Situation','Task','Action','Result'].map((s,i) => (
                             <div key={s} style={{ textAlign:'center', padding:'8px 4px', borderRadius:10, background:'#ECFDF5', border:'1px solid #A7F3D0' }}>
-                              <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:14, color:'#065F46' }}>{s[0]}</p>
+                              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:14, color:'#065F46' }}>{s[0]}</p>
                               <p style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#059669' }}>{s}</p>
                             </div>
                           ))}
@@ -920,12 +923,12 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
           <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, fontWeight:700, color:c, textTransform:'uppercase', letterSpacing:'0.08em' }}>
             Q{questionNum} Feedback
           </span>
-          <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:15, color:'#0F172A', marginTop:4, lineHeight:1.4 }}>
+          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:15, color:'#0F172A', marginTop:4, lineHeight:1.4 }}>
             {question?.text?.slice(0,80)}{question?.text?.length > 80 ? '...' : ''}
           </p>
         </div>
         <div style={{ textAlign:'center', flexShrink:0 }}>
-          <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:36, color:c, lineHeight:1 }}>{Math.round(score)}</p>
+          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:36, color:c, lineHeight:1 }}>{Math.round(score)}</p>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:c, fontWeight:700 }}>{ev?.grade} / 100</p>
         </div>
       </div>
@@ -943,7 +946,7 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
             const cc = v >= 70 ? '#10B981' : v >= 50 ? '#6366F1' : '#F59E0B'
             return (
               <div key={label} style={{ textAlign:'center', padding:'10px 4px', borderRadius:10, background:'#F8FAFC', border:'1px solid #E2E8F0' }}>
-                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:20, color:cc }}>{v}</p>
+                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:20, color:cc }}>{v}</p>
                 <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:1 }}>{label}</p>
               </div>
             )
@@ -992,7 +995,7 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
           <button
             onClick={onReattempt}
             style={{ flex:1, padding:'11px 0', borderRadius:12, border:'1.5px solid #E2E8F0',
-              background:'white', fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:13,
+              background:'white', fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13,
               color:'#64748B', cursor:'pointer', transition:'all 0.2s' }}>
             ↺ Reattempt
           </button>
@@ -1001,7 +1004,7 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
             disabled={loading}
             style={{
               flex:2, padding:'11px 0', borderRadius:12, border:'none',
-              fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'white', cursor:'pointer',
+              fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'white', cursor:'pointer',
               background: isLast ? 'linear-gradient(135deg,#10B981,#059669)' : `linear-gradient(135deg,${c},${c}CC)`,
               boxShadow:`0 4px 12px ${c}35`, transition:'all 0.2s',
             }}>
@@ -1014,10 +1017,33 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
 }
 
 // ── Setup Screen ───────────────────────────────────────────────────────────────
-function SetupScreen({ onStart, loading }) {
+function SetupScreen({ onStart, loading, navState }) {
   const [form, setForm] = useState({
-    job_title: '', difficulty: 'medium', interview_type: 'mixed', num_questions: 8,
+    job_title: navState?.job_title || '', difficulty: 'medium', interview_type: 'mixed', num_questions: 8,
   })
+  const [autoData, setAutoData] = useState(null)
+  const [fetchingAuto, setFetchingAuto] = useState(false)
+
+  useEffect(() => {
+    if (navState?.job_title) {
+      setAutoData({ job_title: navState.job_title, job_description: navState.job_description || '' })
+      setForm(f => ({ ...f, job_title: navState.job_title }))
+      return
+    }
+    const loadAuto = async () => {
+      setFetchingAuto(true)
+      try {
+        const { data: history } = await api.get('/ats/history', { params: { page_size: 1 } })
+        const latest = history.items?.[0]
+        if (latest?.result_id) {
+          const { data: full } = await api.get('/ats/result/' + latest.result_id)
+          setAutoData({ job_title: full.job_title || '', job_description: full.job_description || '' })
+        }
+      } catch (err) { console.warn('Auto-fetch failed:', err) }
+      finally { setFetchingAuto(false) }
+    }
+    loadAuto()
+  }, [navState])
 
   return (
     <div style={{ maxWidth:680, margin:'0 auto', padding:'24px 16px' }}>
@@ -1033,7 +1059,7 @@ function SetupScreen({ onStart, loading }) {
             backgroundSize:'28px 28px' }}/>
           <motion.div animate={{ y:[0,-8,0] }} transition={{ repeat:Infinity, duration:3 }}
             style={{ fontSize:52, marginBottom:16, position:'relative' }}>🤖</motion.div>
-          <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:28, color:'white', marginBottom:8, position:'relative', lineHeight:1.2 }}>
+          <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:28, color:'white', marginBottom:8, position:'relative', lineHeight:1.2 }}>
             AI Mock Interview Platform
           </h1>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'rgba(255,255,255,0.7)', position:'relative' }}>
@@ -1042,22 +1068,62 @@ function SetupScreen({ onStart, loading }) {
         </div>
 
         <div style={{ padding:'32px 36px', display:'flex', flexDirection:'column', gap:18 }}>
-          {/* Job Title */}
-          <div>
-            <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:7 }}>
-              Target Role
-            </label>
-            <input
-              value={form.job_title}
-              onChange={e => setForm(f => ({ ...f, job_title:e.target.value }))}
-              placeholder="e.g. Senior Backend Engineer"
-              style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'2px solid #E2E8F0',
-                fontFamily:"'Inter',sans-serif", fontSize:14, color:'#1E293B', outline:'none', boxSizing:'border-box',
-                transition:'border-color 0.2s' }}
-              onFocus={e => e.target.style.borderColor='#6366F1'}
-              onBlur={e => e.target.style.borderColor='#E2E8F0'}
-            />
-          </div>
+          {fetchingAuto && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'#F8FAFC', border:'1px solid #E2E8F0', display:'flex', alignItems:'center', gap:8 }}>
+              <svg style={{ width:16, height:16 }} className="animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle style={{ opacity:0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path style={{ opacity:0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#64748B' }}>Fetching your target role...</span>
+            </div>
+          )}
+
+          {autoData && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'#EFF6FF', border:'1px solid #BFDBFE' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#4338CA' }}>Target Role (Auto-filled)</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setFetchingAuto(true)
+                    try {
+                      const { data: history } = await api.get('/ats/history', { params: { page_size: 1 } })
+                      const latest = history.items?.[0]
+                      if (latest?.result_id) {
+                        const { data: full } = await api.get('/ats/result/' + latest.result_id)
+                        setAutoData({ job_title: full.job_title || '', job_description: full.job_description || '' })
+                        setForm(f => ({ ...f, job_title: full.job_title || '' }))
+                        toast.success('Data refreshed')
+                      }
+                    } catch (err) { toast.error('Refresh failed') }
+                    finally { setFetchingAuto(false) }
+                  }}
+                  style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#4338CA', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}
+                >
+                  Refresh
+                </button>
+              </div>
+              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:16, color:'#1E293B' }}>{autoData.job_title}</p>
+            </div>
+          )}
+
+          {!autoData && (
+            <div>
+              <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:7 }}>
+                Target Role
+              </label>
+              <input
+                value={form.job_title}
+                onChange={e => setForm(f => ({ ...f, job_title:e.target.value }))}
+                placeholder="e.g. Senior Backend Engineer"
+                style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'2px solid #E2E8F0',
+                  fontFamily:"'Inter',sans-serif", fontSize:14, color:'#1E293B', outline:'none', boxSizing:'border-box',
+                  transition:'border-color 0.2s' }}
+                onFocus={e => e.target.style.borderColor='#6366F1'}
+                onBlur={e => e.target.style.borderColor='#E2E8F0'}
+              />
+            </div>
+          )}
 
           {/* Interview Type */}
           <div>
@@ -1091,7 +1157,7 @@ function SetupScreen({ onStart, loading }) {
                     style={{
                       padding:'12px 8px', borderRadius:12, border:`2px solid ${sel ? dc.color : '#E2E8F0'}`,
                       background: sel ? dc.bg : 'white', color: sel ? dc.color : '#94A3B8',
-                      fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, textTransform:'capitalize',
+                      fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, textTransform:'capitalize',
                       cursor:'pointer', transition:'all 0.2s',
                       boxShadow: sel ? `0 0 0 3px ${dc.color}20` : 'none',
                     }}>
@@ -1111,7 +1177,7 @@ function SetupScreen({ onStart, loading }) {
               <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em' }}>
                 Questions
               </label>
-              <span style={{ fontFamily:"'Sora',sans-serif", fontSize:14, fontWeight:700, color:'#6366F1' }}>
+              <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:700, color:'#6366F1' }}>
                 {form.num_questions} (~{Math.round(form.num_questions * (DIFF_CONFIG[form.difficulty]?.time || 180) / 60)} min)
               </span>
             </div>
@@ -1149,7 +1215,7 @@ function SetupScreen({ onStart, loading }) {
             whileTap={{ scale: loading ? 1 : 0.98 }}
             style={{
               width:'100%', padding:'15px 0', borderRadius:14, border:'none',
-              fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'white',
+              fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:16, color:'white',
               cursor: loading ? 'not-allowed' : 'pointer',
               background: loading ? '#94A3B8' : 'linear-gradient(135deg,#1565C0 0%,#1976D2 50%,#2196F3 100%)',
               boxShadow: loading ? 'none' : '0 6px 20px rgba(21,101,192,0.40)',

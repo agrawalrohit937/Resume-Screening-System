@@ -184,7 +184,7 @@ export default function InterviewAnalytics() {
         action={
           <div className="flex items-center gap-3">
             <div className="text-center">
-              <p style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 28, color: '#FCD34D', lineHeight: 1 }}>
+              <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: 28, color: '#FCD34D', lineHeight: 1 }}>
                 {totalInterviews}
               </p>
               <p className="text-indigo-300 text-xs font-mono mt-0.5">Sessions</p>
@@ -216,7 +216,7 @@ export default function InterviewAnalytics() {
           className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>Score Trend</h3>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>Score Trend</h3>
               <p className="text-xs text-slate-400 font-mono mt-0.5">Average score per interview session</p>
             </div>
             <span className="text-xs font-mono text-slate-400 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg">Last {MOCK_SESSIONS.length} sessions</span>
@@ -227,7 +227,7 @@ export default function InterviewAnalytics() {
         {/* Type distribution */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
           className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B', marginBottom: 4 }}>Interview Types</h3>
+          <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B', marginBottom: 4 }}>Interview Types</h3>
           <p className="text-xs text-slate-400 font-mono mb-4">Distribution of sessions</p>
           <TypeDist data={MOCK_TYPE_DIST}/>
         </motion.div>
@@ -240,7 +240,7 @@ export default function InterviewAnalytics() {
           className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>Topic Performance</h3>
+              <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>Topic Performance</h3>
               <p className="text-xs text-slate-400 font-mono mt-0.5">Average score by topic area</p>
             </div>
             <span className="text-xs font-mono text-rose-500 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
@@ -253,7 +253,7 @@ export default function InterviewAnalytics() {
         {/* Skill radar */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
           className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B', marginBottom: 4 }}>Skill Radar</h3>
+          <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B', marginBottom: 4 }}>Skill Radar</h3>
           <p className="text-xs text-slate-400 font-mono mb-2">Multi-dimensional performance view</p>
           <TypeRadar/>
         </motion.div>
@@ -264,7 +264,7 @@ export default function InterviewAnalytics() {
         className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>AI Confidence Scores by Topic</h3>
+            <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>AI Confidence Scores by Topic</h3>
             <p className="text-xs text-slate-400 font-mono mt-0.5">How consistently strong your answers are per topic</p>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function InterviewAnalytics() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
         className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>Session History</h3>
+          <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B' }}>Session History</h3>
           <span className="text-xs font-mono text-slate-400">{MOCK_SESSIONS.length} sessions</span>
         </div>
         <div className="overflow-x-auto">
@@ -329,7 +329,7 @@ export default function InterviewAnalytics() {
       {/* Improvement tips */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
         className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B', marginBottom: 16 }}>
+        <h3 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: '#1E293B', marginBottom: 16 }}>
           🤖 AI Coach Recommendations
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

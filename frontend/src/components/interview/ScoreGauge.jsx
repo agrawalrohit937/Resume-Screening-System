@@ -105,7 +105,7 @@ export default function ScoreGauge({ score = 0, maxScore = 10, size = 160, label
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 400 }}
-            style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: size * 0.24, color: color.text, lineHeight: 1 }}
+            style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: size * 0.24, color: color.text, lineHeight: 1 }}
           >
             {animated.toFixed(1)}
           </motion.div>
@@ -113,7 +113,7 @@ export default function ScoreGauge({ score = 0, maxScore = 10, size = 160, label
             / {maxScore}
           </div>
           {showGrade && (
-            <div style={{ marginTop: 6, padding: '2px 10px', borderRadius: 20, background: color.bg, color: color.text, fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 13 }}>
+            <div style={{ marginTop: 6, padding: '2px 10px', borderRadius: 20, background: color.bg, color: color.text, fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 13 }}>
               {grade}
             </div>
           )}

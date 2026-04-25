@@ -34,8 +34,8 @@ function Loader() {
           border:'2px solid #E0E7FF', borderTopColor:'#6366F1',
           animation:'spin 1.8s linear infinite' }}/>
       </div>
-      <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:'#94A3B8',
-        letterSpacing:'0.12em', textTransform:'uppercase' }}>
+      <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8',
+        letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:500 }}>
         Loading CareerAI...
       </p>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>

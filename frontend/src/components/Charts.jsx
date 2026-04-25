@@ -6,7 +6,7 @@ import {
 const TIP = {
   contentStyle: {
     background: '#fff', border: '1px solid #EAE7DF', borderRadius: '12px',
-    fontFamily: '"Plus Jakarta Sans", sans-serif', fontSize: '12px', color: '#1C1C28',
+    fontFamily: '"Inter", sans-serif', fontSize: '12px', color: '#1C1C28',
     boxShadow: '0 8px 24px rgba(15,15,20,0.10)', padding: '10px 14px',
   },
   cursor: { fill: 'rgba(99,102,241,0.04)' },
@@ -25,8 +25,8 @@ export function ScoreTrendChart({ data = [] }) {
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="4 4" stroke="#F4F2ED" vertical={false}/>
-        <XAxis dataKey="date" tick={{ fill: '#9E9EAA', fontSize: 11, fontFamily: '"Plus Jakarta Sans"' }} tickLine={false} axisLine={false}/>
-        <YAxis domain={[0, 100]} tick={{ fill: '#9E9EAA', fontSize: 11, fontFamily: '"Plus Jakarta Sans"' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`}/>
+        <XAxis dataKey="date" tick={{ fill: '#9E9EAA', fontSize: 11, fontFamily: '"Inter"' }} tickLine={false} axisLine={false}/>
+        <YAxis domain={[0, 100]} tick={{ fill: '#9E9EAA', fontSize: 11, fontFamily: '"Inter"' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`}/>
         <Tooltip {...TIP} formatter={v => [`${v}%`, 'ATS Score']} labelStyle={{ color: '#5E5E6A', fontWeight: 600, marginBottom: 4 }}/>
         <Area type="monotone" dataKey="score" stroke="#6366F1" strokeWidth={2.5} fill="url(#scoreGrad)"
           dot={{ fill: '#fff', stroke: '#6366F1', strokeWidth: 2, r: 4 }}
@@ -49,8 +49,8 @@ export function SkillDemandChart({ data = [] }) {
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="4 4" stroke="#F4F2ED" horizontal={false}/>
-        <XAxis type="number" domain={[0, 100]} tick={{ fill: '#9E9EAA', fontSize: 11, fontFamily: '"Plus Jakarta Sans"' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`}/>
-        <YAxis type="category" dataKey="skill" width={80} tick={{ fill: '#5E5E6A', fontSize: 11, fontFamily: '"Plus Jakarta Sans"' }} tickLine={false} axisLine={false}/>
+        <XAxis type="number" domain={[0, 100]} tick={{ fill: '#9E9EAA', fontSize: 11, fontFamily: '"Inter"' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`}/>
+        <YAxis type="category" dataKey="skill" width={80} tick={{ fill: '#5E5E6A', fontSize: 11, fontFamily: '"Inter"' }} tickLine={false} axisLine={false}/>
         <Tooltip {...TIP} formatter={v => [`${v}%`, 'Demand']}/>
         <Bar dataKey="demand" fill="url(#demandGrad)" radius={[0, 6, 6, 0]} maxBarSize={16}/>
       </BarChart>
@@ -84,7 +84,7 @@ export function DistributionPie({ data }) {
         </Pie>
         <Tooltip {...TIP}/>
         <Legend iconType="circle" iconSize={8}
-          wrapperStyle={{ fontFamily: '"Plus Jakarta Sans"', fontSize: '11px', color: '#7C7C88', paddingTop: 8 }}/>
+          wrapperStyle={{ fontFamily: '"Inter"', fontSize: '11px', color: '#7C7C88', paddingTop: 8 }}/>
       </PieChart>
     </ResponsiveContainer>
   )
@@ -98,7 +98,7 @@ export function MissingSkillsChart({ data = [] }) {
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={d} margin={{ top: 4, right: 8, left: -20, bottom: 40 }}>
         <CartesianGrid strokeDasharray="4 4" stroke="#F4F2ED" vertical={false}/>
-        <XAxis dataKey="skill" tick={{ fill: '#5E5E6A', fontSize: 10, fontFamily: '"Plus Jakarta Sans"' }} tickLine={false} axisLine={false} angle={-35} textAnchor="end" interval={0}/>
+        <XAxis dataKey="skill" tick={{ fill: '#5E5E6A', fontSize: 10, fontFamily: '"Inter"' }} tickLine={false} axisLine={false} angle={-35} textAnchor="end" interval={0}/>
         <YAxis tick={{ fill: '#9E9EAA', fontSize: 11 }} tickLine={false} axisLine={false}/>
         <Tooltip {...TIP} formatter={v => [v, 'Missing frequency']}/>
         <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={36}>
@@ -116,7 +116,7 @@ export function SkillRadarChart({ data = [] }) {
     <ResponsiveContainer width="100%" height={220}>
       <RadarChart data={d} margin={{ top: 10, right: 40, bottom: 10, left: 40 }}>
         <PolarGrid stroke="#EAE7DF" gridType="polygon"/>
-        <PolarAngleAxis dataKey="skill" tick={{ fill: '#7C7C88', fontSize: 10, fontFamily: '"Plus Jakarta Sans"' }}/>
+        <PolarAngleAxis dataKey="skill" tick={{ fill: '#7C7C88', fontSize: 10, fontFamily: '"Inter"' }}/>
         <Radar name="Demand" dataKey="demand" stroke="#6366F1" fill="#6366F1" fillOpacity={0.12} strokeWidth={2} dot={{ fill: '#6366F1', r: 3 }}/>
         <Tooltip {...TIP} formatter={v => [`${v}%`, 'Market Demand']}/>
       </RadarChart>

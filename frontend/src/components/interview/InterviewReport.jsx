@@ -33,7 +33,7 @@ function ScoreCircle({ score = 0, label, size = 110 }) {
             style={{ transition:'stroke-dashoffset 1.5s cubic-bezier(0.16,1,0.3,1)', filter:`drop-shadow(0 0 6px ${c}60)` }}/>
         </svg>
         <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:size*0.22, color:c, lineHeight:1 }}>
+          <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:size*0.22, color:c, lineHeight:1 }}>
             {Math.round(score)}
           </span>
           <span style={{ fontFamily:"'Inter',sans-serif", fontWeight:700, fontSize:11, color:c, marginTop:2 }}>{grade}</span>
@@ -58,7 +58,7 @@ function HiringBadge({ rec }) {
       <span>{cfg.icon}</span>
       <div>
         <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:cfg.text, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em' }}>Hiring Recommendation</p>
-        <p style={{ fontFamily:"'Sora',sans-serif", fontSize:16, fontWeight:800, color:cfg.text }}>{rec}</p>
+        <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:16, fontWeight:800, color:cfg.text }}>{rec}</p>
       </div>
     </div>
   )
@@ -87,13 +87,13 @@ function AnswerCard({ item, index }) {
               {item.reattempted && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-mono">Reattempted</span>}
               {item.answer_source === 'voice' && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-mono">🎤 Voice</span>}
             </div>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:14, color:'#0F172A', lineHeight:1.5 }}>
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:14, color:'#0F172A', lineHeight:1.5 }}>
               {item.question_text}
             </p>
           </div>
         </div>
         <div className="text-center shrink-0">
-          <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:22, color:c, lineHeight:1 }}>{Math.round(score)}</p>
+          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:22, color:c, lineHeight:1 }}>{Math.round(score)}</p>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#64748B' }}>/ 100</p>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:c }}>{item.evaluation?.grade || 'N/A'}</p>
         </div>
@@ -118,7 +118,7 @@ function AnswerCard({ item, index }) {
             const cc = v >= 70 ? '#10B981' : v >= 50 ? '#6366F1' : '#F59E0B'
             return (
               <div key={label} className="text-center p-2.5 rounded-xl" style={{ background:'#F8FAFC', border:'1px solid #E2E8F0' }}>
-                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:18, color:cc }}>{v}</p>
+                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color:cc }}>{v}</p>
                 <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
               </div>
             )
@@ -207,7 +207,7 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'rgba(255,255,255,0.6)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>
               Interview Complete ✓
             </p>
-            <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:30, color:'white', lineHeight:1.2, marginBottom:12 }}>
+            <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:30, color:'white', lineHeight:1.2, marginBottom:12 }}>
               {session?.job_title || 'Interview'} Report
             </h1>
             {summary?.hiring_recommendation && (
@@ -224,7 +224,7 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
               <div className="w-20 h-20 rounded-full flex items-center justify-center"
                 style={{ background: cheatPct > 50 ? 'rgba(239,68,68,0.2)' : cheatPct > 20 ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)', border:`3px solid ${cheatPct > 50 ? '#F43F5E' : cheatPct > 20 ? '#F59E0B' : '#10B981'}` }}>
                 <div className="text-center">
-                  <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:18, color: cheatPct > 50 ? '#F43F5E' : cheatPct > 20 ? '#F59E0B' : '#10B981', lineHeight:1 }}>{cheatPct}%</p>
+                  <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color: cheatPct > 50 ? '#F43F5E' : cheatPct > 20 ? '#F59E0B' : '#10B981', lineHeight:1 }}>{cheatPct}%</p>
                   <p style={{ fontSize:9, color:'rgba(255,255,255,0.6)', fontFamily:"'Inter',sans-serif" }}>{warnings}⚠</p>
                 </div>
               </div>
@@ -247,7 +247,7 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
         {/* Radar */}
         {radarData.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A', marginBottom:4 }}>Skill Radar</h3>
+            <h3 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A', marginBottom:4 }}>Skill Radar</h3>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', marginBottom:16 }}>Multi-dimensional performance</p>
             <ResponsiveContainer width="100%" height={220}>
               <RadarChart data={radarData}>
@@ -263,7 +263,7 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
 
         {/* Bar scores */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A', marginBottom:4 }}>Score per Question</h3>
+          <h3 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A', marginBottom:4 }}>Score per Question</h3>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', marginBottom:16 }}>Individual answer evaluation</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={barData} margin={{ left:-15 }}>
@@ -289,7 +289,7 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
           { title:'Next Steps',    items:summary?.next_steps     || [], color:'#6366F1', bg:'#EFF6FF', border:'#BFDBFE', icon:'🚀' },
         ].map(({ title, items, color, bg, border, icon }) => (
           <div key={title} className="rounded-2xl p-5" style={{ background:bg, border:`1.5px solid ${border}` }}>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color, marginBottom:12 }}>{icon} {title}</p>
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color, marginBottom:12 }}>{icon} {title}</p>
             <div className="space-y-2">
               {items.slice(0,4).map((item, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs font-body" style={{ color }}>
@@ -304,7 +304,7 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
 
       {/* ── Q&A Breakdown ── */}
       <div>
-        <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:18, color:'#0F172A', marginBottom:16 }}>
+        <h2 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:18, color:'#0F172A', marginBottom:16 }}>
           Question-by-Question Breakdown
         </h2>
         <div className="space-y-4">
@@ -318,12 +318,12 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
       <div className="grid grid-cols-2 gap-4 pt-2">
         <button onClick={onRestart}
           className="py-4 rounded-2xl font-semibold text-sm text-indigo-700 transition-all hover:-translate-y-0.5"
-          style={{ border:'2px solid #C7D2FE', background:'#EFF6FF', fontFamily:"'Sora',sans-serif" }}>
+          style={{ border:'2px solid #C7D2FE', background:'#EFF6FF', fontFamily:"'Poppins',sans-serif" }}>
           🔄 Start New Interview
         </button>
         <Link to="/interview-analytics"
           className="py-4 rounded-2xl font-semibold text-sm text-white text-center transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
-          style={{ background:'linear-gradient(135deg,#1565C0,#2196F3)', boxShadow:'0 4px 14px rgba(21,101,192,0.35)', fontFamily:"'Sora',sans-serif" }}>
+          style={{ background:'linear-gradient(135deg,#1565C0,#2196F3)', boxShadow:'0 4px 14px rgba(21,101,192,0.35)', fontFamily:"'Poppins',sans-serif" }}>
           📊 View All Analytics
         </Link>
       </div>

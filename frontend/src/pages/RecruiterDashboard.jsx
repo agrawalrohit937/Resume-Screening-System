@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useDropzone } from 'react-dropzone'
-import api, { analyzeGitHub, generatePDF } from '../services/api'
+import api, { generatePDF } from '../services/api'
+import GithubHoverCard from '../components/recruiter/GithubHoverCard'
 
 // ─── utils ────────────────────────────────────────────────────────────────────
 const pct = v => Math.round((v || 0) * 100)
@@ -38,155 +39,6 @@ function Bar({ label, val, color }) {
         <motion.div initial={{ width:0 }} animate={{ width:`${p}%` }} transition={{ duration:1, ease:[0.16,1,0.3,1] }}
           style={{ height:'100%', borderRadius:100, background:color }}/>
       </div>
-    </div>
-  )
-}
-
-// ─── GitHub Hover Card ────────────────────────────────────────────────────────
-function GHCard({ username }) {
-  const [d, setD] = useState(null)
-  const [ld, setLd] = useState(false)
-  const [open, setOpen] = useState(false)
-  const t = useRef(null)
-
-  const load = useCallback(async () => {
-    if (d || ld || !username) return
-    setLd(true)
-    try { const { data } = await analyzeGitHub({ username }); setD(data.data || data) }
-    catch { setD({ err: true }) }
-    finally { setLd(false) }
-  }, [d, ld, username])
-
-  if (!username) return (
-    <span style={{ padding:'5px 11px', borderRadius:10, border:'1.5px solid #E2E8F0',
-      background:'#F8FAFC', fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, color:'#CBD5E1' }}>
-      🐙 GitHub
-    </span>
-  )
-
-  const langs = Object.entries(d?.languages || {}).slice(0,3)
-
-  return (
-    <div style={{ position:'relative', display:'inline-block' }}
-      onMouseEnter={() => { t.current = setTimeout(() => { setOpen(true); load() }, 200) }}
-      onMouseLeave={() => { clearTimeout(t.current); setOpen(false) }}>
-      <motion.span whileHover={{ scale:1.04 }}
-        style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 11px', borderRadius:10,
-          border:`1.5px solid ${d && !d.err ? '#C7D2FE' : '#E2E8F0'}`,
-          background: d && !d.err ? '#EFF6FF' : '#F8FAFC',
-          fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600,
-          color: d && !d.err ? '#4338CA' : '#64748B', cursor:'pointer', userSelect:'none' }}>
-        <svg style={{ width:13, height:13 }} viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-        </svg>
-        @{username}
-        {ld && <span style={{ width:7, height:7, borderRadius:'50%', border:'2px solid #6366F1',
-          borderTopColor:'transparent', display:'inline-block', animation:'spin 0.7s linear infinite' }}/>}
-      </motion.span>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity:0, y:8, scale:0.97 }} animate={{ opacity:1, y:0, scale:1 }}
-            exit={{ opacity:0, y:8, scale:0.97 }} transition={{ duration:0.15 }}
-            onMouseEnter={() => clearTimeout(t.current)}
-            onMouseLeave={() => setOpen(false)}
-            style={{ position:'absolute', bottom:'calc(100% + 8px)', left:'50%', transform:'translateX(-50%)',
-              width:290, zIndex:500, background:'white', borderRadius:16,
-              border:'1.5px solid #E2E8F0', boxShadow:'0 16px 40px rgba(0,0,0,0.13)', overflow:'hidden' }}>
-
-            {ld && !d ? (
-              <div style={{ padding:'28px', textAlign:'center' }}>
-                <div style={{ width:24, height:24, margin:'0 auto 8px', borderRadius:'50%',
-                  border:'3px solid #EFF6FF', borderTopColor:'#6366F1', animation:'spin 0.8s linear infinite' }}/>
-                <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8' }}>Loading...</p>
-              </div>
-            ) : d?.err ? (
-              <div style={{ padding:'20px', textAlign:'center' }}>
-                <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#F43F5E' }}>⚠ Unavailable</p>
-              </div>
-            ) : d ? (
-              <>
-                <div style={{ padding:'12px 14px', background:'#0F172A', display:'flex', alignItems:'center', gap:10 }}>
-                  {d.profile?.avatar_url
-                    ? <img src={d.profile.avatar_url} alt="" style={{ width:34, height:34, borderRadius:8, border:'2px solid #334155' }}/>
-                    : <div style={{ width:34, height:34, borderRadius:8, background:'#334155', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🐙</div>
-                  }
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'white', lineHeight:1.2 }}>
-                      {d.profile?.name || username}
-                    </p>
-                    <a href={`https://github.com/${username}`} target="_blank" rel="noopener noreferrer"
-                      style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#64748B', textDecoration:'none' }}>
-                      @{username} ↗
-                    </a>
-                  </div>
-                  {d.contribution_score !== undefined && (
-                    <div style={{ textAlign:'center' }}>
-                      <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:17, lineHeight:1,
-                        color: pct(d.contribution_score) >= 70 ? '#34D399' : '#FBBF24' }}>{pct(d.contribution_score)}%</p>
-                      <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:8, color:'#475569' }}>SCORE</p>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ padding:'10px 14px', display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:5 }}>
-                    {[['Repos', d.profile?.public_repos||0],['Stars', d.total_stars||0],['Stack', d.tech_stack?.length||0]].map(([l,v]) => (
-                      <div key={l} style={{ textAlign:'center', padding:'5px 3px', borderRadius:7, background:'#F8FAFC', border:'1px solid #F1F5F9' }}>
-                        <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:14, color:'#1E293B', lineHeight:1 }}>{v}</p>
-                        <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', marginTop:1 }}>{l}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {langs.length > 0 && (
-                    <div>
-                      <p style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, color:'#64748B',
-                        textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Languages</p>
-                      {langs.map(([lang, count]) => {
-                        const max = langs[0][1]; const p = Math.round((count/max)*100)
-                        const clr = LANG_CLR[lang] || '#6366F1'
-                        return (
-                          <div key={lang} style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
-                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#475569', width:68, flexShrink:0 }}>{lang}</span>
-                            <div style={{ flex:1, height:4, borderRadius:100, background:'#F1F5F9', overflow:'hidden' }}>
-                              <div style={{ height:'100%', borderRadius:100, background:clr, width:`${p}%` }}/>
-                            </div>
-                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#94A3B8', width:18, textAlign:'right' }}>{count}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {d.activity_level && (
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#64748B' }}>Activity</span>
-                      <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:600, fontFamily:"'Inter',sans-serif",
-                        background: d.activity_level==='very_active' ? '#ECFDF5' : d.activity_level==='active' ? '#EFF6FF' : '#F8FAFC',
-                        color:      d.activity_level==='very_active' ? '#065F46' : d.activity_level==='active' ? '#1E40AF' : '#94A3B8',
-                        border:     d.activity_level==='very_active' ? '1px solid #A7F3D0' : d.activity_level==='active' ? '1px solid #BFDBFE' : '1px solid #E2E8F0' }}>
-                        {d.activity_level.replace('_',' ')}
-                      </span>
-                    </div>
-                  )}
-
-                  {d.top_repositories?.slice(0,2).map(r => (
-                    <a key={r.name} href={r.url} target="_blank" rel="noopener noreferrer"
-                      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'5px 9px',
-                        borderRadius:7, background:'#F8FAFC', border:'1px solid #E2E8F0', textDecoration:'none' }}>
-                      <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, color:'#374151',
-                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:170 }}>{r.name}</span>
-                      <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#F59E0B', flexShrink:0 }}>★ {r.stars}</span>
-                    </a>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
@@ -243,13 +95,13 @@ function CandidateCard({ c, idx }) {
         {/* Top row: rank + name + score */}
         <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:12 }}>
           <div style={{ width:34, height:34, borderRadius:10, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-            fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:13,
+            fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:13,
             background: idx===0?'linear-gradient(135deg,#F59E0B,#D97706)':idx===1?'linear-gradient(135deg,#94A3B8,#64748B)':idx===2?'linear-gradient(135deg,#CD7F32,#A0522D)':'#F1F5F9',
             color: idx<=2?'white':'#94A3B8' }}>
             #{c.rank}
           </div>
           <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'#0F172A',
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#0F172A',
               overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:2 }}>
               {c.name || 'Candidate'}
             </p>
@@ -263,7 +115,7 @@ function CandidateCard({ c, idx }) {
           <div style={{ textAlign:'center', flexShrink:0 }}>
             <div style={{ width:48, height:48, borderRadius:'50%', display:'flex', flexDirection:'column',
               alignItems:'center', justifyContent:'center', background:bg.bg, border:`2px solid ${bg.bd}` }}>
-              <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color, lineHeight:1 }}>{s}</span>
+              <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:15, color, lineHeight:1 }}>{s}</span>
               <span style={{ fontFamily:"'Inter',sans-serif", fontSize:7, color, fontWeight:700 }}>%</span>
             </div>
           </div>
@@ -334,7 +186,7 @@ function CandidateCard({ c, idx }) {
             Resume
           </motion.button>
 
-          <GHCard username={c.github_username || ''}/>
+          <GithubHoverCard username={c.github_username || ''}/>
 
           {c.linkedin_url && (
             <motion.a whileHover={{ scale:1.03 }} href={c.linkedin_url} target="_blank" rel="noopener noreferrer"
@@ -419,7 +271,7 @@ export default function RecruiterDashboard() {
           <div style={{ width:40, height:40, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
             fontSize:20, background:'linear-gradient(135deg,#1E40AF,#6366F1)', boxShadow:'0 4px 12px rgba(99,102,241,0.35)' }}>🏢</div>
           <div>
-            <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:24, color:'#0F172A', margin:0 }}>Recruiter Dashboard</h1>
+            <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:24, color:'#0F172A', margin:0 }}>Recruiter Dashboard</h1>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#64748B', margin:0 }}>
               Paste a JD → AI ranks all candidates by ATS score, skill match & experience
             </p>
@@ -437,7 +289,7 @@ export default function RecruiterDashboard() {
           <div style={{ width:30, height:30, borderRadius:10, background:'#DBEAFE', border:'1px solid #BFDBFE',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>📋</div>
           <div>
-            <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, color:'#1E293B', margin:0 }}>Job Description</p>
+            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#1E293B', margin:0 }}>Job Description</p>
             <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', margin:0 }}>Paste or upload the JD to rank all platform candidates</p>
           </div>
         </div>
@@ -496,11 +348,11 @@ export default function RecruiterDashboard() {
                 <input {...getInputProps()}/>
                 {jdFile ? (
                   <><div style={{ fontSize:26 }}>✅</div>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
                     <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8' }}>Click to replace</p></>
                 ) : (
                   <><div style={{ fontSize:30 }}>📎</div>
-                    <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
+                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
                       {isDragActive?'Drop here':'Upload JD (PDF · DOCX · TXT)'}
                     </p></>
                 )}
@@ -540,7 +392,7 @@ export default function RecruiterDashboard() {
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
                 <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
                   textTransform:'uppercase', letterSpacing:'0.07em' }}>Min Score</label>
-                <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:14, color:'#6366F1' }}>{minScore}%</span>
+                <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:14, color:'#6366F1' }}>{minScore}%</span>
               </div>
               <input type="range" min={0} max={90} step={5} value={minScore}
                 onChange={e => setMinScore(Number(e.target.value))}
@@ -564,7 +416,7 @@ export default function RecruiterDashboard() {
           <motion.button onClick={runMatch} disabled={loading}
             whileHover={{ scale:loading?1:1.008 }} whileTap={{ scale:loading?1:0.99 }}
             style={{ width:'100%', padding:'13px 0', borderRadius:13, border:'none',
-              fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'white',
+              fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'white',
               cursor:loading?'not-allowed':'pointer',
               background:loading?'#94A3B8':'linear-gradient(135deg,#1E40AF,#4F46E5)',
               boxShadow:loading?'none':'0 4px 16px rgba(79,70,229,0.4)', transition:'all 0.2s' }}>
@@ -593,7 +445,7 @@ export default function RecruiterDashboard() {
               <div style={{ position:'absolute', inset:16, borderRadius:'50%', border:'2px solid #FFFBEB', borderTopColor:'#F59E0B' }} className="animate-spin"/>
             </div>
             <div>
-              <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>Ranking candidates</p>
+              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>Ranking candidates</p>
               <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>Running BERT + TF-IDF against all platform resumes…</p>
             </div>
           </motion.div>
@@ -618,7 +470,7 @@ export default function RecruiterDashboard() {
                     ['Avg', `${Math.round((summary.average_score||0)*100)}%`,'#F59E0B','#FFFBEB']
                   ].map(([l,v,c,bg]) => (
                     <div key={l} style={{ padding:'7px 14px', borderRadius:11, background:bg, border:`1px solid ${c}30`, textAlign:'center', minWidth:58 }}>
-                      <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:18, color:c, lineHeight:1 }}>{v}</p>
+                      <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color:c, lineHeight:1 }}>{v}</p>
                       <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', marginTop:1 }}>{l}</p>
                     </div>
                   ))}
@@ -644,7 +496,7 @@ export default function RecruiterDashboard() {
 
             {filtered.length === 0 ? (
               <div style={{ background:'white', borderRadius:20, border:'1px solid #E2E8F0', padding:'40px', textAlign:'center' }}>
-                <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:15, color:'#94A3B8' }}>No candidates match this filter</p>
+                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#94A3B8' }}>No candidates match this filter</p>
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:14 }}>
@@ -661,7 +513,7 @@ export default function RecruiterDashboard() {
           style={{ background:'white', borderRadius:22, border:'1px solid #E2E8F0', padding:'60px 40px', textAlign:'center' }}>
           <motion.div animate={{ y:[0,-8,0] }} transition={{ repeat:Infinity, duration:3 }}
             style={{ fontSize:48, marginBottom:14 }}>🏢</motion.div>
-          <p style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:19, color:'#1E293B', marginBottom:8 }}>
+          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#1E293B', marginBottom:8 }}>
             Paste a JD to find top candidates
           </p>
           <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'#94A3B8', maxWidth:400, margin:'0 auto 18px' }}>
