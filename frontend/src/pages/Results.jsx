@@ -15,11 +15,7 @@ import ScoreRing from '../components/ScoreRing'
 import { AnimatedBar } from '../components/AnimatedNumber'
 import api from '../services/api'
 
-useEffect(() => {
-  fetch("https://resume-screening-system-hb2d.onrender.com/health")
-    .then(() => console.log("Backend ready"))
-    .catch(() => console.log("Warmup fail"))
-}, [])
+
 // ── Tutorial links for skill gaps ─────────────────────────────────────────────
 const TUTORIAL_MAP = {
   kubernetes:   [{ title:'Kubernetes Official Docs', url:'https://kubernetes.io/docs/tutorials/' }, { title:'KodeKloud K8s Course (Free)', url:'https://kodekloud.com/courses/kubernetes-for-the-absolute-beginners-hands-on/' }],
@@ -400,6 +396,11 @@ Requirements:
 
 export default function Results() {
   const navigate = useNavigate()
+  useEffect(() => {
+  fetch("https://resume-screening-system-hb2d.onrender.com/health")
+    .then(() => console.log("Backend ready"))
+    .catch(() => console.log("Warmup fail"))
+}, [])
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [resumeFile,    setResumeFile]    = useState(null)   // uploaded File
