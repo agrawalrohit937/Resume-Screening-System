@@ -11,11 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-  <link href="https://fonts.googleapis.com/css2?
-    family=Inter:wght@300;400;500;600;700&
-    family=Poppins:wght@500;600;700&
-    family=JetBrains+Mono:wght@300;400;500;600&
-    display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
   <style>
     *, *::before, *::after {
@@ -34,7 +30,6 @@
       text-rendering: optimizeLegibility;
     }
 
-    /* Scrollbar */
     ::-webkit-scrollbar {
       width: 5px;
       height: 5px;
@@ -53,18 +48,20 @@
       background: #818CF8;
     }
 
-    /* Selection */
     ::selection {
       background: rgba(99, 102, 241, 0.15);
       color: #1C1C28;
     }
 
-    /* Headings (optional improvement) */
     h1, h2, h3 {
       font-family: 'Poppins', sans-serif;
       margin: 0;
     }
   </style>
+
+  <!-- ✅ REQUIRED FOR FACE DETECTION -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
 </head>
 
@@ -75,7 +72,7 @@
   <!-- Google OAuth -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- Main React App -->
+  <!-- React App -->
   <script type="module" src="/src/main.jsx"></script>
 
 </body>
