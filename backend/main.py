@@ -43,8 +43,15 @@ REQUEST_LATENCY = Histogram("http_request_duration_seconds", "Latency", ["method
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Career Platform", version=settings.APP_VERSION)
-    await connect_db()
-    logger.info("MongoDB connected")
+    try:
+        await asyncio.wait_for(connect_db(), timeout=15.0)
+        logger.info("MongoDB connected")
+    except asyncio.TimeoutError:
+        logger.error("MongoDB connection timed out after 15 seconds — check MONGO_URI env var")
+        raise RuntimeError("MongoDB connection timed out. Set MONGO_URI correctly in Render env vars.")
+    except Exception as exc:
+        logger.error("MongoDB connection failed", error=str(exc))
+        raise
     yield
     await disconnect_db()
     logger.info("Shutdown complete")

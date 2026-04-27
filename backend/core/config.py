@@ -49,11 +49,11 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
 
     # ── FTP (Hostinger) ───────────────────────────────────────────────────────
-    FTP_HOST: str
-    FTP_USERNAME: str
-    FTP_PASSWORD: str
+    FTP_HOST: str = ""
+    FTP_USERNAME: str = ""
+    FTP_PASSWORD: str = ""
     FTP_PORT: int = 21
-    FTP_BASE_URL: str
+    FTP_BASE_URL: str = ""
 
     # ── NLP / ML ──────────────────────────────────────────────────────────────
     BERT_MODEL_NAME: str = "all-MiniLM-L6-v2"
