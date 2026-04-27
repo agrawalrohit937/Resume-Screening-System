@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SeniorityLevel(str, Enum):
@@ -38,8 +38,7 @@ class JobDescriptionModel(BaseModel):
     raw_text: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class SkillGap(BaseModel):
@@ -101,5 +100,7 @@ class ATSResultModel(BaseModel):
     model_versions: Dict[str, str] = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        protected_namespaces=(),  # Allow fields prefixed with 'model_'
+    )
