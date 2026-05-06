@@ -48,12 +48,16 @@ class Settings(BaseSettings):
     ALLOWED_FILE_TYPES: List[str] = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     UPLOAD_DIR: str = "./uploads"
 
-    # ── FTP (Hostinger) ───────────────────────────────────────────────────────
+# ── FTP (Hostinger) ───────────────────────────────────────────────────────
     FTP_HOST: str = ""
     FTP_USERNAME: str = ""
     FTP_PASSWORD: str = ""
     FTP_PORT: int = 21
     FTP_BASE_URL: str = ""
+
+    # ── PDF Generation ──────────────────────────────────────────────────────────
+    PDF_TIMEOUT_SECONDS: int = 60
+    PUBLIC_PDF_URL_BASE: str = "https://resume-screening-system-hb2d.onrender.com/generated/"
 
     # ── NLP / ML ──────────────────────────────────────────────────────────────
     BERT_MODEL_NAME: str = "all-MiniLM-L6-v2"
