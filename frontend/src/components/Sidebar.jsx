@@ -50,17 +50,33 @@ const NAV_SECTIONS = [
       { to: '/gamification', label: 'Badges & Points', badgeIcon: '🏆', icon: Icons.gamification },
     ],
   },
-  {
-    title: 'RECRUITER',
-    items: [
-      { to: '/recruiter', label: 'Shortlist', icon: Icons.ats },
-    ],
-  },
 ]
 
 export default function Sidebar({ collapsed, onToggle }) {
   const { user, logout } = useAuth()
   const location = useLocation()
+
+  // Filter navigation sections based on user role
+  const getNavSections = () => {
+    if (!user) return NAV_SECTIONS
+
+    // For recruiter: show only recruiter section (though sidebar won't show for recruiters in AppLayout)
+    if (user.role === 'recruiter') {
+      return [
+        {
+          title: 'RECRUITER',
+          items: [
+            { to: '/recruiter', label: 'Shortlist Candidates', icon: Icons.ats },
+          ],
+        },
+      ]
+    }
+
+    // For candidate: hide recruiter section from all navigation
+    return NAV_SECTIONS.filter(section => section.title !== 'RECRUITER')
+  }
+
+  const visibleSections = getNavSections()
 
   return (
     <motion.aside
@@ -82,9 +98,9 @@ export default function Sidebar({ collapsed, onToggle }) {
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <p className="font-bold text-slate-900 text-xl tracking-tight">
-                Career<span className="text-[#2563EB]">AI</span>
-              </p>
+                <p className="font-bold text-slate-900 text-xl tracking-tight">
+                  CareerPilot<span className="text-[#2563EB]"> AI</span>
+                </p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -92,7 +108,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* ── Navigation List ── */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-3 scrollbar-thin">
-        {NAV_SECTIONS.map((section, idx) => (
+        {visibleSections.map((section, idx) => (
           <div key={idx}>
             <AnimatePresence>
               {!collapsed && (

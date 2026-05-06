@@ -36,7 +36,7 @@ function Loader() {
       </div>
       <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8',
         letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:500 }}>
-        Loading CareerAI...
+        Loading CareerPilot AI...
       </p>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
