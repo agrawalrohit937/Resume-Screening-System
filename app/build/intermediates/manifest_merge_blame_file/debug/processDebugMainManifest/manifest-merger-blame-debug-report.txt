@@ -1,0 +1,159 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.careerai"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="36" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:4:5-66
+11-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+12-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:5:5-71
+12-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:5:22-68
+13
+14    <permission
+14-->[androidx.core:core:1.17.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\fdca94ded3a049bd9b3e7a58feb886fe\transformed\core-1.17.0\AndroidManifest.xml:22:5-24:47
+15        android:name="com.example.careerai.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+15-->[androidx.core:core:1.17.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\fdca94ded3a049bd9b3e7a58feb886fe\transformed\core-1.17.0\AndroidManifest.xml:23:9-81
+16        android:protectionLevel="signature" />
+16-->[androidx.core:core:1.17.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\fdca94ded3a049bd9b3e7a58feb886fe\transformed\core-1.17.0\AndroidManifest.xml:24:9-44
+17
+18    <uses-permission android:name="com.example.careerai.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+18-->[androidx.core:core:1.17.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\fdca94ded3a049bd9b3e7a58feb886fe\transformed\core-1.17.0\AndroidManifest.xml:26:5-97
+18-->[androidx.core:core:1.17.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\fdca94ded3a049bd9b3e7a58feb886fe\transformed\core-1.17.0\AndroidManifest.xml:26:22-94
+19
+20    <application
+20-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:6:5-29:19
+21        android:name="com.example.careerai.CareerAIApp"
+21-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:7:9-36
+22        android:allowBackup="true"
+22-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:9:9-35
+23        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+23-->[androidx.core:core:1.17.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\fdca94ded3a049bd9b3e7a58feb886fe\transformed\core-1.17.0\AndroidManifest.xml:28:18-86
+24        android:dataExtractionRules="@xml/data_extraction_rules"
+24-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:10:9-65
+25        android:debuggable="true"
+26        android:extractNativeLibs="false"
+27        android:fullBackupContent="@xml/backup_rules"
+27-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:11:9-54
+28        android:icon="@drawable/my_logo"
+28-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:12:9-41
+29        android:label="@string/app_name"
+29-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:13:9-41
+30        android:roundIcon="@drawable/my_logo"
+30-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:14:9-46
+31        android:supportsRtl="true"
+31-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:15:9-35
+32        android:testOnly="true"
+33        android:theme="@style/Theme.CareerAI"
+33-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:16:9-46
+34        android:usesCleartextTraffic="true" >
+34-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:8:9-44
+35        <activity
+35-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:18:9-28:20
+36            android:name="com.example.careerai.MainActivity"
+36-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:19:13-41
+37            android:exported="true"
+37-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:20:13-36
+38            android:label="@string/app_name"
+38-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:21:13-45
+39            android:theme="@style/Theme.CareerAI" >
+39-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:22:13-50
+40            <intent-filter>
+40-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:23:13-27:29
+41                <action android:name="android.intent.action.MAIN" />
+41-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:24:17-69
+41-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:24:25-66
+42
+43                <category android:name="android.intent.category.LAUNCHER" />
+43-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:26:17-77
+43-->C:\Users\Shubham\AndroidStudioProjects\CareerAI\app\src\main\AndroidManifest.xml:26:27-74
+44            </intent-filter>
+45        </activity>
+46        <activity
+46-->[androidx.compose.ui:ui-tooling-android:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\da01209e3c0473d16cfec454a86fe19f\transformed\ui-tooling\AndroidManifest.xml:23:9-25:39
+47            android:name="androidx.compose.ui.tooling.PreviewActivity"
+47-->[androidx.compose.ui:ui-tooling-android:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\da01209e3c0473d16cfec454a86fe19f\transformed\ui-tooling\AndroidManifest.xml:24:13-71
+48            android:exported="true" />
+48-->[androidx.compose.ui:ui-tooling-android:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\da01209e3c0473d16cfec454a86fe19f\transformed\ui-tooling\AndroidManifest.xml:25:13-36
+49        <activity
+49-->[androidx.compose.ui:ui-test-manifest:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\0b9c5a7902391790e12fbb8267aca92c\transformed\ui-test-manifest-1.9.0\AndroidManifest.xml:23:9-26:79
+50            android:name="androidx.activity.ComponentActivity"
+50-->[androidx.compose.ui:ui-test-manifest:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\0b9c5a7902391790e12fbb8267aca92c\transformed\ui-test-manifest-1.9.0\AndroidManifest.xml:24:13-63
+51            android:exported="true"
+51-->[androidx.compose.ui:ui-test-manifest:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\0b9c5a7902391790e12fbb8267aca92c\transformed\ui-test-manifest-1.9.0\AndroidManifest.xml:25:13-36
+52            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+52-->[androidx.compose.ui:ui-test-manifest:1.9.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\0b9c5a7902391790e12fbb8267aca92c\transformed\ui-test-manifest-1.9.0\AndroidManifest.xml:26:13-76
+53
+54        <provider
+54-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:24:9-32:20
+55            android:name="androidx.startup.InitializationProvider"
+55-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:25:13-67
+56            android:authorities="com.example.careerai.androidx-startup"
+56-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:26:13-68
+57            android:exported="false" >
+57-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:27:13-37
+58            <meta-data
+58-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:29:13-31:52
+59                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+59-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:30:17-75
+60                android:value="androidx.startup" />
+60-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\f7974ab3c18c24e9ccaaf3f2ec54d3d0\transformed\emoji2-1.4.0\AndroidManifest.xml:31:17-49
+61            <meta-data
+61-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\7666748b8e1c744fc7a0f576609bec70\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:29:13-31:52
+62                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+62-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\7666748b8e1c744fc7a0f576609bec70\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:30:17-78
+63                android:value="androidx.startup" />
+63-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\7666748b8e1c744fc7a0f576609bec70\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:31:17-49
+64            <meta-data
+64-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:29:13-31:52
+65                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+65-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:30:17-85
+66                android:value="androidx.startup" />
+66-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:31:17-49
+67        </provider>
+68
+69        <receiver
+69-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:34:9-52:20
+70            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+70-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:35:13-76
+71            android:directBootAware="false"
+71-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:36:13-44
+72            android:enabled="true"
+72-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:37:13-35
+73            android:exported="true"
+73-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:38:13-36
+74            android:permission="android.permission.DUMP" >
+74-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:39:13-57
+75            <intent-filter>
+75-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:40:13-42:29
+76                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+76-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:17-91
+76-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:25-88
+77            </intent-filter>
+78            <intent-filter>
+78-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:43:13-45:29
+79                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+79-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:17-85
+79-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:25-82
+80            </intent-filter>
+81            <intent-filter>
+81-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:46:13-48:29
+82                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+82-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:17-88
+82-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:25-85
+83            </intent-filter>
+84            <intent-filter>
+84-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:49:13-51:29
+85                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+85-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:17-95
+85-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Shubham\.gradle\caches\8.11.1\transforms\cf7045e2156ccb4377866b85a67656fc\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:25-92
+86            </intent-filter>
+87        </receiver>
+88    </application>
+89
+90</manifest>
