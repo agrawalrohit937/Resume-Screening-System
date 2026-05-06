@@ -20,7 +20,7 @@ export default function AIAvatar({
   autoSpeak = true,
   avatarName = 'Alex',
   compact = false,
-  videoSource = '/avatar-loop.mp4' 
+  videoSource = 'avatar-loop.mp4' 
 }) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voicesReady, setVoicesReady] = useState(false)
