@@ -1,50 +1,24 @@
-# Python
-venv/
-__pycache__/
-**/__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.python-version
-pip-log.txt
-pip-delete-this-directory.txt
-htmlcov/
-.coverage
-.cache
-.env
-backend/.env
-backend/.env.*
-uploads/
-
-# Node / frontend
-frontend/node_modules/
-frontend/dist/
-frontend/build/
-frontend/.vite/
-frontend/.env.local
-frontend/.env.*.local
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-# OS / editor
+gitignore
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
 .DS_Store
-Thumbs.db
-*.swp
-*.swo
-*.bak
-*.tmp
-*.temp
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
 
-# IDE
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-# Added by code-review-graph
-.code-review-graph/
+# Android Studio captures and builds
+**/build/
+*.apk
+*.bundle
+
+# Log files
+*.log
