@@ -10,6 +10,16 @@ export function LeaderboardCard({ entry, currentUserId, index }) {
   }
   const rankStyle = RANK_STYLES[entry.rank] || { bg: 'bg-white border-slate-200', badge: 'bg-slate-200 text-slate-600', icon: '' }
 
+  const displayName = isMe
+    ? 'You'
+    : entry.full_name
+      ? entry.full_name
+      : `Top Player #${entry.rank}`
+
+  const initials = entry.full_name
+    ? entry.full_name.split(' ').slice(0, 2).map(word => word[0]).join('').toUpperCase()
+    : entry.level_info?.icon || '🌱'
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
@@ -23,14 +33,14 @@ export function LeaderboardCard({ entry, currentUserId, index }) {
 
       {/* Avatar */}
       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-        {entry.level_info?.icon || '🌱'}
+        {initials}
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-semibold text-sm text-slate-800 font-body truncate">
-            {isMe ? 'You' : `Player ${entry.user_id.slice(-6)}`}
+            {displayName}
           </p>
           {isMe && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-mono font-bold">YOU</span>}
         </div>

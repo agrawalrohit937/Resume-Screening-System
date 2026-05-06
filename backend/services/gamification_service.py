@@ -266,14 +266,41 @@ class GamificationService:
         }
 
     # ─── Leaderboard ──────────────────────────────────────────────────────────
+
     async def get_leaderboard(self, limit: int = 20) -> List[Dict]:
         cursor = self.collection.find().sort("total_points", -1).limit(limit)
         docs = await cursor.to_list(length=limit)
+
         result = []
         for rank, doc in enumerate(docs, 1):
+            user_id = doc["user_id"]
+            # Always return a usable display name for the leaderboard.
+            # If `full_name` is missing/empty in DB (older users), fall back to other fields.
+            full_name = ""
+            try:
+                user = await self.db.users.find_one(
+                    {"_id": ObjectId(user_id)},
+                    {"full_name": 1, "email": 1, "username": 1, "name": 1},
+                )
+            except Exception:
+                user = None
+
+            if user:
+                full_name = (user.get("full_name") or "").strip()
+                if not full_name:
+                    full_name = (user.get("name") or "").strip()
+                if not full_name:
+                    full_name = (user.get("username") or "").strip()
+                if not full_name:
+                    full_name = (user.get("email") or "").strip()
+
+            if not full_name:
+                full_name = "Unknown"
+
             result.append({
                 "rank": rank,
                 "user_id": doc["user_id"],
+                "full_name": full_name,
                 "total_points": doc.get("total_points", 0),
                 "level_info": self._compute_level(doc.get("total_points", 0)),
                 "current_streak": doc.get("current_streak", 0),
@@ -283,7 +310,7 @@ class GamificationService:
                 "top_badge": doc["badges"][-1] if doc.get("badges") else None,
             })
         return result
-    
+
     async def mark_daily_activity(self, user_id: str):
         now = datetime.now(timezone.utc)
         profile = await self.get_profile(user_id)
