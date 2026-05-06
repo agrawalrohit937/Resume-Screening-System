@@ -5,8 +5,16 @@
       "dest": "/avatar-loop.mp4"
     },
     {
-      "src": "^/assets/(.*)",
+      "src": "^/(favicon\\.ico|illustration\\.png|avatar-loop\\.mp4)$",
+      "dest": "/$1"
+    },
+    {
+      "src": "^/assets/(.*)$",
       "dest": "/assets/$1"
+    },
+    {
+      "src": "^/(.*\\.(png|jpg|jpeg|webp|svg|ico|gif))$",
+      "dest": "/$1"
     },
     {
       "src": "^(.*)$",
