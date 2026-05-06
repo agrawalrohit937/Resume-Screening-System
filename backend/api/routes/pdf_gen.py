@@ -51,7 +51,7 @@ async def generate_resume_pdf(
     output_path = os.path.join(output_dir, output_filename)
 
     pdf_url = await pdf_service.generate_resume_pdf(
-    resume, output_path, template=payload.template
+        resume, output_path, template=payload.template
     )
     # SAVE PDF URL IN DB
     await resume_repo.update(

@@ -5,7 +5,7 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 // ✅ Create instance
 const api = axios.create({
   baseURL: BASE,
-  timeout: 60000,
+  timeout: 120000,  // Increased for PDF generation (2min)
   withCredentials: false // JWT use ho raha hai → cookies ki need nahi
 })
 
