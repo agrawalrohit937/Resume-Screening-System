@@ -94,8 +94,9 @@ export default function Signup() {
       {/* ILLUSTRATION (Friend's UI) */}
       <div className="relative w-full h-full rounded-[90px] overflow-hidden hidden lg:block">
         <div className="absolute bottom-[20px] left-[130px] z-0">
-          <img
-            src={`${import.meta.env.BASE_URL}/illustration.png`} 
+            <img
+            src={'/illustration.png'} 
+
             alt="illustration"
             className="w-[550px] max-w-none object-contain animate-[float_6s_ease-in-out_infinite]"
           />
