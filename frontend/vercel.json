@@ -1,6 +1,10 @@
 {
   "routes": [
     {
+      "src": "^/avatar-loop\\.mp4$",
+      "dest": "/avatar-loop.mp4"
+    },
+    {
       "src": "^/assets/(.*)",
       "dest": "/assets/$1"
     },
