@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { GoogleLogin } from '@react-oauth/google'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
-const illustration = "/illustration.png";
+  const illustration = `${import.meta.env.BASE_URL}/illustration.png`;
 
 export default function Login() {
   const { login, googleLogin } = useAuth()

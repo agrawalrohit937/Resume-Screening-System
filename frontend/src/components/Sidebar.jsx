@@ -172,7 +172,7 @@ export default function Sidebar({ collapsed, onToggle }) {
             >
               <div className="bg-[#F8FAFC] rounded-2xl p-5 text-center relative overflow-hidden flex flex-col items-center">
                 <div className="w-full h-24 mb-2 flex items-center justify-center relative z-10">
-                  <img src="/illustration.png" alt="Upgrade" className="object-contain h-full" />
+                  <img src={`${import.meta.env.BASE_URL}/illustration.png`} alt="Upgrade" className="object-contain h-full" />
                 </div>
                 <h4 className="font-bold text-slate-800 text-[13px] mb-1.5 relative z-10">Unlock Full Potential</h4>
                 <p className="text-[11px] text-slate-500 mb-4 leading-relaxed relative z-10 px-1">
