@@ -46,18 +46,50 @@ class ParserService:
             raise ValueError(f"Unsupported file type: {file_type}")
 
     def _extract_pdf(self, file_path: str) -> str:
+        """Extract text from PDF using multiple strategies for best coverage."""
         text_parts = []
         try:
             with pdfplumber.open(file_path) as pdf:
                 for page in pdf.pages:
-                    page_text = page.extract_text(x_tolerance=2, y_tolerance=2)
+                    # Strategy 1: layout-aware extraction (better for columns/tables)
+                    page_text = page.extract_text(
+                        x_tolerance=3, y_tolerance=3,
+                        layout=True, x_density=7.25, y_density=13
+                    )
+                    if not page_text or len(page_text.strip()) < 50:
+                        # Strategy 2: simpler extraction as fallback
+                        page_text = page.extract_text(x_tolerance=2, y_tolerance=2)
                     if page_text:
                         text_parts.append(page_text)
+
+                    # Also extract text from tables (multi-column skill grids)
+                    tables = page.extract_tables()
+                    for table in (tables or []):
+                        for row in (table or []):
+                            row_text = " | ".join(str(cell) for cell in (row or []) if cell and str(cell).strip())
+                            if row_text.strip():
+                                text_parts.append(row_text)
+        except TypeError:
+            # Older pdfplumber doesn't support layout param — fallback
+            try:
+                with pdfplumber.open(file_path) as pdf:
+                    for page in pdf.pages:
+                        page_text = page.extract_text(x_tolerance=2, y_tolerance=2)
+                        if page_text:
+                            text_parts.append(page_text)
+            except Exception as e:
+                raise RuntimeError(f"PDF extraction error: {e}")
         except Exception as e:
             raise RuntimeError(f"PDF extraction error: {e}")
+
         full_text = "\n".join(text_parts)
+        # Clean up encoding artifacts and excessive whitespace
+        full_text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", " ", full_text)
+        full_text = re.sub(r"[ \t]{3,}", "  ", full_text)
+        full_text = re.sub(r"\n{4,}", "\n\n\n", full_text)
+
         if not full_text.strip():
-            raise ValueError("PDF contains no extractable text (may be image-based).")
+            raise ValueError("PDF contains no extractable text (may be image-based or scanned).")
         return full_text
 
     def _extract_docx(self, file_path: str) -> str:

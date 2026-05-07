@@ -382,17 +382,7 @@ function ScoreHero({ result }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════════════════════
-const SAMPLE_JD = `Senior Python Developer — Build scalable AI-powered systems.
 
-Required Skills: Python, FastAPI, MongoDB, Docker, AWS, PostgreSQL, Redis, Kubernetes
-
-We are building the next generation of AI infrastructure. You'll design microservices, mentor engineers, and drive technical roadmaps.
-
-Requirements:
-• 5+ years Python in production
-• Docker and Kubernetes experience
-• Strong async programming and system design
-• AWS cloud infrastructure experience`
 
 export default function Results() {
   const navigate = useNavigate()
@@ -418,6 +408,7 @@ export default function Results() {
   const [analyzing,     setAnalyzing]     = useState(false)
   const [result,        setResult]        = useState(null)
   const [activeTab,     setActiveTab]     = useState(0)
+
 
   const [enhancing,     setEnhancing]     = useState(false)
   const [enhanceResult, setEnhanceResult] = useState(null)
@@ -735,11 +726,17 @@ const onResumeDrop = useCallback(async (accepted) => {
                     onBlur={e => e.target.style.borderColor=jdText.length > 50 ? '#A7F3D0' : '#E2E8F0'}
                   />
                   <div style={{ position:'absolute', bottom:8, right:10, display:'flex', gap:8 }}>
-                    <button onClick={() => setJdText(SAMPLE_JD)}
+                    {/* No sample/dummy data — user must paste/upload a real JD */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toast.error('Paste a real job description or upload a JD file.');
+                      }}
                       style={{ padding:'3px 9px', borderRadius:7, background:'#EFF6FF', border:'1px solid #C7D2FE',
                         fontFamily:"'JetBrains Mono',monospace", fontSize:10, fontWeight:600, color:'#4338CA', cursor:'pointer' }}>
-                      Load sample
+                      Paste required
                     </button>
+
                     {jdText && (
                       <button onClick={() => setJdText('')}
                         style={{ padding:'3px 9px', borderRadius:7, background:'#F8FAFC', border:'1px solid #E2E8F0',
