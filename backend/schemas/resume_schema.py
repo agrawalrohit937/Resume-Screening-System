@@ -55,6 +55,7 @@ class EnhanceResumeRequest(BaseModel):
         description="Areas to enhance: summary | experience | skills | keywords | formatting"
     )
     tone: str = Field(default="professional", pattern="^(professional|creative|academic)$")
+    save_enhanced: bool = Field(default=False, description="Save the enhanced data back to the resume")
 
 
 class EnhanceResumeResponse(BaseModel):

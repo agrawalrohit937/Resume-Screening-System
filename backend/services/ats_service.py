@@ -1,38 +1,44 @@
 """
 ATS Service — Hybrid TF-IDF + BERT scoring engine
-final_score = 0.75 * BERT + 0.25 * TF-IDF
+final_score = 0.6 * BERT + 0.3 * TF-IDF + 0.1 * keyword_boost
 """
 import requests
 import time
+import threading
 from typing import List, Optional, Tuple
 
 import numpy as np
 import structlog
-# from sentence_transformers import SentenceTransformer
-# from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from core.config import settings
 from models.resume_model import ResumeModel
 from models.result_model import ATSResultModel, SkillGap, ExplainSection
 from utils.nlp_utils import (
     clean_text, get_tfidf_similarity, extract_keywords,
-    detect_skills_in_text, TECH_SKILLS
+    detect_skills_in_text, TECH_SKILLS, extract_sections
 )
 from utils.validators import normalize_score, score_to_label
 
 logger = structlog.get_logger(__name__)
 
-# ─── Singleton BERT Model ─────────────────────────────────────────────────────
-# _bert_model: Optional[SentenceTransformer] = None
+# ─── Singleton BERT Model (thread-safe) ───────────────────────────────────────
+_bert_model: Optional[SentenceTransformer] = None   # FIX: was accidentally commented out
+_bert_lock = threading.Lock()
 
 HF_API_URL = "https://huggingface.co/spaces/rk937/ats-bert-api"
-# def _get_bert_model() -> SentenceTransformer:
-#     global _bert_model
-#     if _bert_model is None:
-#         logger.info("Loading BERT model", model=settings.BERT_MODEL_NAME)
-#         _bert_model = SentenceTransformer(settings.BERT_MODEL_NAME)
-#         logger.info("BERT model loaded ------")
-#     return _bert_model
+
+
+def _get_bert_model() -> SentenceTransformer:
+    global _bert_model
+    if _bert_model is None:
+        with _bert_lock:
+            if _bert_model is None:  # double-checked locking
+                logger.info("Loading BERT model", model=settings.BERT_MODEL_NAME)
+                _bert_model = SentenceTransformer(settings.BERT_MODEL_NAME)
+                logger.info("BERT model loaded successfully")
+    return _bert_model
 
 
 class ATSService:
@@ -41,8 +47,10 @@ class ATSService:
     """
 
     def __init__(self):
-        self.bert_weight = settings.BERT_SCORE_WEIGHT      # 0.6
-        self.tfidf_weight = settings.TFIDF_SCORE_WEIGHT    # 0.4
+        # Score formula: 60% BERT + 30% TF-IDF + 10% keyword match boost
+        self.bert_weight = 0.60
+        self.tfidf_weight = 0.30
+        self.kw_boost_weight = 0.10
 
     # ─── Primary Scoring Pipeline ─────────────────────────────────────────────
     async def score_resume(
@@ -59,19 +67,14 @@ class ATSService:
         """
         t_start = time.perf_counter()
 
-        resume_text = ""
-        if resume.parsed_data and resume.parsed_data.raw_text:
-            resume_text = resume.parsed_data.raw_text
+        # ── Build Resume Text (robust: sections first, then full raw_text fallback)
+        resume_text = self._build_resume_text(resume)
         if not resume_text.strip():
             raise ValueError("Resume has no parsed text. Re-upload and parse first.")
 
         # ── Step 1: Core Similarity ──────────────────────────────────────────
-        # bert_score = self._compute_bert_similarity(resume_text, job_description)
-        bert_score = self._compute_hf_similarity(resume_text, job_description)
+        bert_score = self._compute_bert_similarity(resume_text, job_description)
         tfidf_score = get_tfidf_similarity(resume_text, job_description)
-        final_score = normalize_score(
-            self.bert_weight * bert_score + self.tfidf_weight * tfidf_score
-        )
 
         # ── Step 2: Keyword Analysis ─────────────────────────────────────────
         matched_kw, missing_kw, kw_score = self._keyword_analysis(
@@ -88,12 +91,29 @@ class ATSService:
         # ── Step 4: Component Scores ──────────────────────────────────────────
         experience_score = self._score_experience(resume, job_description)
         education_score = self._score_education(resume, job_description)
-        skills_score = normalize_score(len(matched_skills) / max(len(required_skills + preferred_skills), 1))
 
-        # ── Step 5: Skill Gaps ────────────────────────────────────────────────
+        # Skills score: if no required/preferred skills passed, detect from JD
+        all_jd_skills_count = len(required_skills + preferred_skills)
+        if all_jd_skills_count == 0:
+            # Auto-detect skills from JD text
+            jd_tech, _ = detect_skills_in_text(job_description)
+            all_jd_skills_count = max(len(jd_tech), 1)
+        skills_score = normalize_score(len(matched_skills) / all_jd_skills_count)
+
+        # ── Step 5: Final Composite Score ─────────────────────────────────────
+        # Formula: 60% BERT semantic + 30% TF-IDF keyword + 10% keyword match boost
+        keyword_boost = kw_score * 0.10
+        raw_final = (
+            self.bert_weight * bert_score
+            + self.tfidf_weight * tfidf_score
+            + keyword_boost
+        )
+        final_score = normalize_score(raw_final)
+
+        # ── Step 6: Skill Gaps ────────────────────────────────────────────────
         skill_gaps = self._build_skill_gaps(missing_skills, required_skills)
 
-        # ── Step 6: Explanation ───────────────────────────────────────────────
+        # ── Step 7: Explanation ───────────────────────────────────────────────
         explanation = self._explain_scores(
             bert_score=bert_score,
             tfidf_score=tfidf_score,
@@ -105,7 +125,7 @@ class ATSService:
             missing_kw=missing_kw[:10],
         )
 
-        # ── Step 7: Strengths & Weaknesses ────────────────────────────────────
+        # ── Step 8: Strengths & Weaknesses ────────────────────────────────────
         strengths, weaknesses = self._derive_strengths_weaknesses(
             final_score, matched_skills, missing_skills, experience_score, education_score
         )
@@ -114,6 +134,15 @@ class ATSService:
         recommendation = score_to_label(final_score)
 
         processing_time_ms = int((time.perf_counter() - t_start) * 1000)
+
+        logger.info(
+            "ATS score computed",
+            bert=round(bert_score, 3),
+            tfidf=round(tfidf_score, 3),
+            kw=round(kw_score, 3),
+            final=final_score,
+            resume_chars=len(resume_text),
+        )
 
         return dict(
             bert_score=round(bert_score, 4),
@@ -169,45 +198,86 @@ class ATSService:
             logger.error("HF similarity failed", error=str(e))
         return 0.0
 
+    # ─── Resume Text Builder (robust) ────────────────────────────────────────
+    def _build_resume_text(self, resume: ResumeModel) -> str:
+        """Build the best possible resume text for scoring.
+        Priority: sections (if detected) supplemented by full raw_text.
+        Always falls back to full raw_text to avoid empty text.
+        """
+        if not resume.parsed_data:
+            return ""
+        raw = resume.parsed_data.raw_text or ""
+        if not raw.strip():
+            return ""
+
+        sections = extract_sections(raw)
+        relevant_parts = [
+            sections.get("summary", ""),
+            sections.get("experience", ""),
+            sections.get("skills", ""),
+            sections.get("projects", ""),
+            sections.get("certifications", ""),
+        ]
+        section_text = " ".join(s for s in relevant_parts if s).strip()
+
+        # If sections detected well (>20% of raw), use sections + raw combined
+        if len(section_text) > len(raw) * 0.2:
+            # Combine: section text gives structure, raw_text ensures nothing is missed
+            combined = section_text + " " + raw
+            return combined[:8000]  # limit for BERT
+
+        # Fallback: use full raw text — sections weren't detected reliably
+        return raw[:8000]
+
     # ─── BERT Similarity ──────────────────────────────────────────────────────
-    # def _compute_bert_similarity(self, text1: str, text2: str) -> float:
-    #     try:
-    #         model = _get_bert_model()
-    #         # Truncate to avoid token limit
-    #         t1 = clean_text(text1)[:3000]
-    #         t2 = clean_text(text2)[:3000]
-    #         embeddings = model.encode([t1, t2], convert_to_numpy=True, normalize_embeddings=True)
-    #         sim = float(np.dot(embeddings[0], embeddings[1]))
-    #         return normalize_score(sim)
-    #     except Exception as e:
-    #         logger.warning("BERT similarity failed, falling back to 0", error=str(e))
-    #         return 0.0
+    def _compute_bert_similarity(self, text1: str, text2: str) -> float:
+        try:
+            model = _get_bert_model()
+            # Truncate to 4096 chars for BERT token limit
+            t1 = clean_text(text1)[:4096]
+            t2 = clean_text(text2)[:4096]
+            if not t1.strip() or not t2.strip():
+                return 0.0
+            embeddings = model.encode([t1, t2], convert_to_numpy=True, normalize_embeddings=True)
+            sim = float(np.dot(embeddings[0], embeddings[1]))
+            # Cosine sim of normalized vectors is in [-1, 1]; clamp to [0, 1]
+            return normalize_score(sim)
+        except Exception as e:
+            logger.warning("BERT similarity failed", error=str(e))
+            return 0.0
 
-    # ─── Bulk BERT Embeddings ─────────────────────────────────────────────────
-    # def bulk_bert_similarity(self, resume_texts: List[str], jd_text: str) -> List[float]:
-    #     try:
-    #         model = _get_bert_model()
-    #         all_texts = [clean_text(t)[:3000] for t in resume_texts] + [clean_text(jd_text)[:3000]]
-    #         embeddings = model.encode(all_texts, convert_to_numpy=True, normalize_embeddings=True)
-    #         jd_embedding = embeddings[-1].reshape(1, -1)
-    #         resume_embeddings = embeddings[:-1]
-    #         sims = cosine_similarity(resume_embeddings, jd_embedding).flatten()
-    #         return [normalize_score(float(s)) for s in sims]
-    #     except Exception as e:
-    #         logger.error("Bulk BERT failed", error=str(e))
-    #         return [0.0] * len(resume_texts)
+    # ─── Bulk BERT Embeddings ──────────────────────────────────────────────────
+    def bulk_bert_similarity(self, resume_texts: List[str], jd_text: str) -> List[float]:
+        try:
+            model = _get_bert_model()
+            all_texts = [clean_text(t)[:4096] for t in resume_texts] + [clean_text(jd_text)[:4096]]
+            embeddings = model.encode(all_texts, convert_to_numpy=True, normalize_embeddings=True)
+            jd_embedding = embeddings[-1].reshape(1, -1)
+            resume_embeddings = embeddings[:-1]
+            sims = cosine_similarity(resume_embeddings, jd_embedding).flatten()
+            return [normalize_score(float(s)) for s in sims]
+        except Exception as e:
+            logger.error("Bulk BERT failed", error=str(e))
+            return [0.0] * len(resume_texts)
 
-    # ─── Keyword Analysis ─────────────────────────────────────────────────────
+    # ─── Keyword Analysis ──────────────────────────────────────────────────────────
     def _keyword_analysis(
         self,
         resume_text: str,
         jd_text: str,
         required_skills: List[str],
     ) -> Tuple[List[str], List[str], float]:
-        jd_keywords = {kw for kw, _ in extract_keywords(jd_text, top_n=40)}
+        # Extract important keywords from JD using TF-IDF
+        jd_kw_tfidf = {kw for kw, _ in extract_keywords(jd_text, top_n=50)}
+        # Also add tech skills found in JD for richer matching
+        jd_tech, _ = detect_skills_in_text(jd_text)
+        jd_keywords = jd_kw_tfidf | {s.lower() for s in jd_tech}
+        # Required skills always included
         jd_keywords.update(s.lower() for s in required_skills)
-        resume_lower = resume_text.lower()
+        # Remove very short tokens that cause false positives
+        jd_keywords = {kw for kw in jd_keywords if len(kw) > 2}
 
+        resume_lower = resume_text.lower()
         matched = [kw for kw in jd_keywords if kw in resume_lower]
         missing = [kw for kw in jd_keywords if kw not in resume_lower]
         rate = normalize_score(len(matched) / max(len(jd_keywords), 1))

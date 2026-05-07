@@ -6,6 +6,7 @@ import re
 import string
 from typing import List, Set, Tuple
 
+import structlog
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
@@ -22,6 +23,7 @@ for pkg in _nltk_downloads:
 
 _lemmatizer = WordNetLemmatizer()
 _stop_words = set(stopwords.words("english"))
+logger = structlog.get_logger(__name__)
 
 # ─── Known Skill Lists ────────────────────────────────────────────────────────
 TECH_SKILLS = {
@@ -148,35 +150,62 @@ def get_tfidf_similarity(text1: str, text2: str) -> float:
     """Compute cosine TF-IDF similarity between two texts."""
     from sklearn.metrics.pairwise import cosine_similarity
     try:
-        texts = [clean_text(text1, remove_stopwords=True), clean_text(text2, remove_stopwords=True)]
-        vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words="english")
-        matrix = vectorizer.fit_transform(texts)
+        # FIX: Use clean_text WITHOUT remove_stopwords — the vectorizer handles stopwords.
+        # Previously had double stopword removal which destroyed vocabulary.
+        t1 = clean_text(text1)  # just normalize whitespace/punctuation
+        t2 = clean_text(text2)
+        if not t1.strip() or not t2.strip():
+            return 0.0
+        vectorizer = TfidfVectorizer(
+            ngram_range=(1, 2),
+            stop_words="english",
+            sublinear_tf=True,      # dampen high-freq terms — better for short docs
+            min_df=1,
+            max_df=0.95,
+        )
+        matrix = vectorizer.fit_transform([t1, t2])
         sim = cosine_similarity(matrix[0:1], matrix[1:2])[0][0]
         return round(float(sim), 4)
-    except Exception:
+    except Exception as e:
+        logger.warning("TF-IDF similarity failed", error=str(e))
         return 0.0
 
 
 def extract_sections(text: str) -> dict:
-    """Split resume text into sections by common headers."""
+    """
+    Split resume text into named sections by detecting common headers.
+    Supports a wide variety of resume formatting styles.
+    """
     section_headers = {
-        "summary": r"(summary|objective|profile|about)",
-        "experience": r"(experience|employment|work history|career)",
-        "education": r"(education|academic|qualification)",
-        "skills": r"(skills|technical skills|competencies|expertise)",
-        "projects": r"(projects|portfolio)",
-        "certifications": r"(certifications?|licenses?|courses?)",
+        "summary": r"(summary|objective|profile|about\s*me|career\s*summary|professional\s*summary|personal\s*statement|overview)",
+        "experience": r"(experience|employment|work\s*history|career|professional\s*experience|work\s*experience|job\s*history|relevant\s*experience|internship|positions?\s*held)",
+        "education": r"(education|academic|qualification|schooling|degree|university|college)",
+        "skills": r"(skills|technical\s*skills|competencies|expertise|technologies|tech\s*stack|core\s*competencies|key\s*skills|areas\s*of\s*expertise|tools|languages)",
+        "projects": r"(projects?|portfolio|personal\s*projects?|key\s*projects?|academic\s*projects?|notable\s*projects?)",
+        "certifications": r"(certifications?|certificates?|licenses?|courses?|training|accreditations?|achievements?|awards?)",
+        "publications": r"(publications?|papers?|research|patents?)",
+        "volunteer": r"(volunteer|community|extracurricular|activities|leadership)",
     }
-    sections = {}
+    sections: dict = {}
     lines = text.split("\n")
     current_section = "header"
-    buffer = []
+    buffer: list = []
 
     for line in lines:
         line_stripped = line.strip()
+        # Skip blank lines from section detection but keep in buffer
+        if not line_stripped:
+            buffer.append(line)
+            continue
+
         matched_section = None
+        # Use re.search (not re.match) so headers work with leading spaces/symbols
         for section, pattern in section_headers.items():
-            if re.match(pattern, line_stripped, re.IGNORECASE) and len(line_stripped) < 50:
+            # Only match if the line is short enough to be a header (≤80 chars)
+            # and the pattern is found (case-insensitive)
+            if len(line_stripped) <= 80 and re.search(
+                rf"^[\W_]*({pattern})[\W_]*$", line_stripped, re.IGNORECASE
+            ):
                 matched_section = section
                 break
         if matched_section:
@@ -187,6 +216,7 @@ def extract_sections(text: str) -> dict:
         else:
             buffer.append(line)
 
+    # Save last section
     if buffer:
         sections[current_section] = "\n".join(buffer).strip()
 
