@@ -64,11 +64,16 @@ if (response.success) {
           <div className="flex items-center gap-2">
             <span className="badge-blue">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
               Resume ready!
             </span>
           </div>
+
           <div className="flex gap-2">
             <a
               href={pdfUrl}
@@ -77,7 +82,11 @@ if (response.success) {
               className="btn-primary"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
               Download PDF
             </a>
@@ -86,7 +95,11 @@ if (response.success) {
               className="btn-ghost"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.582 0A4 4 0 014.582 9m0 0H9m11 11v-5h-.581m0 0a4 4 0 01-4.582-9m0 0H9" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 4v5h.582m15.582 0A4 4 0 014.582 9m0 0H9m11 11v-5h-.581m0 0a4 4 0 01-4.582-9m0 0H9"
+                />
               </svg>
               Regenerate
             </button>

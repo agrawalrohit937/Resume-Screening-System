@@ -1,122 +1,247 @@
 """
-PDF Generator Service — Compile LaTeX to PDF, upload via FTP
+PDF Generator Service — Render resume HTML and convert it to PDF with Playwright.
+
+WeasyPrint was replaced because its PDF text layer corrupts ligatures and
+misencodes glyphs, causing strict-match ATS scores to drop.  Playwright uses
+headless Chromium — the same engine as "Print to PDF" in Chrome — which
+produces a clean, fully-selectable text layer that ATS parsers can parse
+without any glyph-merging artefacts.
+
+Post-install step (one-time, also in Dockerfile):
+    playwright install chromium
 """
 
-import io
+import asyncio
 import os
-import shutil
-import subprocess
-import tempfile
-from datetime import datetime
-from ftplib import FTP
 
 import structlog
+from jinja2 import Environment, FileSystemLoader
+from playwright.sync_api import sync_playwright
 
-from models.resume_model import ResumeModel
 from core.config import settings
-from services.latex_template_service import build_latex
+from services.cloudinary_service import upload_ats_resume
 
 logger = structlog.get_logger(__name__)
 
 
-def upload_to_ftp(local_file_path: str, remote_filename: str) -> str:
-    try:
-        logger.info("FTP connecting", host=settings.FTP_HOST)
-        ftp = FTP()
-        ftp.connect(settings.FTP_HOST, settings.FTP_PORT, timeout=20)
-        ftp.login(settings.FTP_USERNAME, settings.FTP_PASSWORD)
-        ftp.set_pasv(True)
+# ---------------------------------------------------------------------------
+# Core PDF utility
+# ---------------------------------------------------------------------------
 
-        ftp.cwd("domains/generativeaix.com/public_html")
+def _sync_generate_pdf(html_content: str, output_path: str) -> None:
+    """
+    Blocking Playwright call that runs inside a worker thread.
 
-        folders = ftp.nlst()
-        if "ats_resume" not in folders:
-            ftp.mkd("ats_resume")
-        ftp.cwd("ats_resume")
+    sync_playwright creates its own internal event loop inside the thread,
+    so it is completely unaffected by which asyncio loop policy the parent
+    process uses.  This is the recommended pattern for Windows + FastAPI.
+    """
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        try:
+            page = browser.new_page()
+            # wait_until="networkidle" lets Google Fonts finish loading.
+            # Falls back gracefully to system fonts if network is unavailable.
+            page.set_content(html_content, wait_until="networkidle")
+            page.pdf(
+                path=output_path,
+                format="A4",
+                print_background=True,
+            )
+            logger.info("Playwright PDF written", path=output_path)
+        finally:
+            browser.close()
 
-        with open(local_file_path, "rb") as f:
-            ftp.storbinary(f"STOR {remote_filename}", f)
 
-        ftp.quit()
+async def generate_pdf_from_html(html_content: str, output_path: str) -> None:
+    """
+    Async wrapper — offloads the blocking Playwright call to a thread so the
+    FastAPI event loop is never blocked.
 
-        url = f"{settings.FTP_BASE_URL}/ats_resume/{remote_filename}"
-        logger.info("FTP upload complete", url=url)
-        return url
+    Windows note: async_playwright raises NotImplementedError on SelectorEventLoop
+    because it needs asyncio.create_subprocess_exec which is not supported.
+    Running sync_playwright in a thread bypasses this entirely.
+    """
+    output_path = os.path.abspath(output_path)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    # asyncio.to_thread offloads to the default ThreadPoolExecutor.
+    # The thread gets its own OS-level event loop context, safe on Windows.
+    await asyncio.to_thread(_sync_generate_pdf, html_content, output_path)
 
-    except Exception as e:
-        logger.error("FTP upload failed", error=str(e))
-        raise Exception(f"FTP upload failed: {str(e)}")
 
+# ---------------------------------------------------------------------------
+# Cloudinary helpers
+# ---------------------------------------------------------------------------
+
+async def upload_to_cloudinary(local_file_path: str, remote_filename: str) -> str:
+    """Read PDF from local path, upload to Cloudinary, return secure_url."""
+    with open(local_file_path, "rb") as f:
+        pdf_bytes = f.read()
+    secure_url, _public_id = await upload_ats_resume(pdf_bytes, remote_filename)
+    logger.info("Cloudinary ATS resume upload complete", url=secure_url)
+    return secure_url
+
+
+# Keep the old name as an alias so that any remaining callers that import
+# upload_to_ftp from this module continue to work.
+upload_to_ftp = upload_to_cloudinary
+
+
+# ---------------------------------------------------------------------------
+# Service class
+# ---------------------------------------------------------------------------
 
 class PDFGeneratorService:
 
+    def _template_dir(self) -> str:
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates"))
+
+    def _dedupe_preserve_order(self, items) -> list:
+        """Dedupe case-insensitively while preserving the LLM's priority order."""
+        seen = set()
+        result = []
+        for item in items or []:
+            cleaned = (item or "").strip()
+            key = cleaned.lower()
+            if cleaned and key not in seen:
+                seen.add(key)
+                result.append(cleaned)
+        return result
+
+    def _normalize_resume_context(self, resume_data: dict) -> dict:
+        contact = resume_data.get("contact") or {}
+        if hasattr(contact, "model_dump"):
+            contact = contact.model_dump()
+        elif hasattr(contact, "__dict__"):
+            contact = contact.__dict__
+
+        def as_dict_list(items):
+            normalized = []
+            for item in items or []:
+                if hasattr(item, "model_dump"):
+                    item = item.model_dump()
+                elif hasattr(item, "__dict__"):
+                    item = item.__dict__
+                if item:
+                    normalized.append(item)
+            return normalized
+
+        return {
+            "full_name": (resume_data.get("full_name") or "").strip(),
+            "role_title": (resume_data.get("target_role") or "").strip(),
+            "email": (contact.get("email") or "").strip(),
+            "phone": (contact.get("phone") or "").strip(),
+            "linkedin": (contact.get("linkedin") or "").strip(),
+            "github": (contact.get("github") or "").strip(),
+            "portfolio": (contact.get("portfolio") or "").strip(),
+
+            "summary": (resume_data.get("summary") or "").strip(),
+
+            "experience": as_dict_list(resume_data.get("experience", [])),
+            "projects": as_dict_list(resume_data.get("projects", [])),
+            "education": as_dict_list(resume_data.get("education", [])),
+
+            # skills may be a Dict[str, List[str]] (categorised, new format) or
+            # a flat List[str] (legacy).  Never run the dict through the list
+            # deduper — iterating a dict yields only keys, losing all values.
+            "skills": (
+                resume_data.get("skills") or {}
+                if isinstance(resume_data.get("skills"), dict)
+                else self._dedupe_preserve_order(resume_data.get("skills", []))
+            ),
+
+            "certifications": resume_data.get("certifications", []) or [],
+            "achievements": resume_data.get("achievements", []) or [],
+
+            # Growth checklist only — the template intentionally does NOT
+            # print this on the resume.
+            "recommended_skills": self._dedupe_preserve_order(
+                resume_data.get("recommended_skills", [])
+            ),
+        }
+
+    def _resolve_template_name(self, template: str) -> str:
+        template_aliases = {
+            "modern": "resume.html",
+            "classic": "resume.html",
+            "minimal": "resume.html",
+        }
+        resolved_template = template_aliases.get(template, template)
+        template_path = os.path.join(self._template_dir(), resolved_template)
+
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Resume template not found: {resolved_template}")
+
+        return resolved_template
+
     async def generate_resume_pdf(
         self,
-        resume: ResumeModel,
+        resume_data: dict,
         output_path: str,
-        template: str = "modern",
+        template: str = "resume.html",
     ) -> str:
-        if not resume.parsed_data:
-            raise ValueError("Resume must be parsed before PDF generation.")
+        """
+        1. Render HTML from the Jinja2 template
+        2. Convert HTML → PDF using Playwright (headless Chromium)
+        3. Upload the PDF to Cloudinary
+        4. Return the Cloudinary secure_url
+        """
+        context = self._normalize_resume_context(resume_data)
 
-        parsed = resume.parsed_data
+        template_dir = self._template_dir()
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template_obj = env.get_template(self._resolve_template_name(template))
+        render_context = {k: v for k, v in context.items() if k != "recommended_skills"}
+        html_content = template_obj.render(**render_context)
 
-        # 1. Build LaTeX source
-        latex_source = build_latex(parsed)
+        output_path = os.path.abspath(output_path)
 
-        # 2. Compile in a temp directory (pdflatex needs to write aux files)
-        pdf_bytes = self._compile_latex(latex_source)
+        # --- Playwright replaces WeasyPrint here ---
+        await generate_pdf_from_html(html_content, output_path)
 
-        # 3. Write PDF to output path
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, "wb") as f:
-            f.write(pdf_bytes)
+        logger.info(
+            "PDF generated locally via Playwright",
+            path=output_path,
+            full_name=context.get("full_name"),
+        )
 
-        logger.info("PDF written", path=output_path, size=len(pdf_bytes))
-
-        # 4. Upload to FTP
+        # Upload to Cloudinary and return the public URL
         filename = os.path.basename(output_path)
-        pdf_url = upload_to_ftp(output_path, filename)
-        return pdf_url
+        cloudinary_url = await upload_to_cloudinary(output_path, filename)
 
-    def _compile_latex(self, latex_source: str) -> bytes:
-        """Write .tex to a temp dir, run pdflatex twice (for proper refs), return PDF bytes."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tex_path = os.path.join(tmpdir, "resume.tex")
+        # Clean up the local temp file
+        try:
+            os.remove(output_path)
+        except Exception:
+            pass
 
-            with open(tex_path, "w", encoding="utf-8") as f:
-                f.write(latex_source)
+        return cloudinary_url
 
-            cmd = [
-                "pdflatex",
-                "-interaction=nonstopmode",
-                "-output-directory", tmpdir,
-                tex_path,
-            ]
 
-            # Run twice so hyperref and titlerule refs resolve correctly
-            for run in range(2):
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                )
-                if result.returncode != 0:
-                    logger.error(
-                        "pdflatex failed",
-                        run=run + 1,
-                        stdout=result.stdout[-2000:],
-                        stderr=result.stderr[-500:],
-                    )
-                    raise RuntimeError(
-                        f"LaTeX compilation failed (run {run+1}):\n"
-                        + result.stdout[-1500:]
-                    )
+# ---------------------------------------------------------------------------
+# Standalone helper (used by email / certificate services)
+# ---------------------------------------------------------------------------
 
-            pdf_path = os.path.join(tmpdir, "resume.pdf")
-            if not os.path.exists(pdf_path):
-                raise RuntimeError("pdflatex ran but no PDF was produced.")
+async def render_html_to_pdf(template_name: str, context: dict, output_key: str) -> str:
+    """
+    Renders a Jinja2 HTML template to a local PDF file for email attachment /
+    preview.  Previously used WeasyPrint; now delegates to generate_pdf_from_html
+    so the entire codebase uses a single, consistent rendering engine.
+    """
+    template_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "templates")
+    )
+    env = Environment(loader=FileSystemLoader(template_dir))
+    template_obj = env.get_template(template_name)
+    html_content = template_obj.render(**context)
 
-            with open(pdf_path, "rb") as f:
-                return f.read()
+    out_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "uploads", "generated")
+    )
+    os.makedirs(out_dir, exist_ok=True)
+    clean_key = output_key.replace("/", "_")
+    output_path = os.path.join(out_dir, f"{clean_key}.pdf")
+
+    # --- Playwright replaces WeasyPrint here ---
+    await generate_pdf_from_html(html_content, output_path)
+    return output_path

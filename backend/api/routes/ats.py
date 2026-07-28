@@ -1,33 +1,60 @@
-"""
-ATS Routes — Single match, bulk match, history
-"""
+# """
+# ATS Routes — Single match, bulk match, history
+# """
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
-
+from typing import Optional
 from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
-    get_ats_service, get_user_repo, PaginationParams
+    get_user_repo, PaginationParams
 )
-from models.result_model import ATSResultModel, JobDescriptionModel
+from models.result_model import ATSResultModel
 from models.resume_model import ResumeStatus
 from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
 from repositories.user_repo import UserRepository
+
 from schemas.ats_schema import (
     ATSMatchRequest, ATSMatchResponse, BulkATSMatchRequest,
-    BulkATSMatchResponse, BulkATSResultItem, ScoreBreakdown,
-    KeywordAnalysis, SkillGapResponse, ExplainSectionResponse
+    BulkATSMatchResponse, BulkATSResultItem
 )
-from services.ats_service import ATSService
+
+from workflows.ats_graph import ats_engine
+from services.strict_ats_service import run_strict_ats_check
 from utils.validators import validate_object_id
+import time
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
-# ─── POST /ats/match ──────────────────────────────────────────────────────────
+def _extract_contact_snapshot(extracted_data: dict) -> dict:
+    """
+    Pull a normalized {email, phone, linkedin, github, portfolio} dict out of
+    whatever the LangGraph extraction node produced. Written defensively
+    since the exact key name/shape lives in ResumeExtraction, which this
+    route doesn't own — tries the common key names and both dict/pydantic
+    shapes rather than assuming one.
+    """
+    raw = extracted_data.get("contact_info") or extracted_data.get("contact") or {}
+    if hasattr(raw, "model_dump"):
+        raw = raw.model_dump()
+    elif hasattr(raw, "__dict__"):
+        raw = dict(raw.__dict__)
+    elif not isinstance(raw, dict):
+        raw = {}
+
+    return {
+        "email": raw.get("email") or None,
+        "phone": raw.get("phone") or None,
+        "linkedin": raw.get("linkedin") or None,
+        "github": raw.get("github") or None,
+        "portfolio": raw.get("portfolio") or None,
+    }
+
+
 @router.post("/match", response_model=ATSMatchResponse)
 async def match_resume(
     payload: ATSMatchRequest,
@@ -35,122 +62,293 @@ async def match_resume(
     resume_repo: ResumeRepository = Depends(get_resume_repo),
     result_repo: ResultRepository = Depends(get_result_repo),
     user_repo: UserRepository = Depends(get_user_repo),
-    ats: ATSService = Depends(get_ats_service),
 ):
-    """Score a resume against a job description using hybrid BERT + TF-IDF ATS engine."""
+    """Score a resume against a job description with BOTH engines:
+
+    1. The existing LangGraph + Groq semantic evaluator (the "AI Potential
+       Score" — generous, context-aware).
+    2. The deterministic strict_ats_service (the "Strict ATS Score" — a
+       dumb, literal keyword/knockout check simulating real corporate ATS
+       software).
+
+    Also returns `contact_snapshot`, reused by the frontend HITL wizard so
+    it can silently skip asking for a LinkedIn/GitHub/Portfolio link the
+    resume already has.
+    """
+
     validate_object_id(payload.resume_id, "resume_id")
 
-    resume = await resume_repo.get_by_id_and_user(payload.resume_id, str(current_user.id))
-    if not resume:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
-    if resume.status != ResumeStatus.PARSED:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Resume is not yet parsed (status: {resume.status}). Wait for parsing to complete.",
-        )
-
-    # Save job description
-    jd_data = {
-        "user_id": str(current_user.id),
-        "title": payload.job_title,
-        "company": payload.company,
-        "description": payload.job_description,
-        "required_skills": payload.required_skills,
-        "preferred_skills": payload.preferred_skills,
-        "raw_text": payload.job_description,
-    }
-    jd = await result_repo.create_job_description(jd_data)
-
-    # Run ATS scoring
-    score_data = await ats.score_resume(
-        resume=resume,
-        job_description=payload.job_description,
-        job_title=payload.job_title,
-        required_skills=payload.required_skills,
-        preferred_skills=payload.preferred_skills,
+    resume = await resume_repo.get_by_id_and_user(
+        payload.resume_id,
+        str(current_user.id),
     )
 
-    # Save result
+    if not resume or resume.status != ResumeStatus.PARSED:
+        raise HTTPException(
+            status_code=404,
+            detail="Parsed resume not found.",
+        )
+
+    raw_text = (resume.parsed_data.raw_text or "").strip()
+
+    if not raw_text:
+        raise HTTPException(
+            status_code=422,
+            detail="Resume contains no parsed text.",
+        )
+
+    # ── [DEBUG] Verify raw_text content for gap-analysis bug ──────────────
+    debug_needles = ["express.js", "node.js", "vector database", "pinecone",
+                     "express", "node", "vector", "pinecone"]
+    print("\n" + "=" * 80)
+    print("[ATS_ROUTE DEBUG] match_resume — raw_text verification:")
+    print(f"  raw_text length: {len(raw_text)} chars, {len(raw_text.split())} words")
+    print(f"  raw_text preview (first 300 chars):")
+    print(f"    '''{raw_text[:300]}'''")
+    print(f"  raw_text preview (last 200 chars):")
+    print(f"    '''{raw_text[-200:]}'''")
+    print(f"  Targeted skill presence in raw_text:")
+    for needle in debug_needles:
+        found = needle.lower() in raw_text.lower()
+        print(f"    {'✅' if found else '❌'} '{needle}': {'FOUND' if found else 'NOT FOUND'}")
+    # Check all extracted skills from the parsed data
+    extracted_skills = resume.parsed_data.skills or []
+    print(f"  Extracted skills from parser: {extracted_skills}")
+    print("=" * 80 + "\n")
+
+    # Save Job Description
+    jd = await result_repo.create_job_description({
+        "user_id": str(current_user.id),
+        "title": payload.job_title,
+        "description": payload.job_description,
+    })
+
+    t_start = time.perf_counter()
+
+    try:
+        graph_result = await ats_engine.ainvoke({
+
+            "resume_text": raw_text,
+            "jd_text": payload.job_description,
+            "required_skills": payload.required_skills,   # Optional skills from UI
+        })
+    except Exception:
+        logger.exception("ATS graph execution failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to analyze resume.",
+        )
+
+    processing_time_ms = int((time.perf_counter() - t_start) * 1000)
+
+    required_keys = (
+        "final_score",
+        "recommendation",
+        "matched_skills",
+        "missing_skills",
+        "experience_score",
+        "education_score",
+        "feedback_suggestions",
+    )
+
+    missing = [key for key in required_keys if key not in graph_result]
+
+    if missing:
+        logger.error(
+            "ATS graph returned incomplete response",
+            missing_keys=missing,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="ATS engine returned an invalid response.",
+        )
+
+    extracted_data = graph_result.get("extracted_data", {}) or {}
+
+    # ── Strict / Corporate ATS engine (deterministic, no LLM) ──────────────
+    skill_universe = list(payload.required_skills or []) + list(graph_result.get("matched_skills") or []) + list(graph_result.get("missing_skills") or [])
+
+    try:
+        strict_result = run_strict_ats_check(
+            raw_text=raw_text,
+            extracted_data=extracted_data,
+            jd_text=payload.job_description,
+            skill_universe=skill_universe,
+        )
+    except Exception:
+        logger.exception("Strict ATS check failed; continuing with AI-only result")
+        strict_result = {
+            "parsing_health": {"is_healthy": True, "confidence": 1.0, "warnings": []},
+            "knockout": {"is_knockout": False, "reasons": [], "advisories": []},
+            "keyword_match": {"strict_ats_score": 0.0, "matched_exact": [], "missing_exact": []},
+        }
+
+    contact_snapshot = _extract_contact_snapshot(extracted_data)
+
+    score_data = {
+        "final_score": graph_result["final_score"],
+        "recommendation": graph_result["recommendation"],
+        "matched_skills": graph_result["matched_skills"],
+        "missing_skills": graph_result["missing_skills"],
+        "experience_score": graph_result["experience_score"],
+        "education_score": graph_result["education_score"],
+        "feedback_suggestions": graph_result["feedback_suggestions"],
+        "processing_time_ms": processing_time_ms,
+
+        # ── Strict engine fields ──
+        "is_knockout": strict_result["knockout"]["is_knockout"],
+        "knockout_reasons": strict_result["knockout"]["reasons"],
+        "knockout_advisories": strict_result["knockout"]["advisories"],
+        "strict_ats_score": strict_result["keyword_match"]["strict_ats_score"],
+        "strict_matched_keywords": strict_result["keyword_match"]["matched_exact"],
+        "strict_missing_keywords": strict_result["keyword_match"]["missing_exact"],
+        "parsing_is_healthy": strict_result["parsing_health"]["is_healthy"],
+        "parsing_confidence": strict_result["parsing_health"]["confidence"],
+        "parsing_warnings": strict_result["parsing_health"]["warnings"],
+
+        # ── HITL wizard support ──
+        "contact_snapshot": contact_snapshot,
+    }
+
     result = None
+
     if payload.save_result:
-        result_record = {
+        result = await result_repo.create_result({
             "user_id": str(current_user.id),
             "resume_id": payload.resume_id,
             "job_description_id": str(jd.id),
             **score_data,
-        }
-        result = await result_repo.create_result(result_record)
-        await user_repo.increment_counter(str(current_user.id), "total_ats_checks")
+        })
+
+        await user_repo.increment_counter(
+            str(current_user.id),
+            "total_ats_checks",
+        )
+
+    logger.info(
+        "ATS analysis completed",
+        resume_id=payload.resume_id,
+        score=score_data["final_score"],
+        strict_score=score_data["strict_ats_score"],
+        is_knockout=score_data["is_knockout"],
+        processing_time_ms=processing_time_ms,
+    )
 
     result_id = str(result.id) if result else "unsaved"
-    return _build_ats_response(result_id, payload.resume_id, payload.job_title, score_data)
 
+    return _build_ats_response(
+        result_id=result_id,
+        resume_id=payload.resume_id,
+        job_title=payload.job_title,
+        data=score_data,
+    )
 
-# ─── POST /ats/bulk-match ─────────────────────────────────────────────────────
 @router.post("/bulk-match", response_model=BulkATSMatchResponse)
 async def bulk_match(
     payload: BulkATSMatchRequest,
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
-    result_repo: ResultRepository = Depends(get_result_repo),
-    ats: ATSService = Depends(get_ats_service),
 ):
-    """Batch-score multiple resumes against one job description. (Recruiter feature)"""
-    import time
+    """Batch-score multiple resumes against one job description using LangGraph.
+
+    NOTE: bulk-match intentionally stays AI-engine-only for now. If you want
+    strict/knockout data in bulk results too, call run_strict_ats_check()
+    per resume here the same way /match does — it's cheap since it's pure
+    Python, no extra LLM calls.
+    """
+
+    logger.info(
+        "Bulk ATS analysis started",
+        user_id=str(current_user.id),
+        total_resumes=len(payload.resume_ids),
+    )
+
     t_start = time.perf_counter()
 
     resumes = await resume_repo.get_multiple_by_ids(payload.resume_ids)
-    parsed_resumes = [r for r in resumes if r.status == ResumeStatus.PARSED and r.parsed_data]
+    parsed_resumes = [r for r in resumes if r.status == ResumeStatus.PARSED]
+
     if not parsed_resumes:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No parsed resumes found in the provided IDs.",
+            status_code=422,
+            detail="No parsed resumes found.",
         )
 
-    # Bulk BERT embeddings (efficient)
-    texts = [r.parsed_data.raw_text for r in parsed_resumes]
-    bert_scores = ats.bulk_bert_similarity(texts, payload.job_description)
-
     results = []
-    for i, (resume, bert_score) in enumerate(zip(parsed_resumes, bert_scores)):
-        from utils.nlp_utils import get_tfidf_similarity
-        tfidf_score = get_tfidf_similarity(resume.parsed_data.raw_text, payload.job_description)
-        final_score = round(0.75 * bert_score + 0.25 * tfidf_score, 4)
 
-        from utils.validators import score_to_label
-        results.append(BulkATSResultItem(
-            resume_id=str(resume.id),
-            candidate_name=resume.parsed_data.full_name,
-            final_score=final_score,
-            recommendation=score_to_label(final_score),
-            matched_keywords=len([
-                kw for kw, _ in __import__("utils.nlp_utils", fromlist=["extract_keywords"]).extract_keywords(payload.job_description, top_n=30)
-                if kw in (resume.parsed_data.raw_text or "").lower()
-            ]),
-            missing_skills_count=len(payload.required_skills) - sum(
-                1 for s in payload.required_skills
-                if s.lower() in (resume.parsed_data.raw_text or "").lower()
-            ),
-            rank=0,
-        ))
+    for resume in parsed_resumes:
+        raw_text = (resume.parsed_data.raw_text or "").strip()
 
-    # Rank by score
-    results.sort(key=lambda r: r.final_score, reverse=True)
-    for idx, r in enumerate(results):
-        r.rank = idx + 1
+        # Skip empty parsed resumes
+        if not raw_text:
+            logger.warning(
+                "Skipping resume with empty parsed text",
+                resume_id=str(resume.id),
+            )
+            continue
+
+        try:
+            graph_result = await ats_engine.ainvoke({
+
+                "resume_text": raw_text,
+                "jd_text": payload.job_description,
+            })
+        except Exception:
+            logger.exception(
+                "ATS graph failed",
+                resume_id=str(resume.id),
+            )
+            continue
+
+        results.append(
+            BulkATSResultItem(
+                resume_id=str(resume.id),
+                candidate_name=resume.filename,
+                final_score=graph_result["final_score"],
+                recommendation=graph_result["recommendation"],
+                matched_keywords=len(graph_result["matched_skills"]),
+                missing_skills_count=len(graph_result["missing_skills"]),
+                rank=0,
+            )
+        )
+
+    if not results:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to analyze all resumes.",
+        )
+
+    # Highest score first
+    results.sort(
+        key=lambda r: r.final_score,
+        reverse=True,
+    )
+
+    for idx, result in enumerate(results, start=1):
+        result.rank = idx
+
+    processing_time_ms = int(
+        (time.perf_counter() - t_start) * 1000
+    )
+
+    logger.info(
+        "Bulk ATS analysis completed",
+        processed=len(results),
+        processing_time_ms=processing_time_ms,
+    )
 
     return BulkATSMatchResponse(
         total_processed=len(results),
         results=results,
-        processing_time_ms=int((time.perf_counter() - t_start) * 1000),
+        processing_time_ms=processing_time_ms,
     )
 
 
-# ─── GET /ats/history ─────────────────────────────────────────────────────────
+# ─── GET /history ─────────────────────────────────────────────────────────
 @router.get("/history")
 async def get_ats_history(
     pagination: PaginationParams = Depends(),
-    min_score: float = None,
+    min_score: Optional[float] = None,
     current_user: UserModel = Depends(get_current_user),
     result_repo: ResultRepository = Depends(get_result_repo),
 ):
@@ -167,7 +365,7 @@ async def get_ats_history(
     }
 
 
-# ─── GET /ats/result/{result_id} ─────────────────────────────────────────────
+# ─── GET /result/{result_id} ─────────────────────────────────────────────
 @router.get("/result/{result_id}")
 async def get_ats_result(
     result_id: str,
@@ -183,47 +381,45 @@ async def get_ats_result(
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-def _build_ats_response(result_id, resume_id, job_title, data) -> ATSMatchResponse:
+def _build_ats_response(result_id: str, resume_id: str, job_title: str, data: dict) -> ATSMatchResponse:
+    """Helper to map our new LangGraph + strict-engine dictionary to the Pydantic Response Model"""
     return ATSMatchResponse(
         result_id=result_id,
         resume_id=resume_id,
         job_title=job_title,
-        scores=ScoreBreakdown(
-            bert_score=data["bert_score"],
-            tfidf_score=data["tfidf_score"],
-            final_score=data["final_score"],
-            keyword_score=data["keyword_score"],
-            experience_score=data["experience_score"],
-            education_score=data["education_score"],
-            skills_score=data["skills_score"],
-        ),
-        keyword_analysis=KeywordAnalysis(
-            matched_keywords=data["matched_keywords"],
-            missing_keywords=data["missing_keywords"],
-            keyword_match_rate=data["keyword_match_rate"],
-            total_jd_keywords=len(data["matched_keywords"]) + len(data["missing_keywords"]),
-            total_matched=len(data["matched_keywords"]),
-        ),
+        final_score=data["final_score"],
+        recommendation=data["recommendation"],
         matched_skills=data["matched_skills"],
         missing_skills=data["missing_skills"],
-        skill_gaps=[SkillGapResponse(**sg) for sg in data["skill_gaps"]],
-        explanation=[ExplainSectionResponse(**e) for e in data["explanation"]],
-        overall_assessment=data["overall_assessment"],
-        strengths=data["strengths"],
-        weaknesses=data["weaknesses"],
-        improvement_suggestions=data["improvement_suggestions"],
-        recommendation=data["recommendation"],
+        experience_score=data["experience_score"],
+        education_score=data["education_score"],
+        feedback_suggestions=data["feedback_suggestions"],
         processing_time_ms=data["processing_time_ms"],
+
+        # Strict engine fields — see schemas/ats_schema_ADDITIONS.py
+        is_knockout=data["is_knockout"],
+        knockout_reasons=data["knockout_reasons"],
+        knockout_advisories=data["knockout_advisories"],
+        strict_ats_score=data["strict_ats_score"],
+        strict_matched_keywords=data["strict_matched_keywords"],
+        strict_missing_keywords=data["strict_missing_keywords"],
+        parsing_is_healthy=data["parsing_is_healthy"],
+        parsing_confidence=data["parsing_confidence"],
+        parsing_warnings=data["parsing_warnings"],
+
+        # HITL wizard support — see resume_schema_ADDITIONS_v2_hitl.py, section 3
+        contact_snapshot=data["contact_snapshot"],
     )
 
 
 def _result_summary(result: ATSResultModel) -> dict:
+    """Helper for the history endpoint"""
     return {
         "result_id": str(result.id),
         "resume_id": result.resume_id,
         "final_score": result.final_score,
         "recommendation": result.recommendation,
-        "matched_keywords_count": len(result.matched_keywords),
-        "missing_skills_count": len(result.missing_skills),
         "created_at": result.created_at,
+        "strict_ats_score": getattr(result, "strict_ats_score", None),
+        "is_knockout": getattr(result, "is_knockout", None),
     }

@@ -41,20 +41,6 @@ class JobDescriptionModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class SkillGap(BaseModel):
-    skill: str
-    importance: str  # critical | important | nice_to_have
-    learning_resources: List[Dict[str, str]] = []
-    estimated_learning_weeks: Optional[int] = None
-
-
-class ExplainSection(BaseModel):
-    section: str
-    score: float
-    reason: str
-    suggestions: List[str] = []
-
-
 class ATSResultModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str
@@ -62,45 +48,30 @@ class ATSResultModel(BaseModel):
     job_description_id: str
 
     # ── Scores ────────────────────────────────────────────────────────────────
-    bert_score: float = 0.0
-    tfidf_score: float = 0.0
-    final_score: float = 0.0
-    keyword_score: float = 0.0
-    experience_score: float = 0.0
-    education_score: float = 0.0
-    skills_score: float = 0.0
+    # [BUG-001] final_score is on a 0-100 scale (e.g. 75.5 = 75.5%).
+    # experience_score and education_score are 0-1 sub-scores from the LangGraph evaluator.
+    final_score: float = 0.0          # 0-100 scale
+    experience_score: float = 0.0     # 0-1 scale
+    education_score: float = 0.0      # 0-1 scale
 
-    # ── Keywords ──────────────────────────────────────────────────────────────
-    matched_keywords: List[str] = []
-    missing_keywords: List[str] = []
-    keyword_match_rate: float = 0.0
-
-    # ── Skill Analysis ────────────────────────────────────────────────────────
+    # ── Skills & Keywords ─────────────────────────────────────────────────────
     matched_skills: List[str] = []
     missing_skills: List[str] = []
-    skill_gaps: List[SkillGap] = []
-    learning_path: List[Dict[str, Any]] = []
+    matched_keywords: List[str] = []
+    missing_keywords: List[str] = []
 
-    # ── Explainable AI ────────────────────────────────────────────────────────
-    explanation: List[ExplainSection] = []
-    overall_assessment: str = ""
+    # ── Feedback & Suggestions ────────────────────────────────────────────────
+    recommendation: str = ""          # strong_match | good_match | partial_match | poor_match
     improvement_suggestions: List[str] = []
     strengths: List[str] = []
     weaknesses: List[str] = []
-
-    # ── Fake Detection ────────────────────────────────────────────────────────
-    authenticity_score: Optional[float] = None
-    red_flags: List[str] = []
-
-    # ── Recommendations ───────────────────────────────────────────────────────
-    recommendation: str = ""  # strong_match | good_match | partial_match | poor_match
-    rank_percentile: Optional[float] = None
+    overall_assessment: str = ""
 
     processing_time_ms: int = 0
-    model_versions: Dict[str, str] = {}
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = ConfigDict(
         populate_by_name=True,
-        protected_namespaces=(),  # Allow fields prefixed with 'model_'
+        protected_namespaces=(),
     )
+

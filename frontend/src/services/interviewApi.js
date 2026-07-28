@@ -25,14 +25,22 @@ export const submitCheatingReport = (payload) =>
 
 
 // ── Gamification ────────────────────────────────────────────
-export const getGamificationProfile = () =>
-  api.get('/interview/ai/gamification/profile')
+export const getGamificationProfile = (config) =>
+  api.get('/interview/ai/gamification/profile', config)
+
 
 export const getLeaderboard = (limit = 20) =>
   api.get(`/interview/ai/gamification/leaderboard?limit=${limit}`)
 
 export const getBadgeCatalog = () =>
   api.get('/interview/ai/badges/catalog')
+
+// NEW: full ordered level list ({ level, name, icon, threshold }) — lets the
+// frontend render the level roadmap from the server instead of hardcoding
+// LEVEL_THRESHOLDS. Requires the /gamification/levels route added to
+// interview_ai.py.
+export const getLevelCatalog = () =>
+  api.get('/interview/ai/gamification/levels')
 
 // ── WebSocket helper ──────────────────────────────────────────────────────────
 export const createInterviewWebSocket = (sessionId) => {
@@ -41,6 +49,35 @@ export const createInterviewWebSocket = (sessionId) => {
     .replace('https://', 'wss://')
   return new WebSocket(`${wsBase}/interview/ws/${sessionId}`)
 }
+
+// ── Daily Activity (first visit bonus) ───────────────────────
+export const markDailyActivity = () =>
+  api.post('/interview/ai/gamification/daily-activity')
+
+// ── Daily Reward (7-Day Claim Track) ─────────────────────────
+export const getDailyRewardStatus = () =>
+  api.get('/interview/ai/gamification/daily-reward/status')
+
+export const claimDailyReward = () =>
+  api.post('/interview/ai/gamification/daily-reward/claim')
+
+// ── Daily Missions ────────────────────────────────────────────
+export const getDailyMissions = () =>
+  api.get('/interview/ai/gamification/daily-missions')
+
+// ── Weekly Challenge ──────────────────────────────────────────
+export const getWeeklyChallenge = () =>
+  api.get('/interview/ai/gamification/weekly-challenge')
+
+export const claimWeeklyChallenge = () =>
+  api.post('/interview/ai/gamification/weekly-challenge/claim')
+
+// ── Reward Chests ─────────────────────────────────────────────
+export const getRewardChests = () =>
+  api.get('/interview/ai/gamification/reward-chests')
+
+export const claimRewardChest = (chestId) =>
+  api.post('/interview/ai/gamification/reward-chest/claim', { chest_id: chestId })
 
 // ── Resume Fetch ─────────────────────────────────────────────
 export const getResumes = () =>

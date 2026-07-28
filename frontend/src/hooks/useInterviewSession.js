@@ -180,13 +180,20 @@ export function useInterviewSession() {
   const createSession = useCallback(async (cfg) => {
     setLoading(true)
     try {
-      const { data } = await api.post(`${BASE}/sessions`, {
+      // 1. Added a timestamp cache-buster to the URL so the browser ALWAYS fetches fresh data
+      const { data } = await api.post(`${BASE}/sessions?t=${Date.now()}`, {
         job_title: cfg.job_title, difficulty: cfg.difficulty,
         interview_type: cfg.interview_type, num_questions: cfg.num_questions
       })
+      // 2. Shuffle the questions array randomly before saving it to state
+      if (data && data.questions) {
+        data.questions = [...data.questions].sort(() => 0.5 - Math.random());
+      }
       setSession(data); setConfig(cfg); setAnswers([]); setCurrentQIdx(0); setTimeElapsed(0);
       setCheatingData({ score:0, warning_count:0, events:[] }); setPhase(SESSION_PHASE.BRIEFING);
-    } catch (err) { toast.error('Failed to create session') }
+    } catch (err) { 
+      toast.error('Failed to create session') 
+    }
     finally { setLoading(false) }
   }, [])
 

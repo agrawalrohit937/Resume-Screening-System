@@ -1,5 +1,5 @@
 """
-Live Interview Service — session CRUD + question bank + cheating processing
+Live Interview Service — session CRUD + AI question generation + cheating processing
 """
 import uuid
 from datetime import datetime, timezone
@@ -12,8 +12,10 @@ from models.interview_session_model import (
     InterviewSession, SessionStatus, CheatingEventRecord, QuestionAnswer,
     DifficultyLevel, CheatingEventType,
 )
+from services.ai_interview_service import AIInterviewService
 
 logger = structlog.get_logger(__name__)
+_ai_svc = AIInterviewService()
 
 # ── Cheating event weights ────────────────────────────────────────────────────
 CHEATING_WEIGHTS = {
@@ -88,7 +90,7 @@ class LiveInterviewService:
         self.db = db
         self.col = db.live_interview_sessions
 
-    # ── Create session ────────────────────────────────────────────────────────
+    # ── Create session (AI questions) ─────────────────────────────────────────
     async def create_session(
         self,
         user_id:        str,
@@ -96,8 +98,20 @@ class LiveInterviewService:
         difficulty:     str,
         interview_type: str,
         num_questions:  int = 8,
+        resume_skills:  Optional[List[str]] = None,
+        experience_years: Optional[float] = None,
+        experience_titles: Optional[List[str]] = None,
     ) -> Dict:
-        questions = self._pick_questions(difficulty, interview_type, num_questions)
+        # Try AI generation first, fall back to static bank
+        questions = await self._generate_ai_questions(
+            job_title=job_title,
+            difficulty=difficulty,
+            interview_type=interview_type,
+            num_questions=num_questions,
+            resume_skills=resume_skills,
+            experience_years=experience_years,
+            experience_titles=experience_titles,
+        )
 
         session_id = str(uuid.uuid4())
         doc = {
@@ -121,6 +135,116 @@ class LiveInterviewService:
         }
         await self.col.insert_one(doc)
         return {"session_id": session_id, "questions": questions, "total_questions": len(questions)}
+
+    # ── AI Question Generation ────────────────────────────────────────────────
+    async def _generate_ai_questions(
+        self,
+        job_title: str,
+        difficulty: str,
+        interview_type: str,
+        num_questions: int,
+        resume_skills: Optional[List[str]] = None,
+        experience_years: Optional[float] = None,
+        experience_titles: Optional[List[str]] = None,
+    ) -> List[Dict]:
+        """Generate AI questions via Groq; fallback to static bank if LLM fails."""
+        try:
+            skills = resume_skills or []
+            exp_years = experience_years or 0
+            titles = experience_titles or []
+
+            prompt = self._build_live_interview_prompt(
+                job_title=job_title,
+                difficulty=difficulty,
+                interview_type=interview_type,
+                num_questions=num_questions,
+                skills=skills,
+                exp_years=exp_years,
+                experience_titles=titles,
+            )
+
+            raw = await _ai_svc._call_llm(prompt, max_tokens=3000, temperature=0.7)
+            if not raw:
+                raise ValueError("LLM returned empty response")
+
+            import json, re
+            # Parse JSON from LLM output
+            clean = raw.replace("```json", "").replace("```", "").strip()
+            try:
+                data = json.loads(clean)
+            except json.JSONDecodeError:
+                match = re.search(r'\{.*"questions".*\}', raw, re.DOTALL)
+                data = json.loads(match.group(0)) if match else None
+
+            if not data or "questions" not in data:
+                raise ValueError("Could not parse LLM questions JSON")
+
+            ai_questions = []
+            for i, q in enumerate(data["questions"][:num_questions]):
+                ai_questions.append({
+                    "id": i + 1,
+                    "text": q.get("question", ""),
+                    "category": q.get("category", "General"),
+                    "difficulty": difficulty,
+                    "ideal_answer": q.get("ideal_answer", ""),
+                    "type": q.get("type", "technical"),
+                    "time_limit": q.get("time_limit_seconds", 120),
+                })
+            return ai_questions
+
+        except Exception as e:
+            logger.warning("AI question generation failed, using fallback", error=str(e))
+            return self._pick_questions(difficulty, interview_type, num_questions)
+
+    def _build_live_interview_prompt(
+        self,
+        job_title: str,
+        difficulty: str,
+        interview_type: str,
+        num_questions: int,
+        skills: List[str],
+        exp_years: float,
+        experience_titles: List[str],
+    ) -> str:
+        type_map = {
+            "technical": "Focus entirely on technical depth, coding, system design, and architecture.",
+            "behavioral": "Use only STAR-format behavioral questions about past experiences.",
+            "situational": "Present hypothetical problem-solving scenarios.",
+            "mixed": "Mix: 40% technical, 35% behavioral (STAR), 25% situational.",
+        }
+        diff_map = {
+            "easy": "Entry-level questions. Clear and approachable.",
+            "medium": "Mid-level. Requires solid practical experience.",
+            "hard": "Senior/Lead level. Deep expertise, edge cases, system design.",
+        }
+        candidate_ctx = ""
+        if skills:
+            candidate_ctx += f"\n- Skills: {', '.join(skills[:10])}"
+        if exp_years:
+            candidate_ctx += f"\n- Experience: {exp_years} years"
+        if experience_titles:
+            candidate_ctx += f"\n- Recent roles: {', '.join(experience_titles[:3])}"
+
+        return f"""You are an expert technical interviewer. Generate EXACTLY {num_questions} interview questions for a {job_title} role.
+{f"CANDIDATE PROFILE:{candidate_ctx}" if candidate_ctx else ""}
+INTERVIEW TYPE: {type_map.get(interview_type, type_map['mixed'])}
+DIFFICULTY: {diff_map.get(difficulty, diff_map['medium'])}
+
+CRITICAL INSTRUCTION: Please select a highly randomized, diverse, and unique set of questions. Do not use the most standard or common interview questions. Be creative.
+
+Return ONLY valid JSON (no markdown fences):
+{{
+  "questions": [
+    {{
+      "id": 1,
+      "type": "technical|behavioral|situational",
+      "category": "specific topic",
+      "question": "The full interview question text",
+      "ideal_answer": "A model answer (2-4 sentences)",
+      "time_limit_seconds": 120
+    }}
+  ]
+}}"""
 
     # ── Start session ─────────────────────────────────────────────────────────
     async def start_session(self, session_id: str, user_id: str) -> bool:

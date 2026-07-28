@@ -1,0 +1,11 @@
+You are analyzing a job description for an AI-assisted job application tool.
+
+Extract the following from the job description below and return ONLY valid JSON (no markdown, no commentary, no code fences) with this exact shape:
+{{
+  "required_skills": ["skill1", "skill2"],
+  "seniority": "junior" | "mid" | "senior" | "unspecified",
+  "tone": "formal" | "casual" | "startup-casual"
+}}
+
+Job description:
+{job_description}

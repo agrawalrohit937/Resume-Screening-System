@@ -4,7 +4,6 @@ import api from '../services/api'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -15,10 +14,20 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error("Logout error:", err)
     } finally {
-        localStorage.removeItem("access_token")
-        localStorage.removeItem("refresh_token") // ✅ remove token
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("refresh_token") // ✅ remove token
       delete api.defaults.headers.common["Authorization"] // ✅ remove header
       setUser(null)
+    }
+  }, [])
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/me')
+      setUser(data)
+      return data
+    } catch (err) {
+      return null
     }
   }, [])
 
@@ -28,14 +37,13 @@ export function AuthProvider({ children }) {
 
     const token = localStorage.getItem("access_token")
 
-    // ❗ ONLY call API if token exists
-    if (!token) {
-      setLoading(false)
-      return
+    // ✅ If we have a localStorage token, attach it.
+    // Otherwise, rely on cookie-based auth (backend sets httponly cookies).
+    if (token) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`
+    } else {
+      delete api.defaults.headers.common["Authorization"]
     }
-
-    // ✅ attach token
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`
 
     api.get('/auth/me')
       .then(res => {
@@ -44,8 +52,8 @@ export function AuthProvider({ children }) {
       .catch(() => {
         if (isMounted) {
           setUser(null)
-            localStorage.removeItem("access_token")
-            localStorage.removeItem("refresh_token")
+          localStorage.removeItem("access_token")
+          localStorage.removeItem("refresh_token")
         }
       })
       .finally(() => {
@@ -57,60 +65,131 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // 🔐 LOGIN ✅ FIXED
-  const login = async (email, password, role = 'candidate') => {
-    // Send the role to the backend so it knows which mode is being accessed
-    const { data } = await api.post('/auth/login', { email, password, role })
-
+  const _persistSession = (data) => {
     localStorage.setItem("access_token", data.access_token)
     localStorage.setItem("refresh_token", data.refresh_token)
-
     api.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`
-
     setUser(data.user)
+  }
+
+  // 🔐 LOGIN — NOTE: may now return { requires_otp: true, challenge_token } instead of tokens
+  // if this is a new/untrusted device (FEATURE 4 — Secure Login). Callers must check
+  // `result.requires_otp` and, if true, route to /verify-login-otp with the challenge_token.
+  const login = async (email, password, role = 'candidate') => {
+    const { data } = await api.post('/auth/login', { email, password, role })
+
+    if (data.requires_otp) {
+      return data // { requires_otp: true, challenge_token, message }
+    }
+
+    _persistSession(data)
     return data
   }
 
-  // 📝 SIGNUP ✅ FIXED
+  const verifyLoginOtp = async (challengeToken, otp) => {
+    const { data } = await api.post('/auth/verify-login-otp', {
+      challenge_token: challengeToken,
+      otp,
+    })
+    _persistSession(data)
+    return data
+  }
+
+  // 📝 SIGNUP — NOTE: contract change. Signup no longer returns tokens directly.
+  // It now returns { success, message, email } and the account stays inactive
+  // until POST /auth/verify-email succeeds (FEATURE 1).
   const signup = async (payload) => {
     const { data } = await api.post('/auth/signup', payload)
+    return data // { success, message, email }
+  }
 
-    localStorage.setItem("access_token", data.access_token)
-    localStorage.setItem("refresh_token", data.refresh_token)
+  const verifyEmail = async (email, otp) => {
+    const { data } = await api.post('/auth/verify-email', { email, otp })
+    _persistSession(data)
+    return data
+  }
 
-    api.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`
+  const resendOtp = async (email, purpose = 'signup_verification') => {
+    const { data } = await api.post('/auth/resend-otp', { email, purpose })
+    return data
+  }
 
-    setUser(data.user)
+  const forgotPassword = async (email) => {
+    const { data } = await api.post('/auth/forgot-password', { email })
+    return data
+  }
+
+  const verifyResetOtp = async (email, otp) => {
+    const { data } = await api.post('/auth/verify-reset-otp', { email, otp })
+    return data // { success, message, reset_token }
+  }
+
+  const resetPassword = async (email, resetToken, newPassword) => {
+    const { data } = await api.post('/auth/reset-password', {
+      email,
+      reset_token: resetToken,
+      new_password: newPassword,
+    })
     return data
   }
 
   // 🔵 GOOGLE LOGIN ✅ FIXED
-// AuthContext.jsx ke andar 🔵 GOOGLE LOGIN section
+  const googleLogin = useCallback(async (token, role = 'candidate') => {
+    try {
+      const { data } = await api.post('/auth/google', { token, role });
+      _persistSession(data)
+      return data;
+    } catch (error) {
+      console.error("Google Login Error:", error);
+      throw error; // Isse UI mein error dikha payenge
+    }
+  }, []);
 
-const googleLogin = useCallback(async (token, role = 'candidate') => {
-  try {
-    const { data } = await api.post('/auth/google', { token, role });
+  // 🟢 LINKEDIN LOGIN SUCCESS HELPER ✅ NEWLY ADDED
+  const linkedinLoginSuccess = useCallback((data) => {
+    try {
+      _persistSession(data)
+    } catch (error) {
+      console.error("LinkedIn Context Sync Error:", error)
+    }
+  }, []);
 
-    localStorage.setItem("access_token", data.access_token)
-    localStorage.setItem("refresh_token", data.refresh_token)
-
-    // 2. Set API Header
-    // api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-    api.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`
-
-    // 3. Update State
-    setUser(data.user);
-    
-    return data;
-  } catch (error) {
-    console.error("Google Login Error:", error);
-    throw error; // Isse UI mein error dikha payenge
+  // 👤 PROFILE — update fields, upload/remove photo
+  const updateProfile = async (payload) => {
+    const { data } = await api.put('/auth/me', payload)
+    setUser(data)
+    return data
   }
-}, []);
 
+  // In AuthContext.jsx, update your uploadProfilePhoto like this:
+  const uploadProfilePhoto = async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // Backend now returns the UPDATED user object with the new FTP profile_picture URL
+    const { data } = await api.post('/users/profile-photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
+    // Update global user state immediately — display_picture is resolved server-side
+    setUser(data)
+    return data
+  }
+
+  const removeProfilePhoto = async () => {
+    const { data } = await api.delete('/users/profile-photo')
+    setUser(data)
+    return data
+  }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, googleLogin }}>
+    <AuthContext.Provider value={{
+      user, loading,
+      login, signup, logout, googleLogin, linkedinLoginSuccess,
+      verifyLoginOtp, verifyEmail, resendOtp,
+      forgotPassword, verifyResetOtp, resetPassword,
+      updateProfile, uploadProfilePhoto, removeProfilePhoto, refreshUser,
+    }}>
       {children}
     </AuthContext.Provider>
   )

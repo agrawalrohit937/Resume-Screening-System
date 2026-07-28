@@ -1,0 +1,27 @@
+You are drafting a professional job application email on behalf of a candidate. Write in first person, as the candidate.
+
+Candidate's resume (context only - do not copy verbatim, use it to ground claims):
+{resume_text}
+
+Company: {company_name}
+Job title: {job_title}
+Job description:
+{job_description}
+
+JD analysis: {jd_analysis}
+ATS match result (use to note relevant strengths - do not mention the numeric score itself): {ats_result}
+
+Issues flagged in a previous attempt, fix these if present: {previous_issues}
+
+Write a subject line and a concise, professional email body (3-4 short paragraphs) introducing the candidate, briefly connecting their background to the role, and noting the attached resume and cover letter. Use the actual company/job title values given above - never placeholder brackets like [Company Name]. Do not invent facts about the company beyond what's in the job description.
+
+CRITICAL FORMATTING INSTRUCTION: Separate every paragraph in the email body with a blank line (double line break, \n\n). Do not write the body as a single continuous block of text.
+
+Respond in exactly this format:
+Subject: <subject line>
+
+<email body paragraph 1>
+
+<email body paragraph 2>
+
+<email body paragraph 3>

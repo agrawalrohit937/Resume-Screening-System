@@ -2,14 +2,21 @@
 Resume Routes — Upload, Parse, List, Delete
 """
 
+import os
+import uuid
+from datetime import datetime, timezone
+
 import structlog
+from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
-from core.config import settings
+from fastapi.responses import RedirectResponse
+
 from api.deps import (
     get_current_user, get_resume_repo, get_parser_service, get_user_repo,
     PaginationParams
 )
+from config.db import get_database
+from core.config import settings
 from models.resume_model import ResumeModel, ResumeStatus
 from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
@@ -19,22 +26,18 @@ from schemas.resume_schema import (
     ResumeListResponse, ResumeUpdateRequest
 )
 from services.parser_service import ParserService
+from services.cloudinary_service import upload_resume, delete_file as cloudinary_delete
+from services.gamification_service import GamificationService
 from utils.file_utils import validate_and_save_file, delete_file, sanitize_filename
 from utils.validators import validate_object_id
-from services.gamification_service import GamificationService
-from services.pdf_generator_service import upload_to_ftp
-from config.db import get_database
-from fastapi import Depends
-from ftplib import FTP
-import os
-import uuid
-from core.config import settings
 
 
 logger = structlog.get_logger(__name__)
 
+
 def get_gamification_service(db=Depends(get_database)) -> GamificationService:
     return GamificationService(db)
+
 
 router = APIRouter()
 
@@ -65,107 +68,8 @@ async def _parse_resume_background(
             os.remove(file_path)
 
 
-
-# ─── POST /resume/upload ──────────────────────────────────────────────────────
-# @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
-# async def upload_resume(
-#     background_tasks: BackgroundTasks,
-#     file: UploadFile = File(..., description="PDF or DOCX resume file"),
-#     current_user: UserModel = Depends(get_current_user),
-#     resume_repo: ResumeRepository = Depends(get_resume_repo),
-#     user_repo: UserRepository = Depends(get_user_repo),
-#     parser: ParserService = Depends(get_parser_service),
-#     gamification: GamificationService = Depends(get_gamification_service),
-# ):
-#     """Upload a resume (PDF/DOCX) — triggers async parsing."""
-#     storage_path, filename, file_type, file_size = await validate_and_save_file(
-#         file, str(current_user.id)
-#     )
-
-#     # keep original filename from validate_and_save_file
-#     # it's already unique
-#     # 🔥 Upload to Hostinger
-#     try:
-#         upload_to_hostinger(storage_path, filename)
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"FTP Upload Failed: {str(e)}")
-
-#     # 🌐 Generate public URL
-#     file_url = f"https://techhubtechnology.com/uploads/resumes/{filename}"
-#     original_filename = sanitize_filename(file.filename or "resume")
-#     # ✅ calculate version
-#     count = await resume_repo.count_by_user(str(current_user.id))
-#     version = count + 1
-#     await resume_repo.collection.update_many(
-#         {"user_id": str(current_user.id)},
-#         {"$set": {"is_primary": False}}
-#     )
-#     resume_data = {
-#         "user_id": str(current_user.id),
-#         "filename": filename,
-#         "original_filename": original_filename,
-#         "file_type": file_type,
-#         "file_size_bytes": file_size,
-#         "storage_path": storage_path,   # local path
-#         "file_url": file_url,          # public URL
-#         "status": ResumeStatus.PENDING,
-#         "tags": [],
-#         "is_primary": True,
-#         "version": version,
-#     }
-#     resume = await resume_repo.create(resume_data)
-    
-#     await gamification.mark_daily_activity(str(current_user.id))
-
-#     background_tasks.add_task(
-#         _parse_resume_background,
-#         str(resume.id), storage_path, file_type,
-#         resume_repo, user_repo, str(current_user.id), parser,
-#     )
-
-#     return ResumeUploadResponse(
-#         resume_id=str(resume.id),
-#         filename=filename,
-#         status=ResumeStatus.PENDING,
-#         message="Resume uploaded. Parsing in progress — check status in a few seconds.",
-#     )
-
-def upload_resume_to_ftp(local_file_path, remote_filename):
-    from ftplib import FTP
-    from core.config import settings
-
-    try:
-        print("🔌 Connecting FTP...")
-        ftp = FTP()
-        ftp.connect(settings.FTP_HOST, settings.FTP_PORT, timeout=10)
-        ftp.login(settings.FTP_USERNAME, settings.FTP_PASSWORD)
-        ftp.set_pasv(True)
-
-        print("📁 Changing directory...")
-        try:
-            ftp.cwd("resumes")   # 🔥 DIRECT folder
-        except:
-            ftp.mkd("resumes")
-            ftp.cwd("resumes")
-
-        print("⬆ Uploading file...")
-        with open(local_file_path, "rb") as f:
-            ftp.storbinary(f"STOR {remote_filename}", f)
-
-        ftp.quit()
-
-        url = f"{settings.FTP_BASE_URL}/resumes/{remote_filename}"
-        print("✅ Uploaded:", url)
-
-        return url
-
-    except Exception as e:
-        print("🔥 FTP ERROR:", str(e))
-        raise
-
-    
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
-async def upload_resume(
+async def upload_resume_endpoint(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="PDF or DOCX resume file"),
     current_user: UserModel = Depends(get_current_user),
@@ -176,60 +80,73 @@ async def upload_resume(
 ):
     """Upload a resume (PDF/DOCX) — triggers async parsing."""
 
-    # ✅ Save locally
+    # Save locally for parsing
     storage_path, filename, file_type, file_size = await validate_and_save_file(
         file, str(current_user.id)
     )
 
-    # ✅ Upload 
+    # Upload to Cloudinary
     try:
-        filename = os.path.basename(storage_path)
+        with open(storage_path, "rb") as f:
+            resume_bytes = f.read()
 
-        ftp_url = upload_resume_to_ftp(storage_path, filename)
+        cloudinary_url, cloudinary_public_id = await upload_resume(resume_bytes, filename)
 
-        if not ftp_url:
-            raise HTTPException(status_code=500, detail="FTP Upload Failed")
+        if not cloudinary_url:
+            raise HTTPException(status_code=500, detail="Cloudinary upload failed")
 
-        file_url = ftp_url
+        file_url = cloudinary_url
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"FTP upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
     original_filename = sanitize_filename(file.filename or "resume")
 
-    # # ✅ Version logic
-    # count = await resume_repo.count_by_user(str(current_user.id))
-    # version = count + 1
+    # Delete old resumes for this user from Cloudinary and MongoDB
+    old_resumes = await resume_repo.collection.find(
+        {"user_id": str(current_user.id)}
+    ).to_list(length=None)
 
-    # # ✅ Make old resumes inactive
-    # await resume_repo.collection.update_many(
-    #     {"user_id": str(current_user.id)},
-    #     {"$set": {"is_primary": False}}
-    # )
-    # 🔥 DELETE old resumes (only keep latest)
-    await resume_repo.collection.delete_many({
-        "user_id": str(current_user.id)
-    })
+    for old_resume in old_resumes:
+        old_pid = old_resume.get("cloudinary_public_id")
+        if old_pid:
+            await cloudinary_delete(old_pid, resource_type="raw")
 
-    # ✅ Save in DB
+    await resume_repo.collection.delete_many({"user_id": str(current_user.id)})
+
+    # Save in DB
     resume_data = {
         "user_id": str(current_user.id),
         "filename": filename,
         "original_filename": original_filename,
         "file_type": file_type,
         "file_size_bytes": file_size,
-        "storage_path": storage_path,   # for parsing
-        "file_url": file_url,           # for recruiter
+        "storage_path": storage_path,       # for parsing (local temp path)
+        "file_url": file_url,               # Cloudinary URL for recruiter view
+        "cloudinary_public_id": cloudinary_public_id,
         "status": ResumeStatus.PENDING,
         "tags": [],
-        "is_primary": True
+        "is_primary": True,
     }
+
+    # ── Save as primary profile resume on the User document ───────────────
+    await user_repo.collection.update_one(
+        {"_id": ObjectId(str(current_user.id))},
+        {"$set": {
+            "profile_resume_url": file_url,
+            "profile_resume_name": original_filename,
+            "updated_at": datetime.now(timezone.utc),
+        }}
+    )
 
     resume = await resume_repo.create(resume_data)
 
-    # ✅ Gamification
+    # Gamification
     await gamification.mark_daily_activity(str(current_user.id))
 
-    # ✅ Background parsing
+    # Background parsing
     background_tasks.add_task(
         _parse_resume_background,
         str(resume.id), storage_path, file_type,
@@ -334,14 +251,21 @@ async def delete_resume(
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
 ):
-    """Delete a resume and its stored file."""
+    """Delete a resume — removes Cloudinary asset first, then MongoDB document."""
     validate_object_id(resume_id, "resume_id")
     resume = await resume_repo.get_by_id_and_user(resume_id, str(current_user.id))
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
 
-    # await delete_file(local_path)
-    await delete_file(resume.storage_path)
+    # Delete from Cloudinary
+    cloudinary_public_id = getattr(resume, "cloudinary_public_id", None)
+    if cloudinary_public_id:
+        await cloudinary_delete(cloudinary_public_id, resource_type="raw")
+
+    # Also delete the local temp file if it still exists
+    if resume.storage_path and os.path.exists(resume.storage_path):
+        await delete_file(resume.storage_path)
+
     deleted = await resume_repo.delete(resume_id, str(current_user.id))
     if not deleted:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Delete failed.")

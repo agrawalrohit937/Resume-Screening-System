@@ -55,16 +55,17 @@ async def rank_candidates(
             "rank": rank,
             "resume_id": result.resume_id,
             "final_score": result.final_score,
-            "bert_score": result.bert_score,
-            "tfidf_score": result.tfidf_score,
+            "bert_score": getattr(result, "bert_score", result.final_score / 100.0 if result.final_score > 1.0 else result.final_score),
+            "tfidf_score": getattr(result, "tfidf_score", result.final_score / 100.0 if result.final_score > 1.0 else result.final_score),
             "recommendation": result.recommendation,
             "matched_skills": result.matched_skills,
             "missing_skills": result.missing_skills[:5],
             "matched_keywords_count": len(result.matched_keywords),
-            "authenticity_score": result.authenticity_score,
-            "red_flags_count": len(result.red_flags),
+            "authenticity_score": getattr(result, "authenticity_score", None),
+            "red_flags_count": len(getattr(result, "red_flags", [])),
             "scored_at": result.created_at,
         })
+
 
     return {
         "job_description_id": payload.job_description_id,

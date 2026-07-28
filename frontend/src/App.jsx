@@ -1,119 +1,157 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 import AppLayout from './components/AppLayout'
+import Loader from './components/Loader'
 
-import Login              from './pages/Login'
-import Signup             from './pages/Signup'
-import Dashboard          from './pages/Dashboard'
-import Upload             from './pages/Upload'
-import Results            from './pages/Results'
-import Analytics          from './pages/Analytics'
-import Interview          from './pages/Interview'
-import Enhance            from './pages/Enhance'
-import GitHub             from './pages/GitHub'
-import FakeDetect         from './pages/FakeDetect'
-import LiveInterview      from './pages/LiveInterview'
-import LiveInterviewV2    from './pages/LiveInterviewV2'
-import Gamification       from './pages/Gamification'
-import InterviewAnalytics from './pages/InterviewAnalytics'
-import RecruiterDashboard from './pages/RecruiterDashboard'
-// ── Loading spinner ─────────────────────────────────────────────────────────
-function Loader() {
-  return (
-    <div style={{ minHeight:'100vh', background:'#F8FAFC', display:'flex', flexDirection:'column',
-      alignItems:'center', justifyContent:'center', gap:20 }}>
-      <div style={{ position:'relative', width:56, height:56 }}>
-        <div style={{ position:'absolute', inset:0, borderRadius:'50%',
-          border:'4px solid #EEF2FF', borderTopColor:'#6366F1', animation:'spin 0.8s linear infinite' }}/>
-        <div style={{ position:'absolute', inset:8, borderRadius:'50%',
-          border:'3px solid #EDE9FE', borderBottomColor:'#8B5CF6',
-          animation:'spin 1.3s linear infinite reverse' }}/>
-        <div style={{ position:'absolute', inset:15, borderRadius:'50%',
-          border:'2px solid #E0E7FF', borderTopColor:'#6366F1',
-          animation:'spin 1.8s linear infinite' }}/>
-      </div>
-      <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8',
-        letterSpacing:'0.12em', textTransform:'uppercase', fontWeight:500 }}>
-        Loading CareerPilot AI...
-      </p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  )
+function applyTheme(theme) {
+  const root = document.documentElement
+  if (theme) root.dataset.theme = theme
 }
 
+function getInitialTheme() {
+  const saved = localStorage.getItem('theme')
+  if (saved === 'light' || saved === 'dark') return saved
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function ThemeInit() {
+  useEffect(() => {
+    const theme = getInitialTheme()
+    applyTheme(theme)
+  }, [])
+  return null
+}
+
+const Login              = lazy(() => import('./pages/Login'))
+const Signup             = lazy(() => import('./pages/Signup'))
+const CareerPilotLanding = lazy(() => import('./pages/CareerPilotLanding'))
+const LinkedinCallback    = lazy(() => import('./pages/LinkedinCallback'))
+const GitHubCallback     = lazy(() => import('./pages/GithubCallback'))
+const GmailCallback      = lazy(() => import('./pages/GmailCallback'))
+const Dashboard          = lazy(() => import('./pages/Dashboard'))
+const Results            = lazy(() => import('./pages/Results'))
+const Interview          = lazy(() => import('./pages/Interview'))
+const GitHub             = lazy(() => import('./pages/GitHub'))
+const LiveInterview    = lazy(() => import('./pages/LiveInterview'))
+const CareerQuest       = lazy(() => import('./pages/CareerQuest'))
+const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'))
+const Premium            = lazy(() => import('./pages/Premium'))
+const Billing            = lazy(() => import('./pages/Billing'))
+const VerifyCertificate = lazy(() => import('./pages/VerifyCertificate'))
+const VerifyEmail        = lazy(() => import('./pages/VerifyEmail'))
+const ForgotPassword     = lazy(() => import('./pages/ForgotPassword'))
+const Profile            = lazy(() => import('./pages/Profile'))
+const ApplyAssistant      = lazy(() => import('./pages/ApplyAssistant'))
+const SupportTickets      = lazy(() => import('./pages/SupportTickets'))
+const TicketDetail        = lazy(() => import('./pages/TicketDetail'))
+
 // ── Route guards ────────────────────────────────────────────────────────────
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
+
   if (loading) return <Loader />
+
   return user ? children : <Navigate to="/login" replace />
 }
 
 function PublicRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return null
+  if (loading) return <Loader />
   return user ? <Navigate to="/dashboard" replace /> : children
+}
+
+function BootLoaderGate({ children }) {
+  const { loading } = useAuth()
+
+  if (loading) return <Loader />
+  return children
 }
 
 // ── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Toaster
-          position="top-right"
-          gutter={10}
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#fff',
-              color: '#1E293B',
-              border: '1px solid #E2E8F0',
-              borderRadius: '14px',
-              fontFamily: "'Inter', sans-serif",
-              fontSize: '13px',
-              fontWeight: '500',
-              boxShadow: '0 8px 32px rgba(15,15,20,0.10)',
-              padding: '12px 16px',
-            },
-            success: { iconTheme: { primary: '#10B981', secondary: '#fff' } },
-            error:   { iconTheme: { primary: '#F43F5E', secondary: '#fff' } },
-          }}
-        />
+      <ThemeInit />
+      <BootLoaderGate>
+        <BrowserRouter>
+          <Toaster
+            position="top-right"
+            gutter={10}
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: 'var(--color-surface)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '14px',
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '13px',
+                fontWeight: '500',
+                boxShadow: '0 8px 32px rgba(15,15,20,0.10)',
+                padding: '12px 16px',
+              },
+              success: { iconTheme: { primary: '#10B981', secondary: '#fff' } },
+              error:   { iconTheme: { primary: '#F43F5E', secondary: '#fff' } },
+            }}
+          />
 
-        <Routes>
-          {/* ── Public ── */}
-          <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          <Suspense fallback={<Loader />}>
+            <Routes>
+              {/* ── Public Certificate Verification — MUST be first, no auth needed ── */}
+              <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
 
-          {/* ── Protected (inside AppLayout shell) ── */}
-          <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
+              {/* ── Auth (public) ── */}
+              <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+              <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/linkedin-callback" element={<LinkedinCallback />} />
+              <Route path="/github-callback" element={<GitHubCallback />} />
+              <Route path="/gmail-callback" element={<GmailCallback />} />
 
-            {/* Core */}
-            <Route path="dashboard"            element={<Dashboard />} />
-            <Route path="upload"               element={<Upload />} />
-            <Route path="results"              element={<Results />} />
-            <Route path="analytics"            element={<Analytics />} />
-            <Route path="enhance"              element={<Enhance />} />
-            <Route path="github"               element={<GitHub />} />
-            <Route path="fake-detect"          element={<FakeDetect />} />
+              {/* ── Dev-only: Loader test route ── */}
+              <Route path="/test-loader" element={<Loader />} />
 
-            {/* Interview */}
-            <Route path="interview"            element={<Interview />} />
-            <Route path="live-interview"       element={<LiveInterview />} />
-            <Route path="live-interview-v2"    element={<LiveInterviewV2 />} />
-            <Route path="interview-analytics"  element={<InterviewAnalytics />} />
+              {/* ── Public Landing ── */}
+              <Route path="/" element={<CareerPilotLanding />} />
 
-            {/* Gamification */}
-            <Route path="gamification"         element={<Gamification />} />
-                      {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            <Route path="recruiter" element={<RecruiterDashboard />}/>
-          </Route>
-        </Routes>
-      </BrowserRouter>
+              {/* ── Protected (inside AppLayout shell - PATHLESS ROUTE) ── */}
+              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                {/* Core */}
+                <Route path="dashboard"            element={<Dashboard />} />
+                <Route path="profile"              element={<Profile />} />
+
+                <Route path="results"              element={<Results />} />
+                <Route path="billing"              element={<Billing />} />
+                <Route path="support"              element={<SupportTickets />} />
+                <Route path="support/:id"          element={<TicketDetail />} />
+                <Route path="apply-assistant"      element={<ApplyAssistant />} />
+                <Route path="github"               element={<GitHub />} />
+                
+                {/* Interview */}
+                <Route path="interview"            element={<Interview />} />
+                <Route path="live-interview"       element={<LiveInterview />} />
+
+                {/* Gamification */}
+                <Route path="gamification"         element={<CareerQuest />} />
+                
+                {/* Premium */}
+                <Route path="premium"              element={<Premium />} />
+                
+                {/* Recruiter Dashboard */}
+                <Route path="recruiter"            element={<RecruiterDashboard />}/>
+                
+                {/* Catch-all — redirects unknown authenticated paths to dashboard */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </BootLoaderGate>
     </AuthProvider>
   )
-}
+}
