@@ -150,7 +150,4 @@ def create_application() -> FastAPI:
     app.include_router(gmail_oauth_router, prefix=f"{p}/auth", tags=["Gmail OAuth"])
 
     return app
-
-
-
 app = create_application()

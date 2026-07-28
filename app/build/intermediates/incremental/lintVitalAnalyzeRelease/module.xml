@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="C:\Users\Shubham\AndroidStudioProjects\CareerAI\app"
+    name=":app"
+    type="APP"
+    maven="CareerAI:app:unspecified"
+    agpVersion="8.10.1"
+    buildFolder="build"
+    bootClassPath="C:\Users\Shubham\AppData\Local\Android\Sdk\platforms\android-36\android.jar;C:\Users\Shubham\AppData\Local\Android\Sdk\build-tools\35.0.0\core-lambda-stubs.jar"
+    javaSourceLevel="11"
+    compileTarget="android-36"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

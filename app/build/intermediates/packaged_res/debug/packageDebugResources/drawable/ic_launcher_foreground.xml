@@ -1,0 +1,54 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+  <group android:scaleX="0.42"
+      android:scaleY="0.42"
+      android:translateX="29"
+      android:translateY="29">
+
+      <!-- 1. THE GLOW EFFECT (Atmospheric Layer) -->
+      <path
+          android:pathData="M50,50m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0"
+          android:fillAlpha="0.25">
+          <aapt:attr name="android:fillColor">
+              <gradient
+                  android:centerX="50"
+                  android:centerY="50"
+                  android:gradientRadius="45"
+                  android:type="radial">
+                  <!-- Matches your start color (#818CF8) with transparency -->
+                  <item android:offset="0" android:color="#FF818CF8"/>
+                  <!-- Fades to complete transparency -->
+                  <item android:offset="1" android:color="#00818CF8"/>
+              </gradient>
+          </aapt:attr>
+      </path>
+
+      <!-- 2. THE MAIN SHAPE (Ascension A) -->
+      <path
+          android:pathData="M50,10 L95,95 L75,95 L50,45 L25,95 L5,95 Z">
+          <aapt:attr name="android:fillColor">
+              <gradient
+                  android:startX="0"
+                  android:startY="0"
+                  android:endX="100"
+                  android:endY="100"
+                  android:type="linear">
+                  <item android:offset="0" android:color="#FF818CF8"/>
+                  <item android:offset="1" android:color="#FFC084FC"/>
+              </gradient>
+          </aapt:attr>
+      </path>
+
+      <!-- 3. THE AI BRIDGE (With its own slight glow) -->
+      <path
+          android:pathData="M32,70 L68,70"
+          android:strokeColor="#FFFFFF"
+          android:strokeWidth="4"
+          android:strokeLineCap="round"/>
+
+  </group>
+</vector>
