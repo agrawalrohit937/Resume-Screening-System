@@ -1,168 +1,174 @@
 /**
- * InterviewReport — Full dashboard report after interview completion
- * Shows: overall score, per-question breakdown, AI feedback, cheating score, radar chart
+ * InterviewReport — redesigned for clarity over decoration.
+ *
+ * Same field names as before (no invented backend fields):
+ *  session.overall_score, session.avg_confidence, session.avg_clarity,
+ *  session.job_title, session.strength_areas, session.weakness_areas,
+ *  session.cheating_score, session.warning_count,
+ *  summary.hiring_recommendation, summary.executive_summary,
+ *  summary.skill_radar.{technical_knowledge,communication,problem_solving,
+ *  confidence,interview_readiness}, summary.top_strengths,
+ *  summary.critical_gaps, summary.next_steps,
+ *  cheatingData.score, cheatingData.warning_count,
+ *  answers[].{category,question_text,answer,reattempted,answer_source,
+ *  evaluation.{overall_score,grade,relevance_score,clarity_score,
+ *  confidence_score,technical_score,feedback,ideal_answer_summary,
+ *  improvement_tips,keywords_found,keywords_missing}}
+ *
+ * Anything missing just falls back gracefully — see TODO comments.
  */
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  BarChart, Bar, Cell,
-} from 'recharts'
+  CheckCircle2, ThumbsUp, HelpCircle, XCircle, ClipboardList, ShieldCheck,
+  TrendingUp, TrendingDown, Rocket, RotateCcw, BarChart3, Mic,
+} from 'lucide-react'
+import { SkillBreakdownBars, QuestionScoreStrip } from '../Charts'
 
-const TIP = {
-  contentStyle: { background:'#fff', border:'1px solid #E2E8F0', borderRadius:12, fontFamily:"'Inter',sans-serif", fontSize:12 },
-  cursor: { fill:'rgba(99,102,241,0.05)' },
-}
+const scoreColor = (v) => (v >= 80 ? '#10B981' : v >= 60 ? '#2E9BDA' : v >= 40 ? '#F59E0B' : '#F43F5E')
+const scoreBg = (v) => (v >= 80 ? 'bg-emerald-50 border-emerald-200' : v >= 60 ? 'bg-[#2E9BDA]/[0.06] border-[#2E9BDA]/20' : v >= 40 ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200')
+const verdict = (v) => (v >= 80 ? 'Strong performance' : v >= 60 ? 'Solid performance' : v >= 40 ? 'Needs work' : 'Significant gaps to close')
 
-// ── Score ring (SVG) ──────────────────────────────────────────────────────────
-function ScoreCircle({ score = 0, label, size = 110 }) {
-  const r   = size / 2 - 10
-  const circ = 2 * Math.PI * r
-  const off  = circ - (score / 100) * circ
-  const c    = score >= 80 ? '#10B981' : score >= 60 ? '#6366F1' : score >= 40 ? '#F59E0B' : '#F43F5E'
-  const grade= score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B+' : score >= 60 ? 'B' : score >= 50 ? 'C' : 'D'
-
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div style={{ position:'relative', width:size, height:size }}>
-        <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#F1F5F9" strokeWidth={8}/>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={c} strokeWidth={8}
-            strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={off}
-            style={{ transition:'stroke-dashoffset 1.5s cubic-bezier(0.16,1,0.3,1)', filter:`drop-shadow(0 0 6px ${c}60)` }}/>
-        </svg>
-        <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:size*0.22, color:c, lineHeight:1 }}>
-            {Math.round(score)}
-          </span>
-          <span style={{ fontFamily:"'Inter',sans-serif", fontWeight:700, fontSize:11, color:c, marginTop:2 }}>{grade}</span>
-        </div>
-      </div>
-      <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em' }}>{label}</p>
-    </div>
-  )
-}
-
-// ── Recommendation badge ──────────────────────────────────────────────────────
+// ── Hiring recommendation chip ─────────────────────────────────────────────
 function HiringBadge({ rec }) {
-  const cfg = {
-    'Strong Yes': { bg:'#ECFDF5', border:'#A7F3D0', text:'#065F46', icon:'✅' },
-    'Yes':        { bg:'#EFF6FF', border:'#BFDBFE', text:'#1E40AF', icon:'👍' },
-    'Maybe':      { bg:'#FFFBEB', border:'#FDE68A', text:'#92400E', icon:'🤔' },
-    'No':         { bg:'#FFF1F2', border:'#FECDD3', text:'#881337', icon:'❌' },
-  }[rec] || { bg:'#F1F5F9', border:'#CBD5E1', text:'#475569', icon:'📋' }
-
+  const CFG = {
+    'Strong Yes': { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', Icon: CheckCircle2 },
+    Yes: { bg: 'bg-[#2E9BDA]/[0.08]', border: 'border-[#2E9BDA]/25', text: 'text-[#1d6fa5]', Icon: ThumbsUp },
+    Maybe: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', Icon: HelpCircle },
+    No: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-800', Icon: XCircle },
+  }
+  const cfg = CFG[rec] || { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', Icon: ClipboardList }
+  const { Icon } = cfg
   return (
-    <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background:cfg.bg, border:`1.5px solid ${cfg.border}` }}>
-      <span>{cfg.icon}</span>
+    <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-2xl border ${cfg.bg} ${cfg.border}`}>
+      <Icon className={`h-4 w-4 ${cfg.text}`} />
       <div>
-        <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:cfg.text, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em' }}>Hiring Recommendation</p>
-        <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:16, fontWeight:800, color:cfg.text }}>{rec}</p>
+        <p className={`text-[10px] font-bold uppercase tracking-wider ${cfg.text} opacity-70`}>Hiring Recommendation</p>
+        <p className={`text-[15px] font-extrabold ${cfg.text}`}>{rec}</p>
       </div>
     </div>
   )
 }
 
-// ── Q&A accordion ─────────────────────────────────────────────────────────────
+// ── Big overall score — the hero number, unmissable ────────────────────────
+function HeroScore({ score, size = 128 }) {
+  const c = scoreColor(score)
+  const r = size / 2 - 9
+  const circ = 2 * Math.PI * r
+  const off = circ - (score / 100) * circ
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={9} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={c} strokeWidth={9} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={off} style={{ transition: 'stroke-dashoffset 1.4s cubic-bezier(0.16,1,0.3,1)' }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-black tabular-nums leading-none text-white" style={{ fontSize: size * 0.28 }}>{Math.round(score)}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-1">Overall</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Small secondary score chip (Confidence / Clarity) ──────────────────────
+function MiniScore({ label, score }) {
+  const c = scoreColor(score)
+  return (
+    <div className="flex flex-col items-center gap-1.5 bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-3 min-w-[84px]">
+      <span className="text-[20px] font-extrabold tabular-nums leading-none" style={{ color: c }}>{Math.round(score)}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wider text-white/45">{label}</span>
+    </div>
+  )
+}
+
+// ── Q&A card ────────────────────────────────────────────────────────────────
 function AnswerCard({ item, index }) {
-  const score = item.evaluation?.overall_score || 0
-  const c = score >= 80 ? '#10B981' : score >= 60 ? '#6366F1' : score >= 40 ? '#F59E0B' : '#F43F5E'
-  const bg= score >= 80 ? '#ECFDF5' : score >= 60 ? '#EFF6FF' : score >= 40 ? '#FFFBEB' : '#FFF1F2'
-  const br= score >= 80 ? '#A7F3D0' : score >= 60 ? '#BFDBFE' : score >= 40 ? '#FDE68A' : '#FECDD3'
+  const score = Math.round(item.evaluation?.overall_score || 0)
+  const c = scoreColor(score)
 
   return (
-    <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:index*0.06 }}
-      className="rounded-2xl border overflow-hidden" style={{ borderColor:br }}>
-      {/* Header */}
-      <div className="px-5 py-4 flex items-start justify-between gap-4" style={{ background:bg }}>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className={`rounded-3xl border overflow-hidden ${scoreBg(score)}`}>
+      <div className="px-5 py-4 flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0"
-            style={{ background:c }}>
-            {String(index+1).padStart(2,'0')}
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-extrabold shrink-0" style={{ background: c }}>
+            {String(index + 1).padStart(2, '0')}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs font-bold uppercase tracking-wider font-mono" style={{ color:c }}>{item.category}</span>
-              {item.reattempted && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-mono">Reattempted</span>}
-              {item.answer_source === 'voice' && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-mono">🎤 Voice</span>}
+              <span className="text-[10.5px] font-extrabold uppercase tracking-wider font-mono" style={{ color: c }}>{item.category /* TODO: fallback if backend omits category */ || 'General'}</span>
+              {item.reattempted && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-mono font-bold">Reattempted</span>}
+              {item.answer_source === 'voice' && (
+                <span className="text-[10px] bg-[#2E9BDA]/10 text-[#1d6fa5] px-2 py-0.5 rounded-full font-mono font-bold inline-flex items-center gap-1">
+                  <Mic className="h-2.5 w-2.5" /> Voice
+                </span>
+              )}
             </div>
-            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:14, color:'#0F172A', lineHeight:1.5 }}>
-              {item.question_text}
-            </p>
+            <p className="text-[14px] font-bold text-blue-950 leading-relaxed">{item.question_text}</p>
           </div>
         </div>
         <div className="text-center shrink-0">
-          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:22, color:c, lineHeight:1 }}>{Math.round(score)}</p>
-          <p style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#64748B' }}>/ 100</p>
-          <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:c }}>{item.evaluation?.grade || 'N/A'}</p>
+          <p className="text-[22px] font-extrabold tabular-nums leading-none" style={{ color: c }}>{score}</p>
+          <p className="text-[10px] text-blue-900/35 font-semibold">/ 100</p>
+          <p className="text-[11px] font-extrabold mt-0.5" style={{ color: c }}>{item.evaluation?.grade || '—'}</p>
         </div>
       </div>
 
-      {/* Answer */}
-      <div className="px-5 py-4 bg-white border-t border-slate-100">
-        <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Your Answer</p>
-        <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#374151', lineHeight:1.7, background:'#F8FAFC', padding:'10px 14px', borderRadius:10 }}>
-          {item.answer || '—'}
-        </p>
+      <div className="px-5 py-4 bg-white border-t border-blue-50/80">
+        <p className="text-[11px] font-extrabold text-blue-900/40 uppercase tracking-wider mb-1.5">Your Answer</p>
+        <p className="text-[13px] text-blue-900/70 leading-relaxed bg-slate-50 px-3.5 py-2.5 rounded-xl border border-blue-50 font-medium">{item.answer || '—'}</p>
 
-        {/* Scores grid */}
-        <div className="grid grid-cols-4 gap-2 mt-4">
+        <div className="grid grid-cols-4 gap-2.5 mt-4">
           {[
-            { label:'Relevance',  val:item.evaluation?.relevance_score  },
-            { label:'Clarity',    val:item.evaluation?.clarity_score    },
-            { label:'Confidence', val:item.evaluation?.confidence_score },
-            { label:'Technical',  val:item.evaluation?.technical_score  },
-          ].map(({ label, val }) => {
+            ['Relevance', item.evaluation?.relevance_score],
+            ['Clarity', item.evaluation?.clarity_score],
+            ['Confidence', item.evaluation?.confidence_score],
+            ['Technical', item.evaluation?.technical_score],
+          ].map(([label, val]) => {
             const v = Math.round(val || 0)
-            const cc = v >= 70 ? '#10B981' : v >= 50 ? '#6366F1' : '#F59E0B'
+            const cc = scoreColor(v)
             return (
-              <div key={label} className="text-center p-2.5 rounded-xl" style={{ background:'#F8FAFC', border:'1px solid #E2E8F0' }}>
-                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color:cc }}>{v}</p>
-                <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
+              <div key={label} className="text-center p-2.5 rounded-xl bg-slate-50 border border-blue-50">
+                <p className="text-[17px] font-extrabold tabular-nums" style={{ color: cc }}>{v}</p>
+                <p className="text-[9px] text-blue-900/40 font-bold uppercase tracking-wider mt-0.5">{label}</p>
               </div>
             )
           })}
         </div>
 
-        {/* AI Feedback */}
         {item.evaluation?.feedback && (
-          <div className="mt-4 p-3.5 rounded-xl" style={{ background:'#F0F9FF', border:'1px solid #BAE6FD' }}>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#0369A1', marginBottom:4 }}>🤖 AI Feedback</p>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#075985', lineHeight:1.6 }}>{item.evaluation.feedback}</p>
+          <div className="mt-4 p-3.5 rounded-2xl bg-[#2E9BDA]/[0.06] border border-[#2E9BDA]/15">
+            <p className="text-[11px] font-extrabold text-[#1d6fa5] mb-1">🤖 AI Feedback</p>
+            <p className="text-[13px] text-blue-950/75 leading-relaxed font-medium">{item.evaluation.feedback}</p>
           </div>
         )}
 
-        {/* Ideal answer */}
         {item.evaluation?.ideal_answer_summary && (
-          <div className="mt-3 p-3.5 rounded-xl" style={{ background:'#F0FDF4', border:'1px solid #BBF7D0' }}>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#15803D', marginBottom:4 }}>💡 Model Answer</p>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#166534', lineHeight:1.6 }}>{item.evaluation.ideal_answer_summary}</p>
+          <div className="mt-3 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-100">
+            <p className="text-[11px] font-extrabold text-emerald-700 mb-1">💡 Model Answer</p>
+            <p className="text-[13px] text-emerald-900/75 leading-relaxed font-medium">{item.evaluation.ideal_answer_summary}</p>
           </div>
         )}
 
-        {/* Improvement tips */}
         {item.evaluation?.improvement_tips?.length > 0 && (
           <div className="mt-3">
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#64748B', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>Improvement Tips</p>
+            <p className="text-[11px] font-extrabold text-blue-900/40 uppercase tracking-wider mb-2">Improvement Tips</p>
             <div className="space-y-1.5">
               {item.evaluation.improvement_tips.map((tip, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs font-body text-slate-600">
-                  <span style={{ color:'#6366F1', flexShrink:0, marginTop:1 }}>→</span>{tip}
+                <div key={i} className="flex items-start gap-2 text-[12.5px] text-blue-900/65 font-medium">
+                  <span className="text-[#2E9BDA] shrink-0 mt-0.5">→</span>{tip}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Keywords */}
         {(item.evaluation?.keywords_found?.length > 0 || item.evaluation?.keywords_missing?.length > 0) && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {item.evaluation.keywords_found?.slice(0,6).map(k => (
-              <span key={k} className="px-2 py-0.5 rounded-lg text-xs font-mono" style={{ background:'#ECFDF5', color:'#065F46', border:'1px solid #A7F3D0' }}>✓ {k}</span>
+            {item.evaluation.keywords_found?.slice(0, 6).map((k) => (
+              <span key={k} className="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">✓ {k}</span>
             ))}
-            {item.evaluation.keywords_missing?.slice(0,6).map(k => (
-              <span key={k} className="px-2 py-0.5 rounded-lg text-xs font-mono" style={{ background:'#FFF1F2', color:'#881337', border:'1px solid #FECDD3' }}>✕ {k}</span>
+            {item.evaluation.keywords_missing?.slice(0, 6).map((k) => (
+              <span key={k} className="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-rose-50 text-rose-700 border border-rose-200">✕ {k}</span>
             ))}
           </div>
         )}
@@ -171,132 +177,94 @@ function AnswerCard({ item, index }) {
   )
 }
 
-// ── Main Report ───────────────────────────────────────────────────────────────
+// ── Main Report ─────────────────────────────────────────────────────────────
 export default function InterviewReport({ reportData, cheatingData, answers, onRestart }) {
   if (!reportData) return null
   const { session, summary } = reportData
   const overall = session?.overall_score || 0
-  const cheatPct= Math.round((cheatingData?.score || session?.cheating_score || 0) * 100)
+  const cheatPct = Math.round((cheatingData?.score || session?.cheating_score || 0) * 100)
   const warnings = cheatingData?.warning_count || session?.warning_count || 0
-
-  const radarData = summary?.skill_radar ? [
-    { skill:'Technical',   score: summary.skill_radar.technical_knowledge || 0 },
-    { skill:'Communication',score:summary.skill_radar.communication || 0 },
-    { skill:'Problem Solving',score:summary.skill_radar.problem_solving || 0 },
-    { skill:'Confidence',  score: summary.skill_radar.confidence || 0 },
-    { skill:'Readiness',   score: summary.skill_radar.interview_readiness || 0 },
-  ] : []
-
-  const barData = answers.map((a, i) => ({
-    name: `Q${i+1}`,
-    score: Math.round(a.evaluation?.overall_score || 0),
-  }))
+  const cheatColor = cheatPct > 50 ? '#F43F5E' : cheatPct > 20 ? '#F59E0B' : '#10B981'
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 pb-14">
       {/* ── Hero ── */}
-      <motion.div initial={{ opacity:0, y:-16 }} animate={{ opacity:1, y:0 }}
-        className="relative rounded-3xl overflow-hidden p-8"
-        style={{ background:'linear-gradient(135deg,#071B38 0%,#0A2347 20%,#1246A0 65%,#1565C0 100%)' }}>
-        <div style={{ position:'absolute', inset:0, opacity:0.07,
-          backgroundImage:'radial-gradient(circle,rgba(255,255,255,0.7) 1px,transparent 1px)',
-          backgroundSize:'28px 28px', pointerEvents:'none' }}/>
+      <motion.div
+        initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
+        className="relative rounded-3xl overflow-hidden p-7 sm:p-8"
+        style={{ background: 'linear-gradient(135deg,#071B38 0%,#0A2347 20%,#1246A0 65%,#1565C0 100%)' }}
+      >
+        <div className="pointer-events-none absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(circle,rgba(255,255,255,0.7) 1px,transparent 1px)', backgroundSize: '28px 28px' }} />
 
         <div className="relative flex flex-wrap items-start justify-between gap-6">
-          <div>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'rgba(255,255,255,0.6)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>
-              Interview Complete ✓
-            </p>
-            <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:30, color:'white', lineHeight:1.2, marginBottom:12 }}>
-              {session?.job_title || 'Interview'} Report
-            </h1>
-            {summary?.hiring_recommendation && (
-              <HiringBadge rec={summary.hiring_recommendation}/>
-            )}
+          <div className="flex-1 min-w-[240px]">
+            <p className="text-[11px] font-bold text-white/50 uppercase tracking-[0.12em] mb-2">Interview Complete</p>
+            <h1 className="text-[26px] sm:text-[30px] font-extrabold text-white leading-tight mb-1">{session?.job_title || 'Interview'} Report</h1>
+            <p className="text-[14px] font-semibold mb-4" style={{ color: scoreColor(overall) }}>{verdict(overall)}</p>
+            {summary?.hiring_recommendation && <HiringBadge rec={summary.hiring_recommendation} />}
           </div>
 
-          {/* Score circles */}
-          <div className="flex items-center gap-6 flex-wrap">
-            <ScoreCircle score={overall}  label="Overall"    size={110}/>
-            <ScoreCircle score={session?.avg_confidence || 0} label="Confidence" size={90}/>
-            <ScoreCircle score={session?.avg_clarity    || 0} label="Clarity"    size={90}/>
-            <div className="flex flex-col items-center gap-1.5">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{ background: cheatPct > 50 ? 'rgba(239,68,68,0.2)' : cheatPct > 20 ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)', border:`3px solid ${cheatPct > 50 ? '#F43F5E' : cheatPct > 20 ? '#F59E0B' : '#10B981'}` }}>
-                <div className="text-center">
-                  <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color: cheatPct > 50 ? '#F43F5E' : cheatPct > 20 ? '#F59E0B' : '#10B981', lineHeight:1 }}>{cheatPct}%</p>
-                  <p style={{ fontSize:9, color:'rgba(255,255,255,0.6)', fontFamily:"'Inter',sans-serif" }}>{warnings}⚠</p>
-                </div>
+          <div className="flex items-center gap-4 flex-wrap">
+            <HeroScore score={overall} />
+            <div className="flex gap-3 flex-wrap">
+              <MiniScore label="Confidence" score={session?.avg_confidence || 0} />
+              <MiniScore label="Clarity" score={session?.avg_clarity || 0} />
+              <div className="flex flex-col items-center gap-1.5 bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-3 min-w-[84px]">
+                <span className="text-[20px] font-extrabold tabular-nums leading-none inline-flex items-center gap-1" style={{ color: cheatColor }}>
+                  <ShieldCheck className="h-4 w-4" /> {cheatPct}%
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/45">Integrity{warnings > 0 ? ` · ${warnings}⚠` : ''}</span>
               </div>
-              <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Integrity</p>
             </div>
           </div>
         </div>
 
         {summary?.executive_summary && (
-          <div className="relative mt-5 p-4 rounded-2xl" style={{ background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)' }}>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'rgba(255,255,255,0.85)', lineHeight:1.65 }}>
-              "{summary.executive_summary}"
-            </p>
+          <div className="relative mt-5 p-4 rounded-2xl bg-white/[0.08] border border-white/10">
+            <p className="text-[13.5px] text-white/85 leading-relaxed font-medium">"{summary.executive_summary}"</p>
           </div>
         )}
       </motion.div>
 
-      {/* ── Charts Row ── */}
+      {/* ── Skill breakdown + question timeline (replaces the old radar/bar charts) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Radar */}
-        {radarData.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h3 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A', marginBottom:4 }}>Skill Radar</h3>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', marginBottom:16 }}>Multi-dimensional performance</p>
-            <ResponsiveContainer width="100%" height={220}>
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="#E2E8F0" gridType="polygon"/>
-                <PolarAngleAxis dataKey="skill" tick={{ fill:'#64748B', fontSize:11, fontFamily:"'Inter',sans-serif" }}/>
-                <Radar name="Score" dataKey="score" stroke="#6366F1" fill="#6366F1" fillOpacity={0.15} strokeWidth={2.5}
-                  dot={{ fill:'#6366F1', r:3 }}/>
-                <Tooltip {...TIP} formatter={v => [`${v}`, 'Score']}/>
-              </RadarChart>
-            </ResponsiveContainer>
+        {summary?.skill_radar && (
+          <div className="bg-white rounded-3xl border border-blue-100 p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+            <h3 className="text-[15px] font-extrabold text-blue-950">Skill Breakdown</h3>
+            <p className="text-[12px] text-blue-900/40 font-medium mb-5">Where you're strongest, and where to focus next</p>
+            <SkillBreakdownBars skillRadar={summary.skill_radar} />
           </div>
         )}
 
-        {/* Bar scores */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <h3 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#0F172A', marginBottom:4 }}>Score per Question</h3>
-          <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', marginBottom:16 }}>Individual answer evaluation</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={barData} margin={{ left:-15 }}>
-              <CartesianGrid strokeDasharray="4 4" stroke="#F1F5F9" vertical={false}/>
-              <XAxis dataKey="name" tick={{ fill:'#64748B', fontSize:11 }} tickLine={false} axisLine={false}/>
-              <YAxis domain={[0,100]} tick={{ fill:'#64748B', fontSize:11 }} tickLine={false} axisLine={false}/>
-              <Tooltip {...TIP} formatter={v => [`${v}/100`, 'Score']}/>
-              <Bar dataKey="score" radius={[6,6,0,0]} maxBarSize={36}>
-                {barData.map((d,i) => (
-                  <Cell key={i} fill={d.score >= 80 ? '#10B981' : d.score >= 60 ? '#6366F1' : d.score >= 40 ? '#F59E0B' : '#F43F5E'}/>
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {answers?.length > 0 && (
+          <div className="bg-white rounded-3xl border border-blue-100 p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+            <h3 className="text-[15px] font-extrabold text-blue-950 inline-flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-[#1d6fa5]" /> Score per Question
+            </h3>
+            <p className="text-[12px] text-blue-900/40 font-medium mb-5">How each answer scored, in order</p>
+            <QuestionScoreStrip answers={answers} />
+          </div>
+        )}
       </div>
 
       {/* ── Strengths / Gaps / Next Steps ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { title:'Top Strengths', items:summary?.top_strengths || session?.strength_areas || [], color:'#10B981', bg:'#ECFDF5', border:'#A7F3D0', icon:'✅' },
-          { title:'Critical Gaps', items:summary?.critical_gaps  || session?.weakness_areas || [], color:'#F43F5E', bg:'#FFF1F2', border:'#FECDD3', icon:'⚠️' },
-          { title:'Next Steps',    items:summary?.next_steps     || [], color:'#6366F1', bg:'#EFF6FF', border:'#BFDBFE', icon:'🚀' },
-        ].map(({ title, items, color, bg, border, icon }) => (
-          <div key={title} className="rounded-2xl p-5" style={{ background:bg, border:`1.5px solid ${border}` }}>
-            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color, marginBottom:12 }}>{icon} {title}</p>
+          { title: 'Top Strengths', items: summary?.top_strengths || session?.strength_areas || [], color: '#059669', bg: 'bg-emerald-50', border: 'border-emerald-200', Icon: TrendingUp },
+          { title: 'Critical Gaps', items: summary?.critical_gaps || session?.weakness_areas || [], color: '#BE123C', bg: 'bg-rose-50', border: 'border-rose-200', Icon: TrendingDown },
+          { title: 'Next Steps', items: summary?.next_steps || [], color: '#1d6fa5', bg: 'bg-[#2E9BDA]/[0.06]', border: 'border-[#2E9BDA]/20', Icon: Rocket },
+        ].map(({ title, items, color, bg, border, Icon }) => (
+          <div key={title} className={`rounded-3xl p-5 border ${bg} ${border}`}>
+            <p className="text-[13px] font-extrabold mb-3 inline-flex items-center gap-1.5" style={{ color }}>
+              <Icon className="h-4 w-4" /> {title}
+            </p>
             <div className="space-y-2">
-              {items.slice(0,4).map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs font-body" style={{ color }}>
-                  <span style={{ flexShrink:0, marginTop:2 }}>→</span>{item}
+              {items.slice(0, 4).map((item, i) => (
+                <div key={i} className="flex items-start gap-2 text-[12.5px] font-medium" style={{ color }}>
+                  <span className="shrink-0 mt-0.5 opacity-70">→</span>{item}
                 </div>
               ))}
-              {items.length === 0 && <p className="text-xs text-slate-400 font-mono">—</p>}
+              {items.length === 0 && <p className="text-[12px] text-blue-900/30 font-mono">— TODO: not returned by backend for this session</p>}
             </div>
           </div>
         ))}
@@ -304,27 +272,23 @@ export default function InterviewReport({ reportData, cheatingData, answers, onR
 
       {/* ── Q&A Breakdown ── */}
       <div>
-        <h2 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:18, color:'#0F172A', marginBottom:16 }}>
-          Question-by-Question Breakdown
-        </h2>
+        <h2 className="text-[18px] font-extrabold text-blue-950 mb-4">Question-by-Question Breakdown</h2>
         <div className="space-y-4">
-          {answers.map((item, i) => (
-            <AnswerCard key={i} item={item} index={i}/>
-          ))}
+          {answers.map((item, i) => <AnswerCard key={i} item={item} index={i} />)}
         </div>
       </div>
 
       {/* ── Actions ── */}
       <div className="grid grid-cols-2 gap-4 pt-2">
-        <button onClick={onRestart}
-          className="py-4 rounded-2xl font-semibold text-sm text-indigo-700 transition-all hover:-translate-y-0.5"
-          style={{ border:'2px solid #C7D2FE', background:'#EFF6FF', fontFamily:"'Poppins',sans-serif" }}>
-          🔄 Start New Interview
+        <button onClick={onRestart} className="py-4 rounded-2xl font-bold text-[13.5px] text-[#1d6fa5] border-2 border-[#2E9BDA]/25 bg-[#2E9BDA]/[0.06] transition-all hover:-translate-y-0.5 inline-flex items-center justify-center gap-2">
+          <RotateCcw className="h-4 w-4" /> Start New Interview
         </button>
-        <Link to="/interview-analytics"
-          className="py-4 rounded-2xl font-semibold text-sm text-white text-center transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
-          style={{ background:'linear-gradient(135deg,#1565C0,#2196F3)', boxShadow:'0 4px 14px rgba(21,101,192,0.35)', fontFamily:"'Poppins',sans-serif" }}>
-          📊 View All Analytics
+        <Link
+          to="/interview"
+          className="py-4 rounded-2xl font-bold text-[13.5px] text-white text-center transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+          style={{ background: 'linear-gradient(135deg,#2E9BDA,#1d6fa5)', boxShadow: '0 8px 20px -8px rgba(46,155,218,0.5)' }}
+        >
+          <BarChart3 className="h-4 w-4" /> Quick Mock Test
         </Link>
       </div>
     </div>

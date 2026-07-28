@@ -29,6 +29,8 @@ class AIInterviewService:
     Falls back through: Groq → Mistral → Anthropic → local templates
     """
 
+    # ─── FULL INTERVIEW SESSION GENERATION ────────────────────────────────────
+
     async def generate_ai_questions(
         self,
         resume: ResumeModel,
@@ -182,6 +184,106 @@ Return ONLY valid JSON in this exact format — no markdown, no explanation:
         ]
         return [self._normalize_questions([{**FALLBACK[i % len(FALLBACK)], "id": i+1}])[0] for i in range(n)]
 
+    # ─── QUICK PRACTICE MCQ GENERATION ────────────────────────────────────────
+
+    async def generate_quick_practice_mcqs(
+        self,
+        topic: str,
+        difficulty: str,
+        num_questions: int = 5
+    ) -> Dict[str, Any]:
+        """Generate AI-powered multiple-choice questions for quick practice."""
+        prompt = self._build_mcq_prompt(topic, difficulty, num_questions)
+        
+        # Use existing LLM caller infrastructure
+        raw = await self._call_llm(prompt, max_tokens=2000)
+        questions = self._parse_mcqs(raw, num_questions, difficulty, topic)
+
+        return {
+            "questions": questions,
+            "session_metadata": {
+                "model_used": self._last_model_used,
+                "topic": topic,
+                "difficulty": difficulty,
+                "total_questions": len(questions)
+            }
+        }
+
+    def _build_mcq_prompt(self, topic: str, difficulty: str, num_questions: int) -> str:
+        """Prompt specifically tuned for generating perfect MCQ JSON."""
+        return f"""You are an expert technical instructor. Generate EXACTLY {num_questions} multiple-choice questions about "{topic}" at a "{difficulty}" difficulty level.
+
+RULES:
+1. Provide exactly 4 options per question.
+2. The correctAnswer MUST be an exact string match to one of the options.
+3. No trick questions; ensure there is only one objectively correct answer.
+
+Return ONLY a valid JSON object in this exact format. Do NOT wrap in markdown formatting blocks (like ```json), just output the raw JSON:
+{{
+  "questions": [
+    {{
+      "id": 1,
+      "question": "The actual question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "The exact string from the options array that is correct",
+      "explanation": "A short 1-2 sentence explanation of why this is correct"
+    }}
+  ]
+}}"""
+
+    def _parse_mcqs(self, raw: str, expected: int, difficulty: str, topic: str) -> List[Dict]:
+        """Parse MCQ JSON output with fallback strategies."""
+        try:
+            # Clean up potential markdown blocks if the LLM ignored instructions
+            clean_raw = raw.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_raw)
+            if "questions" in data:
+                return self._normalize_mcqs(data["questions"])
+        except json.JSONDecodeError:
+            # Regex extraction fallback
+            json_match = re.search(r'\{.*"questions".*\}', raw, re.DOTALL)
+            if json_match:
+                try:
+                    data = json.loads(json_match.group(0))
+                    if "questions" in data:
+                        return self._normalize_mcqs(data["questions"])
+                except json.JSONDecodeError:
+                    pass
+
+        logger.warning(f"MCQ LLM JSON parse failed for topic: {topic} — using fallback")
+        return self._fallback_mcqs(expected, topic)
+
+    def _normalize_mcqs(self, questions: List[Dict]) -> List[Dict]:
+        """Ensure all required MCQ fields are present and safe."""
+        normalized = []
+        for i, q in enumerate(questions):
+            options = q.get("options", ["A", "B", "C", "D"])
+            # Ensure it's exactly a list of strings
+            if not isinstance(options, list):
+                options = [str(options)]
+                
+            normalized.append({
+                "id": i + 1,
+                "question": q.get("question", "Could not parse question?"),
+                "options": options[:4], # Enforce max 4 options
+                "correctAnswer": q.get("correctAnswer", options[0] if options else ""),
+                "explanation": q.get("explanation", "No explanation provided by AI.")
+            })
+        return normalized
+
+    def _fallback_mcqs(self, n: int, topic: str) -> List[Dict]:
+        """Safe fallback if the LLM completely fails or times out."""
+        FALLBACK = {
+            "id": 1,
+            "question": f"Which of the following best describes a core concept of {topic}?",
+            "options": ["A configuration protocol", "A primary structural design pattern", "A deprecated feature", "An external library requirement"],
+            "correctAnswer": "A primary structural design pattern",
+            "explanation": f"This is a fallback generated question because the AI service timed out while processing {topic}."
+        }
+        return [ {**FALLBACK, "id": i + 1} for i in range(n) ]
+
+    # ─── ANSWER EVALUATION ────────────────────────────────────────────────────
+
     async def evaluate_answer(
         self,
         question: str,
@@ -260,7 +362,8 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
             "criteria_scores": {"technical_accuracy": score, "depth": score - 1, "clarity": score, "completeness": score - 1},
         }
 
-    # ─── LLM Callers ─────────────────────────────────────────────────────────
+    # ─── LLM CALLERS ─────────────────────────────────────────────────────────
+
     _last_model_used: str = "template"
 
     async def _call_llm(self, prompt: str, max_tokens: int = 2000) -> str:
@@ -349,7 +452,7 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 r = await client.post(
-                    "https://api.anthropic.com/v1/messages",
+                    "[https://api.anthropic.com/v1/messages](https://api.anthropic.com/v1/messages)",
                     headers={"x-api-key": settings.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
                     json={"model": "claude-haiku-20240307", "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]},
                 )
@@ -362,7 +465,7 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 r = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    "[https://api.openai.com/v1/chat/completions](https://api.openai.com/v1/chat/completions)",
                     headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
                     json={"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens},
                 )

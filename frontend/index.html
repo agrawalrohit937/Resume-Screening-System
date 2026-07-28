@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>CareerAI — Smart ATS & Career Co-Pilot</title>
+  <title>CareerShala — Smart ATS & Career Co-Pilot</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,52 +14,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
+    /* Critical baseline — full theme is loaded via index.css */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      background: #FAF9F6;
-      font-family: 'Inter', sans-serif; /* ✅ FIXED */
+      font-family: 'Inter', sans-serif;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
-
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: #F4F2ED;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #C7D2FE;
-      border-radius: 3px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: #818CF8;
-    }
-
-    ::selection {
-      background: rgba(99, 102, 241, 0.15);
-      color: #1C1C28;
-    }
-
-    h1, h2, h3 {
-      font-family: 'Poppins', sans-serif;
-      margin: 0;
-    }
   </style>
 
-  <!-- ✅ REQUIRED FOR FACE DETECTION -->
+  <!-- ✅ REQUIRED FOR FACE DETECTION (Scripts are now active!) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
@@ -69,10 +35,8 @@
 
   <div id="root"></div>
 
-  <!-- Google OAuth -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <!-- React App -->
   <script type="module" src="/src/main.jsx"></script>
 
 </body>

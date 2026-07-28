@@ -15,14 +15,18 @@ from models.user_model import UserModel, UserRole
 from repositories.user_repo import UserRepository
 from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
+from repositories.otp_repo import OTPRepository
 from services.parser_service import ParserService
-from services.ats_service import ATSService
 from services.skill_service import SkillService
+
 from services.enhancer_service import EnhancerService
-from services.interview_service import InterviewService
+from services.ai_interview_service import AIInterviewService
 from services.github_service import GitHubService
+
 from services.fake_detection_service import FakeDetectionService
 from services.pdf_generator_service import PDFGeneratorService
+from services.email_service import EmailService
+from services.otp_service import OTPService
 from fastapi import Request, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing import Optional, Annotated
@@ -49,25 +53,27 @@ def get_result_repo(db=Depends(get_db)) -> ResultRepository:
     return ResultRepository(db)
 
 
+def get_otp_repo(db=Depends(get_db)) -> OTPRepository:
+    return OTPRepository(db)
+
+
 # ─── Services ─────────────────────────────────────────────────────────────────
 def get_parser_service() -> ParserService:
     return ParserService()
-
-
-def get_ats_service() -> ATSService:
-    return ATSService()
 
 
 def get_skill_service() -> SkillService:
     return SkillService()
 
 
+
 def get_enhancer_service() -> EnhancerService:
     return EnhancerService()
 
 
-def get_interview_service() -> InterviewService:
-    return InterviewService()
+def get_interview_service() -> AIInterviewService:
+    return AIInterviewService()
+
 
 
 def get_github_service() -> GitHubService:
@@ -80,6 +86,17 @@ def get_fake_detection_service() -> FakeDetectionService:
 
 def get_pdf_service() -> PDFGeneratorService:
     return PDFGeneratorService()
+
+
+def get_email_service() -> EmailService:
+    return EmailService()
+
+
+def get_otp_service(
+    otp_repo: OTPRepository = Depends(get_otp_repo),
+    email_service: EmailService = Depends(get_email_service),
+) -> OTPService:
+    return OTPService(otp_repo, email_service)
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────

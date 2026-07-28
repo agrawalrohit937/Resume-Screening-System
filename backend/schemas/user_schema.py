@@ -3,11 +3,11 @@ Pydantic v2 Schemas — User Auth & Profile
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from models.user_model import UserRole, UserStatus
+from models.user_model import UserRole, UserStatus, AuthProvider
 
 
 # ─── Request Schemas ──────────────────────────────────────────────────────────
@@ -43,6 +43,7 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    role: Optional[UserRole] = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -60,6 +61,14 @@ class UpdateProfileRequest(BaseModel):
     linkedin_url: Optional[str] = None
     github_username: Optional[str] = None
     profile_picture: Optional[str] = None
+    # NEW profile fields
+    college: Optional[str] = None
+    degree: Optional[str] = None
+    graduation_year: Optional[int] = Field(default=None, ge=1950, le=2100)
+    location: Optional[str] = None
+    bio: Optional[str] = Field(default=None, max_length=500)
+    github_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
 
 
 # ─── Response Schemas ─────────────────────────────────────────────────────────
@@ -77,6 +86,39 @@ class UserPublicResponse(BaseModel):
     total_ats_checks: int
     last_login: Optional[datetime]
     created_at: datetime
+
+    provider: AuthProvider = AuthProvider.EMAIL
+    email_verified: bool = False
+    google_picture: Optional[str] = None          # 🚨 DEPRECATED — kept for frontend compat
+    display_picture: Optional[str] = None
+    college: Optional[str] = None
+    degree: Optional[str] = None
+    graduation_year: Optional[int] = None
+    location: Optional[str] = None
+    bio: Optional[str] = None
+    github_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
+    profile_completion_percent: int = 0
+
+    # ✅ ADD THESE
+    plan: str = "free"
+    subscription_active: bool = False
+    plan_updated_at: Optional[datetime] = None
+
+    # ── NEW multi-provider auth fields ─────────────────────────────────────
+    auth_methods: List[str] = Field(default_factory=list)
+    last_login_method: Optional[str] = None
+    linked_accounts: Dict[str, Any] = Field(default_factory=dict)
+
+    # ── Primary profile resume fields ────────────────────────────────────
+    profile_resume_url: Optional[str] = None
+    profile_resume_name: Optional[str] = None
+
+
+class SetPrimaryResumeRequest(BaseModel):
+    """Payload for setting a resume as the primary profile resume."""
+    resume_url: str
+    resume_name: str
 
 
 class TokenResponse(BaseModel):

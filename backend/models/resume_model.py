@@ -1,6 +1,11 @@
 """
-MongoDB Document Models — Resume
+MongoDB Document Models — Resume & Parsed Database Entity Layer.
+
+ARCHITECTURE NOTE [DUP-002]:
+- `ResumeModel` & `ParsedResumeData` represent MongoDB persistence models (Database Layer).
+- For LLM structured output extraction (LangChain / Groq prompt I/O), see `schemas/extraction_schema.py` (`ResumeExtraction`).
 """
+
 
 from datetime import datetime, timezone
 from enum import Enum
@@ -88,6 +93,7 @@ class ResumeModel(BaseModel):
     file_size_bytes: int
     storage_path: str
     file_url: Optional[str] = None
+    cloudinary_public_id: Optional[str] = None  # Cloudinary public_id for deletion
     status: ResumeStatus = ResumeStatus.PENDING
     parsed_data: Optional[ParsedResumeData] = None
     parse_error: Optional[str] = None

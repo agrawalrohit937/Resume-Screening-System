@@ -17,13 +17,14 @@ backend/.env.*
 uploads/
 
 # Node / frontend
+# Node / frontend
 frontend/node_modules/
 frontend/dist/
 frontend/build/
 frontend/.vite/
+frontend/.env          <-- Add this line
 frontend/.env.local
 frontend/.env.*.local
-
 # Logs
 *.log
 npm-debug.log*

@@ -6,7 +6,8 @@ import api, { generatePDF } from '../services/api'
 import GithubHoverCard from '../components/recruiter/GithubHoverCard'
 
 // ─── utils ────────────────────────────────────────────────────────────────────
-const pct = v => Math.round((v || 0) * 100)
+// [BUG-001] final_score is on a 0-100 scale — just round it, don't multiply by 100.
+const pct = v => Math.round(v || 0)
 const sc  = p => p >= 80 ? '#10B981' : p >= 60 ? '#6366F1' : p >= 40 ? '#F59E0B' : '#F43F5E'
 const sb  = p => p >= 80 ? { bg:'#ECFDF5', bd:'#A7F3D0', tx:'#065F46' }
                 : p >= 60 ? { bg:'#EFF6FF', bd:'#BFDBFE', tx:'#1E40AF' }

@@ -5,82 +5,79 @@ Pydantic v2 Schemas — ATS Matching, Skill Analysis
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
-
-# ─── ATS Request ──────────────────────────────────────────────────────────────
+# ─── ATS Request (NO CHANGES HERE) ────────────────────────────────────────────
 class ATSMatchRequest(BaseModel):
     resume_id: str
     job_title: str = Field(min_length=2, max_length=200)
     job_description: str = Field(min_length=50, max_length=10000)
-    company: Optional[str] = None
-    required_skills: List[str] = []
-    preferred_skills: List[str] = []
-    experience_years_min: Optional[int] = Field(default=None, ge=0, le=50)
-    experience_years_max: Optional[int] = Field(default=None, ge=0, le=50)
+    required_skills: List[str] = Field(default_factory=list)
     save_result: bool = True
 
-    @field_validator("required_skills", "preferred_skills", mode="before")
+    @field_validator("required_skills", mode="before")
     @classmethod
-    def clean_skills(cls, v):
-        return [s.strip().lower() for s in v if s.strip()]
+    def clean_skills(cls, value):
+        if value is None:
+            return []
 
+        if isinstance(value, str):
+            value = value.split(",")
+
+        return [
+            skill.strip().lower()
+            for skill in value
+            if skill and skill.strip()
+        ]
 
 class BulkATSMatchRequest(BaseModel):
     resume_ids: List[str] = Field(min_length=1, max_length=50)
     job_title: str = Field(min_length=2, max_length=200)
     job_description: str = Field(min_length=50, max_length=10000)
-    company: Optional[str] = None
-    required_skills: List[str] = []
+    required_skills: List[str] = Field(default_factory=list)
 
+    @field_validator("required_skills", mode="before")
+    @classmethod
+    def clean_skills(cls, value):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = value.split(",")
+        return [
+            skill.strip().lower()
+            for skill in value
+            if skill and skill.strip()
+        ]
 
-# ─── ATS Response ─────────────────────────────────────────────────────────────
-class ScoreBreakdown(BaseModel):
-    bert_score: float
-    tfidf_score: float
-    final_score: float
-    keyword_score: float
-    experience_score: float
-    education_score: float
-    skills_score: float
-
-
-class KeywordAnalysis(BaseModel):
-    matched_keywords: List[str]
-    missing_keywords: List[str]
-    keyword_match_rate: float
-    total_jd_keywords: int
-    total_matched: int
-
-
-class SkillGapResponse(BaseModel):
-    skill: str
-    importance: str
-    learning_resources: List[Dict[str, str]]
-    estimated_learning_weeks: Optional[int]
-
-
-class ExplainSectionResponse(BaseModel):
-    section: str
-    score: float
-    reason: str
-    suggestions: List[str]
-
+# ─── ATS Response (UPDATED WITH STRICT ATS FIELDS) ─────────────────────────────
 
 class ATSMatchResponse(BaseModel):
     result_id: str
     resume_id: str
     job_title: str
-    scores: ScoreBreakdown
-    keyword_analysis: KeywordAnalysis
+    
+    # ── Original AI / Semantic Engine Fields ──
+    # [BUG-001] final_score is on a 0-100 scale (e.g. 75.5 = 75.5%).
+    # experience_score and education_score are 0-1 sub-scores from the LangGraph evaluator.
+    final_score: float          # 0-100 scale
+    recommendation: str
     matched_skills: List[str]
     missing_skills: List[str]
-    skill_gaps: List[SkillGapResponse]
-    explanation: List[ExplainSectionResponse]
-    overall_assessment: str
-    strengths: List[str]
-    weaknesses: List[str]
-    improvement_suggestions: List[str]
-    recommendation: str
+    experience_score: float     # 0-1 scale
+    education_score: float      # 0-1 scale
+    feedback_suggestions: List[str]
     processing_time_ms: int
+
+    # ── NEW: Strict / Corporate ATS Engine Fields (Deterministic, no LLM) ──
+    is_knockout: bool = False
+    knockout_reasons: List[str] = Field(default_factory=list)
+    knockout_advisories: List[str] = Field(default_factory=list)
+
+    strict_ats_score: float = 0.0
+    strict_matched_keywords: List[str] = Field(default_factory=list)
+    strict_missing_keywords: List[str] = Field(default_factory=list)
+
+    parsing_is_healthy: bool = True
+    parsing_confidence: float = 1.0
+    parsing_warnings: List[str] = Field(default_factory=list)
 
 
 class BulkATSResultItem(BaseModel):
@@ -100,11 +97,6 @@ class BulkATSMatchResponse(BaseModel):
 
 
 # ─── Skill Schema ─────────────────────────────────────────────────────────────
-class SkillAnalysisRequest(BaseModel):
-    resume_id: str
-    target_role: Optional[str] = None
-    industry: Optional[str] = None
-
 
 class LearningResource(BaseModel):
     title: str

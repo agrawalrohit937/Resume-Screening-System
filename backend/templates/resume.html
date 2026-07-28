@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+    /* ── PAGE ────────────────────────────────────────────────────────────────── */
+    @page { size: A4; margin: 10mm; }
+
+    /* ── RESET ───────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── BASE ────────────────────────────────────────────────────────────────── */
+    body {
+        font-family: 'Inter', Arial, Helvetica, sans-serif;
+        font-size: 10pt;
+        line-height: 1.35;
+        color: #111827;
+        background: #ffffff;
+        /* ATS: block fi/fl/ff ligature merging that corrupts the text layer */
+        font-variant-ligatures: none;
+        /* Chromium: preserve background colours in print-to-PDF */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── HEADER ──────────────────────────────────────────────────────────────── */
+    .header {
+        text-align: center;
+        border-bottom: 1.5px solid #1d4ed8;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+    }
+
+    /* Candidate name — uppercase, bold, prominent */
+    .header h1 {
+        font-size: 17pt;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: #0f172a;
+        line-height: 1.1;
+        margin-bottom: 1px;
+    }
+
+    /* Role / headline — coloured subtitle */
+    .header .role-title {
+        font-size: 9.5pt;
+        font-weight: 600;
+        color: #1d4ed8;
+        margin-bottom: 4px;
+    }
+
+    /* Row 1: email · phone · location — plain text, no links */
+    .contact-basic {
+        font-size: 8.2pt;
+        color: #374151;
+        margin-bottom: 2px;
+    }
+    .contact-basic .sep { margin: 0 6px; color: #9ca3af; }
+
+    /* Row 2: LinkedIn · GitHub · Portfolio — linked, separated by | */
+    .contact-links {
+        font-size: 8.2pt;
+        color: #374151;
+    }
+    .contact-links a { color: #1d4ed8; font-weight: 500; }
+    .contact-links .sep { margin: 0 6px; color: #9ca3af; }
+
+    /* ── SECTION ─────────────────────────────────────────────────────────────── */
+    .section { margin-bottom: 7px; }
+
+    .section-title {
+        font-size: 8pt;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: #1d4ed8;
+        border-bottom: 1px solid #bfdbfe;
+        padding-bottom: 1px;
+        margin-bottom: 4px;
+    }
+
+    /* ── SUMMARY ─────────────────────────────────────────────────────────────── */
+    .summary-text {
+        font-size: 9.2pt;
+        color: #1f2937;
+        line-height: 1.4;
+    }
+
+    /* ── SKILLS ──────────────────────────────────────────────────────────────── */
+    /*
+     * The skills array may arrive in TWO formats:
+     *   A) "Category: Skill1, Skill2, Skill3"   — LLM auto-categorised
+     *   B) "Python", "FastAPI", "Docker"          — flat list (raw parse)
+     *
+     * For format A: we split on the first colon and bold the label.
+     * For format B: the Jinja2 block below renders them as a single dense
+     *               comma-separated paragraph as a safe fallback.
+     *
+     * The template detects format A vs B by checking whether the first item
+     * contains a colon.
+     */
+    .skills-grid { display: flex; flex-direction: column; gap: 1.5px; }
+
+    .skill-row { font-size: 9pt; color: #1f2937; line-height: 1.35; }
+
+    .skill-cat { font-weight: 700; color: #0f172a; }
+
+    /* Flat-skills fallback paragraph */
+    .skills-flat { font-size: 9pt; color: #1f2937; line-height: 1.4; }
+
+    /* ── ENTRY (Experience / Projects / Education) ───────────────────────────── */
+    .entry { margin-bottom: 6px; page-break-inside: avoid; }
+    .entry:last-child { margin-bottom: 0; }
+
+    /*
+     * Flexbox header: left title-group locked at 68%, right meta takes rest.
+     * 68% prevents long project/role names from waterfall-wrapping.
+     */
+    .entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 6px;
+        width: 100%;
+    }
+
+    .entry-title-group {
+        flex: 0 0 68%;
+        max-width: 68%;
+        min-width: 0;
+    }
+
+    /* "Role | Company" on one line, separated by a muted pipe */
+    .entry-headline {
+        display: block;
+        font-size: 10pt;
+        font-weight: 700;
+        color: #0f172a;
+        word-break: break-word;
+    }
+    .entry-headline .pipe { color: #9ca3af; font-weight: 400; margin: 0 4px; }
+    .entry-headline .company { font-weight: 600; color: #1d4ed8; }
+
+    /* Project name (no company line) */
+    .entry-title {
+        display: block;
+        font-size: 10pt;
+        font-weight: 700;
+        color: #0f172a;
+        word-break: break-word;
+    }
+
+    /* Education institution line */
+    .entry-inst  { display: block; font-size: 10pt; font-weight: 700; color: #0f172a; }
+    .entry-deg   { display: block; font-size: 9pt;  font-weight: 600; color: #1d4ed8; }
+
+    /* Right column: date + location stacked */
+    .entry-meta {
+        flex: 1;
+        text-align: right;
+        font-size: 8.2pt;
+        color: #4b5563;
+        white-space: nowrap;
+        align-self: flex-start;
+    }
+    .entry-date     { display: block; font-weight: 500; }
+    .entry-location { display: block; font-style: italic; color: #6b7280; font-size: 7.8pt; }
+
+    /* ── BULLET LISTS ────────────────────────────────────────────────────────── */
+    ul.bullets {
+        margin: 3px 0 0 0;
+        padding-left: 13px;
+        list-style-type: disc;
+    }
+    ul.bullets li {
+        font-size: 9.2pt;
+        margin-bottom: 1px;
+        line-height: 1.32;
+        color: #1f2937;
+    }
+
+    /* ── TECH / STACK LINE ───────────────────────────────────────────────────── */
+    .tech-line {
+        font-size: 8.2pt;
+        color: #4b5563;
+        margin-top: 3px;
+        line-height: 1.3;
+    }
+    .tech-line strong { color: #0f172a; font-weight: 700; }
+
+    /* ── PROJECT LINK ────────────────────────────────────────────────────────── */
+    .proj-link {
+        font-size: 8.2pt;
+        font-weight: 500;
+        color: #1d4ed8;
+        white-space: nowrap;
+    }
+    .proj-link a { color: #1d4ed8; }
+
+    /* ── EDUCATION SCORE ─────────────────────────────────────────────────────── */
+    .edu-score { font-size: 8.2pt; color: #4b5563; margin-top: 1px; }
+
+    /* ── SIMPLE LISTS (Certifications / Achievements) ───────────────────────── */
+    ul.simple-list { margin: 0; padding-left: 13px; list-style-type: disc; }
+    ul.simple-list li {
+        font-size: 9.2pt;
+        margin-bottom: 1px;
+        line-height: 1.32;
+        color: #1f2937;
+    }
+</style>
+</head>
+<body>
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════════════════════ #}
+<div class="header">
+    <h1>{{ full_name }}</h1>
+    {% if role_title %}<p class="role-title">{{ role_title }}</p>{% endif %}
+
+    {# Row 1: email · phone (plain text, not links) #}
+    {% if email or phone %}
+    <div class="contact-basic">
+        {% if email %}{{ email }}{% endif %}
+        {% if email and phone %}<span class="sep">|</span>{% endif %}
+        {% if phone %}{{ phone }}{% endif %}
+    </div>
+    {% endif %}
+
+    {# Row 2: LinkedIn · GitHub · Portfolio (linked) #}
+    {% if linkedin or github or portfolio %}
+    <div class="contact-links">
+        {% set ns = namespace(first=true) %}
+        {% if linkedin %}
+            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            <a href="{{ linkedin }}">LinkedIn</a>
+            {% set ns.first = false %}
+        {% endif %}
+        {% if github %}
+            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            <a href="{{ github }}">GitHub</a>
+            {% set ns.first = false %}
+        {% endif %}
+        {% if portfolio %}
+            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            <a href="{{ portfolio }}">Portfolio</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   SUMMARY
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if summary %}
+<div class="section">
+    <div class="section-title">Summary</div>
+    <p class="summary-text">{{ summary }}</p>
+</div>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   SKILLS
+   Primary format — Dict[str, List[str]]:
+     {"Languages": ["Python","SQL"], "Generative AI": ["LangGraph","RAG"]}
+   Fallback — flat List[str] (legacy / raw parse output).
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if skills %}
+<div class="section">
+    <div class="section-title">Skills</div>
+    <div class="skills-grid">
+        {% if skills is mapping %}
+            {% for category, skill_list in skills.items() %}
+            <div class="skill-row" style="margin-bottom: 3px;">
+                <span class="skill-cat" style="font-weight: 700; color: #0f172a;">{{ category }}:</span> 
+                {{ skill_list | join(', ') }}
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="skills-flat">{{ skills | join(', ') }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   EXPERIENCE
+   Entry headline: "Role | Company" inline on the left.
+   Right side:      Date (bold) stacked above Location (italic).
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if experience %}
+<div class="section">
+    <div class="section-title">Experience</div>
+    {% for exp in experience %}
+    <div class="entry">
+        <div class="entry-header">
+            <div class="entry-title-group">
+                <span class="entry-headline">
+                    {{ exp.role }}
+                    {% if exp.company %}
+                    <span class="pipe">|</span>
+                    <span class="company">{{ exp.company }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="entry-meta">
+                {% if exp.duration %}<span class="entry-date">{{ exp.duration }}</span>{% endif %}
+                {% if exp.location %}<span class="entry-location">{{ exp.location }}</span>{% endif %}
+            </div>
+        </div>
+        {% if exp.highlights %}
+        <ul class="bullets">
+            {% for h in exp.highlights %}<li>{{ h }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if exp.technologies %}
+        <div class="tech-line"><strong>Tech/Stack:</strong> {{ exp.technologies | join(', ') }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   PROJECTS
+   Left: project name.  Right: "Live Demo: Link" anchor (never a raw URL).
+   Tech/Stack always last, after bullet points.
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if projects %}
+<div class="section">
+    <div class="section-title">Projects</div>
+    {% for proj in projects %}
+    <div class="entry">
+        <div class="entry-header">
+            <div class="entry-title-group">
+                <span class="entry-title">{{ proj.name }}</span>
+            </div>
+            {% if proj.link and proj.link != '#' and (proj.link | trim | length) > 0 %}
+            <div class="proj-link">
+                Live Demo: <a href="{{ proj.link }}">Link</a>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if proj.highlights %}
+        <ul class="bullets">
+            {% for h in proj.highlights %}<li>{{ h }}</li>{% endfor %}
+        </ul>
+        {% elif proj.description %}
+        <p class="summary-text">{{ proj.description }}</p>
+        {% endif %}
+
+        {% if proj.technologies %}
+        <div class="tech-line"><strong>Tech/Stack:</strong> {{ proj.technologies | join(', ') }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   EDUCATION
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if education %}
+<div class="section">
+    <div class="section-title">Education</div>
+    {% for edu in education %}
+    <div class="entry">
+        <div class="entry-header">
+            <div class="entry-title-group">
+                <span class="entry-inst">{{ edu.institution }}</span>
+                <span class="entry-deg">{{ edu.degree }}</span>
+            </div>
+            <div class="entry-meta">
+                {% if edu.year %}<span class="entry-date">{{ edu.year }}</span>{% endif %}
+            </div>
+        </div>
+        {% if edu.score %}<div class="edu-score">{{ edu.score }}</div>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   CERTIFICATIONS
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if certifications %}
+<div class="section">
+    <div class="section-title">Certifications</div>
+    <ul class="simple-list">
+        {% for cert in certifications %}<li>{{ cert }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   ACHIEVEMENTS
+═══════════════════════════════════════════════════════════════════════════ #}
+{% if achievements %}
+<div class="section">
+    <div class="section-title">Achievements</div>
+    <ul class="simple-list">
+        {% for ach in achievements %}<li>{{ ach }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+</body>
+</html>

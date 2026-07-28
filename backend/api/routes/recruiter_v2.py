@@ -25,7 +25,7 @@ from api.deps import get_current_user, get_recruiter_or_admin, get_database, get
 from config.db import get_database
 from models.user_model import UserModel, UserRole
 from repositories.resume_repo import ResumeRepository
-from services.ats_service import ATSService
+from services.strict_ats_service import run_strict_ats_check
 from services.github_service import GitHubService
 from models.resume_model import ResumeModel
 from fastapi.responses import RedirectResponse
@@ -33,8 +33,8 @@ from fastapi.responses import RedirectResponse
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
-_ats_svc    = ATSService()
 _github_svc = GitHubService()
+
 
 # ── Request models ────────────────────────────────────────────────────────────
 class SearchRequest(BaseModel):
@@ -95,26 +95,27 @@ async def search_candidates(
         except Exception:
             continue
 
-        # Score against JD using ATS service
+        # Score against JD using deterministic strict ATS service
         try:
-            score_result = await _ats_svc.score_resume(
-                resume=resume_obj,
-                job_description=payload.job_description,
-                job_title=payload.job_title,
-                required_skills=payload.required_skills,
+            raw_text = parsed.get("raw_text", "")
+            strict_res = run_strict_ats_check(
+                raw_text=raw_text,
+                extracted_data=parsed,
+                jd_text=payload.job_description,
+                skill_universe=payload.required_skills or skills,
             )
+            strict_data = strict_res.get("keyword_match", {})
+            final_score = float(strict_data.get("strict_ats_score", 0.0))
+            matched = strict_data.get("matched_exact", [])
+            missing = strict_data.get("missing_exact", [])
+            bert_score = final_score / 100.0
+            tfidf_score = final_score / 100.0
         except Exception as e:
             logger.warning("ATS scoring failed", resume_id=doc["_id"], error=str(e))
             continue
 
-        final_score  = score_result.get("final_score", 0.0)
-        bert_score   = score_result.get("bert_score",  0.0)
-        tfidf_score  = score_result.get("tfidf_score", 0.0)
-        matched      = score_result.get("matched_skills", [])
-        missing      = score_result.get("missing_skills",  [])
-        skill_boost = len(matched) / max(len(payload.required_skills), 1)
-        final_score += 0.1 * skill_boost
-        recommendation = _label(final_score)
+        recommendation = _label(final_score / 100.0 if final_score > 1.0 else final_score)
+
 
         if final_score < payload.min_score:
             continue

@@ -1,0 +1,14 @@
+Review the following job application email and cover letter for:
+1. Tone consistency with the job description
+2. Any factual claims about the company that are not supported by the job description text
+
+Job description:
+{job_description}
+
+Email:
+{email_body}
+
+Cover letter:
+{cover_letter_text}
+
+Respond with ONLY a JSON list of issue strings, e.g. ["Tone is too casual for a formal listing"]. Respond with an empty JSON list [] if there are no issues. No markdown, no commentary.

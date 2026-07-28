@@ -15,11 +15,12 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 
-from api.deps import get_current_user, get_database
+from api.deps import get_current_user, get_database, get_resume_repo
 from models.user_model import UserModel
 from services.live_interview_service import LiveInterviewService
 from services.evaluation_service import EvaluationService
 from services.gamification_service import GamificationService
+from repositories.resume_repo import ResumeRepository
 
 from config.db import get_database
 from fastapi import Depends
@@ -44,6 +45,7 @@ class CreateSessionRequest(BaseModel):
     difficulty:     str = Field(default="medium", pattern="^(easy|medium|hard|mixed)$")
     interview_type: str = Field(default="mixed",  pattern="^(technical|behavioral|situational|mixed)$")
     num_questions:  int = Field(default=8, ge=3, le=15)
+    resume_id:      Optional[str] = None   # optional — enables personalized questions
 
 
 class SubmitAnswerRequest(BaseModel):
@@ -75,15 +77,34 @@ async def create_session(
     user:    UserModel = Depends(get_current_user),
     svc:     LiveInterviewService = Depends(get_svc),
     gamification: GamificationService = Depends(get_gamification_service),
+    resume_repo: ResumeRepository = Depends(get_resume_repo),
 ):
+    # Extract resume context if provided (optional — for personalized questions)
+    resume_skills: Optional[List[str]] = None
+    experience_years: Optional[float] = None
+    experience_titles: Optional[List[str]] = None
+
+    if payload.resume_id:
+        try:
+            resume = await resume_repo.get_by_id_and_user(payload.resume_id, str(user.id))
+            if resume and resume.parsed_data:
+                resume_skills = resume.parsed_data.technical_skills[:12]
+                experience_years = resume.parsed_data.total_experience_years
+                experience_titles = [e.title for e in (resume.parsed_data.work_experience or [])[:3]]
+        except Exception:
+            pass  # Resume fetch failed — proceed with generic questions
+
     data = await svc.create_session(
         user_id=str(user.id),
         job_title=payload.job_title,
         difficulty=payload.difficulty,
         interview_type=payload.interview_type,
         num_questions=payload.num_questions,
+        resume_skills=resume_skills,
+        experience_years=experience_years,
+        experience_titles=experience_titles,
     )
-    
+
     await gamification.mark_daily_activity(str(user.id))
     return {"success": True, **data}
 

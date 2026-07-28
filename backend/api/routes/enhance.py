@@ -2,105 +2,260 @@
 Enhance Routes — AI-powered resume enhancement
 """
 
+import asyncio
+import os
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+
+from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.deps import get_current_user, get_resume_repo, get_enhancer_service
-from models.resume_model import ResumeStatus
+from api.deps import get_current_user, get_resume_repo
 from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
 from schemas.resume_schema import EnhanceResumeRequest, EnhanceResumeResponse
-from services.enhancer_service import EnhancerService
-from utils.validators import validate_object_id
+from services.pdf_generator_service import PDFGeneratorService
+from services.hitl_questionnaire_service import generate_hitl_questions
+from workflows.enhancer_graph import enhance_resume_content
 
 router = APIRouter()
 
 
+def _temp_storage_dir() -> str:
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "temp_storage"))
+
+# PDF Generator instance
+pdf_generator = PDFGeneratorService()
+
+# Thread pool for running sync LLM calls without blocking the event loop
+_executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _serialize_user_verified(payload: EnhanceResumeRequest) -> dict:
+    """
+    Turn payload.user_verified (a UserVerifiedData pydantic model, or None)
+    into the plain dict shape enhancer_graph.py expects. Written defensively
+    with getattr()/model_dump() so this route doesn't hard-fail if the
+    schema field hasn't been added yet — it just behaves as "no HITL data".
+    """
+    user_verified = getattr(payload, "user_verified", None)
+    if user_verified is None:
+        return {}
+
+    data = user_verified.model_dump() if hasattr(user_verified, "model_dump") else dict(user_verified)
+
+    links = data.get("links") or {}
+    if hasattr(links, "model_dump"):
+        links = links.model_dump()
+
+    return {
+        "links": {
+            "linkedin": links.get("linkedin"),
+            "github": links.get("github"),
+            "portfolio": links.get("portfolio"),
+        } if links else None,
+        "verified_skills": data.get("verified_skills") or [],
+        "impact_metrics": [
+            {"question": m.get("question", ""), "answer": m.get("answer", "")}
+            for m in (data.get("impact_metrics") or [])
+        ],
+    }
+
+
+# ── /enhance/resume ────────────────────────────────────────────────────────────
 @router.post("/resume", response_model=EnhanceResumeResponse)
 async def enhance_resume(
     payload: EnhanceResumeRequest,
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
-    enhancer: EnhancerService = Depends(get_enhancer_service),
 ):
     """
-    AI-powered resume enhancement:
-    - Rewrites professional summary
-    - Upgrades experience bullets with action verbs
-    - Injects missing ATS keywords
-    - Provides formatting suggestions
+    AI-powered resume enhancement — returns enhanced text, keywords, suggestions.
+    Does NOT generate a PDF. Use /enhance-and-download for that.
     """
-    validate_object_id(payload.resume_id, "resume_id")
     resume = await resume_repo.get_by_id_and_user(payload.resume_id, str(current_user.id))
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
-    if resume.status != ResumeStatus.PARSED:
+
+    parsed_data = resume.parsed_data.model_dump() if hasattr(resume.parsed_data, 'model_dump') else (resume.parsed_data or {})
+
+    resume_text = (parsed_data.get("raw_text") or "").strip()
+
+    if len(resume_text) < 50:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Resume must be parsed before enhancement.",
+            status_code=422,
+            detail="Resume text is empty or could not be extracted."
         )
-    enhanced_response = await enhancer.enhance_resume(
-        resume=resume,
-        job_description=payload.job_description,
-        target_role=payload.target_role,
-        enhancement_areas=payload.enhancement_areas,
-        tone=payload.tone,
+
+    state = {
+        "resume_text": resume_text,
+        "jd_text": payload.job_description or "",
+        "required_skills": payload.required_skills or [],
+        "strict_missing_keywords": getattr(payload, "strict_missing_keywords", None) or [],
+        # NEW — HITL wizard bundle, see schemas/resume_schema_ADDITIONS_v2_hitl.py
+        "user_verified": _serialize_user_verified(payload),
+        # Passed through so the graph node can restore LLM-truncated highlights
+        "original_parsed_dict": parsed_data,
+    }
+
+    # Run async LLM node natively without blocking event loop
+    enhanced = await enhance_resume_content(state)
+    enhanced_data = enhanced.get("enhanced_data", {})
+
+    if not enhanced_data:
+        raise HTTPException(
+            status_code=500,
+            detail="LLM returned an empty enhanced resume."
+        )
+    # Map to EnhanceResumeResponse (the ATS results schema)
+    return EnhanceResumeResponse(
+        resume_id=payload.resume_id,
+        original_summary=parsed_data.get("summary", ""),
+        enhanced_summary=enhanced_data.get("summary", ""),
+        original_experience=[],
+        enhanced_experience=enhanced_data.get("experience", []),
+        added_keywords=enhanced_data.get("skills", [])[:10],
+        formatting_suggestions=enhanced_data.get("missing_critical_info", []),
+        ats_improvement_estimate=float(enhanced_data.get("ats_improvement_estimate", 0.05)),
+        enhancement_notes=[
+            "✅ Professional summary enhanced with stronger language",
+            "✅ Experience bullets upgraded with action verbs",
+            f"✅ {len(enhanced_data.get('skills', []))} skills identified for ATS",
+            "💡 Manually review all AI suggestions before submitting",
+        ],
     )
 
-    if payload.save_enhanced:
-        # Update the resume with enhanced data
-        if not resume.parsed_data:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No parsed data to update.")
 
-        updated_parsed_data = resume.parsed_data.model_dump()
+# ── /enhance/wizard-questions ─────────────────────────────────────────────────
+class WizardQuestionsRequest(BaseModel):
+    resume_id: str
+    job_description: Optional[str] = None
+    strict_missing_keywords: Optional[List[str]] = None
 
-        # 1. Update enhanced summary
-        if enhanced_response.enhanced_summary:
-            updated_parsed_data["summary"] = enhanced_response.enhanced_summary
 
-        # 2. Update enhanced experience
-        if enhanced_response.enhanced_experience:
-            updated_parsed_data["work_experience"] = enhanced_response.enhanced_experience
+@router.post("/wizard-questions")
+async def get_wizard_questions(
+    payload: WizardQuestionsRequest,
+    current_user: UserModel = Depends(get_current_user),
+    resume_repo: ResumeRepository = Depends(get_resume_repo),
+):
+    """
+    Data Gap Analyzer — generates ≤3 high-value conversational questions
+    to show the candidate BEFORE the enhancer graph runs (the HITL wizard).
 
-        # 3. Rebuild raw_text to include ALL enhancements
-        #    so ATS scoring picks up the improved content
-        updated_raw_text = resume.parsed_data.raw_text or ""
+    Call this endpoint AFTER /ats/match so you have `strict_missing_keywords`
+    to pass in.  The returned `questions` list is ordered by priority and may
+    be empty if no meaningful gaps are found.
 
-        # Replace old summary with enhanced summary
-        if (
-            enhanced_response.enhanced_summary
-            and resume.parsed_data.summary
-            and resume.parsed_data.summary in updated_raw_text
-        ):
-            updated_raw_text = updated_raw_text.replace(
-                resume.parsed_data.summary, enhanced_response.enhanced_summary, 1
+    Flow:
+        POST /ats/match           → get strict_missing_keywords
+        POST /enhance/wizard-questions  ← HERE
+        (user answers in the UI)
+        POST /enhance/enhance-and-download with user_verified bundle
+    """
+    resume = await resume_repo.get_by_id_and_user(payload.resume_id, str(current_user.id))
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found.")
+
+    parsed_data = (
+        resume.parsed_data.model_dump()
+        if hasattr(resume.parsed_data, "model_dump")
+        else (resume.parsed_data or {})
+    )
+
+    # Run sync LLM call in thread pool — keeps the event loop free
+    questions = await asyncio.get_event_loop().run_in_executor(
+        _executor,
+        generate_hitl_questions,
+        parsed_data,
+        payload.job_description or "",
+        payload.strict_missing_keywords or [],
+    )
+
+    return {
+        "resume_id": payload.resume_id,
+        "questions": questions,         # list of {question_id, question_text, category, context_hint}
+        "total": len(questions),
+    }
+
+
+# ── /enhance/enhance-and-download ─────────────────────────────────────────────
+@router.post("/enhance-and-download")
+async def enhance_and_download(
+    payload: EnhanceResumeRequest,
+    current_user: UserModel = Depends(get_current_user),
+    resume_repo: ResumeRepository = Depends(get_resume_repo),
+):
+    """
+    Enhance resume with AI and generate a downloadable PDF.
+    Returns {status: "SUCCESS", pdf_url: "..."} or {status: "MISSING_INFO", missing_fields: [...]}
+
+    `payload.user_verified` (optional) carries the HITL wizard bundle the
+    frontend collects before calling this endpoint — see
+    schemas/resume_schema_ADDITIONS_v2_hitl.py. It's safe to omit entirely
+    (the "skip wizard" quick-enhance path just sends the request without it).
+    """
+    try:
+        # 1. Fetch Resume from DB
+        resume = await resume_repo.get_by_id_and_user(payload.resume_id, str(current_user.id))
+        if not resume:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+
+        # 2. Extract parsed data as plain dict
+        parsed_data = (
+            resume.parsed_data.model_dump()
+            if hasattr(resume.parsed_data, 'model_dump')
+            else (resume.parsed_data or {})
+        )
+
+        resume_text = (parsed_data.get("raw_text") or "").strip()
+
+        if len(resume_text) < 50:
+            raise HTTPException(
+                status_code=422,
+                detail="Resume text is empty or could not be extracted."
             )
-        elif enhanced_response.enhanced_summary and resume.parsed_data.summary not in updated_raw_text:
-            # Prepend enhanced summary if original not found
-            updated_raw_text = enhanced_response.enhanced_summary + "\n\n" + updated_raw_text
 
-        # Replace enhanced experience descriptions in raw_text
-        if enhanced_response.enhanced_experience and resume.parsed_data.work_experience:
-            for orig_exp, enh_exp in zip(
-                resume.parsed_data.work_experience,
-                enhanced_response.enhanced_experience
-            ):
-                orig_desc = orig_exp.description or ""
-                enh_desc = enh_exp.get("description", "") if isinstance(enh_exp, dict) else ""
-                if orig_desc and enh_desc and orig_desc in updated_raw_text:
-                    updated_raw_text = updated_raw_text.replace(orig_desc, enh_desc, 1)
+        state = {
+            "resume_text": resume_text,
+            "jd_text": payload.job_description or "",
+            "required_skills": payload.required_skills or [],
+            "strict_missing_keywords": getattr(payload, "strict_missing_keywords", None) or [],
+            "user_verified": _serialize_user_verified(payload),
+            # Passed through so the graph node can restore LLM-truncated highlights
+            "original_parsed_dict": parsed_data,
+        }
 
-        # Append added keywords to raw_text as a supplemental skills block
-        # This ensures ATS scoring sees these JD-aligned keywords
-        if enhanced_response.added_keywords:
-            keyword_block = "\n\nAdditional Skills & Keywords: " + ", ".join(enhanced_response.added_keywords)
-            updated_raw_text = updated_raw_text + keyword_block
-            # Also update the skills list in parsed data
-            existing_skills = set(s.lower() for s in (updated_parsed_data.get("skills") or []))
-            new_skills = [kw for kw in enhanced_response.added_keywords if kw.lower() not in existing_skills]
-            updated_parsed_data["skills"] = (updated_parsed_data.get("skills") or []) + new_skills
+        # 3. Run AI enhancement (async function) — natively awaited
+        enhanced = await enhance_resume_content(state)
 
-        updated_parsed_data["raw_text"] = updated_raw_text
+        enhanced_data = enhanced.get("enhanced_data", {})
+        if not enhanced_data:
+            raise HTTPException(
+                status_code=500,
+                detail="LLM returned an empty enhanced resume."
+            )
 
-        await resume_repo.update_parsed_data(payload.resume_id, updated_parsed_data)
+        # 4. Generate PDF
+        unique_id = uuid.uuid4().hex[:8]
+        output_filename = f"resume_{current_user.id}_{unique_id}.pdf"
+        output_path = os.path.join(_temp_storage_dir(), output_filename)
 
-    return enhanced_response
+        pdf_url = await pdf_generator.generate_resume_pdf(
+            resume_data=enhanced_data,
+            output_path=output_path
+        )
+
+        return {"status": "SUCCESS", "pdf_url": pdf_url}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"[Enhance] CRITICAL ERROR: {str(e)}\n{traceback_str}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Enhancement failed: {str(e)}"
+        )

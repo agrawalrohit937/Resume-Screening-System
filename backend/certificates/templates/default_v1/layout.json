@@ -1,0 +1,93 @@
+{
+  "background": "base_cert.pdf",
+
+  "fonts": {
+    "script": {
+      "alias": "CertScript",
+      "file": "GreatVibes-Regular.ttf",
+      "fallback": "Helvetica-Bold"
+    },
+    "body": {
+      "alias": "CertBody",
+      "file": "Montserrat-Regular.ttf",
+      "fallback": "Helvetica"
+    },
+    "body_semibold": {
+      "alias": "CertBodySemibold",
+      "file": "Lora-Bold.ttf",
+      "fallback": "Helvetica-Bold"
+    }
+  },
+
+  "text_fields": {
+
+    "recipient_name": {
+      "x_frac": 0.489,
+      "y_frac": 0.587,
+      "font": "script",
+      "size": 38,
+      "color": "#1E293B",
+      "align": "center"
+    },
+
+    "assessment_name": {
+      "x_frac": 0.504,
+      "y_frac": 0.498,
+      "font": "body_semibold",
+      "size": 16,
+      "color": "#1e293b",
+      "align": "center"
+    },
+
+    "level": {
+      "x_frac": 0.50,
+      "y_frac": 0.380,
+      "font": "body",
+      "size": 11,
+      "color": "#94a3b8",
+      "align": "center"
+    },
+    "skill_name": {
+      "x_frac": 0.143,
+      "y_frac": 0.384,
+      "font": "body_semibold",
+      "size": 12,
+      "color": "#FFFFFF",
+      "align": "center"
+    },
+
+    "issued_date": {
+      "x_frac": 0.650,
+      "y_frac": 0.042,
+      "font": "body",
+      "size": 8,
+      "color": "#64748b",
+      "align": "center"
+    },
+
+    "cert_id": {
+      "x_frac": 0.286,
+      "y_frac": 0.042,
+      "font": "body",
+      "size": 8,
+      "color": "#64748b",
+      "align": "center"
+    }
+  },
+
+  "image_fields": {
+    "skill_logo": {
+        "x_frac": 0.076,
+        "y_frac": 0.463,
+        "width_frac": 0.130,
+        "height_frac": 0.115
+    },
+
+    "qr_code": {
+      "x_frac": 0.444,
+      "y_frac": 0.112,
+      "width_frac": 0.088,
+      "height_frac": 0.126
+    }
+  }
+}
