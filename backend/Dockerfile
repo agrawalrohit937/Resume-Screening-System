@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# सिस्टम पैकेजेस (बिना भारी LaTeX के) - सिर्फ जरूरी टूल्स
+# सिस्टम पैकेजेस - सिर्फ जरूरी टूल्स
 RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -9,7 +9,11 @@ WORKDIR /app
 
 COPY requirements.txt .
 
+# 1. Python पैकेजेस इंस्टॉल करें
 RUN pip install --no-cache-dir -r requirements.txt
+
+# 2. Playwright Chromium ब्राउज़र और उसकी जरूरी Linux Dependencies इंस्टॉल करें
+RUN playwright install --with-deps chromium
 
 COPY . .
 
