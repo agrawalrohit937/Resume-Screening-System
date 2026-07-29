@@ -38,7 +38,17 @@ def _sync_generate_pdf(html_content: str, output_path: str) -> None:
     process uses.  This is the recommended pattern for Windows + FastAPI.
     """
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
+        browser = pw.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--single-process",
+                "--no-zygote",
+            ]
+        )
         page = None
         try:
             page = browser.new_page()
