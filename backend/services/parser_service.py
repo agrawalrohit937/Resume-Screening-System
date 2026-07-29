@@ -4,6 +4,7 @@ Parser Service — Extract structured data from PDF and DOCX resumes
 # Yha parser 2 output deta h raw_text, structured_output
 # but hum only raw_text ko sue kr rhe h baki structuring ka kaam LLM ko de diya h 
 # in future structured output jo parsing ho rhi h usko delete kr dege  after proper testing
+import asyncio
 import gc
 import re
 from pathlib import Path

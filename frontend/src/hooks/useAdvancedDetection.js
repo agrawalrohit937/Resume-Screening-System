@@ -19,8 +19,7 @@ const TFJS_CDN = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.m
 const COCOSSL_CDN   = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'
 // const FACEAPI_CDN   = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js'
 const FACEAPI_CDN = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
-// const FACE_API_MODELS= 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
-const FACE_API_MODELS = '/models'
+const FACE_API_MODELS = 'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model';
 // MediaPipe (loaded via index.html script tags — see instructions)
 // @mediapipe/face_mesh and @mediapipe/camera_utils must be in index.html
 

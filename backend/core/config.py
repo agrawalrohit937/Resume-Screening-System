@@ -4,7 +4,7 @@ Application Configuration — Environment-driven settings via Pydantic v2
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +45,25 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "https://resume-screening-system-lyart.vercel.app",
     ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> List[str]:
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [i.strip() for i in v.split(",") if i.strip()]
+        elif isinstance(v, list):
+            return v
+        return [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "https://resume-screening-system-lyart.vercel.app",
+        ]
 
     # ── File Upload ───────────────────────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 10
