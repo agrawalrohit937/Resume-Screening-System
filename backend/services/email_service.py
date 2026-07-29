@@ -64,8 +64,8 @@ class EmailService:
         return True, None
 
     def _smtp_transport_flags(self) -> tuple[bool, bool]:
-        use_tls = bool(settings.SMTP_USE_SSL or settings.SMTP_PORT == 465)
-        start_tls = settings.SMTP_PORT == 587 and not use_tls
+        use_tls = bool(settings.SMTP_PORT == 465 and settings.SMTP_USE_SSL)
+        start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
         return use_tls, start_tls
 
     def _build_message(self, *, to_email: str, subject: str, from_email: str, html_body: str, text_body: str) -> EmailMessage:
@@ -332,8 +332,8 @@ async def send_with_attachments(*, to: str, subject: str, html_body: str, attach
         part["Content-Disposition"] = f'attachment; filename="{path.name}"'
         msg.attach(part)
 
-    use_tls = (settings.SMTP_PORT == 465) or getattr(settings, "SMTP_USE_SSL", True)
-    start_tls = (settings.SMTP_PORT == 587) and not use_tls
+    use_tls = bool(settings.SMTP_PORT == 465 and getattr(settings, "SMTP_USE_SSL", False))
+    start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
 
     try:
         await aiosmtplib.send(

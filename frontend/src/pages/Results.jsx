@@ -1399,9 +1399,14 @@ export default function Results() {
       // UI scroll into view
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
     } catch (err) {
-      toast.error(formatApiError(err) || 'Analysis failed');
+      toast.dismiss()
+      setAnalyzing(false)
+      const msg = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+        ? 'Analysis request timed out (server took too long). Please try again.'
+        : (formatApiError(err) || 'Analysis failed')
+      toast.error(msg)
     } finally {
-      setAnalyzing(false);
+      setAnalyzing(false)
     }
   }
 

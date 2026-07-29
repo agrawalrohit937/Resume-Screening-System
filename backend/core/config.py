@@ -61,14 +61,14 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
-    # SMTP Settings
+    # SMTP Settings (Default to port 587 with STARTTLS for cloud providers like Render)
     SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 465
+    SMTP_PORT: int = Field(default_factory=lambda: int(os.getenv("SMTP_PORT", 587)))
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_FROM_EMAIL: Optional[str] = None
     SMTP_FROM_NAME: str = "CareerShala"
-    SMTP_USE_SSL: bool = True
+    SMTP_USE_SSL: bool = Field(default_factory=lambda: os.getenv("SMTP_USE_SSL", "false").lower() == "true")
     SUPPORT_EMAIL: Optional[str] = None
 
 
