@@ -482,6 +482,7 @@ def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
     if not resume_text or not jd_text:
         return 0.0
 
+    model = get_embedding_model()
     if model is not None:
         try:
             embeddings = model.encode([resume_text, jd_text], convert_to_numpy=True)

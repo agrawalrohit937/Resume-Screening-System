@@ -44,9 +44,10 @@ class ParserService:
 
     # ── Text Extraction ────────────────────────────────────────────────────────
     async def _extract_raw_text(self, file_path: str, file_type: str) -> str:
-        if file_type == "pdf":
+        ft = (file_type or "").lower().lstrip(".")
+        if ft == "pdf":
             return self._extract_pdf(file_path)
-        elif file_type in ("docx", "doc"):
+        elif ft in ("docx", "doc"):
             return self._extract_docx(file_path)
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
@@ -229,7 +230,7 @@ class ParserService:
         degree_patterns = [
             r"\b(B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?A\.?|Ph\.?D\.?|MBA|Bachelor|Master|Doctor)\b",
         ]
-        year_pattern = r"\b(19|20)\d{2}\b"
+        year_pattern = r"\b(?:19|20)\d{2}\b"
         blocks = re.split(r"\n{2,}", text)
         for block in blocks:
             lines = [l.strip() for l in block.split("\n") if l.strip()]
@@ -242,8 +243,8 @@ class ParserService:
                 if degree_match:
                     break
             years = re.findall(year_pattern, block)
-            start_year = int("".join(years[0])) if years else None
-            end_year = int("".join(years[1])) if len(years) > 1 else None
+            start_year = int(years[0]) if years else None
+            end_year = int(years[1]) if len(years) > 1 else None
 
             gpa_match = re.search(r"GPA:?\s*(\d+\.\d+)", block, re.IGNORECASE)
             gpa = float(gpa_match.group(1)) if gpa_match else None
