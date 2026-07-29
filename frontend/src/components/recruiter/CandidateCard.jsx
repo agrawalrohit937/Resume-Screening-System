@@ -34,8 +34,10 @@ export default function CandidateCard({ candidate, rank }) {
       a.download = candidate.filename || `resume-${candidate.name || 'candidate'}.pdf`
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      setTimeout(() => {
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }, 150)
       toast.success('Resume downloaded')
     } catch {
       toast.error('Download failed')

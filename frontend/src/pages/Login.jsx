@@ -41,6 +41,7 @@ export default function Login() {
 
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (codeResponse) => {
+      setLoading(true)
       try {
         // Note: useGoogleLogin returns an access_token, not a credential. 
         // Ensure your backend / googleLogin context handles this correctly.
@@ -49,6 +50,8 @@ export default function Login() {
         navigate('/dashboard')
       } catch (err) {
         toast.error(err.response?.data?.detail || 'Google login failed')
+      } finally {
+        setLoading(false)
       }
     },
     onError: () => toast.error('Google Sign-In failed')

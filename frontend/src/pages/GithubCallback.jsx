@@ -13,7 +13,7 @@ export default function GithubCallback() {
   useEffect(() => {
     const code = searchParams.get('code')
     const state = searchParams.get('state') || 'candidate'
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+    const apiBaseUrl = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
 
     if (!code) {
       setMessage('GitHub sign-in was cancelled or failed.')

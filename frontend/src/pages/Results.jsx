@@ -1241,13 +1241,16 @@ export default function Results() {
         save_enhanced: true
       });
 
+      toast.dismiss();
       if (data.status === "SUCCESS") {
         window.open(data.pdf_url + "?fl_attachment=true", "_blank");
-        toast.dismiss();
         toast.success("Resume Enhanced! 🚀");
         setMissingFields([]);
+      } else {
+        toast.error(data.message || "Failed to update and enhance.");
       }
     } catch (err) {
+      toast.dismiss();
       toast.error("Failed to update and enhance.");
     }
   };
@@ -1448,7 +1451,7 @@ export default function Results() {
 
         // Local API fallback URL (starts with /api) — use full backend URL
         if (pdfUrl.startsWith('/api')) {
-          const backendBase = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+          const backendBase = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || window.location.origin
           const fullUrl = backendBase + pdfUrl
           const a = document.createElement('a')
           a.href = fullUrl

@@ -184,6 +184,11 @@ export default function Premium() {
         name: 'Resume Screening System',
         description: `Upgrade to ${planName} Subscription`,
         order_id: orderData.id,
+        modal: {
+          ondismiss: function () {
+            setProcessingPlan(null)
+          }
+        },
         handler: async function (response) {
           // Step 3: Send verification handshake verification signatures to server
           setProcessingPlan(planName)
@@ -226,7 +231,6 @@ export default function Premium() {
 
     } catch (e) {
       toast.error(e.message || 'Could not complete payment execution.')
-    } finally {
       setProcessingPlan(null)
     }
   }
