@@ -1,6 +1,7 @@
 """
 Application Configuration — Environment-driven settings via Pydantic v2
 """
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
@@ -51,7 +52,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
 
     # ── Certificate public URLs ────────────────────────────────────────────────
-    BASE_URL: str = "http://localhost:5173"
+    BASE_URL: str = Field(default_factory=lambda: os.getenv("BASE_URL", os.getenv("FRONTEND_URL", "http://localhost:5173")))
     PUBLIC_WEBSITE_URL: str = "http://careershala.tech"
 
 
@@ -101,13 +102,23 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_ID: Optional[str] = None
     LINKEDIN_CLIENT_SECRET: Optional[str] = None
 
-    LINKEDIN_REDIRECT_URI: str = "http://localhost:5173/linkedin-callback"
+    LINKEDIN_REDIRECT_URI: str = Field(
+        default_factory=lambda: os.getenv(
+            "LINKEDIN_REDIRECT_URI",
+            f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/linkedin-callback"
+        )
+    )
 
     # GitHub OAuth Settings
     GITHUB_CLIENT_ID: Optional[str] = None
     GITHUB_CLIENT_SECRET: Optional[str] = None
 
-    GITHUB_REDIRECT_URI: str = "http://localhost:5173/github-callback"
+    GITHUB_REDIRECT_URI: str = Field(
+        default_factory=lambda: os.getenv(
+            "GITHUB_REDIRECT_URI",
+            f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/github-callback"
+        )
+    )
 
     # ── Certificates ──────────────────────────────────────────────────────────
     CERT_VERIFY_BASE_URL: str = "https://careershala.com/verify/cert"
@@ -143,7 +154,12 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     # The redirect URI registered in Google Cloud Console for the Gmail OAuth flow.
     # Must match EXACTLY (including http/https) with what's in Google Console.
-    GOOGLE_GMAIL_REDIRECT_URI: str = "http://localhost:5173/gmail-callback"
+    GOOGLE_GMAIL_REDIRECT_URI: str = Field(
+        default_factory=lambda: os.getenv(
+            "GOOGLE_GMAIL_REDIRECT_URI",
+            f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/gmail-callback"
+        )
+    )
 
     # ── OTP / Email Verification (NEW) ────────────────────────────────────────
     OTP_LENGTH: int = 6

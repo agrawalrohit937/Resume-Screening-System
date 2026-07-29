@@ -76,7 +76,14 @@ async def jd_analyzer_node(state: ApplyAssistantState) -> dict:
 # ─── NODE 2: EMAIL GENERATOR (DIRECT GEMINI CLIENT) ────────────────────────
 async def email_generator_node(state: ApplyAssistantState) -> dict:
     """Drafts the application email subject + body using Gemini Direct SDK."""
-    client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        job_title = state.get("job_title", "Position")
+        company_name = state.get("company_name", "Company")
+        return {
+            "email_subject": f"Application for {job_title} at {company_name}",
+            "email_body": "Error: GOOGLE_API_KEY environment variable is missing."
+        }
     
     raw_prompt_text = _load_prompt("email_generation.txt")
     if not raw_prompt_text.strip():
@@ -99,25 +106,34 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
     previous_issues=state.get("validation_issues", []) or "none",
 )}"""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=formatted_prompt,
-    )
-    
-    content = response.text.strip()
+    try:
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=formatted_prompt,
+        )
+        
+        content = response.text.strip()
 
-    if content.lower().startswith("subject:"):
-        first_line, _, rest = content.partition("\n")
-        subject = first_line.split(":", 1)[1].strip()
-        body = rest.strip()
-    else:
-        subject = f"Application for {state.get('job_title', 'Role')} at {state.get('company_name', 'Company')}"
-        body = content
+        if content.lower().startswith("subject:"):
+            first_line, _, rest = content.partition("\n")
+            subject = first_line.split(":", 1)[1].strip()
+            body = rest.strip()
+        else:
+            subject = f"Application for {state.get('job_title', 'Role')} at {state.get('company_name', 'Company')}"
+            body = content
 
-    # 👇 CONVERT NEWLINES TO HTML BREAKS FOR PROPER GMAIL FORMATTING
-    formatted_body = body.replace("\n\n", "<br><br>").replace("\n", "<br>")
+        # 👇 CONVERT NEWLINES TO HTML BREAKS FOR PROPER GMAIL FORMATTING
+        formatted_body = body.replace("\n\n", "<br><br>").replace("\n", "<br>")
 
-    return {"email_subject": subject, "email_body": formatted_body}
+        return {"email_subject": subject, "email_body": formatted_body}
+    except Exception as e:
+        job_title = state.get("job_title", "Position")
+        company_name = state.get("company_name", "Company")
+        return {
+            "email_subject": f"Application for {job_title} at {company_name}",
+            "email_body": f"Error generating email draft: {str(e)}"
+        }
 
 
 # ─── NODE 3: COVER LETTER GENERATOR (DIRECT GEMINI CLIENT) ─────────────────
