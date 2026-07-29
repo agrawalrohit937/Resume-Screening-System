@@ -218,11 +218,15 @@ class CertificateService:
             filename=f"CareerShala_Certificate_{topic.replace(' ', '_')}.pdf",
         )
 
+        use_tls = bool(settings.SMTP_PORT == 465 and getattr(settings, "SMTP_USE_SSL", False))
+        start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
+
         await aiosmtplib.send(
             message,
             hostname=settings.SMTP_HOST,
             port=settings.SMTP_PORT,
             username=settings.SMTP_USER,
             password=settings.SMTP_PASSWORD,
-            use_tls=True,
+            use_tls=use_tls,
+            start_tls=start_tls,
         )

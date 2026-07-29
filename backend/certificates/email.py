@@ -71,6 +71,9 @@ async def dispatch_certificate_email(
         filename=f"CareerShala_Certificate_{title.replace(' ', '_')}.pdf",
     )
 
+    use_tls = bool(settings.SMTP_PORT == 465 and getattr(settings, "SMTP_USE_SSL", False))
+    start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
+
     try:
       await aiosmtplib.send(
         message,
@@ -78,7 +81,8 @@ async def dispatch_certificate_email(
         port=settings.SMTP_PORT,
         username=settings.SMTP_USER,
         password=settings.SMTP_PASSWORD,
-        use_tls=True,
+        use_tls=use_tls,
+        start_tls=start_tls,
       )
     except Exception as exc:
       # Email should never block certificate issuance; the PDF is already
