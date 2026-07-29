@@ -455,57 +455,58 @@ def evaluate_strict_keyword_match(raw_text: str, skill_universe: List[str]) -> S
 # 4. VECTOR SEMANTIC SIMILARITY & KNOCKOUT MATH ENGINES
 # ══════════════════════════════════════════════════════════════════════════
 
-import numpy as np
+import os
+import requests
 from services.skill_ontology import evaluate_skill_fulfillment
 from services.nlp_extractor import extract_skills_deterministic
 
-_EMBEDDING_MODEL = None
-
-def get_embedding_model():
-    """Lazy-load sentence-transformers model all-MiniLM-L6-v2 into memory once."""
-    global _EMBEDDING_MODEL
-    if _EMBEDDING_MODEL is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-            _EMBEDDING_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-        except Exception as e:
-            logger.warning("sentence-transformers not available, using TF-IDF fallback", error=str(e))
-            _EMBEDDING_MODEL = False
-    return _EMBEDDING_MODEL if _EMBEDDING_MODEL is not False else None
+# Hugging Face API Configuration (Zero Local RAM consumption)
+HF_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 
 def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
     """
-    Calculates dense vector Cosine Similarity between resume text and job description.
+    Calculates semantic similarity using Hugging Face Inference API.
+    Zero RAM consumption on the local server — prevents 512MB OOM crashes.
     Returns AI Match Score on a 0-100 percentage scale.
     """
     if not resume_text or not jd_text:
         return 0.0
 
-    model = get_embedding_model()
-    if model is not None:
+    # 1. Hugging Face API Call (Primary - Accurate & Lightweight)
+    if HF_TOKEN:
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        payload = {
+            "inputs": {
+                "source_sentence": jd_text[:2500],  # Limit length for API efficiency
+                "sentences": [resume_text[:2500]]
+            }
+        }
         try:
-            embeddings = model.encode([resume_text, jd_text], convert_to_numpy=True)
-            emb_resume, emb_jd = embeddings[0], embeddings[1]
+            response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=12)
+            if response.status_code == 200:
+                similarity_score = response.json()[0]
+                return max(0.0, min(100.0, round(float(similarity_score) * 100, 2)))
+            else:
+                logger.warning("HuggingFace API returned non-200 status", status=response.status_code, response=response.text)
+        except Exception as e:
+            logger.warning("HuggingFace API call failed, falling back to basic math similarity", error=str(e))
 
-            norm_r = np.linalg.norm(emb_resume)
-            norm_j = np.linalg.norm(emb_jd)
-
-            if norm_r > 0 and norm_j > 0:
-                cosine_sim = float(np.dot(emb_resume, emb_jd) / (norm_r * norm_j))
-                return max(0.0, min(100.0, round(cosine_sim * 100, 2)))
-        except (MemoryError, Exception) as e:
-            logger.warning("Vector embedding computation failed or low memory, falling back to TF-IDF", error=str(e))
-            gc.collect()
-
-    # Fallback to TF-IDF Cosine Similarity (Very lightweight: <2MB RAM)
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
+    # 2. Ultra-Lightweight Pure Python Fallback (No scikit-learn / numpy needed)
+    # Uses Jaccard Word Overlap to save 100% of ML library RAM
     try:
-        vectorizer = TfidfVectorizer(stop_words="english")
-        tfidf_matrix = vectorizer.fit_transform([resume_text, jd_text])
-        sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-        return round(float(sim) * 100, 2)
+        r_words = set(re.findall(r"\w+", resume_text.lower()))
+        j_words = set(re.findall(r"\w+", jd_text.lower()))
+        if not r_words or not j_words:
+            return 0.0
+        
+        intersection = r_words.intersection(j_words)
+        union = r_words.union(j_words)
+        jaccard_sim = len(intersection) / len(union)
+        
+        # Scale Jaccard (usually lower than cosine) to a realistic 0-100 score
+        return max(0.0, min(100.0, round((jaccard_sim * 2.5) * 100, 2)))
     except Exception:
         return 50.0
     finally:
