@@ -13,6 +13,7 @@ free, and 100% deterministic/reproducible for a given input.
 
 from __future__ import annotations
 
+import gc
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -481,7 +482,6 @@ def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
     if not resume_text or not jd_text:
         return 0.0
 
-    model = get_embedding_model()
     if model is not None:
         try:
             embeddings = model.encode([resume_text, jd_text], convert_to_numpy=True)
@@ -493,10 +493,11 @@ def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
             if norm_r > 0 and norm_j > 0:
                 cosine_sim = float(np.dot(emb_resume, emb_jd) / (norm_r * norm_j))
                 return max(0.0, min(100.0, round(cosine_sim * 100, 2)))
-        except Exception as e:
-            logger.warning("Vector embedding computation failed, falling back to TF-IDF", error=str(e))
+        except (MemoryError, Exception) as e:
+            logger.warning("Vector embedding computation failed or low memory, falling back to TF-IDF", error=str(e))
+            gc.collect()
 
-    # Fallback to TF-IDF Cosine Similarity
+    # Fallback to TF-IDF Cosine Similarity (Very lightweight: <2MB RAM)
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
     try:
@@ -506,6 +507,8 @@ def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
         return round(float(sim) * 100, 2)
     except Exception:
         return 50.0
+    finally:
+        gc.collect()
 
 
 def evaluate_knockout_math(extracted_data: dict, jd_text: str) -> Dict[str, Any]:
@@ -589,7 +592,7 @@ def run_strict_ats_check(
         final_score=final_score,
     )
 
-    return {
+    res = {
         "parsing_health": parsing_health.to_dict(),
         "knockout": knockout.to_dict(),
         "keyword_match": keyword_match.to_dict(),
@@ -597,3 +600,5 @@ def run_strict_ats_check(
         "vector_score": vector_score,
         "final_score": final_score,
     }
+    gc.collect()
+    return res

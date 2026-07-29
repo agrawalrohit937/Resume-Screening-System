@@ -58,6 +58,8 @@ _init_cloudinary()
 
 # ── Core upload / delete ──────────────────────────────────────────────────────
 
+import gc
+
 def _sync_upload(
     file_bytes: bytes,
     folder: str,
@@ -73,15 +75,15 @@ def _sync_upload(
     if public_id:
         upload_kwargs["public_id"] = public_id
 
-    result = cloudinary.uploader.upload(
-        io.BytesIO(file_bytes),
-        **upload_kwargs,
-    )
-    print("========== CLOUDINARY RESULT ==========")
-    for k, v in result.items():
-        print(k, ":", v)
-    print("=======================================")
-    return result
+    try:
+        with io.BytesIO(file_bytes) as bio:
+            result = cloudinary.uploader.upload(
+                bio,
+                **upload_kwargs,
+            )
+        return result
+    finally:
+        gc.collect()
 
 
 def _sync_delete(public_id: str, resource_type: str = "auto") -> dict:
