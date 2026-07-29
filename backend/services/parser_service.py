@@ -4,6 +4,7 @@ Parser Service — Extract structured data from PDF and DOCX resumes
 # Yha parser 2 output deta h raw_text, structured_output
 # but hum only raw_text ko sue kr rhe h baki structuring ka kaam LLM ko de diya h 
 # in future structured output jo parsing ho rhi h usko delete kr dege  after proper testing
+import gc
 import re
 from pathlib import Path
 from typing import List, Optional
@@ -33,10 +34,13 @@ class ParserService:
         logger.info("Parsing resume", file_path=file_path, file_type=file_type)
         try:
             raw_text = await self._extract_raw_text(file_path, file_type)
-            return await self._structure_resume(raw_text)
+            result = await self._structure_resume(raw_text)
+            return result
         except Exception as e:
             logger.error("Resume parse failed", error=str(e))
             raise RuntimeError(f"Failed to parse resume: {str(e)}")
+        finally:
+            gc.collect()
 
     # ── Text Extraction ────────────────────────────────────────────────────────
     async def _extract_raw_text(self, file_path: str, file_type: str) -> str:
@@ -92,6 +96,7 @@ class ParserService:
 
         if not full_text.strip():
             raise ValueError("PDF contains no extractable text (may be image-based or scanned).")
+        gc.collect()
         return full_text
 
     def _extract_docx(self, file_path: str) -> str:
@@ -104,7 +109,9 @@ class ParserService:
                     for cell in row.cells:
                         if cell.text.strip():
                             paragraphs.append(cell.text)
-            return "\n".join(paragraphs)
+            extracted = "\n".join(paragraphs)
+            gc.collect()
+            return extracted
         except Exception as e:
             raise RuntimeError(f"DOCX extraction error: {e}")
 

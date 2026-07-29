@@ -11,6 +11,7 @@ Post-install step (one-time, also in Dockerfile):
     playwright install chromium
 """
 
+import gc
 import asyncio
 import os
 
@@ -38,6 +39,7 @@ def _sync_generate_pdf(html_content: str, output_path: str) -> None:
     """
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
+        page = None
         try:
             page = browser.new_page()
             # wait_until="networkidle" lets Google Fonts finish loading.
@@ -50,7 +52,13 @@ def _sync_generate_pdf(html_content: str, output_path: str) -> None:
             )
             logger.info("Playwright PDF written", path=output_path)
         finally:
+            if page:
+                try:
+                    page.close()
+                except Exception:
+                    pass
             browser.close()
+            gc.collect()
 
 
 async def generate_pdf_from_html(html_content: str, output_path: str) -> None:
