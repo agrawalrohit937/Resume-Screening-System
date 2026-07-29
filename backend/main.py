@@ -81,14 +81,17 @@ def create_application() -> FastAPI:
     os.makedirs("uploads/profile", exist_ok=True)
 
     # CORS Middleware — must be added BEFORE static mount so images get CORS headers
+    raw_origins = settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [str(settings.ALLOWED_ORIGINS)]
+    cors_origins = list(set(raw_origins) | {
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://resume-screening-system-lyart.vercel.app",
+    })
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS + [
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "https://resume-screening-system-lyart.vercel.app",
-        ],
-        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_origins=cors_origins,
+        allow_origin_regex=r"https://.*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
