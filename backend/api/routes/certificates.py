@@ -12,6 +12,7 @@ Endpoints:
 
 import traceback
 
+from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
@@ -19,7 +20,8 @@ from api.deps import get_current_user
 from certificates.email import dispatch_certificate_email
 from certificates.rate_limit import limiter
 from certificates.service import CertificateService
-from models.certificate_model import CertificateRecord
+from certificates.skill_icons import slugify
+from models.certificate_record import CertificateRecord
 from models.user_model import UserModel
 
 router = APIRouter()
@@ -30,29 +32,26 @@ router = APIRouter()
 class IssuePayload(BaseModel):
     certificate_type: str = Field(default="assessment")
     assessment_name: str
+    assessment_slug: Optional[str] = None
     score: int
     difficulty: str
 
 
 class ClaimPayload(BaseModel):
     topic: str
+    assessment_slug: Optional[str] = None
     score: int
     difficulty: str
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _slugify(name: str) -> str:
-    slug = name.strip().lower().replace("&", " and ")
-    slug = "-".join(part for part in slug.replace("_", " ").split() if part)
-    return slug or "assessment"
-
-
 async def _do_issue(
     *,
     background_tasks: BackgroundTasks,
     current_user: UserModel,
     assessment_name: str,
+    assessment_slug: Optional[str] = None,
     score: int,
     difficulty: str,
 ):
@@ -63,10 +62,15 @@ async def _do_issue(
             detail="Minimum 80% score required to claim a certificate.",
         )
 
+    # Use explicitly passed assessment_slug if provided, otherwise slugify the display name
+    final_slug = slugify(assessment_slug) if assessment_slug else slugify(assessment_name)
+    if not final_slug:
+        final_slug = "assessment"
+
     context = {
         "recipient_name": current_user.full_name,
         "assessment_name": assessment_name,
-        "assessment_slug": _slugify(assessment_name),
+        "assessment_slug": final_slug,
         "difficulty": difficulty,
         "score": score,
     }
@@ -145,6 +149,7 @@ async def issue_certificate(
         background_tasks=background_tasks,
         current_user=current_user,
         assessment_name=payload.assessment_name,
+        assessment_slug=payload.assessment_slug,
         score=payload.score,
         difficulty=payload.difficulty,
     )
@@ -161,6 +166,7 @@ async def claim_certificate(
         background_tasks=background_tasks,
         current_user=current_user,
         assessment_name=payload.topic,
+        assessment_slug=payload.assessment_slug,
         score=payload.score,
         difficulty=payload.difficulty,
     )
