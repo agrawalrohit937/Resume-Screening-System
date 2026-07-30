@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import logoVideo from '/logo.mp4'
 
 const MESSAGES = [
   'Initializing AI...',
@@ -125,9 +126,8 @@ export default function Loader({ show = true, onExitComplete }) {
                 loop
                 playsInline
                 preload="auto"
-                src="/logo.mp4"
-                onError={(e) => {
-                  console.error('Failed to load video /logo.mp4:', e)
+                onError={() => {
+                  console.warn('Video failed to load or autoplay, falling back to brand logo.')
                   setVideoError(true)
                 }}
                 style={{
@@ -142,7 +142,9 @@ export default function Loader({ show = true, onExitComplete }) {
                   transform: 'scale(1.15)', 
                   transformOrigin: 'center center',
                 }}
-              />
+              >
+                <source src={logoVideo} type="video/mp4" />
+              </video>
             </motion.div>
 
             {/* ---------- Brand ---------- */}
