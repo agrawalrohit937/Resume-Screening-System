@@ -88,7 +88,6 @@ export default function AIAvatar({
              autoPlay
              muted={true} 
              playsInline 
-             crossOrigin="anonymous"
              onError={(e) => console.warn('[AIAvatar] Compact video error:', e)}
              className="w-full h-full object-cover" 
            />
@@ -115,7 +114,6 @@ export default function AIAvatar({
           muted={true} 
           playsInline 
           loop={isActive} 
-          crossOrigin="anonymous"
           onError={(e) => console.warn('[AIAvatar] Video error:', e)}
           className="w-full h-full object-cover" 
         />

@@ -1,24 +1,27 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/avatar-loop\\.mp4$",
-      "dest": "/avatar-loop.mp4"
-    },
+      "source": "/((?!.*\\.).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
     {
-      "src": "^/(favicon\\.ico|illustration\\.png|avatar-loop\\.mp4)$",
-      "dest": "/$1"
-    },
-    {
-      "src": "^/assets/(.*)$",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "^/(.*\\.(png|jpg|jpeg|webp|svg|ico|gif))$",
-      "dest": "/$1"
-    },
-    {
-      "src": "^(.*)$",
-      "dest": "/index.html"
+      "source": "/(.*).(mp4|webm|png|jpg|jpeg|gif|ico|svg|json|bin)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }

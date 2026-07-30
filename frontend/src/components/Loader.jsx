@@ -106,7 +106,6 @@ export default function Loader({ show = true, onExitComplete }) {
                 muted={true}
                 loop
                 playsInline
-                crossOrigin="anonymous"
                 preload="auto"
                 src={logoVideo}
                 onError={(e) => {
