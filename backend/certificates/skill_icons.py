@@ -1,23 +1,45 @@
 import os
+import re
 
-ICON_DIR = os.path.join(os.path.dirname(__file__), "assets", "skill_icons")
+ICON_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "assets", "skill_icons"))
 DEFAULT_ICON = "default.png"
 
 
-def resolve_skill_icon_path(assessment_slug: str) -> str:
-    """Looks for `{slug}.png` in assets/skill_icons, falls back to a
-    generic default icon if the assessment doesn't have a dedicated one
-    yet. Returns a local filesystem path — ReportLab draws it directly,
-    no network fetch involved, which is faster and removes a runtime
-    dependency from the render path.
+def slugify(text: str) -> str:
+    """Converts input text into a sanitized kebab-case slug.
 
-    PNG/JPG only: ReportLab has no native SVG support. If your Canva
-    skill badges are exported as SVG, flatten them to PNG once (e.g. via
-    `rsvg-convert` or Illustrator/Figma export) and drop the PNG here —
-    the design itself doesn't change, just the file format.
+    1. Convert to lowercase & strip whitespace.
+    2. Replace '&' with 'and'.
+    3. Replace non-alphanumeric characters (including underscores/slashes) with hyphens.
+    4. Collapse duplicate hyphens and strip leading/trailing hyphens.
     """
-    filename = f"{assessment_slug}.png"
-    local_path = os.path.join(ICON_DIR, filename)
-    if os.path.exists(local_path):
-        return local_path
-    return os.path.join(ICON_DIR, DEFAULT_ICON)
+    if not text:
+        return ""
+    s = text.lower().strip()
+    s = re.sub(r"&", "and", s)
+    s = re.sub(r"[^\w\-]+", "-", s)  # Replaces spaces, slashes, special chars
+    s = s.replace("_", "-")
+    s = re.sub(r"-+", "-", s)
+    return s.strip("-")
+
+
+def resolve_skill_icon_path(assessment_slug: str) -> str:
+    """Looks for `{slug}.png` in assets/skill_icons, safely falling back to
+    `default.png` if the icon does not exist or if slug contains invalid/typo characters.
+
+    Protects against directory traversal and ensures seamless fallback.
+    """
+    clean_slug = slugify(assessment_slug)
+
+    if clean_slug:
+        filename = f"{clean_slug}.png"
+        target_path = os.path.normpath(os.path.join(ICON_DIR, filename))
+        
+        # Verify target_path is inside ICON_DIR and file exists
+        if target_path.startswith(ICON_DIR) and os.path.isfile(target_path):
+            return target_path
+
+    # Fallback to default icon
+    default_path = os.path.normpath(os.path.join(ICON_DIR, DEFAULT_ICON))
+    return default_path
+

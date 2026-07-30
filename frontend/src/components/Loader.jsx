@@ -28,6 +28,21 @@ export default function Loader({ show = true, onExitComplete }) {
   const prefersReducedMotion = useReducedMotion()
   const [index, setIndex] = useState(0)
   const videoRef = useRef(null)
+  const [videoError, setVideoError] = useState(false)
+
+  // Force muted and handle programmatic play for strict browser policies
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.defaultMuted = true
+      videoRef.current.muted = true
+      const playPromise = videoRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Autoplay prevented or failed in Loader video:', err)
+        })
+      }
+    }
+  }, [])
 
   // -------- message ticker --------
   useEffect(() => {
@@ -111,11 +126,15 @@ export default function Loader({ show = true, onExitComplete }) {
                 playsInline
                 preload="auto"
                 src="/logo.mp4"
+                onError={(e) => {
+                  console.error('Failed to load video /logo.mp4:', e)
+                  setVideoError(true)
+                }}
                 style={{
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  display: 'block',
+                  display: videoError ? 'none' : 'block',
                   border: 'none',
                   outline: 'none',
                   borderRadius: 0,
