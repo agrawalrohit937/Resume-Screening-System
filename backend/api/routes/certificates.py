@@ -21,7 +21,7 @@ from certificates.email import dispatch_certificate_email
 from certificates.rate_limit import limiter
 from certificates.service import CertificateService
 from certificates.skill_icons import slugify
-from models.certificate_record import CertificateRecord
+from models.certificate_model import CertificateRecord
 from models.user_model import UserModel
 
 router = APIRouter()

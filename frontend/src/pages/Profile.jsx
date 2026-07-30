@@ -421,12 +421,18 @@ export default function Profile() {
                     </div>
                     <p className="text-sm font-bold text-slate-700">Uploading & Parsing...</p>
                   </motion.div>
-                ) : uploadDone ? (
-                  <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
+                  ) : uploadDone ? (
+                  <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="flex flex-col items-center text-center max-w-full px-2">
+                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3 shrink-0">
                       <CheckCircle className="text-emerald-500" size={24} />
                     </div>
-                    <p className="text-sm font-bold text-emerald-700">{resumeFile?.name || 'Resume Ready'}</p>
+                    {/* Method 1: break-all ya truncate karke overflow roko */}
+                    <p 
+                      className="text-sm font-bold text-emerald-700 max-w-full truncate px-2"
+                      title={resumeFile?.name || 'Resume Ready'}
+                    >
+                      {resumeFile?.name || 'Resume Ready'}
+                    </p>
                     <p className="text-xs font-medium text-emerald-600/70 mt-1">Click or drag to replace</p>
                   </motion.div>
                 ) : (
