@@ -360,18 +360,21 @@ export default function ApplyAssistant() {
                           <p className="text-sm text-slate-500 mt-1">We'll use your primary profile resume for this application.</p>
                         </div>
                         
-                        {/* 👇 NEW: Profile Resume Attached Card */}
+                        {/* 👇 Profile Resume Attached Card */}
                         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
                           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center shrink-0">
                             <FileText size={24} />
                           </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">
+                          <div className="min-w-0 flex-1">
+                            <h3 
+                              className="text-sm font-bold text-slate-900 truncate max-w-[220px] sm:max-w-xs md:max-w-md"
+                              title={user?.profile_resume_name || "Resume not found"}
+                            >
                               {user?.profile_resume_name || "Resume not found"}
                             </h3>
                             {user?.profile_resume_url ? (
                               <p className="text-xs font-medium text-emerald-600 flex items-center gap-1 mt-0.5">
-                                <CheckCircle size={12} /> Automatically linked from Profile
+                                <CheckCircle size={12} className="shrink-0" /> Automatically linked from Profile
                               </p>
                             ) : (
                               <p className="text-xs font-medium text-rose-500 flex items-center gap-1 mt-0.5">

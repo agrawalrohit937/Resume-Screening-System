@@ -673,13 +673,15 @@ export default function LiveInterviewV2() {
                 {/* LIVE AVATAR VIDEO */}
                 <video 
                   ref={avatarVideoRef}
+                  autoPlay
                   loop 
-                  muted 
+                  muted={true}
                   playsInline
+                  crossOrigin="anonymous"
+                  onError={(e) => console.warn('[LiveInterview] Avatar video load error:', e)}
                   className="absolute inset-0 w-full h-full object-cover z-0"
                 >
-                  {/* Replace this src with the path to your actual video file */}
-                  <source src="interviewer-avatar.mp4" type="video/mp4" />
+                  <source src="/interviewer-avatar.mp4" type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
 

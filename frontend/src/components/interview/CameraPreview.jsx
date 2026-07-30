@@ -71,7 +71,7 @@ export default function CameraPreview({ onEvent, enabled = true, compact = false
     return (
       <div className="relative w-32 h-24 rounded-xl overflow-hidden border-2 bg-slate-900 shrink-0" style={{ borderColor: faceStatus === 'detected' ? '#34D399' : '#F87171' }}>
         {cameraReady ? (
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"
+          <video ref={videoRef} autoPlay playsInline muted={true} crossOrigin="anonymous" onError={(e) => console.warn('[CameraPreview] Stream error:', e)} className="w-full h-full object-cover"
             style={{ transform: mirrorMode ? 'scaleX(-1)' : 'none' }}/>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-500">
@@ -92,7 +92,7 @@ export default function CameraPreview({ onEvent, enabled = true, compact = false
         style={{ aspectRatio: '4/3' }}>
         {cameraReady ? (
           <>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"
+            <video ref={videoRef} autoPlay playsInline muted={true} crossOrigin="anonymous" onError={(e) => console.warn('[CameraPreview] Stream error:', e)} className="w-full h-full object-cover"
               style={{ transform: mirrorMode ? 'scaleX(-1)' : 'none' }}/>
             {/* Corner brackets */}
             {['top-2 left-2', 'top-2 right-2', 'bottom-2 left-2', 'bottom-2 right-2'].map((pos, i) => (

@@ -17,6 +17,7 @@ import {
   Flame
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { getGamificationProfile } from '../services/interviewApi'
 import ProfilePlanDropdown from './ProfilePlanDropdown'
 import AvatarRing from './AvatarRing'
 import NotificationBell from './NotificationBell'
@@ -84,10 +85,27 @@ export default function Navbar({ onMenuToggle }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const [streak, setStreak] = useState(0)
   
   const menuRef = useRef(null)
   const searchContainerRef = useRef(null)
   const searchInputRef = useRef(null)
+
+  useEffect(() => {
+    if (!user) {
+      setStreak(0)
+      return
+    }
+    let isMounted = true
+    getGamificationProfile()
+      .then(res => {
+        if (isMounted && res?.data?.current_streak !== undefined) {
+          setStreak(res.data.current_streak)
+        }
+      })
+      .catch(() => {})
+    return () => { isMounted = false }
+  }, [user])
 
   // Dynamically get current page name for the breadcrumb
   const currentRouteName = SEARCH_ROUTES.find(r => r.path === location.pathname)?.name || 'Dashboard'
@@ -239,12 +257,12 @@ export default function Navbar({ onMenuToggle }) {
           <Search size={18} strokeWidth={2.5} />
         </motion.button>
 
-        {/* NEW: Gamification Quick Stat Pill */}
-        <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-slate-200 shadow-sm cursor-default">
+        {/* Gamification Quick Stat Pill */}
+        <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-slate-200 shadow-sm cursor-default" title="Current Daily Practice Streak">
           <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
             <Flame size={12} strokeWidth={3} />
           </div>
-          <span className="text-xs font-black text-slate-700">1 Day</span>
+          <span className="text-xs font-black text-slate-700">{streak} Day{streak === 1 ? '' : 's'}</span>
         </div>
 
         {/* AI Copilot */}
