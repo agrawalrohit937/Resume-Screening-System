@@ -25,46 +25,15 @@ function formatRelativeTime(timestamp) {
 export default function RecentActivity({ recentPoints = [], catalog }) {
   const displayItems = useMemo(() => {
     if (recentPoints && recentPoints.length > 0) {
-      return [...recentPoints].reverse().slice(0, 4).map((item) => ({
-        id: item.id || item.event + Math.random(),
+      return [...recentPoints].reverse().slice(0, 5).map((item) => ({
+        id: item.id || (item.event + '_' + (item.ts || Math.random())),
         title: describeEvent(item.event, catalog),
         points: item.points || 25,
-        time: formatRelativeTime(item.timestamp || item.created_at),
+        time: formatRelativeTime(item.ts || item.timestamp || item.created_at),
         icon: item.event?.includes('interview') ? ShieldCheck : item.event?.includes('daily') ? Gift : Zap,
       }))
     }
-
-    // Dynamic Default Feed
-    return [
-      {
-        id: '1',
-        title: 'Daily Check-in Claimed',
-        points: 50,
-        time: 'Just now',
-        icon: Gift,
-      },
-      {
-        id: '2',
-        title: 'Completed AI Mock Interview',
-        points: 150,
-        time: '2 hrs ago',
-        icon: ShieldCheck,
-      },
-      {
-        id: '3',
-        title: 'ATS Resume Scan Completed',
-        points: 40,
-        time: 'Yesterday',
-        icon: CheckCircle2,
-      },
-      {
-        id: '4',
-        title: 'Daily Practice Bonus',
-        points: 25,
-        time: '2 days ago',
-        icon: Zap,
-      },
-    ]
+    return []
   }, [recentPoints, catalog])
 
   return (
@@ -82,32 +51,40 @@ export default function RecentActivity({ recentPoints = [], catalog }) {
       </div>
 
       <div className="space-y-3">
-        {displayItems.map((item, i) => {
-          const Icon = item.icon || Zap
-          return (
-            <motion.div 
-              key={item.id || i} 
-              initial={{ opacity: 0, x: -15 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.08, type: 'spring' }}
-              whileHover={{ scale: 1.015, x: 3 }}
-              className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-indigo-100 hover:bg-slate-50 transition-all cursor-default"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Icon className="w-4.5 h-4.5 drop-shadow-sm" />
+        {displayItems.length > 0 ? (
+          displayItems.map((item, i) => {
+            const Icon = item.icon || Zap
+            return (
+              <motion.div 
+                key={item.id || i} 
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08, type: 'spring' }}
+                whileHover={{ scale: 1.015, x: 3 }}
+                className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-indigo-100 hover:bg-slate-50 transition-all cursor-default"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Icon className="w-4.5 h-4.5 drop-shadow-sm" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-slate-800 truncate">{item.title}</p>
+                    <span className="text-[10px] font-bold text-slate-400 block">{item.time}</span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black text-slate-800 truncate">{item.title}</p>
-                  <span className="text-[10px] font-bold text-slate-400 block">{item.time}</span>
-                </div>
-              </div>
-              <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 shrink-0 shadow-xs">
-                +{item.points} XP
-              </span>
-            </motion.div>
-          )
-        })}
+                <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 shrink-0 shadow-xs">
+                  +{item.points} XP
+                </span>
+              </motion.div>
+            )
+          })
+        ) : (
+          <div className="p-6 text-center bg-slate-50/70 border border-slate-100 rounded-2xl">
+            <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-extrabold text-slate-700">No activity logged yet</p>
+            <p className="text-xs font-semibold text-slate-400 mt-1">Complete interviews or daily practice to earn XP!</p>
+          </div>
+        )}
       </div>
     </Card>
   )
