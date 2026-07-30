@@ -13,14 +13,13 @@ import { uploadResume } from '../services/api'
 // --- Utility Functions ---
 function resolveAvatarUrl(user) {
   if (!user) return null
-  if (user.profile_picture) {
-    if (user.profile_picture.startsWith('http')) return user.profile_picture
-    return `https://generativeaix.com/uploads/profile/${user.profile_picture}?t=${Date.now()}`
+  const pic = user.profile_picture || user.google_picture
+  if (!pic) return null
+  if (pic.startsWith('http://') || pic.startsWith('https://')) {
+    return pic
   }
-  if (user.google_picture && user.google_picture.startsWith('http')) {
-    return user.google_picture
-  }
-  return null
+  // For relative asset paths, ensure clean URL construction without hardcoded broken domains
+  return `/uploads/profile/${pic}`
 }
 
 function getInitials(fullName) {
@@ -235,8 +234,9 @@ export default function Profile() {
     try {
       await uploadProfilePhoto(previewFile)
       await refreshUser()
+      setImgError(false) // Reset error state on fresh photo URL
       toast.success('Profile photo updated ✨')
-      URL.revokeObjectURL(previewUrl)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
       setPreviewFile(null)
     } catch (err) {
