@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import logoVideo from '/logo.mp4'
+
+const logoVideo = '/logo.mp4'
 
 const MESSAGES = [
   'Initializing AI...',
@@ -31,33 +32,13 @@ export default function Loader({ show = true, onExitComplete }) {
   const videoRef = useRef(null)
   const [videoError, setVideoError] = useState(false)
 
-  // Force muted and handle programmatic play for strict browser policies
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.defaultMuted = true
-      videoRef.current.muted = true
-      const playPromise = videoRef.current.play()
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('Autoplay prevented or failed in Loader video:', err)
-        })
-      }
-    }
-  }, [])
-
-  // -------- message ticker --------
-  useEffect(() => {
-    if (prefersReducedMotion) {
-      setIndex(MESSAGES.length - 1)
-      return
-    }
-
-    const interval = window.setInterval(() => {
-      setIndex((i) => Math.min(i + 1, MESSAGES.length - 1))
-    }, 2000)
-
-    return () => window.clearInterval(interval)
-  }, [prefersReducedMotion])
+    if (!show) return
+    const id = setInterval(() => {
+      setIndex((i) => (i < MESSAGES.length - 1 ? i + 1 : i))
+    }, 1100)
+    return () => clearInterval(id)
+  }, [show])
 
   // -------- memoised transition --------
   const logoTransition = useMemo(
@@ -75,7 +56,7 @@ export default function Loader({ show = true, onExitComplete }) {
           key="careershala-loader"
           role="status"
           aria-live="polite"
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-auto select-none overflow-hidden"
           style={{
             background: LOADER_BG,
           }}
@@ -88,7 +69,7 @@ export default function Loader({ show = true, onExitComplete }) {
             },
           }}
         >
-          <div className="relative flex flex-col items-center gap-6 px-6">
+          <div className="relative flex flex-col items-center gap-6 px-6 text-center">
             {/* ---------- Animated Logo Video (Bigger wrapper, proportional mask) ---------- */}
             <motion.div
               initial={{
@@ -122,12 +103,14 @@ export default function Loader({ show = true, onExitComplete }) {
               <video
                 ref={videoRef}
                 autoPlay
-                muted
+                muted={true}
                 loop
                 playsInline
+                crossOrigin="anonymous"
                 preload="auto"
-                onError={() => {
-                  console.warn('Video failed to load or autoplay, falling back to brand logo.')
+                src={logoVideo}
+                onError={(e) => {
+                  console.warn('[Loader] Video failed to load or autoplay:', e)
                   setVideoError(true)
                 }}
                 style={{

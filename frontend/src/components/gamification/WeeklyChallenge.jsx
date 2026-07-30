@@ -1,11 +1,18 @@
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Target, Timer, Trophy, ArrowRight } from 'lucide-react'
 import Card from './Card'
 import Button from './Button'
 
-export default function WeeklyChallenge({ progress = 45, target = 100 }) {
+export default function WeeklyChallenge({ progress = 45, target = 100, onStart }) {
+  const navigate = useNavigate()
   const pct = Math.min(100, Math.round((progress / target) * 100))
   const isComplete = progress >= target;
+
+  const handleStart = () => {
+    if (onStart) onStart()
+    navigate('/live-interview')
+  }
 
   return (
     <Card className="p-0 overflow-hidden border-indigo-100">
@@ -64,6 +71,7 @@ export default function WeeklyChallenge({ progress = 45, target = 100 }) {
           
           <Button 
             variant="primary" 
+            onClick={handleStart}
             className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 border-indigo-600 shadow-indigo-500/30"
           >
             {isComplete ? 'Claim Reward' : 'Start Challenge'} <ArrowRight className="w-4 h-4" />

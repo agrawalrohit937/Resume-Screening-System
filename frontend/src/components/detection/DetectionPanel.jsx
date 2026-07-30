@@ -203,7 +203,7 @@ export default function DetectionPanel({
       <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#0F172A',
         border:`2px solid ${faceOk && gazeOk ? '#10B981' : faceCount === 0 ? '#F43F5E' : '#F59E0B'}30`,
         aspectRatio:'4/3', transition:'border-color 0.4s' }}>
-        <video ref={videoRef} autoPlay playsInline muted
+        <video ref={videoRef} autoPlay playsInline muted={true} crossOrigin="anonymous" onError={(e) => console.warn('[DetectionPanel] Camera stream error:', e)}
           style={{ width:'100%', height:'100%', objectFit:'cover', transform:'scaleX(-1)' }}/>
         {/* Canvas overlay for landmark/box drawing */}
         <canvas ref={canvasRef}

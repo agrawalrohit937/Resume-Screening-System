@@ -101,12 +101,12 @@ export default function CareerQuest() {
             <CareerPathMap profile={profile} levels={levels} />
 
             {/* THE LAYOUT FIX: Grouping the columns properly */}
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
               
               {/* Left Column: Quest Log + Daily Rewards */}
               <div className="lg:col-span-2 space-y-6">
                 <MissionList profile={profile} />
-                <DailyRewards />
+                <DailyRewards profile={profile} />
               </div>
 
               {/* Right Column: Challenge, Streak, Activity */}

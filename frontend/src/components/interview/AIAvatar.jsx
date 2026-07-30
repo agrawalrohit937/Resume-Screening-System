@@ -20,9 +20,12 @@ export default function AIAvatar({
   autoSpeak = true,
   avatarName = 'Alex',
   compact = false,
-  videoSource = 'avatar-loop.mp4'
+  videoSource = 'interviewer-avatar.mp4'
 }) {
-  const videoUrl = `${import.meta.env.BASE_URL}${videoSource}`
+  const cleanSource = (videoSource || 'interviewer-avatar.mp4').replace(/^\/+/, '')
+  const rawUrl = `${import.meta.env.BASE_URL}${cleanSource}`
+  const videoUrl = rawUrl.startsWith('http://') ? rawUrl.replace('http://', 'https://') : rawUrl
+
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voicesReady, setVoicesReady] = useState(false)
   const videoRef = useRef(null)
@@ -43,7 +46,9 @@ export default function AIAvatar({
   useEffect(() => {
     if (videoRef.current) {
       if (isActive) {
-        videoRef.current.play().catch(() => {});
+        videoRef.current.play().catch((err) => {
+          console.warn('[AIAvatar] Video play error:', err)
+        });
       } else {
         videoRef.current.pause();
         videoRef.current.currentTime = 0;
@@ -77,7 +82,16 @@ export default function AIAvatar({
     return (
       <div className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
         <div className="relative w-12 h-12 overflow-hidden rounded-xl bg-slate-900">
-           <video ref={videoRef} src={videoUrl} muted playsInline className="w-full h-full object-cover" />
+           <video 
+             ref={videoRef} 
+             src={videoUrl} 
+             autoPlay
+             muted={true} 
+             playsInline 
+             crossOrigin="anonymous"
+             onError={(e) => console.warn('[AIAvatar] Compact video error:', e)}
+             className="w-full h-full object-cover" 
+           />
         </div>
         <div>
           <p className="text-sm font-bold text-slate-800">{avatarName}</p>
@@ -94,7 +108,17 @@ export default function AIAvatar({
         transition={{ repeat: Infinity, duration: 2 }}
         className="relative w-44 h-44 rounded-full overflow-hidden border-4 border-white shadow-xl bg-slate-900"
       >
-        <video ref={videoRef} src={videoUrl} muted playsInline loop={isActive} className="w-full h-full object-cover" />
+        <video 
+          ref={videoRef} 
+          src={videoUrl} 
+          autoPlay
+          muted={true} 
+          playsInline 
+          loop={isActive} 
+          crossOrigin="anonymous"
+          onError={(e) => console.warn('[AIAvatar] Video error:', e)}
+          className="w-full h-full object-cover" 
+        />
       </motion.div>
       <div className="flex items-center gap-1 h-8">
         {[...Array(8)].map((_, i) => <RealWaveBar key={i} index={i} isActive={isActive} />)}

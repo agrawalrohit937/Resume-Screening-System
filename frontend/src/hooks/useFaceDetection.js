@@ -56,6 +56,8 @@ export function useFaceDetection({ videoRef, onEvent, active = true, intervalMs 
     }
   }, [])
 
+  const missingFaceStartTimeRef = useRef(null)
+
   // Process face-api.js results
   const handleFaceApiResults = useCallback(async (detections) => {
     if (!mountedRef.current) return
@@ -63,12 +65,20 @@ export function useFaceDetection({ videoRef, onEvent, active = true, intervalMs 
     setFaceCount(count)
 
     if (count === 0) {
-      setFaceStatus('missing')
-      dispatchEvent('face_missing', 'medium', 'No face detected')
+      if (!missingFaceStartTimeRef.current) {
+        missingFaceStartTimeRef.current = Date.now()
+      }
+      const elapsed = Date.now() - missingFaceStartTimeRef.current
+      if (elapsed >= 1500) {
+        setFaceStatus('missing')
+        dispatchEvent('face_missing', 'medium', 'No face detected')
+      }
     } else if (count > 1) {
+      missingFaceStartTimeRef.current = null
       setFaceStatus('multiple')
       dispatchEvent('multiple_faces', 'high', `${count} faces detected`)
     } else {
+      missingFaceStartTimeRef.current = null
       const detection = detections[0]
       const landmarks = detection.landmarks
       const gaze = computeGazeFaceApi(landmarks)
@@ -100,12 +110,19 @@ export function useFaceDetection({ videoRef, onEvent, active = true, intervalMs 
       const imageData = ctx.getImageData(canvas.width/4, canvas.height/4, canvas.width/2, canvas.height/2)
       const skinPixels = analyzeSkinRegion(imageData.data)
       
-      const facePresence = skinPixels > (imageData.data.length/4 * 0.15)  // 15% skin coverage
+      const facePresence = skinPixels > (imageData.data.length/4 * 0.12)  // 12% skin coverage (adjusted for glasses glare)
       
       if (!facePresence) {
-        setFaceStatus('missing')
-        dispatchEvent('face_missing', 'medium', 'No face region detected')
+        if (!missingFaceStartTimeRef.current) {
+          missingFaceStartTimeRef.current = Date.now()
+        }
+        const elapsed = Date.now() - missingFaceStartTimeRef.current
+        if (elapsed >= 1500) {
+          setFaceStatus('missing')
+          dispatchEvent('face_missing', 'medium', 'No face region detected')
+        }
       } else {
+        missingFaceStartTimeRef.current = null
         setFaceStatus('ok')
         setFaceCount(1)
       }
