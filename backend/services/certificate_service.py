@@ -10,9 +10,7 @@ import uuid
 from datetime import datetime, timezone
 
 import qrcode
-import aiosmtplib
 import structlog
-from email.message import EmailMessage
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
@@ -162,71 +160,18 @@ class CertificateService:
         public_url: str,
         pdf_bytes: bytes,
     ):
-        verify_base = getattr(settings, "CERT_VERIFY_BASE_URL", "https://careershala.com/verify/cert")
-        verification_url = f"{verify_base.rstrip('/')}/{cert_id}"
-        issued_str = issued_at.strftime("%d %B %Y")
+        from services.email_service import EmailService
 
-        message = EmailMessage()
-        message["From"] = settings.SMTP_USER
-        message["To"] = recipient_email
-        message["Subject"] = f"🎉 Congratulations {recipient_name}! Your CareerShala Certificate is Ready"
-
-        plain_body = (
-            f"Hi {recipient_name},\n\n"
-            f"Congratulations on completing the {topic} assessment with a score of "
-            f"{score}% ({grade_label}) at {difficulty} level.\n\n"
-            f"Certificate ID : {cert_id}\n"
-            f"Issued on      : {issued_str}\n"
-            f"Download link  : {public_url}\n"
-            f"Verify online  : {verification_url}\n\n"
-            f"Your certificate is also attached to this email as a PDF.\n\n"
-            f"Keep learning and growing!\n"
-            f"Team CareerShala"
-        )
-        message.set_content(plain_body)
-
-        html_body = f"""\
-<html>
-  <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#1e293b;">
-    <div style="max-width:560px;margin:auto;background:white;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
-      <h2 style="color:#1e293b;">🎉 Congratulations, {recipient_name}!</h2>
-      <p>You've successfully completed the <b>{topic}</b> assessment at <b>{difficulty}</b> level.</p>
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-        <tr><td style="padding:8px 0;color:#64748b;">Score</td><td style="padding:8px 0;font-weight:bold;">{score}%</td></tr>
-        <tr><td style="padding:8px 0;color:#64748b;">Grade</td><td style="padding:8px 0;font-weight:bold;color:#6366f1;">{grade_label}</td></tr>
-        <tr><td style="padding:8px 0;color:#64748b;">Issued on</td><td style="padding:8px 0;">{issued_str}</td></tr>
-        <tr><td style="padding:8px 0;color:#64748b;">Certificate ID</td><td style="padding:8px 0;font-family:monospace;font-size:12px;">{cert_id}</td></tr>
-      </table>
-      <p style="text-align:center;margin:28px 0;">
-        <a href="{public_url}" style="background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Download Certificate</a>
-      </p>
-      <p style="font-size:13px;color:#94a3b8;">
-        Also attached to this email as a PDF. Anyone can verify its authenticity at
-        <a href="{verification_url}">{verification_url}</a>.
-      </p>
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
-      <p style="font-size:12px;color:#94a3b8;">Team CareerShala</p>
-    </div>
-  </body>
-</html>
-"""
-        message.add_alternative(html_body, subtype="html")
-        message.add_attachment(
-            pdf_bytes,
-            maintype="application",
-            subtype="pdf",
-            filename=f"CareerShala_Certificate_{topic.replace(' ', '_')}.pdf",
-        )
-
-        use_tls = bool(settings.SMTP_PORT == 465 and getattr(settings, "SMTP_USE_SSL", False))
-        start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
-
-        await aiosmtplib.send(
-            message,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-            use_tls=use_tls,
-            start_tls=start_tls,
+        svc = EmailService()
+        await svc.send_certificate(
+            recipient_email=recipient_email,
+            recipient_name=recipient_name,
+            topic=topic,
+            score=score,
+            grade_label=grade_label,
+            difficulty=difficulty,
+            cert_id=cert_id,
+            issued_at=issued_at,
+            public_url=public_url,
+            pdf_bytes=pdf_bytes,
         )

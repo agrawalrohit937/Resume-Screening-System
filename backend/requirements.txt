@@ -62,7 +62,7 @@ slowapi>=0.1.9
 pillow>=10.3.0
 qrcode[pil]>=7.4.2
 cloudinary>=1.40.0
-aiosmtplib>=3.0.1
+# aiosmtplib>=3.0.1 (Replaced by Brevo HTTP API via httpx)
 razorpay==2.0.1
 
 # ─── PDF Generation & Templating ─────────────────────────────

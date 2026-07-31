@@ -20,8 +20,7 @@ QR_LOGO_PATH = ASSETS_DIR / "skill_icons" / "qr_logo.png"
 # --------------------------------------------------------
 
 def build_verification_url(cert_id: str) -> str:
-    base = settings.BASE_URL.rstrip("/")
-    return f"{base}/verify/{cert_id}"
+    return f"{settings.cert_verify_base_url}/{cert_id}"
 
 
 # --------------------------------------------------------

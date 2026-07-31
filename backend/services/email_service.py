@@ -1,41 +1,27 @@
 """
-Email Service — sends transactional emails via SMTP using environment-driven
-configuration.
+Brevo HTTP API Email Service — sends transactional emails via Brevo REST API v3
+(https://api.brevo.com/v3/smtp/email) using HTTPS over port 443.
 
-This service is shared by OTP delivery and support-ticket notifications so the
-SMTP setup, logging, and error handling stay consistent in one place.
+Replaces legacy SMTP (aiosmtplib) with an async, non-blocking HTTP mailer service.
 """
 
 import base64
-from contextlib import suppress
 from datetime import timezone
-from email.message import EmailMessage
 from html import escape
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-import aiosmtplib
 import httpx
 import structlog
-from aiosmtplib.errors import (
-    SMTPAuthenticationError,
-    SMTPConnectError,
-    SMTPException,
-    SMTPResponseException,
-    SMTPTimeoutError,
-)
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 
 from core.config import settings
 from models.otp_model import OTPPurpose
 
 logger = structlog.get_logger(__name__)
 
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "email"
 
-# Purpose -> (template filename, subject). Single source of truth for
-# what each OTP purpose sends. Add new purposes here only.
 _OTP_DISPATCH = {
     OTPPurpose.SIGNUP_VERIFICATION: ("otp_verification.html", "Verify your CareerShala email"),
     OTPPurpose.LOGIN_VERIFICATION: ("otp_verification.html", "Your CareerShala login code"),
@@ -45,6 +31,9 @@ _OTP_DISPATCH = {
 
 def _render_template(filename: str, **context) -> str:
     path = TEMPLATES_DIR / filename
+    if not path.exists():
+        logger.error(f"Template {filename} not found at {path}")
+        return f"<p>Your OTP code is {context.get('otp', '')}</p>"
     html = path.read_text(encoding="utf-8")
     for key, value in context.items():
         html = html.replace("{{" + key + "}}", str(value))
@@ -52,123 +41,229 @@ def _render_template(filename: str, **context) -> str:
 
 
 class EmailService:
-    def _smtp_config_ready(self) -> tuple[bool, str | None]:
-        if not settings.SMTP_HOST:
-            return False, "SMTP_HOST is not configured"
-        if not settings.SMTP_PORT:
-            return False, "SMTP_PORT is not configured"
-        if not settings.SMTP_USER:
-            return False, "SMTP_USER is not configured"
-        if not settings.SMTP_PASSWORD:
-            return False, "SMTP_PASSWORD is not configured"
-        return True, None
+    """Production-ready Brevo HTTP API Mailer Service."""
 
-    def _smtp_transport_flags(self) -> tuple[bool, bool]:
-        use_tls = bool(settings.SMTP_PORT == 465 and settings.SMTP_USE_SSL)
-        start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
-        return use_tls, start_tls
+    def _get_api_headers(self) -> Dict[str, str]:
+        api_key = settings.BREVO_API_KEY
+        if not api_key:
+            logger.warning("BREVO_API_KEY is not configured in environment settings")
+        return {
+            "accept": "application/json",
+            "api-key": api_key or "",
+            "content-type": "application/json",
+        }
 
-    def _build_message(self, *, to_email: str, subject: str, from_email: str, html_body: str, text_body: str) -> EmailMessage:
-        message = EmailMessage()
-        message["From"] = f"{settings.SMTP_FROM_NAME} <{from_email}>"
-        message["To"] = to_email
-        message["Subject"] = subject
-        message.set_content(text_body)
-        message.add_alternative(html_body, subtype="html")
-        return message
+    async def _send_brevo_email(
+        self,
+        *,
+        to_email: str,
+        to_name: Optional[str] = None,
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+        reply_to_email: Optional[str] = None,
+        reply_to_name: Optional[str] = None,
+        attachments: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
+        """Core async method for dispatching emails via Brevo HTTP API (v3/smtp/email).
 
-    async def _send_message(self, *, message: EmailMessage, to_email: str, subject: str) -> dict[str, Any]:
-        is_ready, config_error = self._smtp_config_ready()
-        if not is_ready:
-            logger.error(
-                "SMTP Configuration Missing",
-                to=to_email,
-                subject=subject,
-                error=config_error,
-            )
-            return {"sent": False, "error": config_error or "SMTP configuration missing"}
+        :param attachments: List of dicts with keys 'name' and 'content' (base64 string)
+        """
+        api_key = settings.BREVO_API_KEY
+        if not api_key:
+            logger.error("Brevo API Key Missing", to=to_email, subject=subject)
+            return {"sent": False, "error": "BREVO_API_KEY is not configured"}
 
-        from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER
-        if not from_email:
-            logger.error("SMTP From Address Missing", to=to_email, subject=subject)
-            return {"sent": False, "error": "SMTP_FROM_EMAIL is not configured"}
+        sender_info = settings.mail_sender
+        payload: Dict[str, Any] = {
+            "sender": sender_info,
+            "to": [{"email": to_email, "name": to_name or to_email.split("@")[0]}],
+            "subject": subject,
+            "htmlContent": html_body,
+        }
 
-        use_tls, start_tls = self._smtp_transport_flags()
-        client = aiosmtplib.SMTP(
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            timeout=30,
-            use_tls=use_tls,
-            start_tls=start_tls,
-        )
+        if text_body:
+            payload["textContent"] = text_body
+
+        if reply_to_email:
+            payload["replyTo"] = {
+                "email": reply_to_email,
+                "name": reply_to_name or reply_to_email.split("@")[0],
+            }
+
+        if attachments:
+            payload["attachment"] = attachments
+
+        headers = self._get_api_headers()
 
         logger.info(
-            "SMTP Connecting",
-            host=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            from_email=from_email,
+            "Sending Email via Brevo HTTP API",
             to=to_email,
-            use_tls=use_tls,
-            start_tls=start_tls,
             subject=subject,
+            has_reply_to=bool(reply_to_email),
+            attachment_count=len(attachments or []),
         )
 
         try:
-            await client.connect()
-            logger.info("SMTP Connected", host=settings.SMTP_HOST, port=settings.SMTP_PORT, to=to_email)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(BREVO_API_URL, headers=headers, json=payload)
 
-            await client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            logger.info("Authentication Successful", user=settings.SMTP_USER, to=to_email)
-
-            logger.info("Sending Email...", to=to_email, subject=subject)
-            await client.send_message(message)
-            logger.info("Email Sent Successfully", to=to_email, subject=subject)
-            return {"sent": True, "to": to_email, "subject": subject}
-        except SMTPAuthenticationError as exc:
-            logger.error(
-                "SMTP Authentication Failed",
-                to=to_email,
-                subject=subject,
-                error=str(exc),
-            )
-            return {"sent": False, "error": "SMTP authentication failed. Check SMTP_USER and SMTP_PASSWORD."}
-        except SMTPTimeoutError as exc:
-            logger.error("SMTP Timeout", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": "SMTP timeout while sending email."}
-        except SMTPConnectError as exc:
-            logger.error("SMTP Connection Failed", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": "Could not connect to the SMTP server."}
-        except SMTPResponseException as exc:
-            logger.error(
-                "SMTP Response Error",
-                to=to_email,
-                subject=subject,
-                code=getattr(exc, "code", None),
-                error=str(exc),
-            )
-            return {"sent": False, "error": f"SMTP server rejected the message: {getattr(exc, 'code', 'unknown')}"}
-        except SMTPException as exc:
-            logger.error("SMTP Error", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": "SMTP error while sending email."}
+            if response.status_code in (200, 201, 202):
+                data = response.json()
+                message_id = data.get("messageId") or data.get("message_id") or "brevo-success"
+                logger.info("Brevo Email Sent Successfully", to=to_email, subject=subject, message_id=message_id)
+                return {"sent": True, "to": to_email, "subject": subject, "message_id": message_id}
+            else:
+                logger.error(
+                    "Brevo API Error Response",
+                    status_code=response.status_code,
+                    to=to_email,
+                    subject=subject,
+                    response_text=response.text[:300],
+                )
+                return {
+                    "sent": False,
+                    "error": f"Brevo API returned status {response.status_code}",
+                    "detail": response.text,
+                }
+        except httpx.TimeoutException as exc:
+            logger.error("Brevo API Timeout", to=to_email, subject=subject, error=str(exc))
+            return {"sent": False, "error": "Brevo HTTP API connection timeout."}
+        except httpx.RequestError as exc:
+            logger.error("Brevo HTTP Request Error", to=to_email, subject=subject, error=str(exc))
+            return {"sent": False, "error": f"Failed to connect to Brevo API: {str(exc)}"}
         except Exception as exc:
-            logger.exception("Email Sending Failed", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": "Unexpected error while sending email."}
-        finally:
-            with suppress(Exception):
-                await client.quit()
+            logger.exception("Unexpected error in Brevo Email Dispatch", to=to_email, subject=subject, error=str(exc))
+            return {"sent": False, "error": "Unexpected error while dispatching email via Brevo."}
 
     async def _send(self, to_email: str, subject: str, html_body: str) -> bool:
-        text_body = "This email requires an HTML-capable client to view."
-        from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER or "no-reply@careershala.tech"
-        message = self._build_message(
+        result = await self._send_brevo_email(to_email=to_email, subject=subject, html_body=html_body)
+        return bool(result.get("sent"))
+
+    async def send_otp(self, to_email: str, full_name: str, otp: str, purpose: OTPPurpose) -> bool:
+        """1. User Sign-up / Auth OTP Verification"""
+        try:
+            template, subject = _OTP_DISPATCH[purpose]
+        except KeyError:
+            raise ValueError(f"No email dispatch configured for OTP purpose: {purpose}")
+
+        html = _render_template(
+            template,
+            full_name=full_name or "there",
+            otp=otp,
+            expiry_minutes=settings.OTP_EXPIRE_MINUTES,
+        )
+        return await self._send(to_email, subject, html)
+
+    async def send_certificate(
+        self,
+        *,
+        recipient_email: str,
+        recipient_name: str,
+        topic: str,
+        score: float,
+        grade_label: str,
+        difficulty: str,
+        cert_id: str,
+        issued_at: Any,
+        public_url: str,
+        pdf_bytes: bytes,
+    ) -> bool:
+        """2. Certificate Delivery with PDF attachment"""
+        verification_url = f"{settings.cert_verify_base_url}/{cert_id}"
+        issued_str = issued_at.strftime("%d %B %Y") if hasattr(issued_at, "strftime") else str(issued_at)
+        subject = f"🎉 Congratulations {recipient_name}! Your CareerShala Certificate is Ready"
+
+        html_body = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#1e293b;">
+    <div style="max-width:560px;margin:auto;background:white;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
+      <h2 style="color:#1e293b;">🎉 Congratulations, {escape(recipient_name)}!</h2>
+      <p>You've successfully completed the <b>{escape(topic)}</b> assessment at <b>{escape(difficulty)}</b> level.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr><td style="padding:8px 0;color:#64748b;">Score</td><td style="padding:8px 0;font-weight:bold;">{score}%</td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;">Grade</td><td style="padding:8px 0;font-weight:bold;color:#6366f1;">{escape(grade_label)}</td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;">Issued on</td><td style="padding:8px 0;">{issued_str}</td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;">Certificate ID</td><td style="padding:8px 0;font-family:monospace;font-size:12px;">{escape(cert_id)}</td></tr>
+      </table>
+      <p style="text-align:center;margin:28px 0;">
+        <a href="{escape(public_url)}" style="background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Download Certificate</a>
+      </p>
+      <p style="font-size:13px;color:#94a3b8;">
+        Also attached to this email as a PDF. Anyone can verify its authenticity at
+        <a href="{escape(verification_url)}">{escape(verification_url)}</a>.
+      </p>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+      <p style="font-size:12px;color:#94a3b8;">Team CareerShala</p>
+    </div>
+  </body>
+</html>
+"""
+
+        pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        filename = f"CareerShala_Certificate_{topic.replace(' ', '_')}.pdf"
+
+        result = await self._send_brevo_email(
+            to_email=recipient_email,
+            to_name=recipient_name,
+            subject=subject,
+            html_body=html_body,
+            attachments=[{"name": filename, "content": pdf_b64}],
+        )
+        return bool(result.get("sent"))
+
+    async def send_hr_application(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        attachments: List[str],
+        candidate_email: str,
+        candidate_name: str,
+    ) -> str:
+        """3. AI-Automated HR Job Applications:
+
+        Email sent to recruiters on behalf of candidate.
+        CRITICAL REQUIREMENT: replyTo header mapped dynamically to candidate_email
+        so HR replies route directly to candidate's inbox.
+        """
+        brevo_attachments = []
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for file_path in attachments:
+                if not file_path:
+                    continue
+                try:
+                    if file_path.startswith("http://") or file_path.startswith("https://"):
+                        resp = await client.get(file_path)
+                        resp.raise_for_status()
+                        file_bytes = resp.content
+                        url_name = Path(file_path.split("?")[0]).name
+                        filename = url_name if (url_name and "." in url_name) else "attachment.pdf"
+                    else:
+                        p = Path(file_path)
+                        if not p.exists():
+                            logger.warning(f"Attachment file path missing: {file_path}")
+                            continue
+                        file_bytes = p.read_bytes()
+                        filename = p.name
+
+                    b64_content = base64.b64encode(file_bytes).decode("utf-8")
+                    brevo_attachments.append({"name": filename, "content": b64_content})
+                except Exception as exc:
+                    logger.error(f"Error encoding attachment {file_path}: {exc}")
+
+        res = await self._send_brevo_email(
             to_email=to_email,
             subject=subject,
-            from_email=from_email,
             html_body=html_body,
-            text_body=text_body,
+            reply_to_email=candidate_email,
+            reply_to_name=candidate_name,
+            attachments=brevo_attachments,
         )
-        result = await self._send_message(message=message, to_email=to_email, subject=subject)
-        return bool(result.get("sent"))
+        if res.get("sent"):
+            return res.get("message_id") or f"brevo-{to_email}-{subject[:20]}"
+        raise Exception(res.get("error") or "Failed to send HR application via Brevo HTTP API")
 
     def _format_support_created_at(self, created_at) -> str:
         if not created_at:
@@ -251,7 +346,9 @@ class EmailService:
 
         return support_email, subject, "\n".join(text_lines), html_body
 
-    async def send_support_ticket_notification(self, *, ticket: Any, user: Any, metadata: dict | None = None, attachments: list[dict] | None = None) -> dict[str, Any]:
+    async def send_support_ticket_notification(
+        self, *, ticket: Any, user: Any, metadata: dict | None = None, attachments: list[dict] | None = None
+    ) -> dict[str, Any]:
         try:
             support_email, subject, text_body, html_body = self._build_support_ticket_payload(
                 ticket=ticket,
@@ -263,103 +360,37 @@ class EmailService:
             logger.error("Support Email Configuration Missing", ticket_id=getattr(ticket, "ticket_id", None), error=str(exc))
             return {"sent": False, "error": str(exc)}
 
-        from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER or "no-reply@careershala.tech"
-        message = self._build_message(
+        return await self._send_brevo_email(
             to_email=support_email,
             subject=subject,
-            from_email=from_email,
             html_body=html_body,
             text_body=text_body,
         )
 
-        logger.info(
-            "Preparing Support Ticket Email",
-            ticket_id=getattr(ticket, "ticket_id", None),
-            to=support_email,
-            subject=subject,
-            attachment_count=len(attachments or []),
-        )
-        return await self._send_message(message=message, to_email=support_email, subject=subject)
 
-    async def send_otp(self, to_email: str, full_name: str, otp: str, purpose: OTPPurpose) -> bool:
-        """Unified OTP sender — replaces send_verification_otp / send_login_otp /
-        send_password_reset_otp. Template + subject are resolved from _OTP_DISPATCH,
-        so adding a new OTP purpose only requires a new dispatch entry, not a new method."""
-        try:
-            template, subject = _OTP_DISPATCH[purpose]
-        except KeyError:
-            raise ValueError(f"No email dispatch configured for OTP purpose: {purpose}")
+async def send_with_attachments(
+    *,
+    to: str,
+    subject: str,
+    html_body: str,
+    attachments: List[str],
+    reply_to_email: Optional[str] = None,
+    reply_to_name: Optional[str] = None,
+) -> str:
+    """Sends an email with file attachments via Brevo HTTP API.
 
-        html = _render_template(
-            template,
-            full_name=full_name or "there",
-            otp=otp,
-            expiry_minutes=settings.OTP_EXPIRE_MINUTES,
-        )
-        return await self._send(to_email, subject, html)
-    
-
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
-from pathlib import Path
-from typing import List
-
-from core.config import settings
-
-
-async def send_with_attachments(*, to: str, subject: str, html_body: str, attachments: List[str]) -> str:
+    Returns provider message ID string.
     """
-    Sends an email with one or more file attachments (resume PDF, cover
-    letter PDF). Returns a message-id-like string for storage in
-    send_metadata.provider_message_id.
-    """
-    msg = MIMEMultipart()
-    from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER
-    from_name = getattr(settings, "SMTP_FROM_NAME", "CareerShala")
-    msg["From"] = f"{from_name} <{from_email}>"
-    msg["To"] = to
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
+    svc = EmailService()
+    return await svc.send_hr_application(
+        to_email=to,
+        subject=subject,
+        html_body=html_body,
+        attachments=attachments,
+        candidate_email=reply_to_email or settings.mail_sender["email"],
+        candidate_name=reply_to_name or settings.mail_sender["name"],
+    )
 
-    for file_path in attachments:
-        path = Path(file_path)
-        if not path.exists():
-            continue
-        with open(path, "rb") as f:
-            part = MIMEApplication(f.read(), Name=path.name)
-        part["Content-Disposition"] = f'attachment; filename="{path.name}"'
-        msg.attach(part)
-
-    use_tls = bool(settings.SMTP_PORT == 465 and getattr(settings, "SMTP_USE_SSL", False))
-    start_tls = bool(settings.SMTP_PORT == 587 or not use_tls)
-
-    try:
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-            use_tls=use_tls,
-            start_tls=start_tls,
-        )
-        logger.info("Application email with attachments sent successfully", to=to, subject=subject)
-    except Exception as e:
-        logger.error("Failed sending email with attachments via aiosmtplib", error=str(e))
-        if use_tls:
-            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(from_email, [to], msg.as_string())
-        else:
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-                if start_tls:
-                    server.starttls()
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(from_email, [to], msg.as_string())
-
-    return f"{to}-{subject[:20]}"
 
 async def send_application_via_gmail_api(
     *,
@@ -370,71 +401,64 @@ async def send_application_via_gmail_api(
     user_id: str,
     user_repo,
 ) -> str:
+    """Sends an application via Google Gmail API if user connected Gmail OAuth,
+
+    otherwise falls back to Brevo HTTP mailer service.
     """
-    Sends an email with file attachments directly from the user's Gmail account
-    via Google Gmail API, using server-side stored OAuth tokens.
-
-    Token management is fully automatic:
-    - Loads the user's stored refresh_token from MongoDB.
-    - If the access_token is expired, silently refreshes it via Google's token
-      endpoint without any user interaction.
-    - The user only sees Google's consent screen once (during initial connection).
-
-    Supports both local file paths and remote HTTP/HTTPS URLs.
-    Returns the sent message ID.
-
-    Raises:
-        HTTP 428 — if the user has not yet connected their Gmail account.
-        HTTP 401 — if the stored refresh_token was revoked by the user.
-        HTTP 503 — if Google's token endpoint is unreachable.
-    """
+    from googleapiclient.discovery import build
     from services.gmail_token_service import GmailTokenService
 
-    # Get auto-refreshed, ready-to-use credentials from the token service
-    token_service = GmailTokenService(user_repo)
-    creds = await token_service.get_valid_credentials(user_id)
+    try:
+        token_service = GmailTokenService(user_repo)
+        creds = await token_service.get_valid_credentials(user_id)
+        if creds:
+            service = build("gmail", "v1", credentials=creds)
+            from email.message import EmailMessage
 
-    service = build("gmail", "v1", credentials=creds)
+            msg = EmailMessage()
+            msg["To"] = to
+            msg["Subject"] = subject
+            msg.set_content("This email requires an HTML-capable email client to view.")
+            msg.add_alternative(html_body, subtype="html")
 
-    msg = EmailMessage()
-    msg["To"] = to
-    msg["Subject"] = subject
-    msg.set_content("This email requires an HTML-capable email client to view.")
-    msg.add_alternative(html_body, subtype="html")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                for file_path in attachments:
+                    if not file_path:
+                        continue
+                    if file_path.startswith("http://") or file_path.startswith("https://"):
+                        resp = await client.get(file_path)
+                        resp.raise_for_status()
+                        content = resp.content
+                        url_path_name = Path(file_path.split("?")[0]).name
+                        filename = url_path_name if (url_path_name and "." in url_path_name) else "resume.pdf"
+                    else:
+                        p = Path(file_path)
+                        if not p.exists():
+                            continue
+                        with open(p, "rb") as f:
+                            content = f.read()
+                        filename = p.name
+                    msg.add_attachment(content, maintype="application", subtype="pdf", filename=filename)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        for file_path in attachments:
-            if not file_path:
-                continue
+            raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+            sent_message = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
+            msg_id = sent_message.get("id", "")
+            logger.info("Application email sent via Gmail API", to=to, message_id=msg_id)
+            return msg_id
+    except Exception as err:
+        logger.warning(f"Gmail API dispatch failed or not connected for user {user_id}: {err}. Falling back to Brevo HTTP service.")
 
-            logger.info(f"Attempting to attach file: {file_path}")
+    # Fallback to Brevo HTTP mailer
+    svc = EmailService()
+    user_doc = await user_repo.get_by_id(user_id) if hasattr(user_repo, "get_by_id") else None
+    candidate_email = user_doc.get("email") if user_doc else None
+    candidate_name = user_doc.get("full_name") if user_doc else None
 
-            if file_path.startswith("http://") or file_path.startswith("https://"):
-                try:
-                    response = await client.get(file_path)
-                    response.raise_for_status()
-                    content = response.content
-                except Exception as err:
-                    raise Exception(f"Failed to download resume URL: {file_path}") from err
-
-                url_path_name = Path(file_path.split("?")[0]).name
-                filename = url_path_name if (url_path_name and "." in url_path_name) else "resume.pdf"
-            else:
-                path = Path(file_path)
-                if not path.exists():
-                    raise FileNotFoundError(f"Attachment missing at exact path: {file_path}")
-                with open(path, "rb") as f:
-                    content = f.read()
-                filename = path.name
-
-            msg.add_attachment(content, maintype="application", subtype="pdf", filename=filename)
-
-    raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-    sent_message = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
-
-    msg_id = sent_message.get("id", "")
-    logger.info("Application email sent via Gmail API", to=to, message_id=msg_id)
-    return msg_id
-
-
-
+    return await svc.send_hr_application(
+        to_email=to,
+        subject=subject,
+        html_body=html_body,
+        attachments=attachments,
+        candidate_email=candidate_email or settings.mail_sender["email"],
+        candidate_name=candidate_name or settings.mail_sender["name"],
+    )
