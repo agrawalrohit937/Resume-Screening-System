@@ -70,9 +70,25 @@ class Settings(BaseSettings):
     ALLOWED_FILE_TYPES: List[str] = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     UPLOAD_DIR: str = "./uploads"
 
-    # ── Certificate public URLs ────────────────────────────────────────────────
-    BASE_URL: str = Field(default_factory=lambda: os.getenv("BASE_URL", os.getenv("FRONTEND_URL", "http://localhost:5173")))
-    PUBLIC_WEBSITE_URL: str = "http://careershala.tech"
+    # ── Application Base URLs (Environment-aware) ──────────────────────────────
+    APP_BASE_URL: str = Field(
+        default_factory=lambda: os.getenv(
+            "APP_BASE_URL",
+            os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "http://localhost:5173"))
+        )
+    )
+    FRONTEND_URL: str = Field(
+        default_factory=lambda: os.getenv(
+            "FRONTEND_URL",
+            os.getenv("APP_BASE_URL", "http://localhost:5173")
+        )
+    )
+    BASE_URL: str = Field(
+        default_factory=lambda: os.getenv(
+            "BASE_URL",
+            os.getenv("APP_BASE_URL", "http://localhost:5173")
+        )
+    )
 
 
 # ── Cloudinary ───────────────────────────────────────────────────────────────
@@ -80,7 +96,13 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
-    # SMTP Settings (Default to port 587 with STARTTLS for cloud providers like Render)
+    # ── Brevo HTTP API & Transactional Email Settings ───────────────────────
+    BREVO_API_KEY: Optional[str] = None
+    MAIL_FROM_EMAIL: Optional[str] = None
+    MAIL_FROM_NAME: str = "CareerShala"
+    SUPPORT_EMAIL: Optional[str] = None
+
+    # Legacy SMTP Settings (kept for fallback compatibility)
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = Field(default_factory=lambda: int(os.getenv("SMTP_PORT", 587)))
     SMTP_USER: Optional[str] = None
@@ -88,7 +110,6 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: Optional[str] = None
     SMTP_FROM_NAME: str = "CareerShala"
     SMTP_USE_SSL: bool = Field(default_factory=lambda: os.getenv("SMTP_USE_SSL", "false").lower() == "true")
-    SUPPORT_EMAIL: Optional[str] = None
 
 
     # [SEC-002] No default values — must be set via environment variables.
@@ -140,7 +161,7 @@ class Settings(BaseSettings):
     )
 
     # ── Certificates ──────────────────────────────────────────────────────────
-    CERT_VERIFY_BASE_URL: str = "https://careershala.com/verify/cert"
+    CERT_VERIFY_BASE_URL: Optional[str] = None
     CERT_ISSUER_NAME: str = "CareerShala"
 
     # ── Redis / Celery ────────────────────────────────────────────────────────
@@ -217,7 +238,20 @@ class Settings(BaseSettings):
 
     @property
     def smtp_from(self) -> str:
-        return self.SMTP_FROM_EMAIL or self.SMTP_USER or "no-reply@careershala.tech"
+        return self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "no-reply@careershala.tech"
+
+    @property
+    def mail_sender(self) -> dict:
+        email = self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "agrawalrohit937@gmail.com"
+        name = self.MAIL_FROM_NAME or self.SMTP_FROM_NAME or "CareerShala"
+        return {"name": name, "email": email}
+
+    @property
+    def cert_verify_base_url(self) -> str:
+        if self.CERT_VERIFY_BASE_URL and "careershala.com" not in self.CERT_VERIFY_BASE_URL:
+            return self.CERT_VERIFY_BASE_URL.rstrip("/")
+        base = (self.APP_BASE_URL or self.FRONTEND_URL or self.BASE_URL or "http://localhost:5173").rstrip("/")
+        return f"{base}/verify"
 
 
 @lru_cache()
