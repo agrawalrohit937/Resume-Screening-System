@@ -112,9 +112,11 @@ export default function Signup() {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2E9BDA] shadow-md shadow-[#2E9BDA]/20">
-            <span className="text-white font-semibold text-[18px]">C</span>
-          </div>
+          <img
+            src="/logo_t.png"
+            alt="CareerShala Logo"
+            className="w-10 h-10 object-contain shrink-0"
+          />
           <span className="font-display text-[22px] font-bold text-[#111827]">
             Career<span className="text-[#2E9BDA]">Shala</span>
           </span>
@@ -158,11 +160,13 @@ export default function Signup() {
 
           {/* Mobile-only logo */}
           <div className="mb-6 flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2E9BDA]">
-              <span className="font-display text-base font-bold text-white">C</span>
-            </div>
+            <img
+              src="/logo_t.png"
+              alt="CareerShala Logo"
+              className="w-9 h-9 object-contain shrink-0"
+            />
             <span className="font-display text-[19px] font-bold text-[#111827]">
-              Career<span className="text-[#2E9BDA]">AI</span>
+              Career<span className="text-[#2E9BDA]">Shala</span>
             </span>
           </div>
 

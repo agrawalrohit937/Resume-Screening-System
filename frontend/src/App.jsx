@@ -66,8 +66,20 @@ function PublicRoute({ children }) {
 
 function BootLoaderGate({ children }) {
   const { loading } = useAuth()
+  const [minLoadingDone, setMinLoadingDone] = useState(false)
 
-  if (loading) return <Loader />
+  useEffect(() => {
+    // Enforce 5-second (5000ms) minimum video loader display on site open / browser refresh
+    const timer = setTimeout(() => {
+      setMinLoadingDone(true)
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (loading || !minLoadingDone) {
+    return <Loader />
+  }
+
   return children
 }
 
