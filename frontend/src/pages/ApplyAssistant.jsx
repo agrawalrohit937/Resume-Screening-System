@@ -72,32 +72,75 @@ export default function ApplyAssistant() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { step, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, sendApplication, reset } = useApplyAssistant();
+  const { step, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset } = useApplyAssistant();
   const [resumeId, setResumeId] = useState(null);
   const [jobDetailsState, setJobDetailsState] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('apply'); // 'apply' | 'history'
   const [isGmailConnected, setIsGmailConnected] = useState(null); // null = loading
 
-  // 👇 Check Gmail connection status on mount and after returning from /gmail-callback
+  // 👇 Restore pending draft and check Gmail connection status on mount / return from /gmail-callback
   useEffect(() => {
-    const checkGmail = async () => {
+    const checkAndRestore = async () => {
+      // 1. Check for stored pending draft in sessionStorage
+      const storedDraftJson = sessionStorage.getItem('pending_application_draft');
+      const storedAppId = sessionStorage.getItem('pending_application_id');
+      let restored = false;
+
+      if (storedDraftJson) {
+        try {
+          const parsed = JSON.parse(storedDraftJson);
+          restoreDraft(parsed);
+          restored = true;
+        } catch (e) {
+          console.error('[ApplyAssistant] Failed to parse stored draft', e);
+        }
+      }
+
+      if (!restored && storedAppId) {
+        try {
+          const fetched = await applyAssistantApi.getDraft(storedAppId);
+          if (fetched) {
+            restoreDraft(fetched);
+            sessionStorage.setItem('pending_application_draft', JSON.stringify(fetched));
+            restored = true;
+          }
+        } catch (e) {
+          console.error('[ApplyAssistant] Failed to fetch draft by stored ID', e);
+        }
+      }
+
+      if (!restored) {
+        try {
+          const active = await applyAssistantApi.getActiveDraft();
+          if (active && active.status === 'ready_for_review') {
+            restoreDraft(active);
+            sessionStorage.setItem('pending_application_draft', JSON.stringify(active));
+            sessionStorage.setItem('pending_application_id', active.application_id);
+          }
+        } catch {
+          // No active draft, remain on initial step
+        }
+      }
+
+      // 2. Check Gmail connection
       try {
         const { is_connected } = await applyAssistantApi.checkGmailConnected();
         setIsGmailConnected(is_connected);
-        // Show success toast if user just connected Gmail
+
         const params = new URLSearchParams(location.search);
         if (params.get('gmail') === 'connected' && is_connected) {
-          toast.success('Gmail connected! Future sends will be automatic.');
-          // Clean the URL without re-rendering
+          toast.success('Gmail connected! Your application draft is ready to send.');
+          setShowConfirm(true);
           window.history.replaceState({}, '', location.pathname);
         }
       } catch {
         setIsGmailConnected(false);
       }
     };
-    checkGmail();
-  }, [location.search]);
+
+    checkAndRestore();
+  }, [location.search, restoreDraft]);
 
   // 👇 Fetch the primary parsed resume from the backend on load
   useEffect(() => {
@@ -151,6 +194,10 @@ export default function ApplyAssistant() {
 
   // Redirect user to Google consent screen (server-side, gets refresh token)
   const handleConnectGmail = useCallback(async () => {
+    if (draft) {
+      sessionStorage.setItem('pending_application_draft', JSON.stringify(draft));
+      sessionStorage.setItem('pending_application_id', draft.application_id);
+    }
     try {
       const { authorize_url } = await applyAssistantApi.getGmailAuthorizeUrl();
       window.location.href = authorize_url; // Full page redirect to Google
@@ -158,7 +205,7 @@ export default function ApplyAssistant() {
       toast.error('Could not initiate Gmail connection. Please try again.');
       console.error('[ApplyAssistant] Gmail authorize error:', err);
     }
-  }, []);
+  }, [draft]);
 
   const pageVariants = {
     initial: { opacity: 0, y: 10 },
