@@ -13,6 +13,12 @@ export const applyAssistantApi = {
   updateDraft: (applicationId, edits) =>
     api.put(`${BASE}/draft/${applicationId}`, edits).then((r) => r.data),
 
+  getDraft: (applicationId) =>
+    api.get(`${BASE}/draft/${applicationId}`).then((r) => r.data),
+
+  getActiveDraft: () =>
+    api.get(`${BASE}/active-draft`).then((r) => r.data),
+
   // GET returns a PDF file directly — build the URL for an <a>/<iframe> or
   // trigger a download, rather than parsing it as JSON.
   previewDraftUrl: (applicationId) =>

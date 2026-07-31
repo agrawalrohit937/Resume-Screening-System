@@ -120,6 +120,25 @@ async def update_draft(application_id: str, payload: ApplyDraftUpdateRequest, cu
     return _to_draft_response(doc)
 
 
+@router.get("/draft/{application_id}", response_model=ApplyDraftResponse)
+async def get_draft(application_id: str, current_user=Depends(get_current_user)):
+    doc = await service.repo.get_by_id(application_id, _user_id(current_user))
+    if not doc:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Application draft not found")
+    return _to_draft_response(doc)
+
+
+@router.get("/active-draft", response_model=ApplyDraftResponse)
+async def get_active_draft(current_user=Depends(get_current_user)):
+    items, total = await service.get_history(user_id=_user_id(current_user), page=1, page_size=5)
+    for item in items:
+        if item.get("status") in ("ready_for_review", "sending", "created"):
+            full_doc = await service.repo.get_by_id(str(item["_id"]), _user_id(current_user))
+            if full_doc:
+                return _to_draft_response(full_doc)
+    raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active draft found")
+
+
 @router.get("/draft/{application_id}/preview")
 async def preview_draft(application_id: str, current_user=Depends(get_current_user)):
     pdf_path = await service.preview_cover_letter(application_id=application_id, user_id=_user_id(current_user))

@@ -86,6 +86,15 @@ export function useApplyAssistant() {
     [draft],
   );
 
+  const restoreDraft = useCallback((draftData) => {
+    if (!draftData) return;
+    setDraft(draftData);
+    setStep(STEPS.REVIEW);
+    if (draftData.ats_result) {
+      setAtsResult(draftData.ats_result);
+    }
+  }, []);
+
   const sendApplication = useCallback(async () => {
     if (!draft) return;
     setIsSubmitting(true);
@@ -94,6 +103,8 @@ export function useApplyAssistant() {
       const result = await applyAssistantApi.sendApplication(draft.application_id);
       setDraft((prev) => ({ ...prev, status: result.status }));
       setStep(STEPS.SENT);
+      sessionStorage.removeItem('pending_application_draft');
+      sessionStorage.removeItem('pending_application_id');
       return result;
     } catch (err) {
       setError(formatErrorMessage(err, 'Failed to send application.'));
@@ -108,7 +119,9 @@ export function useApplyAssistant() {
     setDraft(null);
     setAtsResult(null);
     setError(null);
+    sessionStorage.removeItem('pending_application_draft');
+    sessionStorage.removeItem('pending_application_id');
   }, []);
 
-  return { step, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, sendApplication, reset };
+  return { step, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset };
 }
