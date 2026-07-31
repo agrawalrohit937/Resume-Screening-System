@@ -204,7 +204,7 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
       <div className={`flex items-center py-4 min-h-[64px] shrink-0 border-b border-slate-100 px-5 ${isCompact ? 'justify-center' : 'justify-start w-full'}`}>
         <div className="flex items-center gap-3">
           <img 
-            src="/logo.png"
+            src="/logo_t.png"
             alt="CareerShala" 
             className="w-9 h-9 object-contain shrink-0" 
           />

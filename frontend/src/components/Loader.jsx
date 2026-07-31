@@ -36,7 +36,7 @@ export default function Loader({ show = true, onExitComplete }) {
     if (!show) return
     const id = setInterval(() => {
       setIndex((i) => (i < MESSAGES.length - 1 ? i + 1 : i))
-    }, 1100)
+    }, 700)
     return () => clearInterval(id)
   }, [show])
 
