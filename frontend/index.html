@@ -11,7 +11,7 @@
   <meta name="keywords" content="CareerShala, AI Career Co-Pilot, Smart ATS, Resume Screening System, AI Mock Interview, Visual Proctoring, Automated Job Application, Resume Enhancer, Verified Skill Certificates, Gamified Learning, Tech Careers" />
   <meta name="author" content="Rohit Agrawal" />
 
-  <!-- ✅ Open Graph / Social Media Tags (For WhatsApp, LinkedIn Preview) -->
+  <!-- ✅ Open Graph / Social Media Tags -->
   <meta property="og:title" content="CareerShala — AI Career Co-Pilot & Smart ATS" />
   <meta property="og:description" content="Level up your career! Get AI resume enhancement, proctored mock interviews, and automated HR outreach in one unified platform." />
   <meta property="og:type" content="website" />
@@ -22,6 +22,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- ✅ REQUIRED FOR FACE DETECTION (Proctored Mock Interviews) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+  <!-- 👇 YAHAN SE GOOGLE ANALYTICS SHURU 👇 -->
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B3T7N6LW8"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-5B3T7N6LW8');
+  </script>
+  <!-- 👆 YAHAN PAR GOOGLE ANALYTICS KHATAM 👆 -->
 
   <style>
     /* Critical baseline — full theme is loaded via index.css */
@@ -35,21 +51,15 @@
     }
   </style>
 
-  <!-- ✅ REQUIRED FOR FACE DETECTION (Proctored Mock Interviews) -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-
 </head>
 
 <body>
-
   <div id="root"></div>
 
   <!-- Google One Tap / OAuth Client -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <script type="module" src="/src/main.jsx"></script>
-
 </body>
 
 </html>
