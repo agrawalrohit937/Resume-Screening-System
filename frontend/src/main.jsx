@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // [SEC-003] No hardcoded fallback — must be set via VITE_GOOGLE_CLIENT_ID env var.
 // In development: add VITE_GOOGLE_CLIENT_ID=<your-id> to frontend/.env
@@ -20,5 +21,7 @@ if (!googleClientId) {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <GoogleOAuthProvider clientId={googleClientId}>
     <App />
+    {/* 👇 2. Ye component add karna hai */}
+    <SpeedInsights />
   </GoogleOAuthProvider>
 )
