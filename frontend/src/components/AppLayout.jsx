@@ -111,6 +111,17 @@ export default function AppLayout() {
     return <Navigate to="/recruiter" replace />
   }
 
+  // Bypass AppLayout shell for /live-interview to prevent CSS animation containment traps in fullscreen mode
+  if (location.pathname === '/live-interview') {
+    return (
+      <div className="min-h-screen w-full bg-[#F5F7FB]">
+        <RouteErrorBoundary>
+          <Outlet />
+        </RouteErrorBoundary>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
       {user?.role !== 'recruiter' && (
