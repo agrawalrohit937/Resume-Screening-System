@@ -106,32 +106,44 @@ export default function AppLayout() {
     }
   }, [isMobileMenuOpen])
 
+  const [isFullscreenActive, setIsFullscreenActive] = useState(() => {
+    if (typeof document === 'undefined') return false
+    return Boolean(document.fullscreenElement || document.body?.classList?.contains('immersive-fullscreen'))
+  })
+
+  useEffect(() => {
+    const syncFs = () => {
+      const active = Boolean(document.fullscreenElement || document.body?.classList?.contains('immersive-fullscreen'))
+      setIsFullscreenActive(active)
+    }
+
+    syncFs()
+    document.addEventListener('fullscreenchange', syncFs)
+
+    const observer = new MutationObserver(syncFs)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFs)
+      observer.disconnect()
+    }
+  }, [])
+
   // Redirect recruiter to shortlist page if not already there
   if (user?.role === 'recruiter' && location.pathname !== '/recruiter') {
     return <Navigate to="/recruiter" replace />
   }
 
-  // Bypass AppLayout shell for /live-interview to prevent CSS animation containment traps in fullscreen mode
-  if (location.pathname === '/live-interview') {
-    return (
-      <div className="min-h-screen w-full bg-[#F5F7FB]">
-        <RouteErrorBoundary>
-          <Outlet />
-        </RouteErrorBoundary>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
-      {user?.role !== 'recruiter' && (
+    <div className={`flex min-h-screen w-full max-w-full overflow-x-hidden ${isFullscreenActive ? 'bg-[#F5F7FB] p-0' : 'bg-slate-50'}`}>
+      {!isFullscreenActive && user?.role !== 'recruiter' && (
         <div className="hidden md:block">
           <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(p => !p)} />
         </div>
       )}
 
       <AnimatePresence>
-        {isMobileMenuOpen && user?.role !== 'recruiter' && (
+        {isMobileMenuOpen && !isFullscreenActive && user?.role !== 'recruiter' && (
           <div className="fixed inset-0 z-[100] md:hidden flex">
             {/* Dark Backdrop Overlay — Tapping anywhere outside the drawer closes it */}
             <motion.div
@@ -164,24 +176,30 @@ export default function AppLayout() {
       </AnimatePresence>
 
       <div
-        className={`flex min-w-0 flex-1 flex-col w-full transition-[margin] duration-200 ease-out ${user?.role === 'recruiter' ? 'md:ml-0' : (collapsed ? 'md:ml-[72px]' : 'lg:ml-[264px] md:ml-[72px]')}`}
+        className={`flex min-w-0 flex-1 flex-col w-full transition-[margin] duration-200 ease-out ${
+          isFullscreenActive || user?.role === 'recruiter'
+            ? 'md:ml-0'
+            : (collapsed ? 'md:ml-[72px]' : 'lg:ml-[264px] md:ml-[72px]')
+        }`}
       >
-        <MobileHeader onMenuToggle={() => setIsMobileMenuOpen(true)} />
-        <div className="hidden md:block">
-          <Navbar
-            sidebarCollapsed={collapsed}
-            onMenuToggle={() => setCollapsed(p => !p)}
-          />
-        </div>
-        <main className="flex-1 min-w-0 overflow-y-auto p-4 md:p-6">
-          <div key={location.pathname} className="mx-auto w-full max-w-7xl min-w-0 animate-fade-in">
+        {!isFullscreenActive && <MobileHeader onMenuToggle={() => setIsMobileMenuOpen(true)} />}
+        {!isFullscreenActive && (
+          <div className="hidden md:block">
+            <Navbar
+              sidebarCollapsed={collapsed}
+              onMenuToggle={() => setCollapsed(p => !p)}
+            />
+          </div>
+        )}
+        <main className={`flex-1 min-w-0 ${isFullscreenActive ? 'p-0 overflow-hidden' : 'overflow-y-auto p-4 md:p-6'}`}>
+          <div key={location.pathname} className={`mx-auto w-full min-w-0 ${isFullscreenActive ? 'max-w-none' : 'max-w-7xl animate-fade-in'}`}>
             <RouteErrorBoundary>
               <Outlet />
             </RouteErrorBoundary>
           </div>
         </main>
       </div>
-      <AICopilotWidget />
+      {!isFullscreenActive && <AICopilotWidget />}
     </div>
   )
 }
