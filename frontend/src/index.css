@@ -46,6 +46,31 @@
     overflow-x: hidden;
   }
 
+  /* ── Fullscreen & Immersive Mode Overrides ────────────────────────────────── */
+  :fullscreen, :-webkit-full-screen, :-moz-full-screen {
+    background-color: #F5F7FB !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  ::backdrop {
+    background-color: #F5F7FB !important;
+  }
+
+  body.immersive-fullscreen {
+    background-color: #F5F7FB !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.immersive-fullscreen #root {
+    background-color: #F5F7FB !important;
+    min-height: 100vh !important;
+    width: 100vw !important;
+  }
+
   html { scroll-behavior: smooth; }
 
   body {

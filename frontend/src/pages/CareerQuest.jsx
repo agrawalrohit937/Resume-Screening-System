@@ -12,7 +12,6 @@ import CareerPathMap from '../components/gamification/CareerPathMap'
 import MissionList from '../components/gamification/MissionList'
 import WeeklyChallenge from '../components/gamification/WeeklyChallenge'
 import StreakCard from '../components/gamification/StreakCard'
-import RecentActivity from '../components/gamification/RecentActivity'
 import DailyRewards from '../components/gamification/DailyRewards'
 import AchievementVault from '../components/gamification/AchievementVault'
 import Leaderboard from '../components/gamification/Leaderboard'
@@ -109,11 +108,10 @@ export default function CareerQuest() {
                 <DailyRewards profile={profile} />
               </div>
 
-              {/* Right Column: Challenge, Streak, Activity */}
+              {/* Right Column: Challenge, Streak */}
               <div className="space-y-6">
                 <WeeklyChallenge profile={profile} onStart={() => {}} />
                 <StreakCard profile={profile} />
-                <RecentActivity recentPoints={profile?.recent_points || []} catalog={catalog} />
               </div>
 
             </div>

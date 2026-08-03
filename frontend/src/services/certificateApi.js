@@ -22,6 +22,19 @@ export async function issueCertificate({ assessmentName, score, difficulty }) {
         score,
         difficulty,
     })
+
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+            new CustomEvent('trigger-notification', {
+                detail: {
+                    title: 'New Certificate Issued! 🏆',
+                    message: `Congratulations! Your ${assessmentName || 'Skill Assessment'} Certificate has been issued.`,
+                    type: 'badge',
+                    created_at: new Date().toISOString(),
+                },
+            })
+        )
+    }
     return data
 }
 
@@ -31,6 +44,19 @@ export async function claimCertificate({ topic, score, difficulty }) {
         score,
         difficulty,
     })
+
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+            new CustomEvent('trigger-notification', {
+                detail: {
+                    title: 'New Certificate Issued! 🏆',
+                    message: `Congratulations! Your ${topic || 'Skill Assessment'} Certificate has been claimed.`,
+                    type: 'badge',
+                    created_at: new Date().toISOString(),
+                },
+            })
+        )
+    }
     return data
 }
 

@@ -13,13 +13,11 @@ import { uploadResume } from '../services/api'
 // --- Utility Functions ---
 function resolveAvatarUrl(user) {
   if (!user) return null
-  const pic = user.profile_picture || user.google_picture
-  if (!pic) return null
-  if (pic.startsWith('http://') || pic.startsWith('https://')) {
-    return pic
-  }
-  // For relative asset paths, ensure clean URL construction without hardcoded broken domains
-  return `/uploads/profile/${pic}`
+  const pics = [user.profile_picture, user.display_picture, user.google_picture]
+  const found = pics.find(pic => pic && String(pic).startsWith('http'))
+  if (found) return found
+  if (user.profile_picture) return `/uploads/profile/${user.profile_picture}`
+  return null
 }
 
 function getInitials(fullName) {
@@ -207,7 +205,7 @@ export default function Profile() {
 
   const initials = getInitials(user.full_name)
 
-  const handlePhotoSelect = (e) => {
+  const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = '' 
@@ -222,25 +220,14 @@ export default function Profile() {
       return
     }
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(URL.createObjectURL(file))
-    setPreviewFile(file)
-    setImgError(false)
-  }
-
-  const handleUploadConfirm = async () => {
-    if (!previewFile) return
     setLoading(true)
     try {
-      await uploadProfilePhoto(previewFile)
+      await uploadProfilePhoto(file)
       await refreshUser()
-      setImgError(false) // Reset error state on fresh photo URL
+      setImgError(false)
       toast.success('Profile photo updated ✨')
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(null)
-      setPreviewFile(null)
     } catch (err) {
-      toast.error('Upload failed')
+      toast.error(err.response?.data?.detail || 'Upload failed')
     } finally {
       setLoading(false)
     }
