@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Menu } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
@@ -25,27 +26,57 @@ const PAGE_TITLES = {
 function MobileHeader({ onMenuToggle }) {
   const { pathname } = useLocation()
   const { user } = useAuth()
-  const meta = PAGE_TITLES[pathname] || { title: 'CareerShala', sub: '' }
+  const meta = PAGE_TITLES[pathname] || { title: 'Overview', sub: '' }
+  const userAvatar = user?.profile_picture || user?.google_picture || user?.display_picture
 
   return (
-    <header className="sticky top-0 z-40 md:hidden border-b border-slate-200 bg-white/90 backdrop-blur-lg">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+    <header className="sticky top-0 z-40 md:hidden border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 min-h-[58px]">
+        {/* Left: 48x48px Touch-Optimized Hamburger Menu Toggle Button */}
         <button
           type="button"
           onClick={onMenuToggle}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm active:scale-95 transition"
-          aria-label="Open menu"
+          onTouchEnd={(e) => {
+            e.preventDefault()
+            onMenuToggle()
+          }}
+          className="inline-flex min-h-[48px] min-w-[48px] h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-700 shadow-sm active:scale-95 transition-all shrink-0"
+          aria-label="Open navigation menu"
         >
-          <span className="text-lg leading-none">☰</span>
+          <Menu className="w-5 h-5 text-slate-800" strokeWidth={2.2} />
         </button>
 
-        <div className="min-w-0 flex-1 text-center">
-          <p className="truncate text-sm font-semibold text-slate-900">{meta.title}</p>
-          {meta.sub && <p className="truncate text-[11px] font-medium text-slate-500">{meta.sub}</p>}
+        {/* Center: Brand Identity (Logo + CareerShala) & Active Page Subtitle */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-center px-1">
+          <img
+            src="/logo_t.png"
+            alt="CareerShala"
+            className="w-7 h-7 object-contain shrink-0"
+          />
+          <div className="min-w-0 text-left">
+            <p className="truncate text-sm font-extrabold text-slate-900 leading-tight">
+              Career<span className="text-[#2E9BDA]">Shala</span>
+            </p>
+            <p className="truncate text-[10.5px] font-semibold text-slate-400 leading-none mt-0.5">
+              {meta.title}
+            </p>
+          </div>
         </div>
 
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white text-xs font-bold">
-          {user?.full_name?.[0]?.toUpperCase() || 'U'}
+        {/* Right: User Avatar / Initial Badge */}
+        <div className="shrink-0">
+          {userAvatar ? (
+            <img
+              src={userAvatar}
+              alt={user?.full_name || 'User'}
+              className="w-10 h-10 rounded-2xl object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
+              {user?.full_name?.[0]?.toUpperCase() || 'U'}
+            </div>
+          )}
         </div>
       </div>
     </header>
