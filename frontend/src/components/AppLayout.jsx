@@ -98,10 +98,15 @@ export default function AppLayout() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           >
-            <button
-              type="button"
-              aria-label="Close menu"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Close menu backdrop"
               onClick={() => setIsMobileMenuOpen(false)}
+              onTouchEnd={(e) => {
+                e.preventDefault()
+                setIsMobileMenuOpen(false)
+              }}
               className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm cursor-pointer transition-opacity"
             />
 
