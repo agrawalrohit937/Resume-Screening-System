@@ -188,7 +188,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const visibleSections = getNavSections()
   const isPremium = user?.plan === 'premium'
 
-  const handleNavigate = () => {
+  const handleItemClick = (path) => {
+    if (path) navigate(path)
     onNavigate?.()
   }
 
@@ -268,7 +269,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    onClick={handleNavigate}
+                    onClick={() => handleItemClick()}
                     title={isCompact ? item.label : undefined}
                     className={`relative flex items-center justify-between px-3.5 h-11 rounded-xl text-[13px] font-semibold transition-all duration-200 group
                       ${isCompact ? 'justify-center px-0' : ''}
@@ -328,7 +329,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
               {isPremium ? (
                 <button
                   title="Premium Active (Manage)"
-                  onClick={() => navigate('/billing')}
+                  onClick={() => handleItemClick('/billing')}
                   className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
                   style={{
                     background: 'linear-gradient(150deg, #241A10, #100C08)',
@@ -341,7 +342,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
               ) : (
                 <button
                   title="Upgrade to Pro"
-                  onClick={() => navigate('/premium')}
+                  onClick={() => handleItemClick('/premium')}
                   className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
                   style={{
                     background: 'linear-gradient(150deg, #241A10, #100C08)',
@@ -384,7 +385,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     </p>
 
                     <button
-                      onClick={() => navigate('/billing')}
+                      onClick={() => handleItemClick('/billing')}
                       className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-bold text-white/90 transition-all hover:bg-white/10 hover:text-white border border-white/10"
                     >
                       Manage Subscription
@@ -437,7 +438,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     </ul>
 
                     <button
-                      onClick={() => navigate('/premium')}
+                      onClick={() => handleItemClick('/premium')}
                       className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-bold transition-transform hover:scale-[1.02]"
                       style={{
                         color: '#241A0A',
@@ -496,7 +497,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         <button
           onClick={() => {
             logout()
-            handleNavigate()
+            handleItemClick()
           }}
           title="Logout"
           className={`flex items-center gap-2 w-full rounded-xl py-2.5 text-[12px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 active:scale-[0.98] transition-all ring-1 ring-rose-100
