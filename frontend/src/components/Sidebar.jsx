@@ -207,11 +207,13 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const visibleSections = getNavSections()
   const isPremium = user?.plan === 'premium'
 
+  const prevPathRef = useRef(location.pathname)
   useEffect(() => {
-    if (mobile) {
+    if (mobile && prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname
       onNavigate?.()
     }
-  }, [location.pathname, location.search, location.hash])
+  }, [location.pathname, mobile, onNavigate])
 
   const handleItemClick = (path) => {
     onNavigate?.()
