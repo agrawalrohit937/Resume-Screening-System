@@ -207,9 +207,15 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const visibleSections = getNavSections()
   const isPremium = user?.plan === 'premium'
 
+  useEffect(() => {
+    if (mobile) {
+      onNavigate?.()
+    }
+  }, [location.pathname, location.search, location.hash])
+
   const handleItemClick = (path) => {
-    if (path) navigate(path)
     onNavigate?.()
+    if (path) navigate(path)
   }
 
   return (
@@ -218,7 +224,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       animate={mobile ? { x: 0, opacity: 1 } : { width: collapsed ? 72 : 264 }}
       exit={mobile ? { x: -24, opacity: 0 } : undefined}
       transition={mobile ? { type: 'tween', duration: 0.22, ease: [0.16, 1, 0.3, 1] } : { type: 'spring', stiffness: 350, damping: 32 }}
-      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'z-50 w-[280px] max-w-[75vw] sm:max-w-[280px] shadow-2xl rounded-r-3xl' : 'z-40 shadow-sm'}`}
+      className={`h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'relative z-50 w-[250px] max-w-[65vw] sm:max-w-[250px] shadow-2xl rounded-r-3xl' : 'fixed left-0 top-0 z-40 shadow-sm'}`}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile ? 'true' : undefined}
     >
