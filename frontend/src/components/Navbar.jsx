@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -76,7 +76,7 @@ function UserAvatar({ user, size = 'sm' }) {
 }
 
 // --- Main Navbar Component ---
-export default function Navbar({ onMenuToggle }) {
+const Navbar = memo(function Navbar({ onMenuToggle }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -328,4 +328,6 @@ export default function Navbar({ onMenuToggle }) {
       </div>
     </header>
   )
-}
+})
+
+export default Navbar

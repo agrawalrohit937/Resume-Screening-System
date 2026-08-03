@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -143,7 +143,7 @@ const NAV_SECTIONS = [
   },
 ]
 
-export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigate }) {
+const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onNavigate }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -277,16 +277,12 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
                   >
                     {isActive && (
                       <>
-                        <motion.div
-                          layoutId="sidebarActiveIndicator"
-                          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
+                        <div
+                          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-all duration-200"
                           style={{ background: 'linear-gradient(180deg, #38AEEA, #6366F1)' }}
-                          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                         />
-                        <motion.div
-                          layoutId="activeNavBg"
-                          className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#2E9BDA]/12 via-[#2E9BDA]/5 to-transparent ring-1 ring-[#2E9BDA]/15"
-                          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                        <div
+                          className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#2E9BDA]/12 via-[#2E9BDA]/5 to-transparent ring-1 ring-[#2E9BDA]/15 transition-all duration-200"
                         />
                       </>
                     )}
@@ -295,25 +291,16 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
                     )}
 
                     <div className="relative z-10 flex items-center gap-3 min-w-0">
-                      <motion.span
-                        whileHover={{ x: isActive ? 0 : 2 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                        className={`shrink-0 transition-colors duration-200 ${isActive ? 'text-[#2E9BDA]' : 'text-slate-400 group-hover:text-slate-600'}`}
+                      <span
+                        className={`shrink-0 transition-all duration-200 group-hover:translate-x-0.5 ${isActive ? 'text-[#2E9BDA]' : 'text-slate-400 group-hover:text-slate-600'}`}
                       >
                         {item.icon}
-                      </motion.span>
-                      <AnimatePresence>
-                        {!isCompact && (
-                          <motion.span
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="truncate"
-                          >
-                            {item.label}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
+                      </span>
+                      {!isCompact && (
+                        <span className="truncate transition-colors duration-150">
+                          {item.label}
+                        </span>
+                      )}
                     </div>
 
                     {!isCompact && (
@@ -528,4 +515,6 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
       )}
     </motion.aside>
   )
-}
+})
+
+export default Sidebar
