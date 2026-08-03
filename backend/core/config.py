@@ -78,19 +78,19 @@ class Settings(BaseSettings):
     APP_BASE_URL: str = Field(
         default_factory=lambda: os.getenv(
             "APP_BASE_URL",
-            os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "http://localhost:5173"))
+            os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://careershala.tech" if (os.getenv("RENDER") or os.getenv("VERCEL") or os.getenv("ENVIRONMENT") == "production") else "http://localhost:5173"))
         )
     )
     FRONTEND_URL: str = Field(
         default_factory=lambda: os.getenv(
             "FRONTEND_URL",
-            os.getenv("APP_BASE_URL", "http://localhost:5173")
+            os.getenv("APP_BASE_URL", "https://careershala.tech" if (os.getenv("RENDER") or os.getenv("VERCEL") or os.getenv("ENVIRONMENT") == "production") else "http://localhost:5173")
         )
     )
     BASE_URL: str = Field(
         default_factory=lambda: os.getenv(
             "BASE_URL",
-            os.getenv("APP_BASE_URL", "http://localhost:5173")
+            os.getenv("APP_BASE_URL", "https://careershala.tech" if (os.getenv("RENDER") or os.getenv("VERCEL") or os.getenv("ENVIRONMENT") == "production") else "http://localhost:5173")
         )
     )
 
@@ -252,9 +252,22 @@ class Settings(BaseSettings):
 
     @property
     def cert_verify_base_url(self) -> str:
-        if self.CERT_VERIFY_BASE_URL and "careershala.com" not in self.CERT_VERIFY_BASE_URL:
+        if self.CERT_VERIFY_BASE_URL and "careershala.com" not in self.CERT_VERIFY_BASE_URL and "localhost" not in self.CERT_VERIFY_BASE_URL:
             return self.CERT_VERIFY_BASE_URL.rstrip("/")
-        base = (self.APP_BASE_URL or self.FRONTEND_URL or self.BASE_URL or "http://localhost:5173").rstrip("/")
+        
+        url_candidates = [self.CERT_VERIFY_BASE_URL, self.FRONTEND_URL, self.APP_BASE_URL, self.BASE_URL]
+        base = None
+        for candidate in url_candidates:
+            if candidate and "localhost" not in candidate and "careershala.com" not in candidate:
+                base = candidate.rstrip("/")
+                break
+        
+        if not base:
+            if self.ENVIRONMENT == "production" or os.getenv("RENDER") or os.getenv("VERCEL"):
+                base = "https://careershala.tech"
+            else:
+                base = (self.APP_BASE_URL or self.FRONTEND_URL or "http://localhost:5173").rstrip("/")
+                
         return f"{base}/verify"
 
 
