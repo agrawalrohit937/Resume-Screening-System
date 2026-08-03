@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu } from 'lucide-react'
@@ -7,6 +7,8 @@ import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import AICopilotWidget from './AICopilotWidget'
+import ProfilePlanDropdown from './ProfilePlanDropdown'
+import AvatarRing from './AvatarRing'
 
 const PAGE_TITLES = {
   '/dashboard': { title: 'Dashboard', sub: 'Career intelligence overview' },
@@ -28,6 +30,18 @@ function MobileHeader({ onMenuToggle }) {
   const { user } = useAuth()
   const meta = PAGE_TITLES[pathname] || { title: 'Overview', sub: '' }
   const userAvatar = user?.profile_picture || user?.display_picture || user?.google_picture
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const profileMenuRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setIsProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   return (
     <header className="sticky top-0 z-40 md:hidden border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
@@ -35,12 +49,11 @@ function MobileHeader({ onMenuToggle }) {
         {/* Left: 48x48px Touch-Optimized Hamburger Menu Toggle Button */}
         <button
           type="button"
-          onClick={onMenuToggle}
-          onTouchEnd={(e) => {
-            e.preventDefault()
+          onClick={(e) => {
+            e.stopPropagation()
             onMenuToggle()
           }}
-          className="inline-flex min-h-[48px] min-w-[48px] h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-700 shadow-sm active:scale-95 transition-all shrink-0"
+          className="inline-flex min-h-[48px] min-w-[48px] h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-700 shadow-sm active:scale-95 transition-all shrink-0 touch-manipulation cursor-pointer"
           aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5 text-slate-800" strokeWidth={2.2} />
@@ -63,20 +76,37 @@ function MobileHeader({ onMenuToggle }) {
           </div>
         </div>
 
-        {/* Right: User Avatar / Initial Badge */}
-        <div className="shrink-0">
-          {userAvatar ? (
-            <img
-              src={userAvatar}
-              alt={user?.full_name || 'User'}
-              className="w-10 h-10 rounded-2xl object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm"
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
-              {user?.full_name?.[0]?.toUpperCase() || 'U'}
-            </div>
-          )}
+        {/* Right: User Avatar Dropdown Button */}
+        <div className="relative shrink-0" ref={profileMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(p => !p)}
+            className="flex items-center justify-center rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/20 active:scale-95 transition-transform touch-manipulation cursor-pointer"
+            aria-label="Open profile menu"
+          >
+            <AvatarRing user={user} ringSize={40} shape="circle">
+              {userAvatar ? (
+                <img
+                  src={userAvatar}
+                  alt={user?.full_name || 'User'}
+                  className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm"
+                />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
+                  {user?.full_name?.[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
+            </AvatarRing>
+          </button>
+
+          <AnimatePresence>
+            {isProfileOpen && (
+              <ProfilePlanDropdown
+                isOpen={isProfileOpen}
+                onClose={() => setIsProfileOpen(false)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </header>
