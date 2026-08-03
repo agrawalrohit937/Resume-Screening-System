@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, Navigate, useOutlet } from 'react-router-dom'
+import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
@@ -57,7 +57,6 @@ export default function AppLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
-  const currentOutlet = useOutlet() // Use useOutlet instead of <Outlet />
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
@@ -115,8 +114,8 @@ export default function AppLayout() {
         )}
       </AnimatePresence>
 
-      <motion.div
-        className={`flex min-w-0 flex-1 flex-col w-full transition-[margin] duration-300 ease-out ${user?.role === 'recruiter' ? 'md:ml-0' : (collapsed ? 'md:ml-[72px]' : 'md:ml-[264px]')}`}
+      <div
+        className={`flex min-w-0 flex-1 flex-col w-full transition-[margin] duration-200 ease-out ${user?.role === 'recruiter' ? 'md:ml-0' : (collapsed ? 'md:ml-[72px]' : 'md:ml-[264px]')}`}
       >
         <MobileHeader onMenuToggle={() => setIsMobileMenuOpen(true)} />
         <div className="hidden md:block">
@@ -126,23 +125,13 @@ export default function AppLayout() {
           />
         </div>
         <main className="flex-1 min-w-0 overflow-y-auto p-4 md:p-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 4 }} /* Distance kam kar di (10 se 4) */
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, transition: { duration: 0.05 } }} /* Purana page almost instantly gayab hoga */
-              transition={{ duration: 0.15, ease: "easeOut" }} /* Naya page tezi se aayega */
-              className="mx-auto w-full max-w-7xl min-w-0"
-            >
-              <RouteErrorBoundary>
-                {/* Use the captured currentOutlet for flawless animations */}
-                {currentOutlet}
-              </RouteErrorBoundary>
-            </motion.div>
-          </AnimatePresence>
+          <div key={location.pathname} className="mx-auto w-full max-w-7xl min-w-0 animate-fade-in">
+            <RouteErrorBoundary>
+              <Outlet />
+            </RouteErrorBoundary>
+          </div>
         </main>
-      </motion.div>
+      </div>
       <AICopilotWidget />
     </div>
   )
