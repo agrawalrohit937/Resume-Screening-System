@@ -90,15 +90,14 @@ export default function AppLayout() {
 
       <AnimatePresence>
         {isMobileMenuOpen && user?.role !== 'recruiter' && (
-          <motion.div
-            key="mobile-drawer-overlay"
-            className="fixed inset-0 z-[100] md:hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <div
+          <div className="fixed inset-0 z-[100] md:hidden flex">
+            {/* Dark Backdrop Overlay — Tapping anywhere outside the drawer closes it */}
+            <motion.div
+              key="mobile-drawer-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
               role="button"
               tabIndex={0}
               aria-label="Close menu backdrop"
@@ -107,15 +106,18 @@ export default function AppLayout() {
                 e.preventDefault()
                 setIsMobileMenuOpen(false)
               }}
-              className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm cursor-pointer transition-opacity"
+              className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm cursor-pointer"
             />
 
-            <Sidebar
-              mobile
-              collapsed={false}
-              onNavigate={() => setIsMobileMenuOpen(false)}
-            />
-          </motion.div>
+            {/* Mobile Sidebar Drawer Container */}
+            <div className="relative z-10 h-full">
+              <Sidebar
+                mobile
+                collapsed={false}
+                onNavigate={() => setIsMobileMenuOpen(false)}
+              />
+            </div>
+          </div>
         )}
       </AnimatePresence>
 

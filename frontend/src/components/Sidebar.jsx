@@ -143,6 +143,25 @@ const NAV_SECTIONS = [
   },
 ]
 
+const ROUTE_PREFETCH = {
+  '/dashboard': () => import('../pages/Dashboard'),
+  '/profile': () => import('../pages/Profile'),
+  '/results': () => import('../pages/Results'),
+  '/interview': () => import('../pages/Interview'),
+  '/live-interview': () => import('../pages/LiveInterview'),
+  '/gamification': () => import('../pages/CareerQuest'),
+  '/billing': () => import('../pages/Billing'),
+  '/premium': () => import('../pages/Premium'),
+  '/apply-assistant': () => import('../pages/ApplyAssistant'),
+  '/support': () => import('../pages/SupportTickets'),
+}
+
+const prefetchRoute = (path) => {
+  if (ROUTE_PREFETCH[path]) {
+    ROUTE_PREFETCH[path]().catch(() => {})
+  }
+}
+
 const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onNavigate }) {
   const { user, logout } = useAuth()
   const location = useLocation()
@@ -188,9 +207,15 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const visibleSections = getNavSections()
   const isPremium = user?.plan === 'premium'
 
+  useEffect(() => {
+    if (mobile) {
+      onNavigate?.()
+    }
+  }, [location.pathname, location.search, location.hash])
+
   const handleItemClick = (path) => {
-    if (path) navigate(path)
     onNavigate?.()
+    if (path) navigate(path)
   }
 
   return (
@@ -199,7 +224,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       animate={mobile ? { x: 0, opacity: 1 } : { width: collapsed ? 72 : 264 }}
       exit={mobile ? { x: -24, opacity: 0 } : undefined}
       transition={mobile ? { type: 'tween', duration: 0.22, ease: [0.16, 1, 0.3, 1] } : { type: 'spring', stiffness: 350, damping: 32 }}
-      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'z-50 w-[280px] max-w-[75vw] sm:max-w-[280px] shadow-2xl rounded-r-3xl' : 'z-40 shadow-sm'}`}
+      className={`h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'relative z-50 w-[250px] max-w-[65vw] sm:max-w-[250px] shadow-2xl rounded-r-3xl' : 'fixed left-0 top-0 z-40 shadow-sm'}`}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile ? 'true' : undefined}
     >
@@ -270,6 +295,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     key={item.to}
                     to={item.to}
                     onClick={() => handleItemClick()}
+                    onMouseEnter={() => prefetchRoute(item.to)}
+                    onTouchStart={() => prefetchRoute(item.to)}
                     title={isCompact ? item.label : undefined}
                     className={`relative flex items-center justify-between px-3.5 h-11 rounded-xl text-[13px] font-semibold transition-all duration-200 group
                       ${isCompact ? 'justify-center px-0' : ''}
