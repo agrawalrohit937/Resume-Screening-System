@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../services/api'
 import { useAuth } from '../context/AuthContext' 
 
 export default function LinkedinCallback() {
@@ -13,7 +13,7 @@ export default function LinkedinCallback() {
   useEffect(() => {
     const code = searchParams.get('code')
     const state = searchParams.get('state') || 'candidate'
-    const apiBaseUrl = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
+    const redirect_uri = `${window.location.origin}/linkedin-callback`
 
     if (!code) {
       setMessage('LinkedIn sign-in was cancelled or failed.')
@@ -22,8 +22,8 @@ export default function LinkedinCallback() {
       return
     }
 
-    // Send authorization code and state to FastAPI backend
-    axios.post(`${apiBaseUrl}/auth/linkedin`, { code, state }, { withCredentials: true })
+    // Send authorization code, state, and dynamic redirect_uri to FastAPI backend
+    api.post('/auth/linkedin', { code, state, redirect_uri })
       .then((res) => {
         toast.success('Welcome back via LinkedIn! 🚀')
 

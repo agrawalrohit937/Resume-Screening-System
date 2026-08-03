@@ -31,6 +31,7 @@ async def linkedin_auth(
     """
     code = payload.get("code")
     selected_role = payload.get("state") or payload.get("role") or "candidate"
+    redirect_uri = payload.get("redirect_uri") or settings.LINKEDIN_REDIRECT_URI
 
     if not code:
         raise HTTPException(status_code=400, detail="LinkedIn authorization code is missing")
@@ -41,7 +42,7 @@ async def linkedin_auth(
         "code": code,
         "client_id": settings.LINKEDIN_CLIENT_ID,
         "client_secret": settings.LINKEDIN_CLIENT_SECRET,
-        "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
     }
 
     async with httpx.AsyncClient() as client:

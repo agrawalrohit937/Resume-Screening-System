@@ -564,7 +564,7 @@ export default function LiveInterviewV2() {
 
   return (
     <ImmersiveShell active={fsGate.immersive}>
-      <div className="fixed inset-0 z-[999999] w-screen h-screen bg-[#F5F7FB] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-[999999] w-full h-full max-w-full bg-[#F5F7FB] flex flex-col overflow-hidden">
         <EndPracticeModal open={showEndConfirm} onCancel={() => setShowEndConfirm(false)} onConfirm={confirmEndPractice} />
         <WarningToast warning={currentWarning} count={session.cheatingData?.warning_count} max={MAX_WARNINGS} />
 

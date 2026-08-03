@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+import api from '../services/api'
 import { useAuth } from '../context/AuthContext' 
 
 export default function GithubCallback() {
@@ -13,7 +13,7 @@ export default function GithubCallback() {
   useEffect(() => {
     const code = searchParams.get('code')
     const state = searchParams.get('state') || 'candidate'
-    const apiBaseUrl = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
+    const redirect_uri = `${window.location.origin}/github-callback`
 
     if (!code) {
       setMessage('GitHub sign-in was cancelled or failed.')
@@ -22,12 +22,8 @@ export default function GithubCallback() {
       return
     }
 
-    // Send authorization code and state matching the backend expectations perfectly
-    axios.post(
-      `${apiBaseUrl}/auth/github`,
-      { code, state },
-      { withCredentials: true }
-    )
+    // Send authorization code, state, and dynamic redirect_uri matching backend expectations
+    api.post('/auth/github', { code, state, redirect_uri })
       .then((res) => {
         toast.success('Welcome back via GitHub! 🚀')
 

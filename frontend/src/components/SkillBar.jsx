@@ -1,6 +1,7 @@
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 
-export default function SkillBar({ label, pct, color }) {
+const SkillBar = memo(function SkillBar({ label, pct, color }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-1.5">
@@ -12,4 +13,6 @@ export default function SkillBar({ label, pct, color }) {
       </div>
     </div>
   )
-}
+})
+
+export default SkillBar

@@ -44,6 +44,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "https://resume-screening-system-lyart.vercel.app",
+        "https://careershala.tech",
+        "https://www.careershala.tech",
     ]
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
@@ -63,6 +65,8 @@ class Settings(BaseSettings):
             "http://localhost:3000",
             "http://localhost:5173",
             "https://resume-screening-system-lyart.vercel.app",
+            "https://careershala.tech",
+            "https://www.careershala.tech",
         ]
 
     # ── File Upload ───────────────────────────────────────────────────────────

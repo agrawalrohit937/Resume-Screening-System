@@ -115,12 +115,15 @@ export default function Navbar({ onMenuToggle }) {
       setSearchResults([])
       return
     }
-    const query = searchQuery.toLowerCase()
-    const results = SEARCH_ROUTES.filter(route => 
-      route.name.toLowerCase().includes(query) || 
-      route.keywords.some(kw => kw.includes(query))
-    )
-    setSearchResults(results)
+    const timer = setTimeout(() => {
+      const query = searchQuery.toLowerCase()
+      const results = SEARCH_ROUTES.filter(route => 
+        route.name.toLowerCase().includes(query) || 
+        route.keywords.some(kw => kw.includes(query))
+      )
+      setSearchResults(results)
+    }, 150)
+    return () => clearTimeout(timer)
   }, [searchQuery])
 
   const handleNavigate = (path) => {

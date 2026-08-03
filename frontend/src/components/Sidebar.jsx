@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronLeft,
   Check,
+  X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
@@ -197,12 +198,12 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
       animate={mobile ? { x: 0, opacity: 1 } : { width: collapsed ? 72 : 264 }}
       exit={mobile ? { x: -24, opacity: 0 } : undefined}
       transition={mobile ? { type: 'tween', duration: 0.22, ease: [0.16, 1, 0.3, 1] } : { type: 'spring', stiffness: 350, damping: 32 }}
-      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'z-50 w-[min(84vw,320px)] shadow-2xl rounded-r-3xl' : 'z-40 shadow-sm'}`}
+      className={`fixed left-0 top-0 h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'z-50 w-[280px] max-w-[75vw] sm:max-w-[280px] shadow-2xl rounded-r-3xl' : 'z-40 shadow-sm'}`}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile ? 'true' : undefined}
     >
-      <div className={`flex items-center py-4 min-h-[64px] shrink-0 border-b border-slate-100 px-5 ${isCompact ? 'justify-center' : 'justify-start w-full'}`}>
-        <div className="flex items-center gap-3">
+      <div className={`flex items-center py-4 min-h-[64px] shrink-0 border-b border-slate-100 px-4 sm:px-5 ${isCompact ? 'justify-center' : 'justify-between w-full'}`}>
+        <div className="flex items-center gap-2.5">
           <img 
             src="/logo_t.png"
             alt="CareerShala" 
@@ -218,7 +219,7 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
                 transition={{ duration: 0.15 }}
                 className="overflow-hidden"
               >
-                <p className="font-bold text-slate-900 text-lg tracking-tight leading-none">
+                <p className="font-bold text-slate-900 text-base sm:text-lg tracking-tight leading-none">
                   Career<span className="text-[#2E9BDA]">Shala</span>
                 </p>
                 <p className="text-[10px] font-semibold text-slate-400 tracking-wide mt-1 leading-none">
@@ -228,6 +229,17 @@ export default function Sidebar({ collapsed, onToggle, mobile = false, onNavigat
             )}
           </AnimatePresence>
         </div>
+
+        {mobile && (
+          <button
+            type="button"
+            onClick={onNavigate}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition active:scale-95 shrink-0"
+            aria-label="Close menu drawer"
+          >
+            <X className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-none">
