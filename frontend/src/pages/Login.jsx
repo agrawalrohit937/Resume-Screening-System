@@ -90,7 +90,7 @@ export default function Login() {
   }
 
   return (
-    <div className="h-screen w-full max-w-full overflow-hidden bg-white font-sans lg:grid lg:grid-cols-[1.25fr_1fr]">
+    <div className="min-h-screen lg:h-screen w-full max-w-full bg-white font-sans lg:grid lg:grid-cols-[1.25fr_1fr] lg:overflow-hidden">
 
       {/* LEFT — BRAND PANEL */}
       <div className="relative hidden h-full flex-col justify-start overflow-hidden bg-gradient-to-b from-[#E8F5FA] via-[#D6EFF8] to-[#BCE2F1] px-16 pt-14 lg:flex">
