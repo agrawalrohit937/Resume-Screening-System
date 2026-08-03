@@ -1,4 +1,6 @@
-export default function Card({ children, className = '', hover = false }) {
+import { memo } from 'react'
+
+const Card = memo(function Card({ children, className = '', hover = false }) {
   return (
     <div 
       className={`bg-white rounded-3xl border border-slate-100 shadow-[0_2px_10px_rgba(30,58,138,0.04)] relative overflow-hidden ${
@@ -8,4 +10,6 @@ export default function Card({ children, className = '', hover = false }) {
       {children}
     </div>
   )
-}
+})
+
+export default Card

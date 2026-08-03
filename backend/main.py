@@ -86,6 +86,8 @@ def create_application() -> FastAPI:
         "http://localhost:5173",
         "http://localhost:3000",
         "https://resume-screening-system-lyart.vercel.app",
+        "https://careershala.tech",
+        "https://www.careershala.tech",
     })
 
     app.add_middleware(
@@ -97,7 +99,7 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["*"],
     )
-    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # Serve uploaded profile photos — mounted AFTER CORS middleware so images
     # served from /static/uploads carry Access-Control-Allow-Origin headers.

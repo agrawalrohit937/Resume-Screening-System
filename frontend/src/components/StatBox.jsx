@@ -1,7 +1,8 @@
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import Card from './Card'
 
-export default function StatBox({ label, value, pct, icon: Icon, colorTheme, delay }) {
+const StatBox = memo(function StatBox({ label, value, pct, icon: Icon, colorTheme, delay }) {
   const themes = {
     blue: { bg: 'bg-blue-50', text: 'text-blue-600', fill: 'bg-blue-500' },
     purple: { bg: 'bg-purple-50', text: 'text-purple-600', fill: 'bg-purple-500' },
@@ -31,4 +32,6 @@ export default function StatBox({ label, value, pct, icon: Icon, colorTheme, del
       </Card>
     </motion.div>
   )
-}
+})
+
+export default StatBox

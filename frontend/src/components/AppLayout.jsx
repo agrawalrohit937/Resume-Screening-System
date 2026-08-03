@@ -82,7 +82,7 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
       {user?.role !== 'recruiter' && (
         <div className="hidden md:block">
           <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(p => !p)} />
@@ -93,7 +93,7 @@ export default function AppLayout() {
         {isMobileMenuOpen && user?.role !== 'recruiter' && (
           <motion.div
             key="mobile-drawer-overlay"
-            className="fixed inset-0 z-40 md:hidden"
+            className="fixed inset-0 z-[100] md:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -103,7 +103,7 @@ export default function AppLayout() {
               type="button"
               aria-label="Close menu"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="absolute inset-0 h-full w-full bg-slate-950/35 backdrop-blur-sm"
+              className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm cursor-pointer transition-opacity"
             />
 
             <Sidebar

@@ -42,6 +42,11 @@
   <style>
     /* Critical baseline — full theme is loaded via index.css */
     *, *::before, *::after { box-sizing: border-box; }
+    html, body, #root {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;

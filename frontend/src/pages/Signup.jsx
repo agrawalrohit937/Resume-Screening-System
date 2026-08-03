@@ -9,11 +9,18 @@ import { Mail, Lock, User, Eye, EyeOff, Briefcase, ArrowRight, CheckCircle2 } fr
 
 const illustration = '/illustration.png';
 
-const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || '860awpba0h82no';
-const LINKEDIN_REDIRECT_URI = import.meta.env.VITE_LINKEDIN_REDIRECT_URI || `${window.location.origin}/linkedin-callback`;
+const getOAuthRedirectUri = (envVal, path) => {
+  if (envVal && typeof envVal === 'string' && !envVal.includes('localhost')) {
+    return envVal;
+  }
+  return `${window.location.origin}${path}`;
+};
 
-const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || 'your_fallback_github_client_id';
-const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/github-callback`;
+const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || '860awpba0h82no';
+const LINKEDIN_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_LINKEDIN_REDIRECT_URI, '/linkedin-callback');
+
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || 'Ov23liO6t7Tun6tzlpYq';
+const GITHUB_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_GITHUB_REDIRECT_URI, '/github-callback');
 
 export default function Signup() {
   const { signup, googleLogin } = useAuth()
@@ -94,7 +101,7 @@ export default function Signup() {
 
   return (
     // FIX 1: Fluid layout on mobile, absolute single-page constraints on desktop templates
-    <div className="min-h-screen lg:h-screen w-screen bg-white font-sans lg:grid lg:grid-cols-[1.25fr_1fr] lg:overflow-hidden">
+    <div className="min-h-screen lg:h-screen w-full max-w-full bg-white font-sans lg:grid lg:grid-cols-[1.25fr_1fr] lg:overflow-hidden">
 
       {/* LEFT — BRAND PANEL */}
       <div className="relative hidden h-full flex-col justify-start overflow-hidden bg-gradient-to-b from-[#E8F5FA] via-[#D6EFF8] to-[#BCE2F1] px-16 pt-14 lg:flex">
