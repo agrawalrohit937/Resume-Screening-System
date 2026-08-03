@@ -122,7 +122,7 @@ export default function AppLayout() {
       </AnimatePresence>
 
       <div
-        className={`flex min-w-0 flex-1 flex-col w-full transition-[margin] duration-200 ease-out ${user?.role === 'recruiter' ? 'md:ml-0' : (collapsed ? 'md:ml-[72px]' : 'md:ml-[264px]')}`}
+        className={`flex min-w-0 flex-1 flex-col w-full transition-[margin] duration-200 ease-out ${user?.role === 'recruiter' ? 'md:ml-0' : (collapsed ? 'md:ml-[72px]' : 'lg:ml-[264px] md:ml-[72px]')}`}
       >
         <MobileHeader onMenuToggle={() => setIsMobileMenuOpen(true)} />
         <div className="hidden md:block">
