@@ -143,6 +143,25 @@ const NAV_SECTIONS = [
   },
 ]
 
+const ROUTE_PREFETCH = {
+  '/dashboard': () => import('../pages/Dashboard'),
+  '/profile': () => import('../pages/Profile'),
+  '/results': () => import('../pages/Results'),
+  '/interview': () => import('../pages/Interview'),
+  '/live-interview': () => import('../pages/LiveInterview'),
+  '/gamification': () => import('../pages/CareerQuest'),
+  '/billing': () => import('../pages/Billing'),
+  '/premium': () => import('../pages/Premium'),
+  '/apply-assistant': () => import('../pages/ApplyAssistant'),
+  '/support': () => import('../pages/SupportTickets'),
+}
+
+const prefetchRoute = (path) => {
+  if (ROUTE_PREFETCH[path]) {
+    ROUTE_PREFETCH[path]().catch(() => {})
+  }
+}
+
 const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onNavigate }) {
   const { user, logout } = useAuth()
   const location = useLocation()
@@ -270,6 +289,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     key={item.to}
                     to={item.to}
                     onClick={() => handleItemClick()}
+                    onMouseEnter={() => prefetchRoute(item.to)}
+                    onTouchStart={() => prefetchRoute(item.to)}
                     title={isCompact ? item.label : undefined}
                     className={`relative flex items-center justify-between px-3.5 h-11 rounded-xl text-[13px] font-semibold transition-all duration-200 group
                       ${isCompact ? 'justify-center px-0' : ''}
