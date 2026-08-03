@@ -27,7 +27,7 @@ function MobileHeader({ onMenuToggle }) {
   const { pathname } = useLocation()
   const { user } = useAuth()
   const meta = PAGE_TITLES[pathname] || { title: 'Overview', sub: '' }
-  const userAvatar = user?.profile_picture || user?.google_picture || user?.display_picture
+  const userAvatar = user?.profile_picture || user?.display_picture || user?.google_picture
 
   return (
     <header className="sticky top-0 z-40 md:hidden border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
