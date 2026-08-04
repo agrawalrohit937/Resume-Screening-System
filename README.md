@@ -252,7 +252,7 @@ To prevent cloud platform outbound SMTP port-blocking (ports 25, 465, 587 are fr
    When emailing recruiters on behalf of a candidate, Brevo HTTP API injects:
    ```json
    {
-     "sender": { "name": "CareerShala", "email": "agrawalrohit937@gmail.com" },
+     "sender": { "name": "CareerShala", "email": "admin@careershala.tech" },
      "to": [{ "email": "recruiter@company.com", "name": "HR Manager" }],
      "replyTo": { "email": "candidate@gmail.com", "name": "Candidate Name" },
      "subject": "Application for Senior Developer",
@@ -301,10 +301,10 @@ cp backend/.env.example backend/.env
 | **`MONGO_DB_NAME`** | Yes | `ai_career_platform` | Target MongoDB database name |
 | **`SECRET_KEY`** | **Yes** | `256-bit-hex-secret-key` | JWT token encryption key (32+ chars) |
 | **`ALGORITHM`** | No | `HS256` | JWT signing algorithm |
-| **`BREVO_API_KEY`** | **Yes** | `xkeysib-71346ca5673f2953...` | Brevo HTTP REST API v3 key |
-| **`MAIL_FROM_EMAIL`** | **Yes** | `agrawalrohit937@gmail.com` | Verified sender email address |
-| **`MAIL_FROM_NAME`** | No | `CareerShala` | Verified sender display name |
-| **`SUPPORT_EMAIL`** | Yes | `agrawalrohit937@gmail.com` | Target inbox for candidate support tickets |
+| **`BREVO_API_KEY`** | **Yes** | `xkeysib-...` | Brevo REST API v3 key (port 443 HTTPS) |
+| **`MAIL_FROM_EMAIL`** | **Yes** | `admin@careershala.tech` | Verified sender email address |
+| **`MAIL_FROM_NAME`** | Yes | `CareerShala` | Sender display name in email clients |
+| **`SUPPORT_EMAIL`** | Yes | `admin@careershala.tech` | Target inbox for candidate support tickets |
 | **`GOOGLE_CLIENT_ID`** | **Yes** | `...apps.googleusercontent.com` | Google OAuth Client ID |
 | **`GOOGLE_CLIENT_SECRET`** | Yes | `GOCSPX-...` | Google OAuth Client Secret |
 | **`GOOGLE_GMAIL_REDIRECT_URI`** | Yes | `http://localhost:5173/gmail-callback` | Gmail OAuth redirect URI |
@@ -409,8 +409,8 @@ cd frontend && npm run build
   - `ENV`: `production`
   - `APP_BASE_URL`: `https://resume-screening-system-lyart.vercel.app`
   - `FRONTEND_URL`: `https://resume-screening-system-lyart.vercel.app`
-  - `BREVO_API_KEY`: Brevo REST API v3 Key
-  - `MAIL_FROM_EMAIL`: `agrawalrohit937@gmail.com`
+  - `BREVO_API_KEY`: `xkeysib-...`
+  - `MAIL_FROM_EMAIL`: `admin@careershala.tech`
   - `MAIL_FROM_NAME`: `CareerShala`
 
 ---

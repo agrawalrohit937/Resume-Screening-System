@@ -10,6 +10,7 @@ from datetime import timezone
 from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -174,6 +175,26 @@ class EmailService:
         issued_str = issued_at.strftime("%d %B %Y") if hasattr(issued_at, "strftime") else str(issued_at)
         subject = f"🎉 Congratulations {recipient_name}! Your CareerShala Certificate is Ready"
 
+        # Generate LinkedIn 'Add Certification' URL with proper encoding
+        issue_year = str(issued_at.year) if hasattr(issued_at, "year") else str(datetime.now().year)
+        issue_month = str(issued_at.month) if hasattr(issued_at, "month") else str(datetime.now().month)
+
+        cert_name = f"CareerShala {topic} Certificate"
+        encoded_cert_name = quote(cert_name, safe='')
+        encoded_org_name = quote("CareerShala", safe='')
+        encoded_cert_id = quote(str(cert_id), safe='')
+        encoded_cert_url = quote(public_url or verification_url, safe='')
+
+        linkedin_url = (
+            "https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME"
+            f"&name={encoded_cert_name}"
+            f"&organizationName={encoded_org_name}"
+            f"&issueYear={issue_year}"
+            f"&issueMonth={issue_month}"
+            f"&certId={encoded_cert_id}"
+            f"&certUrl={encoded_cert_url}"
+        )
+
         html_body = f"""
 <html>
   <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#1e293b;">
@@ -186,9 +207,10 @@ class EmailService:
         <tr><td style="padding:8px 0;color:#64748b;">Issued on</td><td style="padding:8px 0;">{issued_str}</td></tr>
         <tr><td style="padding:8px 0;color:#64748b;">Certificate ID</td><td style="padding:8px 0;font-family:monospace;font-size:12px;">{escape(cert_id)}</td></tr>
       </table>
-      <p style="text-align:center;margin:28px 0;">
-        <a href="{escape(public_url)}" style="background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Download Certificate</a>
-      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="{escape(public_url)}" style="background:#6366f1;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;margin-right:8px;margin-bottom:8px;">Download Certificate</a>
+        <a href="{escape(linkedin_url)}" target="_blank" rel="noopener noreferrer" style="background:#0A66C2;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;margin-bottom:8px;">Add to LinkedIn</a>
+      </div>
       <p style="font-size:13px;color:#94a3b8;">
         Also attached to this email as a PDF. Anyone can verify its authenticity at
         <a href="{escape(verification_url)}">{escape(verification_url)}</a>.

@@ -115,18 +115,25 @@ export default function VerifyCertificate() {
                                 <Row icon={Hash} label="Certificate ID" value={data.cert_id} />
                             </div>
 
-                            {data.public_url && (
-                                <a href={data.public_url} target="_blank" rel="noreferrer"
-                                    className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-slate-800 active:scale-[0.99]">
-                                    <Download className="h-4 w-4" /> Download Certificate
+                            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                                {data.public_url && (
+                                    <a href={data.public_url} target="_blank" rel="noreferrer"
+                                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-slate-800 active:scale-[0.99]">
+                                        <Download className="h-4 w-4" /> Download
+                                    </a>
+                                )}
+                                <a href={`https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(`CareerShala ${data.title || 'Excellence'} Certificate`)}&organizationName=${encodeURIComponent('CareerShala')}&issueYear=${data.issued_at ? new Date(data.issued_at).getFullYear() : new Date().getFullYear()}&issueMonth=${data.issued_at ? new Date(data.issued_at).getMonth() + 1 : new Date().getMonth() + 1}&certId=${encodeURIComponent(data.cert_id || certificateId)}&certUrl=${encodeURIComponent(data.public_url || window.location.href)}`}
+                                    target="_blank" rel="noreferrer"
+                                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#0A66C2] py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-[#084e96] active:scale-[0.99]">
+                                    Add to LinkedIn
                                 </a>
-                            )}
+                            </div>
                         </div>
                     </motion.div>
                 )}
 
                 <p className="mt-8 text-center text-xs text-slate-400">
-                    <Link to="/" className="hover:text-indigo-500">www.careershala.com</Link>
+                    <Link to="/" className="hover:text-indigo-500">www.careershala.tech</Link>
                 </p>
             </div>
         </div>

@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 import AppLayout from './components/AppLayout'
+import RouteErrorBoundary from './components/RouteErrorBoundary'
 import Loader from './components/Loader'
 
 function applyTheme(theme) {
@@ -123,7 +124,7 @@ export default function App() {
               <Route path="/" element={<CareerPilotLanding />} />
 
               {/* ── Protected (inside AppLayout shell - PATHLESS ROUTE) ── */}
-              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route element={<ProtectedRoute><RouteErrorBoundary><AppLayout /></RouteErrorBoundary></ProtectedRoute>}>
                 {/* Core */}
                 <Route path="dashboard"            element={<Dashboard />} />
                 <Route path="profile"              element={<Profile />} />
