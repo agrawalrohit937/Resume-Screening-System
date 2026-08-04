@@ -102,16 +102,16 @@ class Settings(BaseSettings):
 
     # ── Brevo HTTP API & Transactional Email Settings ───────────────────────
     BREVO_API_KEY: Optional[str] = None
-    MAIL_FROM_EMAIL: Optional[str] = None
+    MAIL_FROM_EMAIL: Optional[str] = "admin@careershala.tech"
     MAIL_FROM_NAME: str = "CareerShala"
-    SUPPORT_EMAIL: Optional[str] = None
+    SUPPORT_EMAIL: Optional[str] = "admin@careershala.tech"
 
     # Legacy SMTP Settings (kept for fallback compatibility)
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = Field(default_factory=lambda: int(os.getenv("SMTP_PORT", 587)))
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM_EMAIL: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = "admin@careershala.tech"
     SMTP_FROM_NAME: str = "CareerShala"
     SMTP_USE_SSL: bool = Field(default_factory=lambda: os.getenv("SMTP_USE_SSL", "false").lower() == "true")
 
@@ -242,11 +242,11 @@ class Settings(BaseSettings):
 
     @property
     def smtp_from(self) -> str:
-        return self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "no-reply@careershala.tech"
+        return self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "admin@careershala.tech"
 
     @property
     def mail_sender(self) -> dict:
-        email = self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "agrawalrohit937@gmail.com"
+        email = self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "admin@careershala.tech"
         name = self.MAIL_FROM_NAME or self.SMTP_FROM_NAME or "CareerShala"
         return {"name": name, "email": email}
 
