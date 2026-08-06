@@ -36,6 +36,13 @@ def _render_template(filename: str, **context) -> str:
         logger.error(f"Template {filename} not found at {path}")
         return f"<p>Your OTP code is {context.get('otp', '')}</p>"
     html = path.read_text(encoding="utf-8")
+
+    if "logo_url" not in context:
+        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+        if "localhost" in base_url or not base_url:
+            base_url = "https://careershala.tech"
+        context["logo_url"] = f"{base_url}/logo_t.png"
+
     for key, value in context.items():
         html = html.replace("{{" + key + "}}", str(value))
     return html

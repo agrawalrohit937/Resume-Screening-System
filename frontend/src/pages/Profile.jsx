@@ -385,9 +385,10 @@ export default function Profile() {
                     <div className="relative w-16 h-16 mb-4">
                       <svg width="64" height="64" style={{ transform: 'rotate(-90deg)' }}>
                         <circle cx="32" cy="32" r="28" fill="none" stroke="#E2E8F0" strokeWidth="6" />
-                        <circle cx="32" cy="32" r="28" fill="none" stroke="#4F46E5" strokeWidth="6" strokeLinecap="round"
+                        <circle cx="32" cy="32" r="28" fill="none" stroke="#4F46E5" strokeWidth="6"
+                          strokeLinecap={uploadProgress > 0 ? "round" : "butt"}
                           strokeDasharray={176} strokeDashoffset={176 - (uploadProgress / 100) * 176}
-                          style={{ transition: 'stroke-dashoffset 0.3s ease' }} />
+                          style={{ transition: 'stroke-dashoffset 0.3s ease', opacity: uploadProgress > 0 ? 1 : 0 }} />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
                         <span className="text-sm font-bold text-indigo-600">{uploadProgress}%</span>

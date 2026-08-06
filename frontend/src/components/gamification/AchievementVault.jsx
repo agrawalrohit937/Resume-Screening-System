@@ -118,7 +118,7 @@ function Medal({ badge, earnedAt, index }) {
 
         {/* Medal Base */}
         <div
-          className={`relative w-20 h-20 rounded-full flex items-center justify-center border-4 overflow-hidden z-10 transition-all duration-500 ${
+          className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-3 sm:border-4 overflow-hidden z-10 transition-all duration-500 ${
             earned 
               ? `bg-gradient-to-br ${style.gradient} ${style.border} ${style.shadow} ${style.ring}` 
               : 'bg-gradient-to-br from-slate-100 to-slate-200 border-white shadow-[inset_0_4px_8px_rgba(0,0,0,0.1)] shadow-md grayscale opacity-70'
@@ -196,22 +196,22 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
       <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-200/20 rounded-full blur-3xl pointer-events-none" />
 
       {/* Premium Header */}
-      <div className="relative p-8 sm:p-10 border-b border-slate-100/50 backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      <div className="relative p-5 sm:p-8 lg:p-10 border-b border-slate-100/50 backdrop-blur-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 sm:gap-6">
           <div>
             <motion.h3 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="font-extrabold text-3xl text-slate-800 tracking-tight flex items-center gap-3"
+              className="font-extrabold text-2xl sm:text-3xl text-slate-800 tracking-tight flex items-center gap-2.5 sm:gap-3"
             >
-              <Award className="w-8 h-8 text-blue-600" />
+              <Award className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600 shrink-0" />
               Achievement Vault
             </motion.h3>
             <motion.p 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
-              className="text-base font-medium text-slate-500 mt-2"
+              className="text-xs sm:text-base font-medium text-slate-500 mt-1 sm:mt-2"
             >
               Your legacy of accomplishments and milestones.
             </motion.p>
@@ -221,17 +221,17 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-5 bg-white/80 backdrop-blur-md px-5 py-3 rounded-2xl border border-white shadow-xl shadow-slate-200/40"
+            className="flex items-center justify-between sm:justify-start gap-4 sm:gap-5 bg-white/80 backdrop-blur-md px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-white shadow-xl shadow-slate-200/40"
           >
-            <div className="text-right">
-              <p className="font-extrabold text-3xl text-transparent bg-clip-text bg-gradient-to-br from-slate-800 to-slate-500 leading-none">
-                {earnedMap.size} <span className="text-sm text-slate-400 font-bold">/ {total}</span>
+            <div className="text-left sm:text-right">
+              <p className="font-extrabold text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-br from-slate-800 to-slate-500 leading-none">
+                {earnedMap.size} <span className="text-xs sm:text-sm text-slate-400 font-bold">/ {total}</span>
               </p>
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-500 mt-1.5">Unlocked</p>
+              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-blue-500 mt-1">Unlocked</p>
             </div>
             
             {/* Animated Circular Progress */}
-            <div className="relative w-14 h-14 flex items-center justify-center">
+            <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
               <svg className="w-full h-full transform -rotate-90 drop-shadow-sm" viewBox="0 0 36 36">
                 <path className="text-slate-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                 <motion.path 
@@ -246,13 +246,13 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
                   strokeLinecap="round" 
                 />
               </svg>
-              <span className="absolute text-[11px] font-extrabold text-slate-700">{pct}%</span>
+              <span className="absolute text-[10px] sm:text-[11px] font-extrabold text-slate-700">{pct}%</span>
             </div>
           </motion.div>
         </div>
 
         {/* Glowing Animated Progress Bar */}
-        <div className="h-4 rounded-full bg-slate-100/80 overflow-hidden mt-8 shadow-inner relative border border-slate-200/50">
+        <div className="h-3 sm:h-4 rounded-full bg-slate-100/80 overflow-hidden mt-6 sm:mt-8 shadow-inner relative border border-slate-200/50">
           <motion.div
             initial={{ width: 0 }}
             whileInView={{ width: `${pct}%` }}
@@ -271,7 +271,7 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
       </div>
 
       {/* Vault Content */}
-      <div className="p-8 sm:p-10 relative z-10">
+      <div className="p-4 sm:p-8 lg:p-10 relative z-10">
         {total === 0 ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}

@@ -165,8 +165,10 @@ export default function Dashboard() {
               <svg className="w-full h-full -rotate-90 p-4">
                 <circle cx="50%" cy="50%" r="42%" fill="none" stroke="#EFF6FF" strokeWidth="8%" />
                 <motion.circle 
-                  cx="50%" cy="50%" r="42%" fill="none" stroke="#2563EB" strokeWidth="8%" strokeLinecap="round"
-                  strokeDasharray="264" strokeDashoffset={264 - (264 * readiness) / 100}
+                  cx="50%" cy="50%" r="42%" fill="none" stroke="#2563EB" strokeWidth="8%"
+                  strokeLinecap={readiness > 0 ? "round" : "butt"}
+                  strokeDasharray="264" strokeDashoffset={264 - (264 * Math.max(0, Math.min(100, readiness))) / 100}
+                  style={{ opacity: readiness > 0 ? 1 : 0 }}
                   transition={{ duration: 2, ease: "easeOut", delay: 0.2 }}
                 />
               </svg>

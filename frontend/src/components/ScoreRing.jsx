@@ -118,12 +118,13 @@ export default function ScoreRing({ score = 0, size = 140, strokeWidth = 10, lab
             fill="none"
             stroke={`url(#${gradId})`}
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap={pct > 0 ? "round" : "butt"}
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             className="transition-all duration-300"
             style={{
               filter: `drop-shadow(0 3px 8px ${theme.gradient[0]}35)`,
+              opacity: pct > 0 ? 1 : 0
             }}
           />
         </svg>

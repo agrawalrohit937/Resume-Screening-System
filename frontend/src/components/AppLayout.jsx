@@ -121,7 +121,7 @@ export default function AppLayout() {
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
-  }, [location.pathname])
+  }, [location.pathname, location.key])
 
   useEffect(() => {
     if (!isMobileMenuOpen) {

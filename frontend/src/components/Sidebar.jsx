@@ -230,7 +230,9 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     if (mobile && onNavigate) {
       onNavigate()
     }
-    if (path) navigate(path)
+    if (path && path !== location.pathname) {
+      navigate(path)
+    }
   }
 
   // ── Admin view mode (persisted in localStorage) ──────────────────────────
@@ -460,10 +462,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    onClick={(e) => {
-                      // Stop event from bubbling to backdrop and triggering double-close
-                      e.stopPropagation()
-                      handleItemClick(item.to)
+                    onClick={() => {
+                      if (mobile && onNavigate) {
+                        onNavigate()
+                      }
                     }}
                     onMouseEnter={() => prefetchRoute(item.to)}
                     onTouchStart={() => prefetchRoute(item.to)}
@@ -654,7 +656,9 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       </nav>
 
       <div className="border-t border-slate-100 p-3 shrink-0 space-y-2">
-        <div className={`relative flex items-center gap-2.5 p-1.5 rounded-2xl transition-colors ${
+        <div 
+          onClick={() => handleItemClick('/profile')}
+          className={`relative flex items-center gap-2.5 p-1.5 rounded-2xl transition-colors cursor-pointer ${
           isCompact ? 'justify-center' : ''
         } ${isPremium ? 'bg-gradient-to-r from-[#F3C24B]/10 to-transparent hover:from-[#F3C24B]/20' : isPro ? 'bg-slate-100/60 hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
           
