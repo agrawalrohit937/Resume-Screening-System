@@ -208,11 +208,11 @@ export default function AppLayout() {
                   setIsMobileMenuOpen(false)
                 }
               }}
-              className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm cursor-pointer"
+              className="absolute inset-0 h-full w-full bg-black/60 sm:backdrop-blur-xs cursor-pointer transform-gpu"
             />
 
             {/* Mobile Sidebar Drawer Container */}
-            <div className="relative z-10 h-full" style={{ pointerEvents: 'auto' }}>
+            <div className="relative z-10 h-full transform-gpu" style={{ pointerEvents: 'auto' }}>
               <Sidebar
                 mobile
                 collapsed={false}

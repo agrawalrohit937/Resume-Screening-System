@@ -388,7 +388,7 @@ export default function AICopilotWidget() {
                 e.preventDefault()
                 setIsOpen(false)
               }}
-              className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs sm:hidden"
+              className="fixed inset-0 z-40 bg-slate-950/50 sm:backdrop-blur-xs transform-gpu"
             />
 
             <motion.div
@@ -396,7 +396,7 @@ export default function AICopilotWidget() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 30, scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-              className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 sm:right-6 w-full sm:w-[410px] h-[85dvh] max-h-[85vh] sm:h-[620px] sm:max-h-[740px] flex flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl border-t border-x sm:border border-slate-200/80 sm:border-white bg-white/95 backdrop-blur-xl shadow-2xl"
+              className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 sm:right-6 w-full sm:w-[410px] h-[85dvh] max-h-[85vh] sm:h-[620px] sm:max-h-[740px] flex flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl border-t border-x sm:border border-slate-200/80 sm:border-white bg-white sm:bg-white/95 sm:backdrop-blur-xl shadow-2xl transform-gpu"
               style={{ boxShadow: '0 25px 60px -15px rgba(15,23,42,0.22)' }}
               role="dialog"
               aria-label="CareerShala AI Copilot"

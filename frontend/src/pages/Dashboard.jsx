@@ -134,47 +134,47 @@ export default function Dashboard() {
       
       {/* ── 1. Vibrant Bright Hero ──────────────────────────────────────── */}
       <motion.div initial={{ y: 20 }} animate={{ y: 0 }} transition={{ type: "spring" }}>
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 relative overflow-hidden shadow-[0_8px_30px_rgba(59,130,246,0.08)] border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-10">
+        <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 md:p-10 relative overflow-hidden shadow-[0_8px_30px_rgba(59,130,246,0.08)] border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-10">
           
           <div className="absolute inset-0 bg-[linear-gradient(to_right_bottom,rgba(59,130,246,0.03),rgba(37,99,235,0.01))]" />
-          <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-400/10 rounded-full blur-3xl animate-pulse-soft pointer-events-none" />
-          <Sparkles className="absolute top-8 right-1/4 w-12 h-12 text-blue-200/50 rotate-12 pointer-events-none" />
+          <div className="hidden sm:block absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+          <Sparkles className="absolute top-6 right-6 w-8 h-8 sm:w-12 sm:h-12 text-blue-200/50 rotate-12 pointer-events-none" />
           
           <div className="relative z-10 text-center md:text-left flex-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest border border-blue-100 mb-5 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping-slow" /> Copilot Active
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest border border-blue-100 mb-3.5 sm:mb-5 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-blue-500" /> Copilot Active
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 font-display tracking-tight mb-4 leading-tight">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 font-display tracking-tight mb-3 sm:mb-4 leading-tight">
               Welcome back, <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">{firstName}</span>.
             </h1>
-            <p className="text-slate-500 font-medium max-w-xl text-base leading-relaxed">
+            <p className="text-slate-500 font-medium max-w-xl text-xs sm:text-base leading-relaxed">
               {headline}
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center md:justify-start gap-4">
-              <button onClick={openCopilot} className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-extrabold shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 transition-all flex items-center gap-2">
+            <div className="mt-5 sm:mt-8 flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4">
+              <button onClick={openCopilot} className="w-full sm:w-auto justify-center px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs sm:text-sm font-extrabold shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 transition-all flex items-center gap-2">
                 <Sparkles size={18} /> Ask AI Copilot
               </button>
             </div>
           </div>
 
           <div className="relative z-10 flex flex-col items-center shrink-0">
-            <div className="relative w-40 h-40 md:w-48 md:h-48 bg-white rounded-full shadow-xl border border-slate-50 flex items-center justify-center">
-              <svg className="absolute inset-2 w-[calc(100%-16px)] h-[calc(100%-16px)] animate-[spin_10s_linear_infinite] opacity-20" viewBox="0 0 100 100">
+            <div className="relative w-36 h-36 sm:w-40 sm:h-40 md:w-48 md:h-48 bg-white rounded-full shadow-xl border border-slate-50 flex items-center justify-center">
+              <svg className="hidden sm:block absolute inset-2 w-[calc(100%-16px)] h-[calc(100%-16px)] opacity-20" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="48" fill="none" stroke="#3B82F6" strokeWidth="2" strokeDasharray="6 6" />
               </svg>
-              <svg className="w-full h-full -rotate-90 p-4">
+              <svg className="w-full h-full -rotate-90 p-3 sm:p-4">
                 <circle cx="50%" cy="50%" r="42%" fill="none" stroke="#EFF6FF" strokeWidth="8%" />
                 <motion.circle 
                   cx="50%" cy="50%" r="42%" fill="none" stroke="#2563EB" strokeWidth="8%"
                   strokeLinecap={readiness > 0 ? "round" : "butt"}
                   strokeDasharray="264" strokeDashoffset={264 - (264 * Math.max(0, Math.min(100, readiness))) / 100}
                   style={{ opacity: readiness > 0 ? 1 : 0 }}
-                  transition={{ duration: 2, ease: "easeOut", delay: 0.2 }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl md:text-5xl font-black text-slate-900 font-display">{readiness}<span className="text-2xl text-blue-500">%</span></span>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Ready</span>
+                <span className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 font-display">{readiness}<span className="text-xl sm:text-2xl text-blue-500">%</span></span>
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400 mt-0.5 sm:mt-1">Ready</span>
               </div>
             </div>
           </div>
