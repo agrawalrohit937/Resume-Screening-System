@@ -458,15 +458,17 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             <div className="space-y-[3px]">
               {section.items.map((item) => {
                 const isActive = location.pathname === item.to || (item.to === '/dashboard' && location.pathname === '/')
+                const dismissMobileDrawer = () => {
+                  if (mobile && onNavigate) {
+                    onNavigate()
+                  }
+                }
                 return (
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    onClick={() => {
-                      if (mobile && onNavigate) {
-                        onNavigate()
-                      }
-                    }}
+                    onClick={dismissMobileDrawer}
+                    onTouchEnd={dismissMobileDrawer}
                     onMouseEnter={() => prefetchRoute(item.to)}
                     onTouchStart={() => prefetchRoute(item.to)}
                     title={isCompact ? item.label : undefined}

@@ -62,9 +62,14 @@ async def search_candidates(
     """
     Score ALL parsed resumes in the system against the provided JD.
     Returns ranked candidate list with enriched profile data.
-    Expensive for large datasets — results are computed on-the-fly (no caching).
     """
-    # Fetch parsed resumes from DB
+    # 1. Extract target skills from the Job Description & explicit required skills
+    jd_text_clean = payload.job_description or ""
+    jd_extracted_skills = extract_skills_deterministic(jd_text_clean)
+    explicit_skills = [s.strip() for s in (payload.required_skills or []) if s and s.strip()]
+    target_skill_universe = list(dict.fromkeys(explicit_skills + jd_extracted_skills))
+
+    # Fetch parsed primary resumes from DB
     cursor = resume_repo.collection.find(
         {
             "status": "parsed",
@@ -72,58 +77,54 @@ async def search_candidates(
         },
         limit=min(payload.max_results * 5, 100)
     )
-    raw_resumes = await cursor.to_list(length=min(payload.max_results * 5, 100)) # fetch into memory for processing   
+    raw_resumes = await cursor.to_list(length=min(payload.max_results * 5, 100))
 
     candidates = []
     seen_users = set()
     for doc in raw_resumes:
         user_id = doc.get("user_id")
-        # 🚨 Skip duplicate users
-        if user_id in seen_users:
+        if not user_id or user_id in seen_users:
             continue
         seen_users.add(user_id)
         doc["_id"] = str(doc["_id"])
-        # Skip resumes with no parsed text
+        
         parsed = doc.get("parsed_data", {})
-
-        if not parsed or not parsed.get("raw_text"):
+        raw_text = parsed.get("raw_text", "")
+        if not parsed or not raw_text:
             continue
 
         skills = parsed.get("technical_skills", []) or parsed.get("skills", [])
-        try:
-            resume_obj = ResumeModel(**doc)
-        except Exception:
-            continue
 
-        # Score against JD using deterministic strict ATS service
+        # Multi-Factor ATS Scoring against JD
         try:
-            raw_text = parsed.get("raw_text", "")
             strict_res = run_strict_ats_check(
                 raw_text=raw_text,
                 extracted_data=parsed,
                 jd_text=payload.job_description,
-                skill_universe=payload.required_skills or skills,
+                skill_universe=target_skill_universe or skills,
             )
-            strict_data = strict_res.get("keyword_match", {})
-            final_score = float(strict_data.get("strict_ats_score", 0.0))
-            matched = strict_data.get("matched_exact", [])
-            missing = strict_data.get("missing_exact", [])
-            bert_score = final_score / 100.0
-            tfidf_score = final_score / 100.0
+            final_score = float(strict_res.get("final_score", 0.0))
+            vector_score = float(strict_res.get("vector_score", 0.0))
+            
+            keyword_data = strict_res.get("keyword_match", {})
+            keyword_score = float(keyword_data.get("strict_ats_score", 0.0))
+            
+            math_data = strict_res.get("math_result", {})
+            matched = math_data.get("matched_skills") or keyword_data.get("matched_exact") or []
+            missing = math_data.get("missing_skills") or keyword_data.get("missing_exact") or []
         except Exception as e:
             logger.warning("ATS scoring failed", resume_id=doc["_id"], error=str(e))
             continue
 
-        recommendation = _label(final_score / 100.0 if final_score > 1.0 else final_score)
+        recommendation = _label(final_score / 100.0)
 
-
-        if final_score < payload.min_score:
+        min_threshold = payload.min_score * 100.0 if payload.min_score <= 1.0 else payload.min_score
+        if final_score < min_threshold:
             continue
         if payload.filter_rec and recommendation != payload.filter_rec:
             continue
 
         # Fetch user info for name/email
-        user_id = doc.get("user_id", "")
         user_doc = None
         try:
             user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
@@ -131,8 +132,7 @@ async def search_candidates(
             pass
 
         contact = parsed.get("contact_info", {})
-
-        github_username = parsed.get("github_username") or _extract_github(parsed.get("raw_text", ""))
+        github_username = parsed.get("github_username") or _extract_github(raw_text)
 
         candidates.append({
             "resume_id": doc["_id"],
@@ -153,9 +153,9 @@ async def search_candidates(
             "matched_skills": matched[:15],
             "missing_skills": missing[:10],
 
-            "final_score": round(final_score, 3),
-            "bert_score": round(bert_score, 3),
-            "tfidf_score": round(tfidf_score, 3),
+            "final_score": round(final_score, 1),
+            "bert_score": round(vector_score, 1),
+            "tfidf_score": round(keyword_score, 1),
             "recommendation": recommendation,
 
             "uploaded_at": doc.get("created_at", ""),
@@ -169,16 +169,19 @@ async def search_candidates(
         c["rank"] = i
 
     top = candidates[:payload.max_results]
+    total_top = len(top)
+    avg_score = (sum(c["final_score"] for c in top) / max(total_top, 1)) / 100.0 if total_top > 0 else 0.0
+
     return {
-        "total_candidates": len(top),
+        "total_candidates": total_top,
         "candidates":       top,
         "summary": {
             "strong_matches":  sum(1 for c in top if c["recommendation"] == "strong_match"),
             "good_matches":    sum(1 for c in top if c["recommendation"] == "good_match"),
             "partial_matches": sum(1 for c in top if c["recommendation"] == "partial_match"),
             "poor_matches":    sum(1 for c in top if c["recommendation"] == "poor_match"),
-            "average_score":   round(sum(c["final_score"] for c in top) / max(len(top), 1), 3),
-            "top_score":       round(top[0]["final_score"], 3) if top else 0.0,
+            "average_score":   round(avg_score, 3),
+            "top_score":       round(top[0]["final_score"] / 100.0, 3) if top else 0.0,
         },
     }
 
