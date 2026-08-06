@@ -49,6 +49,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 const ApplyAssistant = lazy(() => import('./pages/ApplyAssistant'))
 const SupportTickets = lazy(() => import('./pages/SupportTickets'))
 const TicketDetail = lazy(() => import('./pages/TicketDetail'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 
 // ── Route guards ────────────────────────────────────────────────────────────
 
@@ -64,6 +65,14 @@ function PublicRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <Loader />
   return user ? <Navigate to="/dashboard" replace /> : children
+}
+
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <Loader />
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'admin') return <Navigate to="/dashboard" replace />
+  return children
 }
 
 function BootLoaderGate({ children }) {
@@ -173,6 +182,9 @@ export default function App() {
 
                 {/* Recruiter Dashboard */}
                 <Route path="recruiter" element={<RecruiterDashboard />} />
+
+                {/* Admin Dashboard */}
+                <Route path="admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
                 {/* Catch-all — redirects unknown authenticated paths to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />

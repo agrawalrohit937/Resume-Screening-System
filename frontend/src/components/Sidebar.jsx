@@ -13,6 +13,12 @@ import {
   ChevronLeft,
   Check,
   X,
+  Shield,
+  UserCircle,
+  Ticket,
+  Briefcase,
+  Users,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
@@ -74,6 +80,7 @@ const Icons = {
   interview: <MessagesSquare {...ICON_PROPS} />,
   gamification: <Trophy {...ICON_PROPS} />,
   recruiter: <UserSearch {...ICON_PROPS} />,
+  admin: <Shield {...ICON_PROPS} />,
   check: <Check className="w-3 h-3" strokeWidth={3} />,
   logout: <LogOut className="w-4 h-4" strokeWidth={2.2} />,
 }
@@ -140,6 +147,30 @@ const NAV_SECTIONS = [
   },
 ]
 
+const ADMIN_NAV_SECTIONS = [
+  {
+    title: 'Admin',
+    items: [
+      { to: '/admin', label: 'Admin Dashboard', icon: Icons.admin },
+    ],
+  },
+]
+
+const RECRUITER_NAV_SECTIONS = [
+  {
+    title: 'Recruiter',
+    items: [
+      { to: '/recruiter', label: 'Shortlist Candidates', icon: Icons.recruiter },
+    ],
+  },
+]
+
+const VIEW_MODES = [
+  { key: 'admin', label: 'Admin', icon: Shield, color: '#6366F1', defaultPath: '/admin' },
+  { key: 'candidate', label: 'Candidate', icon: UserCircle, color: '#2E9BDA', defaultPath: '/dashboard' },
+  { key: 'recruiter', label: 'Recruiter', icon: UserSearch, color: '#10B981', defaultPath: '/recruiter' },
+]
+
 const ROUTE_PREFETCH = {
   '/dashboard': () => import('../pages/Dashboard'),
   '/profile': () => import('../pages/Profile'),
@@ -151,6 +182,7 @@ const ROUTE_PREFETCH = {
   '/premium': () => import('../pages/Premium'),
   '/apply-assistant': () => import('../pages/ApplyAssistant'),
   '/support': () => import('../pages/SupportTickets'),
+  '/admin': () => import('../pages/AdminDashboard'),
 }
 
 const prefetchRoute = (path) => {
@@ -201,24 +233,44 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     if (path) navigate(path)
   }
 
+  // ── Admin view mode (persisted in localStorage) ──────────────────────────
+  const [adminViewMode, setAdminViewMode] = useState(() => {
+    if (typeof window === 'undefined') return 'admin'
+    return localStorage.getItem('admin_view_mode') || 'admin'
+  })
+  const [viewModeOpen, setViewModeOpen] = useState(false)
+
+  const switchViewMode = (mode) => {
+    setViewModeOpen(false)
+    setAdminViewMode(mode)
+    localStorage.setItem('admin_view_mode', mode)
+    if (mobile && onNavigate) {
+      onNavigate()
+    }
+    const vm = VIEW_MODES.find(v => v.key === mode)
+    if (vm) navigate(vm.defaultPath)
+  }
+
+  const isAdmin = user?.role === 'admin'
+
   // Compute nav content — must be before early return so JSX can use them,
   // but these are plain variables (not hooks) so order relative to return is fine.
   const getNavSections = () => {
     if (!user) return NAV_SECTIONS
+    if (isAdmin) {
+      // Admin sidebar navigation sections based on selected view mode
+      if (adminViewMode === 'candidate') return NAV_SECTIONS
+      if (adminViewMode === 'recruiter') return RECRUITER_NAV_SECTIONS
+      return ADMIN_NAV_SECTIONS // default: admin-only
+    }
     if (user.role === 'recruiter') {
-      return [
-        {
-          title: 'Recruiter',
-          items: [
-            { to: '/recruiter', label: 'Shortlist Candidates', icon: Icons.recruiter },
-          ],
-        },
-      ]
+      return RECRUITER_NAV_SECTIONS
     }
     return NAV_SECTIONS.filter(section => section.title.toUpperCase() !== 'RECRUITER')
   }
 
   const visibleSections = getNavSections()
+  const currentViewMode = VIEW_MODES.find(v => v.key === adminViewMode) || VIEW_MODES[0]
   const userPlan = (user?.plan || user?.subscription_tier || '').toLowerCase()
   const isPremium = userPlan.includes('premium')
   const isPro = userPlan.includes('pro')
@@ -285,6 +337,102 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
           </button>
         )}
       </div>
+
+      {/* ── Admin View Mode Switcher (Always upper side for Admin) ─────── */}
+      {isAdmin && (
+        <div className={`shrink-0 border-b border-slate-100 ${isCompact ? 'px-2 py-2.5' : 'px-3 py-2.5'}`}>
+          {isCompact ? (
+            /* Compact: cycle through modes on click */
+            <button
+              onClick={() => {
+                const modes = VIEW_MODES.map(v => v.key)
+                const nextIdx = (modes.indexOf(adminViewMode) + 1) % modes.length
+                switchViewMode(modes[nextIdx])
+              }}
+              title={`View: ${currentViewMode.label} (click to switch)`}
+              className="w-full flex items-center justify-center"
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+                style={{ backgroundColor: currentViewMode.color + '15' }}
+              >
+                <currentViewMode.icon className="w-4 h-4" style={{ color: currentViewMode.color }} />
+              </div>
+            </button>
+          ) : (
+            /* Expanded: dropdown selector */
+            <div className="relative">
+              <button
+                onClick={() => setViewModeOpen(p => !p)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm active:scale-[0.98]"
+                style={{
+                  backgroundColor: currentViewMode.color + '08',
+                  borderColor: currentViewMode.color + '25',
+                }}
+              >
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: currentViewMode.color + '18' }}
+                >
+                  <currentViewMode.icon className="w-3.5 h-3.5" style={{ color: currentViewMode.color }} />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">View Mode</p>
+                  <p className="text-[12px] font-bold truncate mt-0.5 leading-none" style={{ color: currentViewMode.color }}>
+                    {currentViewMode.label}
+                  </p>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${viewModeOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {viewModeOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setViewModeOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                      transition={{ duration: 0.12 }}
+                      className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden"
+                    >
+                      <div className="p-1">
+                        {VIEW_MODES.map(v => {
+                          const active = adminViewMode === v.key
+                          return (
+                            <button
+                              key={v.key}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                switchViewMode(v.key)
+                              }}
+                              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all ${
+                                active
+                                  ? 'font-bold'
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              }`}
+                              style={active ? { backgroundColor: v.color + '12', color: v.color } : {}}
+                            >
+                              <v.icon className="w-4 h-4" style={{ color: v.color }} />
+                              <span className="flex-1 text-left">{v.label}</span>
+                              {active && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: v.color }} />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="px-3 py-2 bg-slate-50 border-t border-slate-100">
+                        <p className="text-[9.5px] text-slate-400 font-medium leading-snug">
+                          Switch view to test different user experiences
+                        </p>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-none">
         {visibleSections.map((section, idx) => (

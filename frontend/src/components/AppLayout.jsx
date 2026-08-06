@@ -102,7 +102,7 @@ function MobileHeader({ onMenuToggle }) {
           <AnimatePresence>
             {isProfileOpen && (
               <ProfilePlanDropdown
-                isOpen={isProfileOpen}
+                user={user}
                 onClose={() => setIsProfileOpen(false)}
               />
             )}
@@ -168,7 +168,7 @@ export default function AppLayout() {
     }
   }, [])
 
-  // Redirect recruiter to shortlist page if not already there
+  // Redirect recruiter to shortlist page if not already there (admin bypasses this)
   if (user?.role === 'recruiter' && location.pathname !== '/recruiter') {
     return <Navigate to="/recruiter" replace />
   }

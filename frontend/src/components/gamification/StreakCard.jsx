@@ -68,19 +68,16 @@ export default function StreakCard({ profile }) {
     )
 
     if (!profile?.active_dates || !Array.isArray(profile.active_dates)) {
-      // Mark current streak ending today
-      for (let i = 0; i < streak; i++) {
-        const d = new Date(today)
-        d.setDate(today.getDate() - i)
-        activeDateSet.add(formatDateKey(d))
+      if (streak > 0) {
+        // Mark actual consecutive days of current streak ending today or yesterday
+        const lastPracticeStr = profile?.last_practice_date ? String(profile.last_practice_date).slice(0, 10) : ''
+        const endOffset = (lastPracticeStr && lastPracticeStr !== todayStr) ? 1 : 0
+        for (let i = 0; i < streak; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() - (i + endOffset))
+          activeDateSet.add(formatDateKey(d))
+        }
       }
-      // Preserve sample historical activity across past days
-      const sampleOffsetDays = [4, 5, 8, 11, 12, 15, 18, 22, 25, 28]
-      sampleOffsetDays.forEach((offset) => {
-        const d = new Date(today)
-        d.setDate(today.getDate() - offset)
-        activeDateSet.add(formatDateKey(d))
-      })
     }
 
     const padding = Array.from({ length: startWeekday }, (_, i) => i)
