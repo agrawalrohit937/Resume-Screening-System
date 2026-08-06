@@ -61,10 +61,11 @@ function AvatarOrb({ speaking }) {
         className={`absolute h-36 w-36 rounded-full blur-2xl ${speaking ? 'bg-violet-500' : 'bg-slate-500'}`}
       />
       <div
-        className={`relative h-24 w-24 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${speaking
+        className={`relative h-24 w-24 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${
+          speaking
             ? 'bg-gradient-to-br from-violet-500 to-indigo-600 border-violet-300/60 shadow-[0_0_36px_rgba(124,108,240,0.45)]'
             : 'bg-white/10 border-white/15'
-          }`}
+        }`}
       >
         <Bot className="h-10 w-10 text-white" strokeWidth={1.75} />
       </div>
@@ -202,55 +203,80 @@ function QuestionGridMatrixSidebar({ currentQIdx, totalQ, phase, answers = [] })
 function AnswerInput({ value, onChange, onSubmit, loading, questionTimer, diffCfg, sttHook, isSpeaking }) {
   const timeLimit = diffCfg?.time || 180
   const remaining = Math.max(0, timeLimit - questionTimer)
+  const pct = Math.min(100, (questionTimer / timeLimit) * 100)
   const urgent = questionTimer > timeLimit * 0.8
-  const timerColor = urgent ? 'text-rose-600' : 'text-[#1d6fa5]'
+  const timerColor = urgent ? 'text-rose-600' : questionTimer > timeLimit * 0.6 ? 'text-amber-600' : 'text-[#1d6fa5]'
+  const barColor = urgent ? 'bg-rose-500' : questionTimer > timeLimit * 0.6 ? 'bg-amber-500' : 'bg-[#2E9BDA]'
 
   return (
-    <div className="bg-white rounded-3xl border border-blue-100 flex flex-col flex-1 min-h-0 overflow-hidden shadow-sm">
-      <div className="px-6 py-4 flex items-center justify-between border-b border-blue-50">
-        <span className="text-[14px] font-bold text-blue-950">Your Response</span>
-        <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-1.5 px-3 py-1 bg-slate-50 rounded-lg ${timerColor}`}>
-            <span className="text-[12px]">⏱</span>
-            <span className="font-mono text-[13px] font-bold tabular-nums">{fmt(remaining)}</span>
+    <div className="bg-white rounded-3xl border border-blue-100 flex flex-col flex-1 min-h-0 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+      <div className="h-[3px] bg-blue-50 w-full">
+        <motion.div animate={{ width: `${Math.max(0, 100 - pct)}%` }} transition={{ duration: 1, ease: 'linear' }} className={`h-full ${barColor}`} />
+      </div>
+
+      <div className="px-5 py-3.5 flex items-center justify-between border-b border-blue-50">
+        <span className="text-[13px] font-extrabold text-blue-950">Your Response</span>
+        <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-blue-100 rounded-full px-3 py-1">
+            <span className="text-[11px]">⏱</span>
+            <span className={`font-mono text-[13px] font-bold tabular-nums ${timerColor}`}>{fmt(remaining)}</span>
           </div>
+          <span className="text-[11.5px] text-blue-900/35 font-semibold">{value.length} chars</span>
         </div>
       </div>
 
-      <div className="flex-1 p-6 flex flex-col">
-        {sttHook?.listening && sttHook?.transcript && (
-          <div className="mb-4 p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-            <p className="text-[13px] text-[#1d6fa5] italic">"{sttHook.transcript}"</p>
-          </div>
-        )}
+      {sttHook?.listening && sttHook?.transcript && (
+        <div className="mx-5 mt-3 px-3.5 py-2.5 rounded-xl bg-[#2E9BDA]/[0.06] border border-[#2E9BDA]/20">
+          <p className="text-[12px] text-[#1d6fa5] italic font-medium">🎤 "{sttHook.transcript}"</p>
+        </div>
+      )}
+
+      <div className="flex-1 p-5 flex">
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={isSpeaking}
-          placeholder={isSpeaking ? "Listen to the question..." : "Type your answer here..."}
-          className="w-full h-full outline-none resize-none bg-transparent text-[14.5px] text-blue-950 placeholder:text-blue-900/30 font-medium leading-relaxed"
+          placeholder={
+            isSpeaking
+              ? 'The interviewer is asking the question — think through your approach, then type or speak your answer here.'
+              : 'Type your answer. Cover the approach, key trade-offs, and how you would validate it.'
+          }
+          className="w-full h-full outline-none resize-none bg-transparent text-[14px] text-blue-950 placeholder:text-blue-900/25 font-medium leading-relaxed disabled:text-blue-900/30"
         />
       </div>
 
-      <div className="px-6 py-4 border-t border-blue-50 flex items-center justify-between bg-white">
-        {sttHook?.supported && (
+      <div className="px-5 py-3.5 border-t border-blue-50 bg-slate-50/60 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {sttHook?.supported && (
+            <button
+              type="button"
+              disabled={isSpeaking}
+              onClick={sttHook.toggleListening}
+              className={`inline-flex items-center gap-2 h-9 px-3.5 rounded-xl text-[12px] font-bold border transition-all ${
+                sttHook.listening ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-blue-200 bg-white text-blue-900/60 hover:border-blue-300'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Mic className="h-3.5 w-3.5" /> {sttHook.listening ? 'Recording…' : 'Speak Answer'}
+            </button>
+          )}
           <button
             type="button"
-            disabled={isSpeaking}
-            onClick={sttHook.toggleListening}
-            className={`inline-flex items-center gap-2 h-10 px-4 rounded-xl text-[13px] font-bold transition-all ${sttHook.listening ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-blue-900/60 hover:bg-slate-100'
-              } disabled:opacity-40`}
+            onClick={() => { onChange(''); sttHook?.resetTranscript?.() }}
+            className="h-9 px-3.5 rounded-xl border border-blue-200 bg-white text-blue-900/50 text-[12px] font-bold hover:border-blue-300 transition-all"
           >
-            <Mic className="h-4 w-4" /> {sttHook.listening ? 'Recording...' : 'Speak Answer'}
+            Clear
           </button>
-        )}
-        <button
+        </div>
+
+        <motion.button
+          whileHover={{ scale: value.trim().length >= 5 && !isSpeaking && !loading ? 1.02 : 1 }}
+          whileTap={{ scale: value.trim().length >= 5 && !isSpeaking && !loading ? 0.98 : 1 }}
           onClick={() => onSubmit({ answerText: value, answerSource: sttHook?.listening ? 'voice' : 'text' })}
           disabled={loading || value.trim().length < 5 || isSpeaking}
-          className="h-10 px-8 rounded-xl font-bold text-[13px] text-white bg-[#2E9BDA] hover:bg-[#1d6fa5] shadow-md shadow-[#2E9BDA]/20 disabled:opacity-40 transition-all"
+          className="h-10 px-6 rounded-xl font-bold text-[13px] text-white bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] shadow-md shadow-[#2E9BDA]/25 disabled:opacity-40 disabled:shadow-none transition-all"
         >
-          {loading ? 'Scoring...' : 'Submit →'}
-        </button>
+          {loading ? 'Scoring…' : 'Submit Answer →'}
+        </motion.button>
       </div>
     </div>
   )
@@ -355,7 +381,7 @@ export default function LiveInterviewV2() {
         avatarVideoRef.current.play().catch((e) => console.log("Video play blocked:", e));
       } else {
         avatarVideoRef.current.pause();
-        avatarVideoRef.current.currentTime = 0;
+        avatarVideoRef.current.currentTime = 0; 
       }
     }
   }, [tts.speaking]);
@@ -538,114 +564,154 @@ export default function LiveInterviewV2() {
 
   return (
     <ImmersiveShell active={fsGate.immersive}>
-      <div className="fixed inset-0 z-[999999] w-full h-full bg-[#FAFBFC] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-[999999] w-screen h-screen bg-[#F5F7FB] flex flex-col overflow-hidden">
         <EndPracticeModal open={showEndConfirm} onCancel={() => setShowEndConfirm(false)} onConfirm={confirmEndPractice} />
         <WarningToast warning={currentWarning} count={session.cheatingData?.warning_count} max={MAX_WARNINGS} />
 
-        {/* Simplified Top Bar */}
-        <div className="h-16 bg-white border-b border-blue-100 flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-4">
-            <h1 className="text-[16px] font-extrabold text-blue-950">
-              Career<span className="text-[#1d6fa5]">Shala</span>
-            </h1>
-            <div className="h-4 w-px bg-blue-100" />
-            <p className="text-[13px] text-blue-900/60 font-medium">{session.config?.job_title || 'Technical Assessment'}</p>
+        {/* Top bar */}
+        <div className="h-16 bg-white border-b border-blue-100 flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-3.5">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#2E9BDA] to-[#1d6fa5] text-white font-black text-[15px] flex items-center justify-center shadow-md shadow-[#2E9BDA]/30">
+              C
+            </div>
+            <div>
+              <p className="text-[14px] font-extrabold text-blue-950 leading-tight">
+                Career<span className="text-[#1d6fa5]">Shala</span> Live Interview
+              </p>
+              <p className="text-[11.5px] text-blue-900/45 font-semibold">{session.config?.job_title || 'Technical Assessment'}</p>
+            </div>
           </div>
 
-          {/* Minimal Progress Indicator replacing the bulky sidebar */}
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-bold text-blue-900/40 uppercase tracking-wide">Progress</span>
-            <span className="text-[13px] font-mono font-bold text-[#1d6fa5] bg-blue-50 px-2 py-0.5 rounded-md">
-              {session.currentQIdx + 1} / {session.totalQ}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setVoiceEnabled((v) => { if (v) tts.stop(); return !v })}
-              className={`text-blue-900/40 hover:text-blue-950 transition-colors ${!voiceEnabled && 'text-amber-500'}`}
+              title={voiceEnabled ? 'Mute AI voice' : 'Enable AI voice'}
+              className={`h-9 w-9 rounded-xl flex items-center justify-center border transition-all ${voiceEnabled ? 'border-blue-200 text-blue-900/60 hover:border-blue-300' : 'border-amber-300 bg-amber-50 text-amber-600'}`}
             >
-              {voiceEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+              {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
+
+            <div className="flex items-center gap-2 bg-slate-50 border border-blue-100 rounded-full px-3.5 py-1.5">
+              <span className={`h-2 w-2 rounded-full ${aiSpeaking ? 'bg-violet-500' : 'bg-emerald-500'}`} />
+              <span className="font-mono text-[12.5px] font-bold text-blue-900/70 tabular-nums">{fmt(session.timeElapsed)}</span>
+            </div>
+
             <button
               onClick={requestEndPractice}
-              className="text-[13px] font-bold text-blue-900/60 hover:text-rose-600 transition-colors"
+              className="h-9 px-4 rounded-xl bg-white border border-rose-200 text-rose-600 text-[12.5px] font-bold hover:bg-rose-50 transition-all inline-flex items-center gap-1.5"
             >
-              End Practice
+              <LogOut className="h-3.5 w-3.5" /> Exit Practice
             </button>
           </div>
         </div>
 
-        {/* Body - 2 Column Layout */}
-        <div className="flex-1 p-8 flex gap-8 overflow-hidden max-w-[1400px] mx-auto w-full">
+        {/* Body */}
+        <div className="flex-1 flex overflow-hidden">
+          <QuestionGridMatrixSidebar currentQIdx={session.currentQIdx} totalQ={session.totalQ} phase={session.phase} answers={session.answers} />
 
-          {/* Left Column: Video & AI */}
-          <div className="w-[400px] shrink-0 flex flex-col gap-4 h-full">
-            <div className="relative rounded-3xl overflow-hidden aspect-[4/3] bg-blue-950 shadow-lg">
-              <video
-                ref={avatarVideoRef} autoPlay loop muted playsInline
-                className="absolute inset-0 w-full h-full object-cover opacity-90"
+          <div className="flex-1 grid gap-5 p-5 overflow-hidden" style={{ gridTemplateColumns: '1fr 350px' }}>
+            <div className="flex flex-col gap-4 min-h-0 h-full">
+              <AnimatePresence mode="wait">
+                {session.phase === SESSION_PHASE.ACTIVE && q && (
+                  <motion.div
+                    key={`q-${session.currentQIdx}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                    onAnimationComplete={handleQuestionRevealed}
+                    className="flex flex-col gap-4 flex-1 min-h-0"
+                  >
+                    <div className="bg-white rounded-3xl border border-blue-100 p-6 shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full border ${diffCfg.color} ${diffCfg.bg} ${diffCfg.border}`}>
+                          {diffCfg.label.toUpperCase()}
+                        </span>
+                        <span className="text-[11px] font-bold text-blue-900/40">{(q.category || 'TECHNICAL').toUpperCase()}</span>
+                        <span className="ml-auto font-mono text-[11px] text-blue-900/30 font-semibold">Q{session.currentQIdx + 1} / {session.totalQ}</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <h1 className="text-[18px] font-bold text-blue-950 leading-relaxed flex-1">{q.text}</h1>
+                        {tts.supported && (
+                          <button onClick={repeatQuestion} title="Replay question" className="shrink-0 h-8 w-8 rounded-lg border border-blue-200 text-blue-900/40 hover:border-[#2E9BDA] hover:text-[#1d6fa5] flex items-center justify-center transition-all">
+                            <Repeat className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <AnswerInput
+                      value={answerText} onChange={setAnswerText} onSubmit={handleSubmitAnswer}
+                      loading={session.phase === SESSION_PHASE.EVALUATING} questionTimer={session.questionTimer}
+                      diffCfg={diffCfg} sttHook={stt} isSpeaking={aiSpeaking}
+                    />
+                  </motion.div>
+                )}
+
+                {session.phase === SESSION_PHASE.FEEDBACK && session.currentEval && (
+                  <motion.div key="feedback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 min-h-0">
+                    <FeedbackPanel
+                      eval={session.currentEval} question={q} questionNum={session.currentQIdx + 1}
+                      isLast={session.isLastQ} onNext={session.nextQuestion} onReattempt={session.reattemptQuestion} loading={session.loading}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Right rail: AI avatar + proctoring */}
+            <div className="flex flex-col gap-4 h-full min-h-0 overflow-y-auto pr-1">
+              <div
+                className="relative rounded-3xl overflow-hidden shrink-0 aspect-[16/12] border transition-all duration-500"
+                style={{
+                  background: 'linear-gradient(160deg, #0B1220, #161225)',
+                  borderColor: aiSpeaking ? 'rgba(139,92,246,0.4)' : 'rgba(46,155,218,0.25)',
+                  boxShadow: aiSpeaking ? '0 0 0 3px rgba(139,92,246,0.18), 0 20px 40px -20px rgba(139,92,246,0.4)' : '0 10px 30px -15px rgba(0,0,0,0.5)',
+                }}
               >
-                <source src={`${import.meta.env.BASE_URL}interviewer-avatar.mp4`} type="video/mp4" />
-              </video>
-
-              {/* Subtle Proctoring overlay instead of a huge panel */}
-              <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/50 backdrop-blur-md rounded-lg px-3 py-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-white text-[11px] font-bold tracking-wide">PROCTORING SECURE</span>
-              </div>
-
-              <div className={`absolute bottom-4 left-4 right-4 z-20 rounded-xl px-4 py-3 backdrop-blur-md border ${aiSpeaking ? 'bg-violet-600/80 border-violet-400/50' : 'bg-black/40 border-white/10'}`}>
-                <p className="text-[13px] font-bold text-white">{aiSpeaking ? "AI Interviewer is speaking..." : "Listening to your response..."}</p>
-              </div>
-            </div>
-
-            {/* Hidden technical canvases for proctoring */}
-            <div className="hidden">
-              <DetectionPanel detectionStatus={detectionStatus} videoRef={videoRef} canvasRef={canvasRef} warningCount={session.cheatingData.warning_count} maxWarnings={MAX_WARNINGS} cheatingScore={session.cheatingData.score} />
-            </div>
-          </div>
-
-          {/* Right Column: Question & Input */}
-          <div className="flex-1 flex flex-col min-h-0 h-full">
-            <AnimatePresence mode="wait">
-              {session.phase === SESSION_PHASE.ACTIVE && q && (
-                <motion.div
-                  key={`q-${session.currentQIdx}`}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0 }}
-                  onAnimationComplete={handleQuestionRevealed}
-                  className="flex flex-col gap-6 flex-1 min-h-0"
+                
+                {/* LIVE AVATAR VIDEO */}
+                <video 
+                  ref={avatarVideoRef}
+                  autoPlay
+                  loop 
+                  muted={true}
+                  playsInline
+                  crossOrigin="anonymous"
+                  onError={(e) => console.warn('[LiveInterview] Avatar video load error:', e)}
+                  className="absolute inset-0 w-full h-full object-cover z-0"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-[22px] font-bold text-blue-950 leading-snug">{q.text}</h2>
-                    {tts.supported && (
-                      <button onClick={repeatQuestion} className="shrink-0 p-2 rounded-lg bg-blue-50 text-[#1d6fa5] hover:bg-blue-100 transition-colors">
-                        <Repeat className="h-5 w-5" />
-                      </button>
-                    )}
-                  </div>
+                  <source src="/interviewer-avatar.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
 
-                  <AnswerInput
-                    value={answerText} onChange={setAnswerText} onSubmit={handleSubmitAnswer}
-                    loading={session.phase === SESSION_PHASE.EVALUATING} questionTimer={session.questionTimer}
-                    diffCfg={diffCfg} sttHook={stt} isSpeaking={aiSpeaking}
-                  />
-                </motion.div>
-              )}
+                {/* Note: I added z-10 and z-20 to these overlays so the video doesn't hide them */}
+                <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-white text-[10px] font-extrabold tracking-wide">LIVE</span>
+                </div>
 
-              {session.phase === SESSION_PHASE.FEEDBACK && session.currentEval && (
-                <motion.div key="feedback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 min-h-0">
-                  <FeedbackPanel
-                    eval={session.currentEval} question={q} questionNum={session.currentQIdx + 1}
-                    isLast={session.isLastQ} onNext={session.nextQuestion} onReattempt={session.reattemptQuestion} loading={session.loading}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+                <div className={`absolute top-3 right-3 z-20 rounded-full px-2.5 py-1 text-[10px] font-bold text-white ${aiSpeaking ? 'bg-violet-500' : 'bg-[#2E9BDA]'}`}>
+                  {aiSpeaking ? "AI'S TURN" : 'YOUR TURN'}
+                </div>
+
+                <div className="absolute bottom-3 left-3 right-3 z-20 bg-black/35 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/10">
+                  <p className="text-[12px] font-bold text-slate-100">Alex — AI Interviewer</p>
+                  <p className="text-[10.5px] text-slate-400">{session.config?.job_title || 'Technical Assessment'}</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl border border-blue-100 p-4 shrink-0">
+                <div className="flex items-center justify-between border-b border-blue-50 pb-2.5 mb-3">
+                  <span className="text-[11px] font-extrabold text-blue-900/45 uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Proctoring
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-emerald-600">● ACTIVE</span>
+                </div>
+                <DetectionPanel detectionStatus={detectionStatus} videoRef={videoRef} canvasRef={canvasRef} warningCount={session.cheatingData.warning_count} maxWarnings={MAX_WARNINGS} cheatingScore={session.cheatingData.score} />
+              </div>
+            </div>
           </div>
-
         </div>
       </div>
     </ImmersiveShell>

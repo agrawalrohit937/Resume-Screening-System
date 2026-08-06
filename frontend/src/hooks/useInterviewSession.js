@@ -210,6 +210,11 @@ export function useInterviewSession() {
     else { setCurrentQIdx(i => i + 1); setCurrentEval(null); setPhase(SESSION_PHASE.ACTIVE); }
   }, [isLastQ])
 
+  const reattemptQuestion = useCallback(() => {
+    setCurrentEval(null)
+    setPhase(SESSION_PHASE.ACTIVE)
+  }, [])
+
   const completeSession = useCallback(async () => {
     if (!session?.session_id) return
     setLoading(true)
@@ -230,6 +235,6 @@ export function useInterviewSession() {
     answers, currentEval, cheatingData, sessionReport,
     loading, timeElapsed, questionTimer,
     createSession, startSession, submitAnswer, nextQuestion,
-    completeSession, recordCheatingEvent, resetSession,
+    completeSession, recordCheatingEvent, resetSession, reattemptQuestion,
   }
 }
