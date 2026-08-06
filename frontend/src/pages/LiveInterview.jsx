@@ -351,6 +351,11 @@ export default function LiveInterviewV2() {
   const session = useInterviewSession()
   const [briefStep, setBriefStep] = useState('guidelines')
 
+  // Detect mobile once — on phones we skip all heavy ML models entirely
+  // (MediaPipe, TF.js COCO-SSD, face-api) to keep the page fast.
+  const isMobile = typeof window !== 'undefined'
+    && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches)
+
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
@@ -386,9 +391,11 @@ export default function LiveInterviewV2() {
     }
   }, [tts.speaking]);
 
+  // On mobile: active=false prevents MediaPipe / TF.js / face-api from ever loading.
+  // This keeps the page lightweight on phones (they can't do the interview anyway).
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
-    active: session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING,
+    active: !isMobile && (session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING),
     faceInterval: 1500, objectInterval: 4000, emotionInterval: 5000,
   })
 
