@@ -184,8 +184,25 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
   const isImmersive = isFullscreenMode
 
-  if (isImmersive) return null
+  // ⚠️ These hooks MUST be declared before any early return — React requires
+  // hooks to always be called in the same order on every render.
+  const prevPathRef = useRef(location.pathname)
+  useEffect(() => {
+    if (mobile && prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname
+      onNavigate?.()
+    }
+  }, [location.pathname, mobile, onNavigate])
 
+  const handleItemClick = (path) => {
+    if (mobile && onNavigate) {
+      onNavigate()
+    }
+    if (path) navigate(path)
+  }
+
+  // Compute nav content — must be before early return so JSX can use them,
+  // but these are plain variables (not hooks) so order relative to return is fine.
   const getNavSections = () => {
     if (!user) return NAV_SECTIONS
     if (user.role === 'recruiter') {
@@ -207,22 +224,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const isPro = userPlan.includes('pro')
   const hasCrown = isPremium || isPro
 
-  const prevPathRef = useRef(location.pathname)
-  useEffect(() => {
-    if (mobile && prevPathRef.current !== location.pathname) {
-      prevPathRef.current = location.pathname
-      onNavigate?.()
-    }
-  }, [location.pathname, mobile, onNavigate])
+  if (isImmersive) return null
 
-  const handleItemClick = (path) => {
-    // Close drawer FIRST (immediately), then navigate
-    // This ensures sidebar closes before route change on mobile
-    if (mobile && onNavigate) {
-      onNavigate()
-    }
-    if (path) navigate(path)
-  }
 
   return (
     <motion.aside
