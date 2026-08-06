@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Camera, Mic, Volume2, MonitorCheck, CheckCircle2, AlertCircle,
-  Loader2, ArrowRight, RefreshCw, ShieldCheck, User,
+  Loader2, ArrowRight, RefreshCw, ShieldCheck, User, Smartphone, Monitor,
 } from 'lucide-react'
 import FlowStepper from './FlowStepper'
 import { useTextToSpeech } from '../../../hooks/useSpeech'
@@ -90,6 +90,14 @@ export default function SystemCheckStep({
   const [enteringFs, setEnteringFs] = useState(false)
   const startedRef = useRef(false)
 
+  // Detect mobile: narrow screen OR touch-only (coarse pointer) device
+  const isMobile = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const narrowScreen = window.innerWidth < 768
+    const touchOnly = window.matchMedia('(pointer: coarse)').matches
+    return narrowScreen || touchOnly
+  }, [])
+
   const mic = useMicLevelTest()
   const tts = useTextToSpeech({ rate: 0.95 })
   const [speakerConfirmed, setSpeakerConfirmed] = useState(null) // null | true | false
@@ -148,6 +156,37 @@ export default function SystemCheckStep({
       <div className="pointer-events-none absolute -bottom-40 -right-20 h-[420px] w-[420px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl py-8 sm:py-10 px-4 sm:px-6 lg:px-8">
+
+        {/* ⚠️ Mobile warning — shown first, before any other content */}
+        {isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 p-5 shadow-sm"
+          >
+            <div className="flex items-start gap-4">
+              <div className="shrink-0 h-11 w-11 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center">
+                <Smartphone className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-extrabold text-amber-900 leading-tight mb-1">
+                  📵 Mobile not supported for Live Interview
+                </p>
+                <p className="text-[12.5px] text-amber-800/80 font-medium leading-relaxed">
+                  Live interviews require a large screen, fullscreen mode, and a front-facing camera — features that work best on a laptop or desktop.
+                  Please switch devices to take this interview.
+                </p>
+                <div className="mt-3 inline-flex items-center gap-2 bg-amber-100 border border-amber-200 rounded-full px-3 py-1.5">
+                  <Monitor className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+                  <span className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wide">
+                    Use a Desktop or Laptop to continue
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         <div className="flex items-center justify-between mb-8 gap-4">
           <FlowStepper current={3} />
           <button
@@ -339,11 +378,26 @@ export default function SystemCheckStep({
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleEnterAndStart}
-                      disabled={enteringFs}
-                      className="inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white text-[14px] font-bold shadow-lg shadow-[#2E9BDA]/25 disabled:opacity-60 transition-all"
+                      disabled={enteringFs || isMobile}
+                      title={isMobile ? 'Switch to a desktop or laptop to start the interview' : undefined}
+                      className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg disabled:opacity-60 transition-all ${
+                        isMobile
+                          ? 'bg-amber-200 text-amber-800 border-2 border-amber-300 cursor-not-allowed shadow-none'
+                          : 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white shadow-[#2E9BDA]/25'
+                      }`}
                     >
-                      {enteringFs ? <><Loader2 className="h-4 w-4 animate-spin" /> Entering full-screen…</> : <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen & Start</>}
+                      {isMobile
+                        ? <><Smartphone className="h-4 w-4" /> Not available on mobile</>
+                        : enteringFs
+                          ? <><Loader2 className="h-4 w-4 animate-spin" /> Entering full-screen…</>
+                          : <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start</>
+                      }
                     </motion.button>
+                    {isMobile && (
+                      <p className="text-[11.5px] text-amber-700 font-semibold">
+                        Please open this page on a laptop or desktop to start the interview.
+                      </p>
+                    )}
                     <button type="button" onClick={() => setStep('speaker')} className="block mx-auto text-[12px] font-bold text-blue-400 hover:text-[#1d6fa5] transition-colors">
                       ← Re-check speaker
                     </button>
