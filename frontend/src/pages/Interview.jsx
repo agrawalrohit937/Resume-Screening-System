@@ -83,17 +83,17 @@ function TabBtn({ active, onClick, icon, children }) {
             onClick={onClick}
             whileHover={{ scale: active ? 1 : 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 select-none outline-none ${active
-                ? 'text-white bg-indigo-600 shadow-lg shadow-indigo-200/70'
-                : 'text-slate-600 bg-white/70 hover:bg-white hover:text-slate-900 border border-slate-200'
+            className={`relative flex flex-1 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all duration-200 select-none outline-none ${active
+                ? 'text-white bg-indigo-600 shadow-md shadow-indigo-200/70'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent'
                 }`}
         >
-            <span className={`inline-flex h-7 w-7 items-center justify-center rounded-xl ${active ? 'bg-white/20' : 'bg-slate-100'}`}>
+            <span className={`inline-flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg sm:rounded-xl ${active ? 'bg-white/20' : 'bg-slate-200/60 sm:bg-slate-100'}`}>
                 {icon}
             </span>
-            <span className="whitespace-nowrap">{children}</span>
+            <span className="whitespace-nowrap truncate">{children}</span>
             {active && (
-                <span className="pointer-events-none absolute -bottom-1 left-5 right-5 h-0.5 rounded-full bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300" />
+                <span className="pointer-events-none absolute -bottom-1 left-3 right-3 sm:left-5 sm:right-5 h-0.5 rounded-full bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300" />
             )}
         </motion.button>
     )
@@ -513,15 +513,15 @@ function MCQPractice() {
 
     // ── Setup Screen ──────────────────────────────────────────────
     if (!questions && !loading) return (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-12">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-4">
-                <div className="lg:sticky lg:top-6 space-y-5 rounded-3xl border border-white bg-white/80 p-6 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
-                    <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                <div className="lg:sticky lg:top-6 space-y-4 sm:space-y-5 rounded-3xl border border-white bg-white/80 p-4 sm:p-6 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+                    <div className="flex items-center gap-3 border-b border-slate-100 pb-3.5 sm:pb-4">
+                        <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 shrink-0">
                             <Layers className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold tracking-tight text-slate-900">Build Your Practice Session</h3>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900">Build Your Practice Session</h3>
                             <p className="text-xs text-slate-400">Pick a topic, we'll handle the rest</p>
                         </div>
                     </div>
@@ -529,14 +529,14 @@ function MCQPractice() {
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">Topic</label>
                         <input value={topic} onChange={e => setTopic(e.target.value)} onKeyDown={e => e.key === 'Enter' && generate()}
                             placeholder="e.g. React Hooks, SQL Joins…"
-                            className="block w-full rounded-xl border border-gray-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10" />
+                            className="block w-full rounded-xl border border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10" />
                     </div>
                     <div>
                         <p className="mb-2 text-xs font-medium text-slate-500">Quick-pick a topic</p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {QUICK_TOPICS.map(t => (
                                 <button key={t} onClick={() => setTopic(t)}
-                                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${topic === t ? 'border-violet-400 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-600'
+                                    className={`rounded-lg border px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold transition-all ${topic === t ? 'border-violet-400 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-600'
                                         }`}>{t}</button>
                             ))}
                         </div>
@@ -554,7 +554,7 @@ function MCQPractice() {
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">Number of Questions</label>
                         <select value={numQ} onChange={e => setNumQ(+e.target.value)}
-                            className="block w-full rounded-xl border-gray-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10">
+                            className="block w-full rounded-xl border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10">
                             {[5, 8, 10, 15].map(n => <option key={n} value={n}>{n} questions</option>)}
                         </select>
                     </div>
@@ -567,25 +567,25 @@ function MCQPractice() {
                     </button>
                 </div>
             </motion.div>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="lg:col-span-8 flex h-[600px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/40 text-center px-6">
-                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-violet-50 text-violet-500 shadow-inner">
-                    <Brain className="h-9 w-9" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="lg:col-span-8 flex min-h-[300px] py-10 lg:h-[600px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/40 text-center px-4 sm:px-6">
+                <div className="mb-4 sm:mb-6 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-2xl bg-violet-50 text-violet-500 shadow-inner">
+                    <Brain className="h-8 w-8 sm:h-9 sm:w-9" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800">Test your knowledge instantly</h2>
-                <p className="mt-3 max-w-md text-slate-500">Pick a topic, set difficulty, and generate AI questions. Submit each answer to see the correct option with a full explanation.</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Test your knowledge instantly</h2>
+                <p className="mt-2 sm:mt-3 max-w-md text-xs sm:text-sm text-slate-500 leading-relaxed">Pick a topic, set difficulty, and generate AI questions. Submit each answer to see the correct option with a full explanation.</p>
             </motion.div>
         </div>
     )
 
     // ── Loading ───────────────────────────────────────────────────
     if (loading) return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[500px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/50 text-center px-6">
-            <div className="relative mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-violet-50">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex min-h-[350px] py-12 lg:h-[500px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/50 text-center px-6">
+            <div className="relative mb-6 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full bg-violet-50">
                 <div className="absolute inset-0 rounded-full border-4 border-violet-100 border-t-violet-600 animate-spin" />
-                <Brain className="h-8 w-8 text-violet-500 animate-pulse" />
+                <Brain className="h-7 w-7 sm:h-8 sm:w-8 text-violet-500 animate-pulse" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800">Building your "{topic}" questions</h3>
-            <p className="mt-2 max-w-sm text-sm text-slate-500">Our AI is crafting personalized {difficulty} questions just for you.</p>
+            <h3 className="text-lg sm:text-xl font-bold text-slate-800">Building your "{topic}" questions</h3>
+            <p className="mt-2 max-w-sm text-xs sm:text-sm text-slate-500">Our AI is crafting personalized {difficulty} questions just for you.</p>
             <AnimatePresence mode="wait">
                 <motion.p key={loadingMsg} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                     className="mt-4 text-xs font-semibold uppercase tracking-widest text-violet-500">
@@ -597,16 +597,16 @@ function MCQPractice() {
 
     // ── Summary ───────────────────────────────────────────────────
     if (finished) return (
-        <div className="rounded-3xl border border-white bg-white/80 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+        <div className="rounded-3xl border border-white bg-white/80 p-4 sm:p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
             <QuizSummary score={score} total={questions.length} topic={topic} difficulty={difficulty} onRetry={reset} />
         </div>
     )
 
     // ── Active Quiz ───────────────────────────────────────────────
     return (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-12">
             <div className="lg:col-span-3">
-                <div className="lg:sticky lg:top-6 space-y-4 rounded-2xl border border-white bg-white/80 p-5 shadow-xl shadow-slate-200/40 backdrop-blur-xl">
+                <div className="lg:sticky lg:top-6 space-y-4 rounded-2xl border border-white bg-white/80 p-4 sm:p-5 shadow-xl shadow-slate-200/40 backdrop-blur-xl">
                     <div><p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Topic</p><p className="text-sm font-bold text-slate-800">{topic}</p></div>
                     <div>
                         <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Difficulty</p>
@@ -630,7 +630,7 @@ function MCQPractice() {
                 </div>
             </div>
             <div className="lg:col-span-9">
-                <div className="rounded-3xl border border-white bg-white/80 p-7 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+                <div className="rounded-3xl border border-white bg-white/80 p-4 sm:p-7 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
                     <AnimatePresence mode="wait">
                         <MCQCard key={currentIdx} question={questions[currentIdx]} questionIndex={currentIdx}
                             totalQuestions={questions.length} onNext={handleNext} isLast={currentIdx >= questions.length - 1} />
@@ -700,16 +700,16 @@ function FullMockInterview({ resumes }) {
     }
 
     return (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-12">
             {/* Config Panel */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-4">
-                <form onSubmit={handleSubmit(onSubmit)} className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-6 rounded-3xl border border-white bg-white/80 p-6 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
-                    <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                <form onSubmit={handleSubmit(onSubmit)} className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-5 sm:space-y-6 rounded-3xl border border-white bg-white/80 p-4 sm:p-6 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+                    <div className="flex items-center gap-3 border-b border-slate-100 pb-3.5 sm:pb-4">
+                        <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 shrink-0">
                             <SlidersHorizontal className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold tracking-tight text-slate-900">Build Your Interview</h3>
+                            <h3 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900">Build Your Interview</h3>
                             <p className="text-xs text-slate-400">Takes about 30 seconds</p>
                         </div>
                     </div>
@@ -720,7 +720,7 @@ function FullMockInterview({ resumes }) {
                             <p className="text-sm text-slate-500">Syncing profile data…</p>
                         </div>
                     ) : autoData ? (
-                        <div className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white p-5">
+                        <div className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white p-4 sm:p-5">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Auto-Filled</span>
                             <div className="mt-3 space-y-3">
                                 <div className="flex items-start gap-2.5">
@@ -737,21 +737,21 @@ function FullMockInterview({ resumes }) {
                         <div className="space-y-4">
                             <div>
                                 <label className="mb-1.5 block text-sm font-medium text-slate-700">Resume</label>
-                                <select {...register('resume_id', { required: true })} className="block w-full rounded-xl border-gray-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
+                                <select {...register('resume_id', { required: true })} className="block w-full rounded-xl border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
                                     <option value="">— Select Resume —</option>
                                     {resumes.map(r => <option key={r.id} value={r.id}>{r.original_filename}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="mb-1.5 block text-sm font-medium text-slate-700">Target Role</label>
-                                <input {...register('job_title')} placeholder="e.g. Senior Frontend Engineer" className="block w-full rounded-xl border-gray-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10" />
+                                <input {...register('job_title')} placeholder="e.g. Senior Frontend Engineer" className="block w-full rounded-xl border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10" />
                             </div>
                         </div>
                     )}
 
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">Interview Type</label>
-                        <select {...register('interview_type')} className="block w-full rounded-xl border-gray-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
+                        <select {...register('interview_type')} className="block w-full rounded-xl border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
                             <option value="mixed">Mixed (Tech + Behavioral)</option>
                             <option value="technical">Technical Deep-Dive</option>
                             <option value="behavioral">Behavioral (STAR Method)</option>
@@ -773,7 +773,7 @@ function FullMockInterview({ resumes }) {
 
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">Interview Length</label>
-                        <select {...register('num_questions')} className="block w-full rounded-xl border-gray-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
+                        <select {...register('num_questions')} className="block w-full rounded-xl border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
                             {[5, 10, 15, 20].map(n => <option key={n} value={n}>{n} questions · ~{n * 4} min</option>)}
                         </select>
                     </div>
@@ -797,13 +797,13 @@ function FullMockInterview({ resumes }) {
             {/* Results */}
             <motion.div layout className="lg:col-span-8">
                 {loading ? (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[600px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/50 text-center px-6">
-                        <div className="relative mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-indigo-50">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex min-h-[350px] py-12 lg:h-[600px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/50 text-center px-4 sm:px-6">
+                        <div className="relative mb-6 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full bg-indigo-50">
                             <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" />
-                            <Sparkles className="h-8 w-8 text-indigo-500 animate-pulse" />
+                            <Sparkles className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-500 animate-pulse" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800">Preparing your interview</h3>
-                        <p className="mt-2 max-w-sm text-sm text-slate-500">Our AI is analyzing your resume and preparing a personalized interview experience.</p>
+                        <h3 className="text-lg sm:text-xl font-bold text-slate-800">Preparing your interview</h3>
+                        <p className="mt-2 max-w-sm text-xs sm:text-sm text-slate-500">Our AI is analyzing your resume and preparing a personalized interview experience.</p>
                         <AnimatePresence mode="wait">
                             <motion.p key={loadingMsg} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                                 className="mt-4 text-xs font-semibold uppercase tracking-widest text-indigo-500">
@@ -817,24 +817,24 @@ function FullMockInterview({ resumes }) {
                         {!hasStarted ? (
                             // Intro Screen (Visible immediately after generation)
                             <div className="overflow-hidden rounded-3xl border border-indigo-100 bg-white shadow-xl shadow-slate-200/40">
-                                <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-8 text-white">
+                                <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-5 sm:p-8 text-white">
                                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
                                         <CheckCircle2 className="h-3.5 w-3.5" /> Interview ready
                                     </span>
-                                    <h2 className="mt-3 text-2xl font-bold">{interview.job_title || 'Custom Interview'}</h2>
-                                    <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-indigo-100 opacity-90">
+                                    <h2 className="mt-3 text-xl sm:text-2xl font-bold">{interview.job_title || 'Custom Interview'}</h2>
+                                    <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-indigo-100 opacity-90">
                                         <span className="inline-flex items-center gap-1.5"><ListChecks className="h-4 w-4" /> {interview.questions.length} Questions</span>
                                         <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> Approx {interview.estimated_duration_minutes} minutes</span>
                                     </p>
                                 </div>
                                 {interview.preparation_tips?.length > 0 && (
-                                    <div className="bg-white p-8">
-                                        <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-400">
+                                    <div className="bg-white p-5 sm:p-8">
+                                        <h3 className="mb-4 flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-400">
                                             <Lightbulb className="h-4 w-4" /> Before You Begin
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             {interview.preparation_tips.map((tip, i) => (
-                                                <div key={i} className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                                                <div key={i} className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs sm:text-sm text-slate-700">
                                                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-600">
                                                         <Check className="h-3 w-3" />
                                                     </span>{tip}
@@ -844,10 +844,10 @@ function FullMockInterview({ resumes }) {
                                     </div>
                                 )}
                                 {/* Start Interview Button */}
-                                <div className="bg-slate-50 p-6 flex justify-end border-t border-slate-100">
+                                <div className="bg-slate-50 p-4 sm:p-6 flex justify-end border-t border-slate-100">
                                     <button 
                                         onClick={() => setHasStarted(true)} 
-                                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-[0.98]"
+                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-[0.98]"
                                     >
                                         Start Interview <ArrowRight className="h-4 w-4" />
                                     </button>
@@ -857,14 +857,14 @@ function FullMockInterview({ resumes }) {
                             // Interview Questions View (Appears after clicking 'Start Interview')
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Your Questions</h3>
+                                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest text-slate-400">Your Questions</h3>
                                     <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
                                         <button type="button" onClick={() => setViewMode('focus')}
-                                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${viewMode === 'focus' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-all ${viewMode === 'focus' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}>
                                             <Focus className="h-3.5 w-3.5" /> Focus
                                         </button>
                                         <button type="button" onClick={() => setViewMode('list')}
-                                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}>
                                             <Rows3 className="h-3.5 w-3.5" /> All Questions
                                         </button>
                                     </div>
@@ -878,18 +878,18 @@ function FullMockInterview({ resumes }) {
                                         </AnimatePresence>
                                         <div className="flex items-center justify-between gap-3">
                                             <button type="button" onClick={() => setActiveIndex(i => Math.max(0, i - 1))} disabled={activeIndex === 0}
-                                                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                                className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200 bg-white px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
                                                 <ArrowLeft className="h-4 w-4" /> Previous
                                             </button>
-                                            <span className="text-xs font-medium text-slate-400">Question {activeIndex + 1} of {interview.questions.length}</span>
+                                            <span className="text-[11px] sm:text-xs font-medium text-slate-400">Q {activeIndex + 1} of {interview.questions.length}</span>
                                             {activeIndex === interview.questions.length - 1 ? (
                                                 <button type="button" onClick={() => setViewMode('list')}
-                                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:bg-indigo-700">
+                                                    className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-indigo-600 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:bg-indigo-700">
                                                     Review All <Rows3 className="h-4 w-4" />
                                                 </button>
                                             ) : (
                                                 <button type="button" onClick={() => setActiveIndex(i => Math.min(interview.questions.length - 1, i + 1))}
-                                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:bg-indigo-700">
+                                                    className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-indigo-600 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:bg-indigo-700">
                                                     Next <ArrowRight className="h-4 w-4" />
                                                 </button>
                                             )}
@@ -906,15 +906,15 @@ function FullMockInterview({ resumes }) {
                         )}
                     </motion.div>
                 ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex h-[600px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/40 text-center px-6">
-                        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 shadow-inner">
-                            <Mic className="h-9 w-9" />
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex min-h-[300px] py-10 lg:h-[600px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white/40 text-center px-4 sm:px-6">
+                        <div className="mb-4 sm:mb-6 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 shadow-inner">
+                            <Mic className="h-8 w-8 sm:h-9 sm:w-9" />
                         </div>
-                        <h2 className="text-2xl font-bold text-slate-800">Step into the interview room</h2>
-                        <p className="mt-3 max-w-md text-slate-500">Set your resume, target role, and difficulty on the left — we'll build a personalized mock interview around them.</p>
-                        <div className="mt-6 flex flex-wrap justify-center gap-2">
+                        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Step into the interview room</h2>
+                        <p className="mt-2 sm:mt-3 max-w-md text-xs sm:text-sm text-slate-500 leading-relaxed">Set your resume, target role, and difficulty on the left — we'll build a personalized mock interview around them.</p>
+                        <div className="mt-4 sm:mt-6 flex flex-wrap justify-center gap-1.5 sm:gap-2">
                             {['Built from your resume', 'Real interview structure', 'Ready in seconds'].map(f => (
-                                <span key={f} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500">
+                                <span key={f} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium text-slate-500">
                                     <Check className="h-3 w-3 text-indigo-500" /> {f}
                                 </span>
                             ))}
@@ -939,11 +939,11 @@ export default function Interview() {
     }, [])
 
     return (
-        <div className="min-h-screen bg-slate-50 [background-image:radial-gradient(circle_at_1px_1px,theme(colors.slate.200)_1px,transparent_0)] [background-size:24px_24px] p-6 font-sans text-slate-900">
-            <div className="mx-auto max-w-7xl space-y-8">
+        <div className="min-h-screen bg-slate-50 [background-image:radial-gradient(circle_at_1px_1px,theme(colors.slate.200)_1px,transparent_0)] [background-size:24px_24px] p-3.5 sm:p-6 md:p-8 font-sans text-slate-900">
+            <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
                 {/* Hero Header */}
                 <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
-                    className="relative overflow-hidden rounded-3xl border border-indigo-100/70 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-8 shadow-sm sm:p-10">
+                    className="relative overflow-hidden rounded-3xl border border-indigo-100/70 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-8 lg:p-10 shadow-sm">
                     <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-indigo-200/30 blur-3xl" />
                     <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-violet-200/30 blur-3xl" />
                     <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -951,24 +951,24 @@ export default function Interview() {
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white/80 px-3 py-1 text-xs font-semibold text-indigo-600 shadow-sm">
                                 <Sparkles className="h-3.5 w-3.5" /> AI Interview Coach
                             </span>
-                            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Walk in ready.</h1>
-                            <p className="mt-3 text-base text-slate-600">
+                            <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">Walk in ready.</h1>
+                            <p className="mt-2.5 text-sm sm:text-base text-slate-600 leading-relaxed">
                                 AI-crafted mock interviews built from your resume and target role — practice the questions you'll actually face.
                             </p>
-                            <div className="mt-5 flex flex-wrap gap-2">
+                            <div className="mt-4 sm:mt-5 flex flex-wrap gap-1.5 sm:gap-2">
                                 {[
                                     { icon: Sparkles, label: 'AI-Powered' },
                                     { icon: FileText, label: 'Resume-Matched' },
                                     { icon: Target, label: 'Personalized' },
                                     { icon: Zap, label: 'Instant Generation' },
                                 ].map(({ icon: Icon, label }) => (
-                                    <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                                    <span key={label} className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white/70 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-slate-600">
                                         <Icon className="h-3.5 w-3.5 text-indigo-500" /> {label}
                                     </span>
                                 ))}
                             </div>
                         </div>
-                        <div className="flex gap-2 self-start rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm lg:self-end">
+                        <div className="flex w-full sm:w-auto gap-1.5 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1.5 shadow-sm sm:bg-white self-stretch lg:self-end">
                             <TabBtn active={activeTab === 'mcq'} onClick={() => setActiveTab('mcq')} icon={<Zap className="h-4 w-4" />}>Quick MCQ Practice</TabBtn>
                             <TabBtn active={activeTab === 'mock'} onClick={() => setActiveTab('mock')} icon={<Mic className="h-4 w-4" />}>Full Mock Interview</TabBtn>
                         </div>

@@ -455,31 +455,63 @@ def evaluate_strict_keyword_match(raw_text: str, skill_universe: List[str]) -> S
 # 4. VECTOR SEMANTIC SIMILARITY & KNOCKOUT MATH ENGINES
 # ══════════════════════════════════════════════════════════════════════════
 
-import os
-import requests
-from services.skill_ontology import evaluate_skill_fulfillment
-from services.nlp_extractor import extract_skills_deterministic
+import math
+from collections import Counter
 
-# Hugging Face API Configuration (Zero Local RAM consumption)
-HF_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
-HF_TOKEN = os.environ.get("HF_TOKEN")
+_ENGLISH_STOPWORDS = {
+    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
+    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
+    "can", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from",
+    "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself", "him", "himself",
+    "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "just", "me", "more", "most",
+    "my", "myself", "no", "nor", "not", "now", "of", "off", "on", "once", "only", "or", "other", "our",
+    "ours", "ourselves", "out", "over", "own", "same", "she", "should", "so", "some", "such", "than",
+    "that", "the", "their", "theirs", "them", "themselves", "then", "there", "these", "they", "this",
+    "those", "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what",
+    "when", "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours",
+    "resume", "experience", "education", "skills", "project", "projects", "work", "responsibilities"
+}
+
+
+def compute_tfidf_cosine_similarity(text1: str, text2: str) -> float:
+    """Computes TF-IDF cosine similarity between two text blocks (0.0 to 100.0%)."""
+    words1 = [w for w in re.findall(r"\b[a-zA-Z0-9+#.-]{2,}\b", (text1 or "").lower()) if w not in _ENGLISH_STOPWORDS]
+    words2 = [w for w in re.findall(r"\b[a-zA-Z0-9+#.-]{2,}\b", (text2 or "").lower()) if w not in _ENGLISH_STOPWORDS]
+
+    if not words1 or not words2:
+        return 0.0
+
+    tf1 = Counter(words1)
+    tf2 = Counter(words2)
+
+    common_terms = set(tf1.keys()).intersection(set(tf2.keys()))
+    if not common_terms:
+        return 0.0
+
+    dot_product = sum(tf1[term] * tf2[term] for term in common_terms)
+    mag1 = math.sqrt(sum(v ** 2 for v in tf1.values()))
+    mag2 = math.sqrt(sum(v ** 2 for v in tf2.values()))
+
+    if mag1 == 0 or mag2 == 0:
+        return 0.0
+
+    cosine_sim = dot_product / (mag1 * mag2)
+    return round(min(100.0, max(0.0, cosine_sim * 100.0)), 1)
 
 
 def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
     """
-    Calculates semantic similarity using Hugging Face Inference API.
-    Zero RAM consumption on the local server — prevents 512MB OOM crashes.
+    Calculates semantic similarity using Hugging Face Inference API or TF-IDF Cosine Similarity fallback.
     Returns AI Match Score on a 0-100 percentage scale.
     """
     if not resume_text or not jd_text:
         return 0.0
 
-    # 1. Hugging Face API Call (Primary - Accurate & Lightweight)
     if HF_TOKEN:
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
         payload = {
             "inputs": {
-                "source_sentence": jd_text[:2500],  # Limit length for API efficiency
+                "source_sentence": jd_text[:2500],
                 "sentences": [resume_text[:2500]]
             }
         }
@@ -487,42 +519,27 @@ def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
             response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=12)
             if response.status_code == 200:
                 similarity_score = response.json()[0]
-                return max(0.0, min(100.0, round(float(similarity_score) * 100, 2)))
+                val = float(similarity_score)
+                val_pct = val * 100.0 if val <= 1.0 else val
+                return max(0.0, min(100.0, round(val_pct, 1)))
             else:
                 logger.warning("HuggingFace API returned non-200 status", status=response.status_code, response=response.text)
         except Exception as e:
-            logger.warning("HuggingFace API call failed, falling back to basic math similarity", error=str(e))
+            logger.warning("HuggingFace API call failed, falling back to TF-IDF similarity", error=str(e))
 
-    # 2. Ultra-Lightweight Pure Python Fallback (No scikit-learn / numpy needed)
-    # Uses Jaccard Word Overlap to save 100% of ML library RAM
-    try:
-        r_words = set(re.findall(r"\w+", resume_text.lower()))
-        j_words = set(re.findall(r"\w+", jd_text.lower()))
-        if not r_words or not j_words:
-            return 0.0
-        
-        intersection = r_words.intersection(j_words)
-        union = r_words.union(j_words)
-        jaccard_sim = len(intersection) / len(union)
-        
-        # Scale Jaccard (usually lower than cosine) to a realistic 0-100 score
-        return max(0.0, min(100.0, round((jaccard_sim * 2.5) * 100, 2)))
-    except Exception:
-        return 50.0
-    finally:
-        gc.collect()
+    # Fast, high-accuracy TF-IDF Cosine Similarity fallback
+    return compute_tfidf_cosine_similarity(resume_text, jd_text)
 
 
-def evaluate_knockout_math(extracted_data: dict, jd_text: str) -> Dict[str, Any]:
+def evaluate_knockout_math(extracted_data: dict, jd_text: str, skill_universe: List[str] = None) -> Dict[str, Any]:
     """
     Calculates deterministic weighted scores:
     - Mandatory Skills (50%)
     - Experience (30%)
     - Education (20%)
-    Evaluates required skills using Skill Ontology equivalence.
     """
-    cand_skills = extracted_data.get("skills", [])
-    jd_skills = extract_skills_deterministic(jd_text)
+    cand_skills = extracted_data.get("skills", []) or extracted_data.get("technical_skills", [])
+    jd_skills = skill_universe or extract_skills_deterministic(jd_text)
 
     matched_skills = []
     missing_skills = []
@@ -536,27 +553,27 @@ def evaluate_knockout_math(extracted_data: dict, jd_text: str) -> Dict[str, Any]
                 missing_skills.append(req_skill)
         skills_score = len(matched_skills) / len(jd_skills)
     else:
-        skills_score = 0.8
+        skills_score = 0.5
 
     # Experience ratio
     cand_exp = float(extracted_data.get("total_experience_years") or 0.0)
     years_req = _extract_years_requirement(jd_text)
     required_exp = years_req[0] if years_req else 0.0
-    exp_score = min(1.0, cand_exp / required_exp) if required_exp > 0 else 1.0
+    exp_score = min(1.0, cand_exp / required_exp) if required_exp > 0 else (0.8 if cand_exp > 0 else 0.5)
 
     # Education rank ratio
     degree_req = _extract_degree_requirement(jd_text)
     required_rank = degree_req[0] if degree_req else 1
     cand_rank, _ = _candidate_max_degree_rank(extracted_data)
-    edu_score = 1.0 if cand_rank >= required_rank else cand_rank / max(required_rank, 1)
+    edu_score = 1.0 if cand_rank >= required_rank else (cand_rank / max(required_rank, 1) if cand_rank > 0 else 0.6)
 
     math_score = (skills_score * 0.50) + (exp_score * 0.30) + (edu_score * 0.20)
 
     return {
-        "skills_score": round(skills_score * 100, 2),
-        "experience_score": round(exp_score * 100, 2),
-        "education_score": round(edu_score * 100, 2),
-        "knockout_math_score": round(math_score * 100, 2),
+        "skills_score": round(skills_score * 100, 1),
+        "experience_score": round(exp_score * 100, 1),
+        "education_score": round(edu_score * 100, 1),
+        "knockout_math_score": round(math_score * 100, 1),
         "matched_skills": matched_skills,
         "missing_skills": missing_skills,
     }
@@ -579,11 +596,11 @@ def run_strict_ats_check(
     parsing_health = evaluate_parsing_health(raw_text)
     knockout = evaluate_knockout(extracted_data or {}, jd_text or "")
     keyword_match = evaluate_strict_keyword_match(raw_text, skill_universe or [])
-    math_result = evaluate_knockout_math(extracted_data or {}, jd_text or "")
+    math_result = evaluate_knockout_math(extracted_data or {}, jd_text or "", skill_universe or [])
     vector_score = compute_vector_similarity(raw_text or "", jd_text or "")
 
-    # Dual-Stage Blended Score (70% Knockout Math + 30% Dense Vector Similarity)
-    final_score = round((math_result["knockout_math_score"] * 0.70) + (vector_score * 0.30), 2)
+    # Dual-Stage Blended Score (60% Skill Knockout Math + 40% Dense Vector Similarity)
+    final_score = round((math_result["knockout_math_score"] * 0.60) + (vector_score * 0.40), 1)
 
     logger.info(
         "Strict ATS check complete",

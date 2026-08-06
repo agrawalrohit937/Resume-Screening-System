@@ -2,20 +2,52 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useDropzone } from 'react-dropzone'
+import { 
+  Building2, Sparkles, FileText, UploadCloud, CheckCircle2, AlertTriangle, 
+  Search, SlidersHorizontal, ArrowRight, Download, Github, Linkedin, ExternalLink, 
+  UserCheck, Briefcase, Target, Award, Zap, RefreshCw, X, Check, Code, Layers, 
+  BrainCircuit, Users, Filter, Sliders
+} from 'lucide-react'
 import api, { generatePDF } from '../services/api'
 import GithubHoverCard from '../components/recruiter/GithubHoverCard'
 
-// ─── utils ────────────────────────────────────────────────────────────────────
-// [BUG-001] final_score is on a 0-100 scale — just round it, don't multiply by 100.
-const pct = v => Math.round(v || 0)
-const sc  = p => p >= 80 ? '#10B981' : p >= 60 ? '#6366F1' : p >= 40 ? '#F59E0B' : '#F43F5E'
-const sb  = p => p >= 80 ? { bg:'#ECFDF5', bd:'#A7F3D0', tx:'#065F46' }
-                : p >= 60 ? { bg:'#EFF6FF', bd:'#BFDBFE', tx:'#1E40AF' }
-                : p >= 40 ? { bg:'#FFFBEB', bd:'#FDE68A', tx:'#92400E' }
-                :            { bg:'#FFF1F2', bd:'#FECDD3', tx:'#881337' }
+// ─── Score Utilities ──────────────────────────────────────────────────────────
+const pct = (v) => Math.round(v || 0)
 
-const LANG_CLR = { Python:'#3572A5', JavaScript:'#F7DF1E', TypeScript:'#2B7489',
-  Go:'#00ADD8', Rust:'#DEA584', Java:'#B07219', 'C++':'#F34B7D' }
+const getScoreTheme = (p) => {
+  if (p >= 80) return {
+    text: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200/80',
+    badgeText: 'text-emerald-700',
+    barFill: 'bg-emerald-500',
+    stroke: '#10B981'
+  }
+  if (p >= 60) return {
+    text: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200/80',
+    badgeText: 'text-indigo-700',
+    barFill: 'bg-indigo-500',
+    stroke: '#6366F1'
+  }
+  if (p >= 40) return {
+    text: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200/80',
+    badgeText: 'text-amber-700',
+    barFill: 'bg-amber-500',
+    stroke: '#F59E0B'
+  }
+  return {
+    text: 'text-rose-600',
+    bg: 'bg-rose-50',
+    border: 'border-rose-200/80',
+    badgeText: 'text-rose-700',
+    barFill: 'bg-rose-500',
+    stroke: '#F43F5E'
+  }
+}
 
 const SAMPLE_JD = `Senior Python Developer — AI platform backend
 
@@ -27,18 +59,22 @@ Requirements:
 • Cloud infrastructure (AWS preferred)
 • Docker and container orchestration`
 
-// ─── MiniBar ──────────────────────────────────────────────────────────────────
-function Bar({ label, val, color }) {
+// ─── Mini Progress Bar ────────────────────────────────────────────────────────
+function ScoreBar({ label, val, colorClass }) {
   const p = pct(val)
   return (
-    <div>
-      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#94A3B8', fontWeight:600 }}>{label}</span>
-        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, fontWeight:700, color }}>{p}%</span>
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px] font-bold">
+        <span className="text-slate-400 uppercase tracking-wider">{label}</span>
+        <span className="text-slate-700 font-mono">{p}%</span>
       </div>
-      <div style={{ height:4, borderRadius:100, background:'#F1F5F9', overflow:'hidden' }}>
-        <motion.div initial={{ width:0 }} animate={{ width:`${p}%` }} transition={{ duration:1, ease:[0.16,1,0.3,1] }}
-          style={{ height:'100%', borderRadius:100, background:color }}/>
+      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${p}%` }}
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          className={`h-full rounded-full ${colorClass}`}
+        />
       </div>
     </div>
   )
@@ -47,487 +83,645 @@ function Bar({ label, val, color }) {
 // ─── Candidate Card ───────────────────────────────────────────────────────────
 function CandidateCard({ c, idx }) {
   const s = pct(c.final_score)
-  const color = sc(s)
-  const bg = sb(s)
+  const theme = getScoreTheme(s)
 
-  const REC = {
-    strong_match:'✅ Strong Match', good_match:'👍 Good Match',
-    partial_match:'🔶 Partial',     poor_match:'❌ Poor Match',
-  }[c.recommendation] || '—'
+  const REC_CONFIG = {
+    strong_match: { label: 'Strong Match', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/70' },
+    good_match: { label: 'Good Match', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200/70' },
+    partial_match: { label: 'Partial Match', bg: 'bg-amber-50 text-amber-700 border-amber-200/70' },
+    poor_match: { label: 'Weak Match', bg: 'bg-rose-50 text-rose-700 border-rose-200/70' },
+  }[c.recommendation] || { label: 'Evaluated', bg: 'bg-slate-100 text-slate-700 border-slate-200' }
 
-  const download = async () => {
+  const handleDownloadPdf = async () => {
     try {
-      // if already URL hai → direct open
       if (c.file_url) {
         window.open(c.file_url, '_blank')
         return
       }
 
-      // warna generate karo
       toast('Generating PDF…', { icon: '⏳' })
-
       const { data } = await generatePDF({
         resume_id: c.resume_id,
         template: 'modern'
       })
 
-      const url = data.pdf_url
-
-      if (url) {
-        window.open(url, '_blank')
+      if (data?.pdf_url) {
+        window.open(data.pdf_url, '_blank')
       } else {
-        toast.error('PDF not available')
+        toast.error('PDF generation not available')
       }
-
     } catch (err) {
       console.error(err)
       toast.error(err.response?.data?.detail || 'Download failed')
     }
   }
+
+  // Rank Badge Styles
+  const getRankBadgeStyle = (rank) => {
+    if (rank === 1) return 'bg-gradient-to-br from-amber-400 to-amber-600 text-white border-amber-300 shadow-md'
+    if (rank === 2) return 'bg-gradient-to-br from-slate-400 to-slate-600 text-white border-slate-300 shadow-sm'
+    if (rank === 3) return 'bg-gradient-to-br from-amber-700 to-amber-900 text-white border-amber-600 shadow-sm'
+    return 'bg-slate-100 text-slate-600 border-slate-200'
+  }
+
   return (
-    <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }}
-      transition={{ delay: idx * 0.04, duration:0.35, ease:[0.16,1,0.3,1] }}
-      whileHover={{ y:-3, boxShadow:'0 12px 32px rgba(0,0,0,0.10)' }}
-      style={{ background:'white', borderRadius:20, border:`1.5px solid ${bg.bd}`,
-        boxShadow:'0 2px 8px rgba(0,0,0,0.05)', overflow:'hidden', transition:'box-shadow 0.2s, transform 0.2s' }}>
-      <div style={{ height:4, background:`linear-gradient(90deg,${color},${color}88)` }}/>
-      <div style={{ padding:'18px 18px 16px' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.04, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -4 }}
+      className={`bg-white rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group`}
+    >
+      {/* Top Accent Line */}
+      <div className={`h-1.5 w-full ${theme.barFill}`} />
 
-        {/* Top row: rank + name + score */}
-        <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:12 }}>
-          <div style={{ width:34, height:34, borderRadius:10, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-            fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:13,
-            background: idx===0?'linear-gradient(135deg,#F59E0B,#D97706)':idx===1?'linear-gradient(135deg,#94A3B8,#64748B)':idx===2?'linear-gradient(135deg,#CD7F32,#A0522D)':'#F1F5F9',
-            color: idx<=2?'white':'#94A3B8' }}>
-            #{c.rank}
-          </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#0F172A',
-              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:2 }}>
-              {c.name || 'Candidate'}
-            </p>
-            {c.email && (
-              <a href={`mailto:${c.email}`}
-                style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#6366F1', textDecoration:'none' }}>
-                {c.email}
-              </a>
-            )}
-          </div>
-          <div style={{ textAlign:'center', flexShrink:0 }}>
-            <div style={{ width:48, height:48, borderRadius:'50%', display:'flex', flexDirection:'column',
-              alignItems:'center', justifyContent:'center', background:bg.bg, border:`2px solid ${bg.bd}` }}>
-              <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:15, color, lineHeight:1 }}>{s}</span>
-              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:7, color, fontWeight:700 }}>%</span>
+      <div className="p-5 space-y-4">
+        {/* Header: Rank + Name + Score Gauge */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-extrabold text-xs shrink-0 border ${getRankBadgeStyle(c.rank)}`}>
+              #{c.rank}
+            </div>
+            <div className="min-w-0">
+              <h4 className="font-extrabold text-base text-slate-900 truncate leading-tight">
+                {c.name || 'Candidate'}
+              </h4>
+              {c.email ? (
+                <a
+                  href={`mailto:${c.email}`}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline truncate block mt-0.5"
+                >
+                  {c.email}
+                </a>
+              ) : (
+                <p className="text-[11px] font-medium text-slate-400 mt-0.5">ATS Evaluated</p>
+              )}
             </div>
           </div>
+
+          {/* Radial percentage gauge */}
+          <div className={`w-12 h-12 rounded-2xl ${theme.bg} border ${theme.border} flex flex-col items-center justify-center shrink-0 shadow-xs`}>
+            <span className={`font-black text-base ${theme.text} leading-none`}>{s}</span>
+            <span className={`text-[8px] font-bold ${theme.text} uppercase mt-0.5`}>% ATS</span>
+          </div>
         </div>
 
-        {/* Rec badge */}
-        <div style={{ display:'inline-flex', padding:'3px 9px', borderRadius:20, marginBottom:10,
-          background:bg.bg, border:`1px solid ${bg.bd}` }}>
-          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, color:bg.tx }}>{REC}</span>
+        {/* Recommendation Badge */}
+        <div>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${REC_CONFIG.bg}`}>
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {REC_CONFIG.label}
+          </span>
         </div>
 
-        {/* Score bars */}
-        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:12 }}>
-          <Bar label="Semantic Match" val={c.bert_score}  color="#6366F1"/>
-          <Bar label="Keyword Match"  val={c.tfidf_score} color="#10B981"/>
-          <Bar label="Overall ATS"   val={c.final_score} color={color}/>
+        {/* Score Breakdown Bars */}
+        <div className="space-y-2.5 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
+          <ScoreBar label="Semantic Match" val={c.bert_score} colorClass="bg-indigo-500" />
+          <ScoreBar label="Keyword Match" val={c.tfidf_score} colorClass="bg-emerald-500" />
+          <ScoreBar label="Overall Score" val={c.final_score} colorClass={theme.barFill} />
         </div>
 
-        {/* Matched skills */}
+        {/* Matched Skills Pills */}
         {c.matched_skills?.length > 0 && (
-          <div style={{ marginBottom:10 }}>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, color:'#64748B',
-              textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Matched</p>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-              {c.matched_skills.slice(0,6).map(sk => (
-                <span key={sk} style={{ padding:'2px 7px', borderRadius:6, background:'#ECFDF5',
-                  border:'1px solid #A7F3D0', fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#065F46', fontWeight:600 }}>
-                  ✓ {sk}
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1.5">
+              Matched Skills ({c.matched_skills.length})
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {c.matched_skills.slice(0, 6).map((sk) => (
+                <span
+                  key={sk}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono text-[10.5px] font-bold"
+                >
+                  <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                  {sk}
                 </span>
               ))}
             </div>
           </div>
         )}
 
-        {/* Missing skills */}
+        {/* Missing Skills Pills */}
         {c.missing_skills?.length > 0 && (
-          <div style={{ marginBottom:12 }}>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, color:'#94A3B8',
-              textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Missing</p>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-              {c.missing_skills.slice(0,4).map(sk => (
-                <span key={sk} style={{ padding:'2px 7px', borderRadius:6, background:'#FFF1F2',
-                  border:'1px solid #FECDD3', fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#9F1239', fontWeight:600 }}>
-                  ✕ {sk}
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1.5">
+              Missing Skills ({c.missing_skills.length})
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {c.missing_skills.slice(0, 4).map((sk) => (
+                <span
+                  key={sk}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200/60 font-mono text-[10.5px] font-bold"
+                >
+                  <X className="w-3 h-3 text-rose-600 stroke-[3]" />
+                  {sk}
                 </span>
               ))}
             </div>
           </div>
         )}
 
+        {/* Experience Indicator */}
         {c.experience_years > 0 && (
-          <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#64748B', marginBottom:10 }}>
-            🗓 {c.experience_years}y experience
+          <p className="text-xs font-bold text-slate-500 flex items-center gap-1.5 pt-1">
+            <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
+            {c.experience_years} years verified experience
           </p>
         )}
+      </div>
 
-        <div style={{ height:1, background:'#F1F5F9', marginBottom:12 }}/>
+      {/* Action Footer */}
+      <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+        <button
+          onClick={handleDownloadPdf}
+          className="flex-1 min-w-[100px] h-9 px-3 rounded-xl bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 active:scale-95 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Resume
+        </button>
 
-        {/* Actions */}
-        <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
-          <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }} onClick={download}
-            style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:9,
-              border:'1.5px solid #C7D2FE', background:'#EFF6FF', cursor:'pointer',
-              fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, color:'#4338CA' }}>
-            <svg style={{ width:12, height:12 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-            Resume
-          </motion.button>
+        <GithubHoverCard username={c.github_username || ''} />
 
-          <GithubHoverCard username={c.github_username || ''}/>
-
-          {c.linkedin_url && (
-            <motion.a whileHover={{ scale:1.03 }} href={c.linkedin_url} target="_blank" rel="noopener noreferrer"
-              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:9,
-                border:'1.5px solid #BAE6FD', background:'#F0F9FF', cursor:'pointer', textDecoration:'none',
-                fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, color:'#0369A1' }}>
-              <svg style={{ width:11, height:11 }} viewBox="0 0 24 24" fill="#0A66C2">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-              </svg>
-              LinkedIn
-            </motion.a>
-          )}
-        </div>
+        {c.linkedin_url && (
+          <a
+            href={c.linkedin_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-9 px-3 rounded-xl bg-[#0A66C2]/10 border border-[#0A66C2]/20 text-[#0A66C2] hover:bg-[#0A66C2]/20 active:scale-95 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Linkedin className="w-3.5 h-3.5" />
+            LinkedIn
+          </a>
+        )}
       </div>
     </motion.div>
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main Recruiter Dashboard Component ───────────────────────────────────────
 export default function RecruiterDashboard() {
-  const [jdMode,    setJdMode]    = useState('paste')
-  const [jdText,    setJdText]    = useState('')
-  const [jdFile,    setJdFile]    = useState(null)
-  const [jobTitle,  setJobTitle]  = useState('')
-  const [skills,    setSkills]    = useState('')
-  const [minScore,  setMinScore]  = useState(0)
-  const [topN,      setTopN]      = useState(20)
-  const [loading,   setLoading]   = useState(false)
-  const [candidates,setCandidates]= useState([])
-  const [summary,   setSummary]   = useState(null)
+  const [jdMode, setJdMode] = useState('paste')
+  const [jdText, setJdText] = useState('')
+  const [jdFile, setJdFile] = useState(null)
+  const [jobTitle, setJobTitle] = useState('')
+  const [skills, setSkills] = useState('')
+  const [minScore, setMinScore] = useState(0)
+  const [topN, setTopN] = useState(20)
+  const [loading, setLoading] = useState(false)
+  const [candidates, setCandidates] = useState([])
+  const [summary, setSummary] = useState(null)
   const [filterRec, setFilterRec] = useState('all')
-  const [sortBy,    setSortBy]    = useState('score')
-  const ref = useRef(null)
+  const [sortBy, setSortBy] = useState('score')
+  const resultsRef = useRef(null)
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     multiple: false,
-    accept: { 'application/pdf':['.pdf'], 'text/plain':['.txt'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':['.docx'] },
+    accept: {
+      'application/pdf': ['.pdf'],
+      'text/plain': ['.txt'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+    },
     onDrop: async ([f]) => {
-      if (!f) return; setJdFile(f)
-      if (f.type==='text/plain') { setJdText(await f.text()) }
-      else toast('File saved — text extracted on match', { icon:'📄' })
+      if (!f) return
+      setJdFile(f)
+      if (f.type === 'text/plain') {
+        setJdText(await f.text())
+      } else {
+        toast('File uploaded — text will be parsed during candidate matching', { icon: '📄' })
+      }
     }
   })
 
   const runMatch = async () => {
     const jd = jdText.trim()
-    if (jd.length < 30 && !jdFile) { toast.error('Paste a JD (min 30 chars)'); return }
-    setLoading(true); setCandidates([]); setSummary(null)
+    if (jd.length < 30 && !jdFile) {
+      toast.error('Please paste or upload a Job Description (min 30 characters)')
+      return
+    }
+    setLoading(true)
+    setCandidates([])
+    setSummary(null)
+
     try {
       const { data } = await api.post('/recruiter/v2/match-jd', {
-        job_title:       jobTitle || 'Target Role',
+        job_title: jobTitle || 'Target Role',
         job_description: jd || `File: ${jdFile?.name}`,
-        required_skills: skills.split(',').map(s=>s.trim()).filter(Boolean),
-        min_score:       minScore / 100,
+        required_skills: skills.split(',').map(s => s.trim()).filter(Boolean),
+        min_score: minScore / 100,
         max_results: topN,
       })
       setCandidates(data.candidates || [])
       setSummary(data.summary || {})
-      toast.success(`Matched ${data.total_candidates} candidates 🎯`)
-      setTimeout(() => ref.current?.scrollIntoView({ behavior:'smooth', block:'start' }), 300)
+      toast.success(`Matched & ranked ${data.total_candidates} candidates 🎯`)
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
       if (!data.candidates || data.candidates.length === 0) {
-        toast('⚠ No candidates found. Try different JD or skills')
+        toast('No matching candidates found. Try adjusting min score or skills.')
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Matching failed')
-    } finally { setLoading(false) }
+      toast.error(err.response?.data?.detail || 'Candidate matching failed.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filtered = candidates
-    .filter(c => filterRec==='all' || (c.recommendation || '').toLowerCase() === filterRec)
-    .sort((a,b) => sortBy==='score' ? b.final_score-a.final_score : (a.name||'').localeCompare(b.name||''))
+    .filter(c => filterRec === 'all' || (c.recommendation || '').toLowerCase() === filterRec)
+    .sort((a, b) => sortBy === 'score' ? b.final_score - a.final_score : (a.name || '').localeCompare(b.name || ''))
 
   const jdLen = jdText.trim().length
 
   return (
-    <div style={{ maxWidth:1100, margin:'0 auto', display:'flex', flexDirection:'column', gap:22, paddingBottom:48 }}>
+    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 font-sans pb-24">
 
-      {/* Header */}
-      <motion.div initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
-          <div style={{ width:40, height:40, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
-            fontSize:20, background:'linear-gradient(135deg,#1E40AF,#6366F1)', boxShadow:'0 4px 12px rgba(99,102,241,0.35)' }}>🏢</div>
-          <div>
-            <h1 style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:24, color:'#0F172A', margin:0 }}>Recruiter Dashboard</h1>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:'#64748B', margin:0 }}>
-              Paste a JD → AI ranks all candidates by ATS score, skill match & experience
-            </p>
+      {/* ── 1. Header Banner ────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-indigo-100/50 to-blue-50/30 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 text-white flex items-center justify-center shadow-md border border-indigo-400/30 shrink-0">
+              <Building2 className="w-6 h-6 text-white" strokeWidth={2} />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10.5px] font-black uppercase tracking-wider border border-indigo-100 mb-2">
+                <Sparkles className="w-3 h-3 text-indigo-500" />
+                Shortlist & Rank Candidates
+              </div>
+              <h1 className="font-extrabold text-2xl sm:text-3xl text-slate-900 tracking-tight">
+                Recruiter Intelligence Dashboard
+              </h1>
+              <p className="text-sm font-medium text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                Paste or upload a Job Description to rank all platform candidates instantly using multi-factor ATS scoring, skill verification, and GitHub insights.
+              </p>
+            </div>
           </div>
         </div>
       </motion.div>
 
-      {/* JD Input Card */}
-      <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.06 }}
-        style={{ background:'white', borderRadius:22, border:'1px solid #E2E8F0',
-          boxShadow:'0 2px 12px rgba(0,0,0,0.06)', overflow:'hidden' }}>
+      {/* ── 2. JD Input & Criteria Form Card ──────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden"
+      >
+        {/* Form Card Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shadow-xs">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900">Job Description & Criteria</h3>
+              <p className="text-xs font-medium text-slate-400">Provide job requirements to run instant ATS candidate matching</p>
+            </div>
+          </div>
 
-        <div style={{ padding:'16px 22px', borderBottom:'1px solid #F1F5F9',
-          background:'linear-gradient(135deg,#EFF6FF,#F8FAFC)', display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:30, height:30, borderRadius:10, background:'#DBEAFE', border:'1px solid #BFDBFE',
-            display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>📋</div>
-          <div>
-            <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:14, color:'#1E293B', margin:0 }}>Job Description</p>
-            <p style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#94A3B8', margin:0 }}>Paste or upload the JD to rank all platform candidates</p>
+          {/* JD Mode Switcher Pills */}
+          <div className="flex items-center bg-slate-200/60 p-1 rounded-xl gap-1">
+            <button
+              onClick={() => setJdMode('paste')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                jdMode === 'paste' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              ✏️ Paste Text
+            </button>
+            <button
+              onClick={() => setJdMode('file')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                jdMode === 'file' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              📎 Upload File
+            </button>
           </div>
         </div>
 
-        <div style={{ padding:'20px 22px', display:'flex', flexDirection:'column', gap:14 }}>
-          {/* JD mode toggle */}
+        {/* Form Input Content */}
+        <div className="p-6 sm:p-8 space-y-6">
+          {/* Job Description Input Container */}
           <div>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-              <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
-                textTransform:'uppercase', letterSpacing:'0.07em' }}>Job Description *</label>
-              <div style={{ display:'flex', gap:4 }}>
-                {['paste','file'].map(m => (
-                  <button key={m} onClick={() => setJdMode(m)}
-                    style={{ padding:'3px 11px', borderRadius:8, border:'1.5px solid', cursor:'pointer',
-                      fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600, transition:'all 0.15s',
-                      ...(jdMode===m ? { background:'#EFF6FF', borderColor:'#C7D2FE', color:'#4338CA' }
-                                     : { background:'white', borderColor:'#E2E8F0', color:'#94A3B8' }) }}>
-                    {m==='paste' ? '✏ Paste' : '📎 File'}
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                Job Description <span className="text-rose-500">*</span>
+              </label>
+              {jdMode === 'paste' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setJdText(SAMPLE_JD)}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3 text-indigo-500" />
+                    Load Sample
                   </button>
-                ))}
-              </div>
+                  {jdText && (
+                    <button
+                      onClick={() => setJdText('')}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3 text-slate-400" />
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {jdMode==='paste' ? (
-              <div style={{ position:'relative' }}>
-                <textarea value={jdText} onChange={e => setJdText(e.target.value)}
-                  placeholder="Paste the full job description here...&#10;&#10;Include: required skills, responsibilities, qualifications."
-                  style={{ width:'100%', height:190, padding:'13px 14px', borderRadius:14, resize:'none', outline:'none',
-                    border:`1.5px solid ${jdLen>50?'#A7F3D0':'#E2E8F0'}`, background:'#FAFAFA',
-                    fontFamily:"'Inter',sans-serif", fontSize:13, color:'#374151', lineHeight:1.7,
-                    boxSizing:'border-box', transition:'border-color 0.2s' }}
-                  onFocus={e => e.target.style.borderColor='#A5B4FC'}
-                  onBlur={e => e.target.style.borderColor=jdLen>50?'#A7F3D0':'#E2E8F0'}/>
-                <div style={{ position:'absolute', bottom:10, right:12, display:'flex', gap:6 }}>
-                  <button onClick={() => setJdText(SAMPLE_JD)}
-                    style={{ padding:'3px 9px', borderRadius:7, background:'#EFF6FF', border:'1px solid #C7D2FE',
-                      fontFamily:"'JetBrains Mono',monospace", fontSize:10, fontWeight:600, color:'#4338CA', cursor:'pointer' }}>
-                    Sample
-                  </button>
-                  {jdText && <button onClick={() => setJdText('')}
-                    style={{ padding:'3px 9px', borderRadius:7, background:'#F8FAFC', border:'1px solid #E2E8F0',
-                      fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#94A3B8', cursor:'pointer' }}>
-                    Clear
-                  </button>}
+            {jdMode === 'paste' ? (
+              <div>
+                <textarea
+                  value={jdText}
+                  onChange={(e) => setJdText(e.target.value)}
+                  placeholder="Paste the full job description here... Include required technical skills, responsibilities, and experience requirements."
+                  className="w-full h-44 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all resize-none leading-relaxed font-sans"
+                />
+                <div className="mt-1.5 flex items-center justify-between text-xs">
+                  <span className={`font-mono font-bold ${jdLen >= 30 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {jdLen} characters {jdLen >= 30 ? '✓ Ready' : '(minimum 30 required)'}
+                  </span>
                 </div>
-                <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:jdLen>100?'#10B981':'#94A3B8', marginTop:4 }}>
-                  {jdLen} chars {jdLen<30?'— need 30+':'✓'}
-                </p>
               </div>
             ) : (
-              <div {...getRootProps()} style={{ height:150, borderRadius:14,
-                border:`2px dashed ${isDragActive?'#6366F1':jdFile?'#10B981':'#E2E8F0'}`,
-                background:isDragActive?'#EFF6FF':jdFile?'#F0FDF4':'#FAFAFA',
-                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8,
-                cursor:'pointer', transition:'all 0.2s', textAlign:'center', padding:16 }}>
-                <input {...getInputProps()}/>
+              <div
+                {...getRootProps()}
+                className={`h-40 rounded-2xl border-2 border-dashed transition-all p-6 flex flex-col items-center justify-center gap-2 text-center cursor-pointer ${
+                  isDragActive
+                    ? 'border-indigo-500 bg-indigo-50/60'
+                    : jdFile
+                    ? 'border-emerald-400 bg-emerald-50/40'
+                    : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60 hover:border-slate-300'
+                }`}
+              >
+                <input {...getInputProps()} />
                 {jdFile ? (
-                  <><div style={{ fontSize:26 }}>✅</div>
-                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:13, color:'#065F46' }}>{jdFile.name}</p>
-                    <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#94A3B8' }}>Click to replace</p></>
+                  <>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                      <Check className="w-5 h-5 stroke-[3]" />
+                    </div>
+                    <p className="font-extrabold text-sm text-slate-800">{jdFile.name}</p>
+                    <p className="text-xs text-slate-400">Click or drag a new file to replace</p>
+                  </>
                 ) : (
-                  <><div style={{ fontSize:30 }}>📎</div>
-                    <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13, color:'#374151' }}>
-                      {isDragActive?'Drop here':'Upload JD (PDF · DOCX · TXT)'}
-                    </p></>
+                  <>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-xs">
+                      <UploadCloud className="w-5 h-5" />
+                    </div>
+                    <p className="font-bold text-sm text-slate-700">
+                      {isDragActive ? 'Drop job description file here' : 'Drag & drop JD file or click to upload'}
+                    </p>
+                    <p className="text-xs text-slate-400">Supports PDF, DOCX, or TXT format</p>
+                  </>
                 )}
               </div>
             )}
           </div>
 
-          {/* Row: Job Title + Skills */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          {/* Grid 1: Job Title & Required Skills */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
-                display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>Job Title</label>
-              <input value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="e.g. Senior Python Developer"
-                style={{ width:'100%', padding:'10px 13px', borderRadius:11, border:'1.5px solid #E2E8F0',
-                  fontFamily:"'Inter',sans-serif", fontSize:13, color:'#374151', outline:'none',
-                  boxSizing:'border-box', background:'#FAFAFA', transition:'border-color 0.2s' }}
-                onFocus={e => e.target.style.borderColor='#A5B4FC'}
-                onBlur={e => e.target.style.borderColor='#E2E8F0'}/>
-            </div>
-            <div>
-              <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
-                display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>
-                Required Skills <span style={{ color:'#94A3B8', fontWeight:400, textTransform:'none', fontSize:10 }}>optional</span>
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 block mb-2">
+                Target Job Title
               </label>
-              <input value={skills} onChange={e => setSkills(e.target.value)} placeholder="python, docker, aws"
-                style={{ width:'100%', padding:'10px 13px', borderRadius:11, border:'1.5px solid #E2E8F0',
-                  fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#374151', outline:'none',
-                  boxSizing:'border-box', background:'#FAFAFA', transition:'border-color 0.2s' }}
-                onFocus={e => e.target.style.borderColor='#A5B4FC'}
-                onBlur={e => e.target.style.borderColor='#E2E8F0'}/>
+              <div className="relative">
+                <Briefcase className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                  placeholder="e.g. Senior Full Stack Engineer"
+                  className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 block mb-2">
+                Required Skills <span className="text-slate-400 font-normal lowercase">(comma separated)</span>
+              </label>
+              <div className="relative">
+                <Target className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  value={skills}
+                  onChange={(e) => setSkills(e.target.value)}
+                  placeholder="e.g. python, fastapi, docker, aws"
+                  className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Row: Min score + Top N */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          {/* Grid 2: Min Score & Show Top N */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200/60">
             <div>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
-                  textTransform:'uppercase', letterSpacing:'0.07em' }}>Min Score</label>
-                <span style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:14, color:'#6366F1' }}>{minScore}%</span>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
+                  Minimum ATS Match Score
+                </label>
+                <span className="font-black text-sm text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
+                  {minScore}%
+                </span>
               </div>
-              <input type="range" min={0} max={90} step={5} value={minScore}
-                onChange={e => setMinScore(Number(e.target.value))}
-                style={{ width:'100%', accentColor:'#6366F1', cursor:'pointer' }}/>
-              <div style={{ display:'flex', justifyContent:'space-between', fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#94A3B8', marginTop:2 }}>
-                <span>0% all</span><span>45% decent</span><span>90% elite</span>
+              <input
+                type="range"
+                min={0}
+                max={90}
+                step={5}
+                value={minScore}
+                onChange={(e) => setMinScore(Number(e.target.value))}
+                className="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+              />
+              <div className="flex justify-between text-[10px] font-mono text-slate-400 mt-1">
+                <span>0% (All)</span>
+                <span>45% (Decent)</span>
+                <span>90% (Elite)</span>
               </div>
             </div>
+
             <div>
-              <label style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#374151',
-                display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>Show Top</label>
-              <select value={topN} onChange={e => setTopN(Number(e.target.value))}
-                style={{ width:'100%', padding:'10px 13px', borderRadius:11, border:'1.5px solid #E2E8F0',
-                  fontFamily:"'Inter',sans-serif", fontSize:13, color:'#374151', background:'white', outline:'none', cursor:'pointer' }}>
-                {[1, 5,20,30,50].map(n => <option key={n} value={n}>Top {n} candidates</option>)}
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 block mb-2">
+                Max Candidates to Display
+              </label>
+              <select
+                value={topN}
+                onChange={(e) => setTopN(Number(e.target.value))}
+                className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 cursor-pointer shadow-xs"
+              >
+                {[1, 5, 20, 30, 50].map((n) => (
+                  <option key={n} value={n}>
+                    Show Top {n} Candidates
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Match button */}
-          <motion.button onClick={runMatch} disabled={loading}
-            whileHover={{ scale:loading?1:1.008 }} whileTap={{ scale:loading?1:0.99 }}
-            style={{ width:'100%', padding:'13px 0', borderRadius:13, border:'none',
-              fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'white',
-              cursor:loading?'not-allowed':'pointer',
-              background:loading?'#94A3B8':'linear-gradient(135deg,#1E40AF,#4F46E5)',
-              boxShadow:loading?'none':'0 4px 16px rgba(79,70,229,0.4)', transition:'all 0.2s' }}>
+          {/* Run Match Button */}
+          <motion.button
+            onClick={runMatch}
+            disabled={loading}
+            whileHover={{ scale: loading ? 1 : 1.01 }}
+            whileTap={{ scale: loading ? 1 : 0.99 }}
+            className={`w-full py-4 rounded-2xl font-extrabold text-base text-white shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+              loading
+                ? 'bg-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-indigo-500/25'
+            }`}
+          >
             {loading ? (
-              <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:9 }}>
-                <svg style={{ width:15, height:15 }} className="animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle style={{ opacity:0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path style={{ opacity:0.8 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-                Ranking candidates…
-              </span>
-            ) : '🏆  Find & Rank Best Candidates'}
+              <>
+                <RefreshCw className="w-5 h-5 animate-spin" />
+                Analyzing Platform Candidates...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5" />
+                Find & Rank Best Candidates
+              </>
+            )}
           </motion.button>
         </div>
       </motion.div>
 
-      {/* Loading */}
+      {/* ── 3. Loading Skeleton ────────────────────────────────────────── */}
       <AnimatePresence>
         {loading && (
-          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-            style={{ background:'white', borderRadius:22, border:'1px solid #E2E8F0', padding:'56px 40px',
-              display:'flex', flexDirection:'column', alignItems:'center', gap:18, textAlign:'center' }}>
-            <div style={{ position:'relative', width:64, height:64 }}>
-              <div style={{ position:'absolute', inset:0, borderRadius:'50%', border:'4px solid #EFF6FF', borderTopColor:'#6366F1' }} className="animate-spin"/>
-              <div style={{ position:'absolute', inset:8, borderRadius:'50%', border:'3px solid #F0FDF4', borderBottomColor:'#10B981' }} className="animate-spin"/>
-              <div style={{ position:'absolute', inset:16, borderRadius:'50%', border:'2px solid #FFFBEB', borderTopColor:'#F59E0B' }} className="animate-spin"/>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center flex flex-col items-center justify-center space-y-4 shadow-sm"
+          >
+            <div className="w-16 h-16 rounded-3xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 animate-bounce shadow-md">
+              <BrainCircuit className="w-8 h-8" />
             </div>
             <div>
-              <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>Ranking candidates</p>
-              <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>Analyzing candidates against job description…</p>
+              <h3 className="font-extrabold text-xl text-slate-900">Semantic Matching in Progress</h3>
+              <p className="text-sm font-medium text-slate-500 mt-1 max-w-md mx-auto">
+                Running NLP semantic matching, skill verification, and experience scoring on candidate profiles...
+              </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Results */}
+      {/* ── 4. Candidate Match Results ───────────────────────────────────── */}
       <AnimatePresence>
         {candidates.length > 0 && !loading && (
-          <motion.div ref={ref} initial={{ opacity:0, y:18 }} animate={{ opacity:1, y:0 }}
-            transition={{ duration:0.45, ease:[0.16,1,0.3,1] }}
-            style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
-            {/* Summary + controls */}
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+          <motion.div
+            ref={resultsRef}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
+            {/* Summary Statistics Ribbon + Filters */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm">
               {summary && (
-                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                  {[['Total', candidates.length,'#6366F1','#EFF6FF'],
-                    ['Strong', summary.strong_matches,'#10B981','#ECFDF5'],
-                    ['Good',   summary.good_matches,'#6366F1','#EFF6FF'],
-                    ['Weak',   summary.poor_matches,'#F43F5E','#FFF1F2'],
-                    ['Avg', `${Math.round((summary.average_score||0)*100)}%`,'#F59E0B','#FFFBEB']
-                  ].map(([l,v,c,bg]) => (
-                    <div key={l} style={{ padding:'7px 14px', borderRadius:11, background:bg, border:`1px solid ${c}30`, textAlign:'center', minWidth:58 }}>
-                      <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:18, color:c, lineHeight:1 }}>{v}</p>
-                      <p style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'#94A3B8', marginTop:1 }}>{l}</p>
-                    </div>
-                  ))}
+                <div className="flex flex-wrap gap-2.5 items-center">
+                  <div className="px-3.5 py-2 rounded-2xl bg-indigo-50 border border-indigo-100 text-center min-w-[70px]">
+                    <p className="font-black text-xl text-indigo-700 leading-none">{candidates.length}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Total</p>
+                  </div>
+                  <div className="px-3.5 py-2 rounded-2xl bg-emerald-50 border border-emerald-100 text-center min-w-[70px]">
+                    <p className="font-black text-xl text-emerald-700 leading-none">{summary.strong_matches || 0}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Strong</p>
+                  </div>
+                  <div className="px-3.5 py-2 rounded-2xl bg-blue-50 border border-blue-100 text-center min-w-[70px]">
+                    <p className="font-black text-xl text-blue-700 leading-none">{summary.good_matches || 0}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Good</p>
+                  </div>
+                  <div className="px-3.5 py-2 rounded-2xl bg-rose-50 border border-rose-100 text-center min-w-[70px]">
+                    <p className="font-black text-xl text-rose-700 leading-none">{summary.poor_matches || 0}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Weak</p>
+                  </div>
+                  <div className="px-3.5 py-2 rounded-2xl bg-amber-50 border border-amber-100 text-center min-w-[70px]">
+                    <p className="font-black text-xl text-amber-700 leading-none">
+                      {Math.round(summary.average_score > 1.0 ? summary.average_score : (summary.average_score || 0) * 100)}%
+                    </p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Average</p>
+                  </div>
                 </div>
               )}
-              <div style={{ display:'flex', gap:7 }}>
-                <select value={filterRec} onChange={e => setFilterRec(e.target.value)}
-                  style={{ padding:'7px 11px', borderRadius:9, border:'1.5px solid #E2E8F0',
-                    fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, color:'#374151', background:'white', cursor:'pointer', outline:'none' }}>
-                  <option value="all">All matches</option>
-                  <option value="strong_match">Strong only</option>
-                  <option value="good_match">Good only</option>
-                  <option value="partial_match">Partial only</option>
-                </select>
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-                  style={{ padding:'7px 11px', borderRadius:9, border:'1.5px solid #E2E8F0',
-                    fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, color:'#374151', background:'white', cursor:'pointer', outline:'none' }}>
-                  <option value="score">By Score</option>
-                  <option value="name">By Name</option>
-                </select>
+
+              {/* Filter & Sort controls */}
+              <div className="flex items-center gap-2.5 self-end md:self-auto">
+                <div className="relative flex items-center">
+                  <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+                  <select
+                    value={filterRec}
+                    onChange={(e) => setFilterRec(e.target.value)}
+                    className="h-10 pl-8 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-extrabold text-slate-700 outline-none cursor-pointer focus:bg-white transition-all shadow-xs"
+                  >
+                    <option value="all">All Matches</option>
+                    <option value="strong_match">Strong Matches Only</option>
+                    <option value="good_match">Good Matches Only</option>
+                    <option value="partial_match">Partial Matches Only</option>
+                  </select>
+                </div>
+
+                <div className="relative flex items-center">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="h-10 pl-8 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-extrabold text-slate-700 outline-none cursor-pointer focus:bg-white transition-all shadow-xs"
+                  >
+                    <option value="score">Sort by Score</option>
+                    <option value="name">Sort by Name</option>
+                  </select>
+                </div>
               </div>
             </div>
 
+            {/* Candidates Grid */}
             {filtered.length === 0 ? (
-              <div style={{ background:'white', borderRadius:20, border:'1px solid #E2E8F0', padding:'40px', textAlign:'center' }}>
-                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:15, color:'#94A3B8' }}>No candidates match this filter</p>
+              <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center">
+                <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <p className="font-extrabold text-base text-slate-800">No candidates match the selected filter</p>
+                <p className="text-xs text-slate-400 mt-1">Try switching to "All Matches" to see remaining candidates.</p>
               </div>
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:14 }}>
-                {filtered.map((c, i) => <CandidateCard key={`${c.user_id}-${c.resume_id}`} c={c} idx={i}/>)}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filtered.map((c, i) => (
+                  <CandidateCard key={`${c.user_id}-${c.resume_id}`} c={c} idx={i} />
+                ))}
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Empty state */}
+      {/* ── 5. Default Initial State Card ─────────────────────────────── */}
       {!loading && candidates.length === 0 && (
-        <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }}
-          style={{ background:'white', borderRadius:22, border:'1px solid #E2E8F0', padding:'60px 40px', textAlign:'center' }}>
-          <motion.div animate={{ y:[0,-8,0] }} transition={{ repeat:Infinity, duration:3 }}
-            style={{ fontSize:48, marginBottom:14 }}>🏢</motion.div>
-          <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#1E293B', marginBottom:8 }}>
-            Paste a JD to find top candidates
-          </p>
-          <p style={{ fontFamily:"'Inter',sans-serif", fontSize:14, color:'#94A3B8', maxWidth:400, margin:'0 auto 18px' }}>
-            AI scores all platform resumes against your job description and ranks the best matches instantly.
-          </p>
-          <div style={{ display:'flex', gap:7, justifyContent:'center', flexWrap:'wrap' }}>
-            {['Semantic Match','Keyword Overlap','Skill Gaps','GitHub Stats'].map(t => (
-              <span key={t} style={{ padding:'3px 11px', borderRadius:20, background:'#F8FAFC', border:'1px solid #E2E8F0',
-                fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#94A3B8' }}>{t}</span>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center flex flex-col items-center justify-center space-y-4 shadow-sm"
+        >
+          <div className="w-16 h-16 rounded-3xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-md">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-xl text-slate-900">Shortlist Top Candidates Instantly</h3>
+            <p className="text-sm font-medium text-slate-500 mt-1 max-w-md mx-auto leading-relaxed">
+              Paste or upload your target Job Description above to rank platform candidates based on semantic ATS matching, technical skill coverage, and GitHub insights.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            {['Semantic NLP Match', 'Keyword Coverage', 'Skill Gap Breakdown', 'GitHub Insights'].map((tag) => (
+              <span
+                key={tag}
+                className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200/60 font-mono text-[11px] font-bold text-slate-500"
+              >
+                ✓ {tag}
+              </span>
             ))}
           </div>
         </motion.div>
       )}
+
     </div>
   )
 }
