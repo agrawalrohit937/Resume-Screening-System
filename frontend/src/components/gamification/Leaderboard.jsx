@@ -34,7 +34,11 @@ const TOP_RANKS = {
 }
 
 export default function Leaderboard({ leaderboard = [], currentUserId }) {
-  const myEntry = leaderboard.find((e) => e.user_id === currentUserId)
+  // Only display candidates on the leaderboard (exclude admin & recruiter)
+  const candidateLeaderboard = leaderboard.filter(
+    (e) => !e.role || e.role.toLowerCase() === 'candidate'
+  )
+  const myEntry = candidateLeaderboard.find((e) => e.user_id === currentUserId)
 
   // Dynamic subtitle based on available candidates count
   const getDynamicSubtitle = (count) => {
@@ -73,7 +77,7 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
           <h3 className="font-extrabold text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
             Leaderboard
           </h3>
-          <p className="text-[13px] font-medium text-slate-500 mt-1">{getDynamicSubtitle(leaderboard.length)}</p>
+          <p className="text-[13px] font-medium text-slate-500 mt-1">{getDynamicSubtitle(candidateLeaderboard.length)}</p>
         </div>
 
         {myEntry && (
@@ -86,7 +90,7 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
 
 
       {/* Empty State */}
-      {leaderboard.length === 0 ? (
+      {candidateLeaderboard.length === 0 ? (
         <div className="text-center py-16 px-4">
           <motion.div 
             initial={{ scale: 0.8, opacity: 0 }} 
@@ -107,7 +111,7 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
           initial="hidden"
           animate="visible"
         >
-          {leaderboard.map((entry, i) => {
+          {candidateLeaderboard.map((entry, i) => {
             const actualRank = entry.rank ?? i + 1
             const isTop3 = actualRank <= 3
             const rankStyle = TOP_RANKS[actualRank]

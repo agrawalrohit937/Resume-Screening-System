@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -14,11 +14,14 @@ import {
   Zap,
   ChevronRight
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 import AvatarRing, { getUserPlan } from './AvatarRing'
+import { getMyAnalytics } from '../services/api'
 
 // --- Helper Functions ---
 function safeNumber(value, fallback = 0) {
+  if (value === undefined || value === null) return fallback
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
@@ -84,17 +87,44 @@ function StatBox({ icon: Icon, label, value, trend }) {
   )
 }
 
-export default function ProfilePlanDropdown({ user, onClose }) {
+export default function ProfilePlanDropdown({ user: propUser, onClose }) {
   const navigate = useNavigate()
+  const { user: authUser } = useAuth()
+  const user = propUser || authUser
+
   const plan = getUserPlan(user)
   const email = user?.email || 'No email provided'
 
-  // Stats Data
-  const ats = user?.ats || {}
-  const careerScore = safeNumber(ats?.career_score ?? user?.career_score, 88)
-  const atsScore = safeNumber(ats?.ats_score ?? user?.ats_score, 92)
-  const resumeCount = safeNumber(user?.resume_count ?? user?.resumes?.count, 12)
-  const aiUsage = safeNumber(user?.ai_usage ?? user?.ai_used, 3200)
+  // Fetch real analytics data
+  const [analytics, setAnalytics] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    const controller = new AbortController()
+
+    getMyAnalytics(undefined, { signal: controller.signal })
+      .then((res) => {
+        if (mounted && res.data) {
+          setAnalytics(res.data)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      mounted = false
+      controller.abort()
+    }
+  }, [])
+
+  // Real Stats Data from user object & analytics API
+  const resumeCount = safeNumber(user?.total_resumes, analytics?.summary?.total_resumes ?? 0)
+  const totalAtsChecks = safeNumber(user?.total_ats_checks, analytics?.summary?.total_ats_checks ?? 0)
+
+  const rawAtsScore = analytics?.summary?.best_score ?? analytics?.summary?.average_score ?? user?.ats?.best_score ?? user?.ats_score ?? 0
+  const atsScore = totalAtsChecks > 0 ? (rawAtsScore > 1 ? Math.round(rawAtsScore) : Math.round(rawAtsScore * 100)) : 0
+
+  const careerScore = safeNumber(user?.profile_completion_percent ?? analytics?.profile_completeness?.percentage, 0)
+  const trend = totalAtsChecks > 0 && atsScore >= 80 ? 'Top 10%' : totalAtsChecks > 0 && atsScore >= 60 ? 'Good' : null
 
   // Plan Tier Configurations
   const planConfigs = {
@@ -169,15 +199,10 @@ export default function ProfilePlanDropdown({ user, onClose }) {
       {/* 2. Stats Section */}
       <div className="p-4 pb-2 bg-slate-50/40">
         <div className="grid grid-cols-2 gap-2">
-          <StatBox icon={Shield} label="ATS Score" value={`${atsScore}%`} trend="Top 10%" />
-          <StatBox icon={User} label="Career Fit" value={`${careerScore}/100`} />
-          
-          {(plan === 'pro' || plan === 'premium') && (
-            <>
-              <StatBox icon={LayoutGrid} label="Resumes" value={resumeCount} />
-              <StatBox icon={Sparkles} label="AI Usage" value={`${Math.floor(aiUsage / 60)}h`} />
-            </>
-          )}
+          <StatBox icon={Shield} label="ATS Score" value={totalAtsChecks > 0 ? `${atsScore}%` : '0%'} trend={trend} />
+          <StatBox icon={User} label="Profile Fit" value={`${careerScore}%`} />
+          <StatBox icon={LayoutGrid} label="Resumes" value={resumeCount} />
+          <StatBox icon={Sparkles} label="ATS Checks" value={totalAtsChecks} />
         </div>
       </div>
 

@@ -145,6 +145,24 @@ class GamificationService:
         if not doc:
             doc = await self._create_profile(user_id)
         doc["_id"] = str(doc["_id"])
+
+        # ── STREAK EXPIRATION RESET ──────────────────────────────────────────────
+        # If user hasn't practiced since before yesterday, their current streak is broken (0)
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        last_str = doc.get("last_practice_date")
+        if last_str and doc.get("current_streak", 0) > 0:
+            try:
+                last_date = date.fromisoformat(last_str[:10])
+                if last_date < (today - timedelta(days=1)):
+                    doc["current_streak"] = 0
+                    await self.collection.update_one(
+                        {"user_id": user_id},
+                        {"$set": {"current_streak": 0}}
+                    )
+            except Exception:
+                pass
+
         doc["level_info"] = self._compute_level(doc.get("total_points", 0))
 
         # Calculate exact global leaderboard rank dynamically
@@ -161,6 +179,7 @@ class GamificationService:
             "current_streak": 0,
             "longest_streak": 0,
             "last_practice_date": None,
+            "active_dates": [],
             "total_interviews": 0,
             "total_questions_answered": 0,
             "average_score": 0.0,
@@ -351,15 +370,16 @@ class GamificationService:
 
     async def _update_streak(self, user_id: str, profile: Dict, now: datetime) -> Dict:
         today = now.date()
+        today_str = today.isoformat()
         last_str = profile.get("last_practice_date")
         current_streak = profile.get("current_streak", 0)
         streak_bonus = 0
 
         if last_str:
             try:
-                last_date = date.fromisoformat(last_str)
+                last_date = date.fromisoformat(last_str[:10])
                 if last_date == today:
-                    new_streak = current_streak
+                    new_streak = current_streak if current_streak > 0 else 1
                 elif last_date == today - timedelta(days=1):
                     new_streak = current_streak + 1
                     streak_bonus = POINT_RULES["streak_bonus_daily"] * new_streak
@@ -374,7 +394,16 @@ class GamificationService:
 
         await self.collection.update_one(
             {"user_id": user_id},
-            {"$set": {"last_practice_date": today.isoformat(), "current_streak": new_streak, "longest_streak": longest}},
+            {
+                "$set": {
+                    "last_practice_date": today_str,
+                    "current_streak": new_streak,
+                    "longest_streak": longest,
+                },
+                "$addToSet": {
+                    "active_dates": today_str
+                }
+            },
             upsert=True,
         )
         return {"new_streak": new_streak, "streak_bonus": streak_bonus}
@@ -427,13 +456,23 @@ class GamificationService:
                     "from": "users",
                     "let": {"uid": "$user_id"},
                     "pipeline": [
-                        {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, {"$toString": "$$uid"}]}}},
-                        {"$project": {"full_name": 1, "email": 1, "username": 1, "name": 1}},
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$and": [
+                                        {"$eq": [{"$toString": "$_id"}, {"$toString": "$$uid"}]},
+                                        {"$ne": ["$role", "admin"]},
+                                        {"$ne": ["$role", "recruiter"]},
+                                    ]
+                                }
+                            }
+                        },
+                        {"$project": {"full_name": 1, "email": 1, "username": 1, "name": 1, "role": 1}},
                     ],
                     "as": "user_info",
                 }
             },
-            # Strict filter: only include records where user exists in 'users' collection
+            # Strict filter: only include records where user exists in 'users' collection AND is candidate mode
             {"$match": {"user_info": {"$ne": []}}},
             {"$addFields": {"user_info": {"$arrayElemAt": ["$user_info", 0]}}},
             {"$limit": limit},
@@ -449,6 +488,10 @@ class GamificationService:
             user_info = doc.get("user_info")
             if not user_info:
                 continue  # Skip if user does not exist in users table
+
+            user_role = (user_info.get("role") or "candidate").lower()
+            if user_role in ["admin", "recruiter"]:
+                continue  # Only candidate mode users should be shown on leaderboard
 
             full_name = (user_info.get("full_name") or "").strip()
             if not full_name:
@@ -468,6 +511,7 @@ class GamificationService:
                 "rank": rank,
                 "user_id": doc["user_id"],
                 "full_name": full_name,
+                "role": user_role,
                 "total_points": doc.get("total_points", 0),
                 "level_info": self._compute_level(doc.get("total_points", 0)),
                 "current_streak": doc.get("current_streak", 0),
