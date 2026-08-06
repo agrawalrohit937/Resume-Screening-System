@@ -389,6 +389,119 @@ class EmailService:
             text_body=text_body,
         )
 
+    async def send_career_application(
+        self,
+        *,
+        applicant_name: str,
+        applicant_email: str,
+        role_title: str,
+        portfolio_url: Optional[str],
+        cover_letter: str,
+        resume_bytes: Optional[bytes] = None,
+        resume_filename: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send job application notification email to admin via Brevo HTTP API with attached resume PDF."""
+        admin_email = settings.SUPPORT_EMAIL or settings.MAIL_FROM_EMAIL or "admin@careershala.tech"
+        subject = f"💼 New Job Application: {applicant_name} — {role_title}"
+
+        portfolio_html = (
+            f'<a href="{escape(portfolio_url)}" target="_blank" style="color:#2E9BDA; font-weight:bold;">{escape(portfolio_url)}</a>'
+            if portfolio_url
+            else '<span style="color:#94a3b8; font-style:italic;">Not provided</span>'
+        )
+
+        formatted_cover = escape(cover_letter).replace("\n", "<br/>")
+
+        resume_status_html = (
+            f'<span style="color:#10b981; font-weight:bold;">Attached ({escape(resume_filename)})</span>'
+            if resume_bytes and resume_filename
+            else '<span style="color:#94a3b8; font-style:italic;">No file attached</span>'
+        )
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"/></head>
+        <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 32px 16px; color: #0f172a;">
+          <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.06);">
+            
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; tracking-tight: -0.02em;">
+                Career<span style="color: #2E9BDA;">Shala</span> Careers
+              </h1>
+              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 13px; font-weight: 600;">
+                New Candidate Application Submission
+              </p>
+            </div>
+
+            <div style="padding: 32px;">
+              <div style="background: #f1f5f9; border-left: 4px solid #2E9BDA; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #2E9BDA;">Position Applied For</p>
+                <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 800; color: #0f172a;">{escape(role_title)}</p>
+              </div>
+
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b; width: 140px;">Applicant Name</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; font-weight: 700; color: #0f172a;">{escape(applicant_name)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b;">Email Address</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; font-weight: 700; color: #2E9BDA;">
+                    <a href="mailto:{escape(applicant_email)}" style="color: #2E9BDA; text-decoration: none;">{escape(applicant_email)}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b;">Portfolio Link</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px;">{portfolio_html}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b;">Resume Attachment</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px;">{resume_status_html}</td>
+                </tr>
+              </table>
+
+              <div style="margin-top: 24px;">
+                <p style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569;">Cover Letter / Note</p>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.6; color: #334155;">
+                  {formatted_cover}
+                </div>
+              </div>
+
+              <div style="margin-top: 32px; text-align: center;">
+                <a href="mailto:{escape(applicant_email)}?subject=Re:%20Application%20for%20{quote(role_title)}" 
+                   style="display: inline-block; background: #2E9BDA; color: #ffffff; font-weight: 800; font-size: 13px; text-decoration: none; padding: 14px 28px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.05em;">
+                  Reply Directly to Applicant
+                </a>
+              </div>
+            </div>
+
+            <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
+              Sent via CareerShala Brevo Mailer Engine · {settings.APP_NAME}
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+
+        attachments_payload = []
+        if resume_bytes and resume_filename:
+            b64_content = base64.b64encode(resume_bytes).decode("utf-8")
+            attachments_payload.append({
+                "name": resume_filename,
+                "content": b64_content,
+            })
+
+        return await self._send_brevo_email(
+            to_email=admin_email,
+            to_name="CareerShala Hiring Team",
+            subject=subject,
+            html_body=html_body,
+            reply_to_email=applicant_email,
+            reply_to_name=applicant_name,
+            attachments=attachments_payload if attachments_payload else None,
+        )
+
 
 async def send_with_attachments(
     *,

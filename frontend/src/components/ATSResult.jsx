@@ -125,7 +125,7 @@ export default function ATSResumeAnalyzer({ result, jdTitle }) {
         {/* Top tech header status indicator */}
         <div className="flex items-center gap-2 border-b border-ink-100 bg-ink-50/40 px-6 py-3 text-xs text-ink-500 font-mono">
           <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-          <span>Hybrid BERT Semantic Matcher + TF-IDF Active</span>
+          <span>AI Semantic Matcher + Skill Keyword Engine Active</span>
         </div>
 
         <div className="p-6 sm:p-8 space-y-6">
@@ -190,8 +190,8 @@ export default function ATSResumeAnalyzer({ result, jdTitle }) {
           {/* Configuration Summary & Modern Processing Button */}
           <div className="pt-5 border-t border-ink-100 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex flex-wrap gap-2 text-[11px] font-mono">
-              <span className="rounded-md bg-indigo-50 px-2 py-1 border border-indigo-100 text-indigo-700">BERT Semantic • 60%</span>
-              <span className="rounded-md bg-emerald-50 px-2 py-1 border border-emerald-100 text-emerald-700">TF-IDF Keywords • 40%</span>
+              <span className="rounded-md bg-indigo-50 px-2 py-1 border border-indigo-100 text-indigo-700">Semantic Relevance • 60%</span>
+              <span className="rounded-md bg-emerald-50 px-2 py-1 border border-emerald-100 text-emerald-700">Keyword Overlap • 40%</span>
               <span className="rounded-md bg-slate-50 px-2 py-1 border border-slate-100 text-ink-500">Skill Gap Analysis</span>
             </div>
 
@@ -222,8 +222,8 @@ export default function ATSResumeAnalyzer({ result, jdTitle }) {
 
                 <div className="grid grid-cols-3 gap-3 pt-1">
                   {[
-                    { label: 'BERT Score', val: scores.bert_score, color: '#6366F1' },
-                    { label: 'TF-IDF Overlap', val: scores.tfidf_score, color: '#10B981' },
+                    { label: 'Semantic Score', val: scores.bert_score, color: '#6366F1' },
+                    { label: 'Keyword Overlap', val: scores.tfidf_score, color: '#10B981' },
                     { label: 'Match Rate', val: keyword_analysis?.keyword_match_rate, color: '#F59E0B' },
                   ].map(({ label, val, color }) => (
                     <div key={label} className="bg-white/90 backdrop-blur-xs rounded-xl p-2.5 text-center border border-white/60 shadow-2xs">
@@ -267,15 +267,15 @@ export default function ATSResumeAnalyzer({ result, jdTitle }) {
                 <div className="rounded-2xl border border-ink-100 bg-white p-6 space-y-5 shadow-xs">
                   <h3 className="font-display font-semibold text-ink-800 text-base">Score Breakdown</h3>
                   <div className="space-y-4">
-                    <ScoreRow label="BERT Semantic Similarity" value={scores.bert_score} color="#6366F1" delay={0}/>
-                    <ScoreRow label="TF-IDF Keyword Overlap" value={scores.tfidf_score} color="#10B981" delay={100}/>
+                    <ScoreRow label="Semantic Relevance" value={scores.bert_score} color="#6366F1" delay={0}/>
+                    <ScoreRow label="Keyword Match Rate" value={scores.tfidf_score} color="#10B981" delay={100}/>
                     <ScoreRow label="Experience Relevance" value={scores.experience_score} color="#F59E0B" delay={200}/>
                     <ScoreRow label="Education Match" value={scores.education_score} color="#8B5CF6" delay={300}/>
                     <ScoreRow label="Skills Coverage" value={scores.skills_score} color="#0EA5E9" delay={400}/>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-indigo-50/50 border border-indigo-100/60 rounded-xl">
                     <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 font-mono text-xs font-bold">ƒ</div>
-                    <p className="text-xs font-mono text-indigo-700">Final Score formula weights: 60% BERT Neural Embeddings + 40% Exact TF-IDF Vectorization Match</p>
+                    <p className="text-xs font-mono text-indigo-700">Final Score formula weights: 60% AI Semantic Relevance + 40% Keyword Match Rate</p>
                   </div>
                 </div>
               )}

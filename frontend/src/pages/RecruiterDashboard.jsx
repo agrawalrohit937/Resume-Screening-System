@@ -130,8 +130,8 @@ function CandidateCard({ c, idx }) {
 
         {/* Score bars */}
         <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:12 }}>
-          <Bar label="BERT Semantic" val={c.bert_score}  color="#6366F1"/>
-          <Bar label="TF-IDF Match"  val={c.tfidf_score} color="#10B981"/>
+          <Bar label="Semantic Match" val={c.bert_score}  color="#6366F1"/>
+          <Bar label="Keyword Match"  val={c.tfidf_score} color="#10B981"/>
           <Bar label="Overall ATS"   val={c.final_score} color={color}/>
         </div>
 
@@ -447,7 +447,7 @@ export default function RecruiterDashboard() {
             </div>
             <div>
               <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:700, fontSize:19, color:'#0F172A', marginBottom:6 }}>Ranking candidates</p>
-              <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>Running BERT + TF-IDF against all platform resumes…</p>
+              <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#94A3B8' }}>Analyzing candidates against job description…</p>
             </div>
           </motion.div>
         )}
@@ -521,7 +521,7 @@ export default function RecruiterDashboard() {
             AI scores all platform resumes against your job description and ranks the best matches instantly.
           </p>
           <div style={{ display:'flex', gap:7, justifyContent:'center', flexWrap:'wrap' }}>
-            {['BERT Semantic','TF-IDF Keywords','Skill Gaps','GitHub Hover'].map(t => (
+            {['Semantic Match','Keyword Overlap','Skill Gaps','GitHub Stats'].map(t => (
               <span key={t} style={{ padding:'3px 11px', borderRadius:20, background:'#F8FAFC', border:'1px solid #E2E8F0',
                 fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#94A3B8' }}>{t}</span>
             ))}

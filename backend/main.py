@@ -44,6 +44,7 @@ from api.routes.apply_assistant import router as apply_assistant_router
 from api.routes.support import router as support_router
 from api.routes.gmail_oauth import router as gmail_oauth_router
 from api.routes.notifications import router as notifications_router
+from api.routes.careers import router as careers_router
 from config.db import connect_db, disconnect_db
 from core.config import settings
 from core.logging import setup_logging
@@ -163,6 +164,8 @@ def create_application() -> FastAPI:
     app.include_router(support_router, prefix=f"{p}", tags=["Support"])
     app.include_router(gmail_oauth_router, prefix=f"{p}/auth", tags=["Gmail OAuth"])
     app.include_router(notifications_router, prefix=f"{p}/notifications", tags=["Notifications"])
+    app.include_router(careers_router, prefix=f"{p}/careers", tags=["Careers"])
+    app.include_router(careers_router, prefix="/api", tags=["Careers Direct"])
 
     return app
 

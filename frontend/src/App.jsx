@@ -29,6 +29,7 @@ function ThemeInit() {
 const Login = lazy(() => import('./pages/Login'))
 const Signup = lazy(() => import('./pages/Signup'))
 const CareerPilotLanding = lazy(() => import('./pages/CareerPilotLanding'))
+const Careers = lazy(() => import('./pages/Careers'))
 const LinkedinCallback = lazy(() => import('./pages/LinkedinCallback'))
 const GitHubCallback = lazy(() => import('./pages/GithubCallback'))
 const GmailCallback = lazy(() => import('./pages/GmailCallback'))
@@ -143,8 +144,9 @@ export default function App() {
               {/* ── Dev-only: Loader test route ── */}
               <Route path="/test-loader" element={<Loader />} />
 
-              {/* ── Public Landing ── */}
+              {/* ── Public Landing & Careers ── */}
               <Route path="/" element={<CareerPilotLanding />} />
+              <Route path="/careers" element={<Careers />} />
 
               {/* ── Protected (inside AppLayout shell - PATHLESS ROUTE) ── */}
               <Route element={<ProtectedRoute><RouteErrorBoundary><AppLayout /></RouteErrorBoundary></ProtectedRoute>}>
