@@ -52,14 +52,20 @@ async def generate_interview(
             detail="Resume must be parsed before generating an interview.",
         )
         
-    return await interview_service.generate_interview(
-        resume=resume,
-        job_description=payload.job_description,
-        job_title=payload.job_title,
-        difficulty=payload.difficulty,
-        interview_type=payload.interview_type,
-        num_questions=payload.num_questions,
-    )
+    try:
+        return await interview_service.generate_interview(
+            resume=resume,
+            job_description=payload.job_description,
+            job_title=payload.job_title,
+            difficulty=payload.difficulty,
+            interview_type=payload.interview_type,
+            num_questions=payload.num_questions,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate interview: {str(e)}",
+        )
 
 
 @router.post("/quick-practice")

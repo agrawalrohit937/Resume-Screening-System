@@ -928,7 +928,7 @@ function FullMockInterview({ resumes }) {
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function Interview() {
-    const [activeTab, setActiveTab] = useState('mock')
+    const [activeTab, setActiveTab] = useState('mcq')
     const [resumes, setResumes] = useState([])
 
 
@@ -969,21 +969,21 @@ export default function Interview() {
                             </div>
                         </div>
                         <div className="flex gap-2 self-start rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm lg:self-end">
-                            <TabBtn active={activeTab === 'mock'} onClick={() => setActiveTab('mock')} icon={<Mic className="h-4 w-4" />}>Full Mock Interview</TabBtn>
                             <TabBtn active={activeTab === 'mcq'} onClick={() => setActiveTab('mcq')} icon={<Zap className="h-4 w-4" />}>Quick MCQ Practice</TabBtn>
+                            <TabBtn active={activeTab === 'mock'} onClick={() => setActiveTab('mock')} icon={<Mic className="h-4 w-4" />}>Full Mock Interview</TabBtn>
                         </div>
                     </div>
                 </motion.div>
 
                 {/* Content */}
                 <AnimatePresence mode="wait">
-                    {activeTab === 'mock' ? (
-                        <motion.div key="mock" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
-                            <FullMockInterview resumes={resumes} />
-                        </motion.div>
-                    ) : (
+                    {activeTab === 'mcq' ? (
                         <motion.div key="mcq" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
                             <MCQPractice />
+                        </motion.div>
+                    ) : (
+                        <motion.div key="mock" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
+                            <FullMockInterview resumes={resumes} />
                         </motion.div>
                     )}
                 </AnimatePresence>

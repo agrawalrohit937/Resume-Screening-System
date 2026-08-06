@@ -91,12 +91,16 @@ export default function Signup() {
         toast.success('Welcome to CareerShala! 🚀')
         navigate('/dashboard')
       } catch (err) {
+        console.error('Google Auth Backend Error:', err)
         toast.error(err.response?.data?.detail || 'Google signup failed')
       } finally {
         setLoading(false)
       }
     },
-    onError: () => toast.error('Google Sign-In failed')
+    onError: (errorResponse) => {
+      console.error('Google Sign-In Failed (Frontend):', errorResponse)
+      toast.error('Google Sign-In failed. Please check origin configuration in Google Cloud Console.')
+    }
   });
 
   return (

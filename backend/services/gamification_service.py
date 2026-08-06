@@ -146,6 +146,12 @@ class GamificationService:
             doc = await self._create_profile(user_id)
         doc["_id"] = str(doc["_id"])
         doc["level_info"] = self._compute_level(doc.get("total_points", 0))
+
+        # Calculate exact global leaderboard rank dynamically
+        total_pts = doc.get("total_points", 0)
+        higher_count = await self.collection.count_documents({"total_points": {"$gt": total_pts}})
+        doc["rank"] = higher_count + 1
+
         return doc
 
     async def _create_profile(self, user_id: str) -> Dict:
@@ -416,19 +422,21 @@ class GamificationService:
 
         pipeline = [
             {"$sort": {"total_points": -1}},
-            {"$limit": limit},
             {
                 "$lookup": {
                     "from": "users",
                     "let": {"uid": "$user_id"},
                     "pipeline": [
-                        {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$uid"]}}},
+                        {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, {"$toString": "$$uid"}]}}},
                         {"$project": {"full_name": 1, "email": 1, "username": 1, "name": 1}},
                     ],
                     "as": "user_info",
                 }
             },
-            {"$addFields": {"user_info": {"$ifNull": [{"$arrayElemAt": ["$user_info", 0]}, None]}}},
+            # Strict filter: only include records where user exists in 'users' collection
+            {"$match": {"user_info": {"$ne": []}}},
+            {"$addFields": {"user_info": {"$arrayElemAt": ["$user_info", 0]}}},
+            {"$limit": limit},
         ]
 
         docs = []
@@ -436,19 +444,25 @@ class GamificationService:
             docs.append(doc)
 
         result = []
-        for rank, doc in enumerate(docs, 1):
+        rank = 1
+        for doc in docs:
             user_info = doc.get("user_info")
-            full_name = "Unknown"
-            if user_info:
-                full_name = (user_info.get("full_name") or "").strip()
-                if not full_name:
-                    full_name = (user_info.get("name") or "").strip()
-                if not full_name:
-                    full_name = (user_info.get("username") or "").strip()
-                if not full_name:
-                    full_name = (user_info.get("email") or "").strip()
+            if not user_info:
+                continue  # Skip if user does not exist in users table
+
+            full_name = (user_info.get("full_name") or "").strip()
             if not full_name:
-                full_name = "Unknown"
+                full_name = (user_info.get("name") or "").strip()
+            if not full_name:
+                full_name = (user_info.get("username") or "").strip()
+            if not full_name:
+                email = (user_info.get("email") or "").strip()
+                if email and "@" in email:
+                    full_name = email.split("@")[0].replace(".", " ").replace("_", " ").title()
+                elif email:
+                    full_name = email
+            if not full_name or full_name.lower() == "unknown":
+                full_name = "Anonymous Candidate"
 
             result.append({
                 "rank": rank,
@@ -462,6 +476,7 @@ class GamificationService:
                 "badge_count": len(doc.get("badges", [])),
                 "top_badge": doc["badges"][-1] if doc.get("badges") else None,
             })
+            rank += 1
 
         _leaderboard_cache["data"] = result
         _leaderboard_cache["ts"] = time.time()

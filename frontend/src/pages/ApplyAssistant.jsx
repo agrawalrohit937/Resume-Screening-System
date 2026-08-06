@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Sparkles, Briefcase, FileText, CheckCircle, 
-  Loader2, Send, ArrowRight, History, Plus, 
+import {
+  Sparkles, Briefcase, FileText, CheckCircle,
+  Loader2, Send, ArrowRight, History, Plus,
   AlertTriangle, ScanSearch, Mail
 } from 'lucide-react';
 
@@ -33,31 +33,29 @@ function StepIndicator({ currentStep }) {
   return (
     <div className="flex items-center justify-between w-full mb-10 relative">
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-[2px] bg-slate-100 -z-10" />
-      <div 
-        className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-indigo-600 -z-10 transition-all duration-500 ease-in-out" 
+      <div
+        className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-indigo-600 -z-10 transition-all duration-500 ease-in-out"
         style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
       />
-      
+
       {steps.map((step, index) => {
         const isActive = index === currentIndex;
         const isPast = index < currentIndex;
 
         return (
           <div key={step.key} className="flex flex-col items-center gap-3 bg-white px-2">
-            <div 
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                isActive 
-                  ? 'bg-indigo-600 text-white ring-4 ring-indigo-50' 
-                  : isPast 
-                    ? 'bg-indigo-600 text-white' 
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${isActive
+                  ? 'bg-indigo-600 text-white ring-4 ring-indigo-50'
+                  : isPast
+                    ? 'bg-indigo-600 text-white'
                     : 'bg-white border-2 border-slate-200 text-slate-400'
-              }`}
+                }`}
             >
               {isPast ? <CheckCircle size={14} strokeWidth={3} /> : step.number}
             </div>
-            <span className={`text-xs font-semibold uppercase tracking-wider hidden sm:block ${
-              isActive ? 'text-indigo-900' : isPast ? 'text-slate-600' : 'text-slate-400'
-            }`}>
+            <span className={`text-xs font-semibold uppercase tracking-wider hidden sm:block ${isActive ? 'text-indigo-900' : isPast ? 'text-slate-600' : 'text-slate-400'
+              }`}>
               {step.label}
             </span>
           </div>
@@ -216,7 +214,7 @@ export default function ApplyAssistant() {
   return (
     <div className="min-h-screen bg-slate-50/50 py-12 px-4 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto space-y-8">
-        
+
         {/* Header & Tabs */}
         <div className="space-y-6">
           <div>
@@ -231,21 +229,19 @@ export default function ApplyAssistant() {
           <div className="flex items-center gap-1 border-b border-slate-200">
             <button
               onClick={() => setActiveTab('apply')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'apply' 
-                  ? 'border-indigo-600 text-indigo-700' 
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'apply'
+                  ? 'border-indigo-600 text-indigo-700'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-              }`}
+                }`}
             >
               <Plus size={16} /> New Application
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'history' 
-                  ? 'border-indigo-600 text-indigo-700' 
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'history'
+                  ? 'border-indigo-600 text-indigo-700'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-              }`}
+                }`}
             >
               <History size={16} /> History
             </button>
@@ -255,9 +251,9 @@ export default function ApplyAssistant() {
         {/* Error Banner */}
         <AnimatePresence>
           {error && activeTab === 'apply' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }} 
-              animate={{ opacity: 1, height: 'auto' }} 
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-3"
             >
@@ -268,10 +264,10 @@ export default function ApplyAssistant() {
 
         {/* Content Area */}
         <AnimatePresence mode="wait">
-          
+
           {/* --- TAB: NEW APPLICATION --- */}
           {activeTab === 'apply' && (
-            <motion.div 
+            <motion.div
               key="tab-apply"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -283,15 +279,15 @@ export default function ApplyAssistant() {
 
               <div className="mt-8">
                 <AnimatePresence mode="wait">
-                  
+
                   {/* STEP 1.5: ATS SCORE CHECK */}
                   {step === STEPS.ATS_CHECK && (
-                    <motion.div 
-                      key="step-ats" 
-                      variants={pageVariants} 
-                      initial="initial" 
-                      animate="animate" 
-                      exit="exit" 
+                    <motion.div
+                      key="step-ats"
+                      variants={pageVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
                       transition={{ duration: 0.2 }}
                       className="max-w-2xl mx-auto space-y-8"
                     >
@@ -305,7 +301,7 @@ export default function ApplyAssistant() {
 
                       <div className="flex flex-col items-center p-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
                         <ScoreRing score={(atsResult?.score || 0) / 100} size={160} label="ATS Match" />
-                        
+
                         <p className="text-2xl font-bold text-slate-900 mt-6">
                           Your ATS Score is <span className={atsResult?.is_low_score ? 'text-amber-500' : 'text-emerald-500'}>{atsResult?.score || 0}</span>/100
                         </p>
@@ -389,12 +385,12 @@ export default function ApplyAssistant() {
 
                   {/* STEP 1: JOB DETAILS */}
                   {step === STEPS.JOB_DETAILS && (
-                    <motion.div 
-                      key="step-details" 
-                      variants={pageVariants} 
-                      initial="initial" 
-                      animate="animate" 
-                      exit="exit" 
+                    <motion.div
+                      key="step-details"
+                      variants={pageVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
                       transition={{ duration: 0.2 }}
                       className="grid grid-cols-1 md:grid-cols-2 gap-10"
                     >
@@ -406,14 +402,14 @@ export default function ApplyAssistant() {
                           </h2>
                           <p className="text-sm text-slate-500 mt-1">We'll use your primary profile resume for this application.</p>
                         </div>
-                        
+
                         {/* 👇 Profile Resume Attached Card */}
                         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
                           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center shrink-0">
                             <FileText size={24} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 
+                            <h3
                               className="text-sm font-bold text-slate-900 truncate max-w-[220px] sm:max-w-xs md:max-w-md"
                               title={user?.profile_resume_name || "Resume not found"}
                             >
@@ -465,11 +461,11 @@ export default function ApplyAssistant() {
 
                   {/* STEP 2: GENERATING */}
                   {step === STEPS.GENERATING && (
-                    <motion.div 
-                      key="step-generating" 
-                      variants={pageVariants} 
-                      initial="initial" 
-                      animate="animate" 
+                    <motion.div
+                      key="step-generating"
+                      variants={pageVariants}
+                      initial="initial"
+                      animate="animate"
                       exit="exit"
                       className="flex flex-col items-center justify-center py-24 text-center"
                     >
@@ -483,11 +479,11 @@ export default function ApplyAssistant() {
 
                   {/* STEP 3: REVIEW */}
                   {step === STEPS.REVIEW && draft && (
-                    <motion.div 
-                      key="step-review" 
-                      variants={pageVariants} 
-                      initial="initial" 
-                      animate="animate" 
+                    <motion.div
+                      key="step-review"
+                      variants={pageVariants}
+                      initial="initial"
+                      animate="animate"
                       exit="exit"
                       className="space-y-6"
                     >
@@ -497,7 +493,7 @@ export default function ApplyAssistant() {
                           <p className="text-sm text-slate-500 mt-1">Verify and adjust the generated content before sending.</p>
                         </div>
                       </div>
-                      
+
                       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                         <DraftEditor
                           draft={draft}
@@ -511,11 +507,11 @@ export default function ApplyAssistant() {
 
                   {/* STEP 4: SENT */}
                   {step === STEPS.SENT && (
-                    <motion.div 
-                      key="step-sent" 
-                      variants={pageVariants} 
-                      initial="initial" 
-                      animate="animate" 
+                    <motion.div
+                      key="step-sent"
+                      variants={pageVariants}
+                      initial="initial"
+                      animate="animate"
                       exit="exit"
                       className="flex flex-col items-center justify-center py-20 text-center"
                     >
@@ -526,9 +522,9 @@ export default function ApplyAssistant() {
                       <p className="text-sm text-slate-500 max-w-sm mx-auto mb-8">
                         Your tailored application has been successfully queued for delivery with your resume and cover letter attached.
                       </p>
-                      <button 
-                        type="button" 
-                        onClick={reset} 
+                      <button
+                        type="button"
+                        onClick={reset}
                         className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
                       >
                         Start New Application

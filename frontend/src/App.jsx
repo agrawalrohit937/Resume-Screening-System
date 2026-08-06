@@ -26,28 +26,28 @@ function ThemeInit() {
   return null
 }
 
-const Login              = lazy(() => import('./pages/Login'))
-const Signup             = lazy(() => import('./pages/Signup'))
+const Login = lazy(() => import('./pages/Login'))
+const Signup = lazy(() => import('./pages/Signup'))
 const CareerPilotLanding = lazy(() => import('./pages/CareerPilotLanding'))
-const LinkedinCallback    = lazy(() => import('./pages/LinkedinCallback'))
-const GitHubCallback     = lazy(() => import('./pages/GithubCallback'))
-const GmailCallback      = lazy(() => import('./pages/GmailCallback'))
-const Dashboard          = lazy(() => import('./pages/Dashboard'))
-const Results            = lazy(() => import('./pages/Results'))
-const Interview          = lazy(() => import('./pages/Interview'))
-const GitHub             = lazy(() => import('./pages/GitHub'))
-const LiveInterview    = lazy(() => import('./pages/LiveInterview'))
-const CareerQuest       = lazy(() => import('./pages/CareerQuest'))
+const LinkedinCallback = lazy(() => import('./pages/LinkedinCallback'))
+const GitHubCallback = lazy(() => import('./pages/GithubCallback'))
+const GmailCallback = lazy(() => import('./pages/GmailCallback'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Results = lazy(() => import('./pages/Results'))
+const Interview = lazy(() => import('./pages/Interview'))
+const GitHub = lazy(() => import('./pages/GitHub'))
+const LiveInterview = lazy(() => import('./pages/LiveInterview'))
+const CareerQuest = lazy(() => import('./pages/CareerQuest'))
 const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'))
-const Premium            = lazy(() => import('./pages/Premium'))
-const Billing            = lazy(() => import('./pages/Billing'))
+const Premium = lazy(() => import('./pages/Premium'))
+const Billing = lazy(() => import('./pages/Billing'))
 const VerifyCertificate = lazy(() => import('./pages/VerifyCertificate'))
-const VerifyEmail        = lazy(() => import('./pages/VerifyEmail'))
-const ForgotPassword     = lazy(() => import('./pages/ForgotPassword'))
-const Profile            = lazy(() => import('./pages/Profile'))
-const ApplyAssistant      = lazy(() => import('./pages/ApplyAssistant'))
-const SupportTickets      = lazy(() => import('./pages/SupportTickets'))
-const TicketDetail        = lazy(() => import('./pages/TicketDetail'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const Profile = lazy(() => import('./pages/Profile'))
+const ApplyAssistant = lazy(() => import('./pages/ApplyAssistant'))
+const SupportTickets = lazy(() => import('./pages/SupportTickets'))
+const TicketDetail = lazy(() => import('./pages/TicketDetail'))
 
 // ── Route guards ────────────────────────────────────────────────────────────
 
@@ -84,22 +84,45 @@ export default function App() {
         <BrowserRouter>
           <Toaster
             position="top-right"
+            containerStyle={{
+              top: 84,
+              right: 28,
+            }}
             gutter={10}
             toastOptions={{
               duration: 4000,
               style: {
-                background: 'var(--color-surface)',
-                color: 'var(--color-text)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '14px',
-                fontFamily: "'Inter', sans-serif",
-                fontSize: '13px',
-                fontWeight: '500',
-                boxShadow: '0 8px 32px rgba(15,15,20,0.10)',
-                padding: '12px 16px',
+                background: 'rgba(255, 255, 255, 0.96)',
+                color: '#0F172A',
+                border: '1px solid rgba(226, 232, 240, 0.9)',
+                borderRadius: '18px',
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                fontSize: '13.5px',
+                fontWeight: '700',
+                letterSpacing: '-0.01em',
+                boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
+                padding: '12px 18px',
+                backdropFilter: 'blur(16px)',
+                maxWidth: '420px',
               },
-              success: { iconTheme: { primary: '#10B981', secondary: '#fff' } },
-              error:   { iconTheme: { primary: '#F43F5E', secondary: '#fff' } },
+              success: {
+                iconTheme: {
+                  primary: '#10B981',
+                  secondary: '#ECFDF5',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#F43F5E',
+                  secondary: '#FFF1F2',
+                },
+              },
+              loading: {
+                iconTheme: {
+                  primary: '#6366F1',
+                  secondary: '#EEF2FF',
+                },
+              },
             }}
           />
 
@@ -109,7 +132,7 @@ export default function App() {
               <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
 
               {/* ── Auth (public) ── */}
-              <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
               <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
               <Route path="/verify-email" element={<VerifyEmail />} />
@@ -126,29 +149,29 @@ export default function App() {
               {/* ── Protected (inside AppLayout shell - PATHLESS ROUTE) ── */}
               <Route element={<ProtectedRoute><RouteErrorBoundary><AppLayout /></RouteErrorBoundary></ProtectedRoute>}>
                 {/* Core */}
-                <Route path="dashboard"            element={<Dashboard />} />
-                <Route path="profile"              element={<Profile />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="profile" element={<Profile />} />
 
-                <Route path="results"              element={<Results />} />
-                <Route path="billing"              element={<Billing />} />
-                <Route path="support"              element={<SupportTickets />} />
-                <Route path="support/:id"          element={<TicketDetail />} />
-                <Route path="apply-assistant"      element={<ApplyAssistant />} />
-                <Route path="github"               element={<GitHub />} />
-                
+                <Route path="results" element={<Results />} />
+                <Route path="billing" element={<Billing />} />
+                <Route path="support" element={<SupportTickets />} />
+                <Route path="support/:id" element={<TicketDetail />} />
+                <Route path="apply-assistant" element={<ApplyAssistant />} />
+                <Route path="github" element={<GitHub />} />
+
                 {/* Interview */}
-                <Route path="interview"            element={<Interview />} />
-                <Route path="live-interview"       element={<LiveInterview />} />
+                <Route path="interview" element={<Interview />} />
+                <Route path="live-interview" element={<LiveInterview />} />
 
                 {/* Gamification */}
-                <Route path="gamification"         element={<CareerQuest />} />
-                
+                <Route path="gamification" element={<CareerQuest />} />
+
                 {/* Premium */}
-                <Route path="premium"              element={<Premium />} />
-                
+                <Route path="premium" element={<Premium />} />
+
                 {/* Recruiter Dashboard */}
-                <Route path="recruiter"            element={<RecruiterDashboard />}/>
-                
+                <Route path="recruiter" element={<RecruiterDashboard />} />
+
                 {/* Catch-all — redirects unknown authenticated paths to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
@@ -158,4 +181,4 @@ export default function App() {
       </BootLoaderGate>
     </AuthProvider>
   )
-}
+}

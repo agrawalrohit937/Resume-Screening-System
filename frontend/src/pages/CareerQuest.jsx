@@ -58,27 +58,33 @@ export default function CareerQuest() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-        {/* Premium Skeleton Loader */}
-        <div className="h-40 rounded-[2rem] bg-slate-100/80 animate-pulse border border-slate-100" />
-        <div className="flex gap-4">
-          <div className="h-16 flex-1 rounded-2xl bg-slate-100/80 animate-pulse" />
-          <div className="h-16 w-64 rounded-2xl bg-slate-100/80 animate-pulse hidden sm:block" />
+      <div className="max-w-[1200px] mx-auto p-4 md:p-6 lg:p-8 space-y-6 w-full">
+        {/* Premium Skeleton Loader matched to the new aesthetic */}
+        <div className="h-48 rounded-[32px] bg-blue-50/60 animate-pulse border border-blue-100/50" />
+        <div className="flex gap-5">
+          <div className="h-16 flex-1 rounded-2xl bg-blue-50/60 animate-pulse border border-blue-100/50" />
+          <div className="h-16 w-72 rounded-2xl bg-blue-50/60 animate-pulse hidden sm:block border border-blue-100/50" />
         </div>
-        <div className="h-48 rounded-[2rem] bg-slate-100/80 animate-pulse border border-slate-100" />
+        <div className="h-56 rounded-3xl bg-blue-50/60 animate-pulse border border-blue-100/50" />
         <div className="grid lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2 h-[500px] rounded-[2rem] bg-slate-100/80 animate-pulse border border-slate-100" />
-          <div className="h-[500px] rounded-[2rem] bg-slate-100/80 animate-pulse border border-slate-100" />
+          <div className="lg:col-span-2 h-[500px] rounded-3xl bg-blue-50/60 animate-pulse border border-blue-100/50" />
+          <div className="h-[500px] rounded-3xl bg-blue-50/60 animate-pulse border border-blue-100/50" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 pb-20">
-      <ProfileHero profile={profile} name={user?.full_name || user?.name || user?.username} badgeCount={earnedBadges.length} />
+    <div className="max-w-[1200px] mx-auto p-4 md:p-6 lg:p-8 space-y-6 pb-16 w-full">
+      <ProfileHero
+        profile={profile}
+        name={user?.full_name || user?.name || user?.username}
+        badgeCount={earnedBadges.length}
+        leaderboard={leaderboard}
+        currentUserId={currentUserId}
+      />
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-5">
         <div className="flex-1 min-w-0">
           <CopilotInsight profile={profile} catalog={catalog} onOpenCopilot={openCopilot} />
         </div>
@@ -99,8 +105,8 @@ export default function CareerQuest() {
           >
             <CareerPathMap profile={profile} levels={levels} />
 
-            {/* THE LAYOUT FIX: Grouping the columns properly */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            {/* THE LAYOUT FIX: Tightened the gap from gap-8 to gap-6 for a cohesive dashboard feel */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               
               {/* Left Column: Quest Log + Daily Rewards */}
               <div className="lg:col-span-2 space-y-6">

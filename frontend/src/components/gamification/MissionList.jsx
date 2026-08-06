@@ -5,13 +5,13 @@ import { Crosshair, Zap, BookOpen, Flame, ShieldCheck, Check, Loader, Star, Spar
 import { getDailyMissions } from '../../services/interviewApi'
 import Card from './Card'
 
-// Upgraded gamified icons mapped to specific 3D styles
+// Gamified icons mapped to clean executive slate & brand blue palette
 const ICON_STYLES = {
-  Target: { icon: Crosshair, bg: 'from-fuchsia-400 to-purple-500', shadow: 'shadow-purple-300/50' },
-  TrendingUp: { icon: Zap, bg: 'from-amber-300 to-orange-500', shadow: 'shadow-orange-300/50' },
-  BookOpen: { icon: BookOpen, bg: 'from-cyan-400 to-blue-500', shadow: 'shadow-blue-300/50' },
-  Flame: { icon: Flame, bg: 'from-orange-400 to-red-500', shadow: 'shadow-red-300/50' },
-  ShieldCheck: { icon: ShieldCheck, bg: 'from-emerald-400 to-teal-500', shadow: 'shadow-emerald-300/50' },
+  Target: { icon: Crosshair, bg: 'bg-[#2E9BDA]', shadow: 'shadow-sm' },
+  TrendingUp: { icon: Zap, bg: 'bg-amber-500', shadow: 'shadow-sm' },
+  BookOpen: { icon: BookOpen, bg: 'bg-blue-600', shadow: 'shadow-sm' },
+  Flame: { icon: Flame, bg: 'bg-amber-600', shadow: 'shadow-sm' },
+  ShieldCheck: { icon: ShieldCheck, bg: 'bg-indigo-600', shadow: 'shadow-sm' },
 }
 
 function resolveMissionAction(mission) {
@@ -36,7 +36,7 @@ function resolveMissionAction(mission) {
 
 function MissionRow({ mission, index }) {
   const navigate = useNavigate()
-  const IconData = ICON_STYLES[mission.icon] || { icon: Star, bg: 'from-blue-400 to-indigo-500', shadow: 'shadow-blue-300/50' }
+  const IconData = ICON_STYLES[mission.icon] || { icon: Star, bg: 'bg-[#2E9BDA]', shadow: 'shadow-sm' }
   const Icon = IconData.icon
   
   const pct = mission.target > 0 ? Math.min(100, Math.round((mission.progress / mission.target) * 100)) : 0
@@ -45,68 +45,59 @@ function MissionRow({ mission, index }) {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ delay: index * 0.1, type: 'spring', bounce: 0.4 }}
-      whileHover={{ scale: 1.015 }}
+      transition={{ delay: index * 0.04 }}
+      whileHover={{ y: -1 }}
       onClick={() => navigate(action.url)}
-      className={`relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border cursor-pointer group transition-all duration-300 ${
+      className={`relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
         complete 
-          ? 'bg-slate-50/80 border-slate-200' 
-          : 'bg-white border-slate-100 shadow-[0_4px_15px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgb(0,0,0,0.06)] hover:border-indigo-200'
+          ? 'bg-slate-50/60 border-slate-200/60 shadow-none opacity-80' 
+          : 'bg-white border-slate-200/80 shadow-sm hover:border-[#2E9BDA]/40'
       }`}
     >
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        {/* 3D Orb Icon */}
+        {/* Clean Icon Badge */}
         <div className="relative shrink-0">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 z-10 relative transition-all duration-300 ${
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white border transition-all ${
             complete 
-              ? 'bg-slate-200 border-white shadow-inner grayscale' 
-              : `bg-gradient-to-br ${IconData.bg} border-white shadow-lg ${IconData.shadow} shadow-[inset_0_-2px_4px_rgba(0,0,0,0.2)]`
+              ? 'bg-slate-100 text-slate-400 border-slate-200' 
+              : `${IconData.bg} border-white/20 shadow-sm`
           }`}>
-            {complete ? <Check className="w-6 h-6 text-slate-400 stroke-[3]" /> : <Icon className="w-5 h-5 text-white drop-shadow-md" />}
+            {complete ? <Check className="w-5 h-5 text-slate-400 stroke-[2.5]" /> : <Icon className="w-5 h-5 text-white" />}
           </div>
-          
-          {/* Glow effect for active missions */}
-          {!complete && (
-            <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${IconData.bg} blur-md opacity-40 -z-10`} />
-          )}
         </div>
 
         {/* Mission Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <p className={`text-[14px] font-extrabold truncate group-hover:text-indigo-600 transition-colors ${complete ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+          <div className="flex items-start justify-between gap-3 mb-1.5">
+            <p className={`text-[13.5px] font-bold truncate transition-colors ${complete ? 'text-slate-400' : 'text-slate-900'}`}>
               {mission.title}
             </p>
             
-            {/* Premium XP Tag */}
-            <div className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider border shadow-sm ${
+            {/* XP Tag */}
+            <div className={`shrink-0 flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10.5px] font-extrabold uppercase tracking-wider border ${
               complete 
-                ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                : 'bg-gradient-to-b from-amber-100 to-orange-100 text-orange-600 border-orange-200'
+                ? 'bg-slate-100 text-slate-400 border-slate-200' 
+                : 'bg-amber-50 text-amber-700 border-amber-200/80'
             }`}>
               +{mission.xp} XP
             </div>
           </div>
 
-          {/* Thick Progress Bar */}
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden shadow-inner relative">
+          {/* Progress Bar */}
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden relative">
               <motion.div
                 initial={{ width: 0 }}
                 whileInView={{ width: `${pct}%` }}
                 viewport={{ once: true }}
-                transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-                className={`h-full rounded-full relative ${complete ? 'bg-slate-300' : 'bg-gradient-to-r from-blue-400 to-purple-500'}`}
-              >
-                {!complete && (
-                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
-                )}
-              </motion.div>
+                transition={{ duration: 1, ease: "easeOut" }}
+                className={`h-full rounded-full ${complete ? 'bg-slate-300' : 'bg-[#2E9BDA]'}`}
+              />
             </div>
-            <span className={`text-[11px] font-bold w-8 text-right ${complete ? 'text-slate-400' : 'text-slate-500'}`}>
+            <span className={`text-[10.5px] font-bold w-8 text-right ${complete ? 'text-slate-400' : 'text-slate-500'}`}>
               {mission.progress}/{mission.target}
             </span>
           </div>
@@ -116,7 +107,7 @@ function MissionRow({ mission, index }) {
       {/* Action CTA Button */}
       <div className="shrink-0 flex items-center justify-end">
         {complete ? (
-          <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-extrabold flex items-center gap-1">
+          <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 text-[11px] font-extrabold flex items-center gap-1.5 shadow-sm">
             <Check className="w-3.5 h-3.5" /> Done
           </span>
         ) : (
@@ -126,7 +117,7 @@ function MissionRow({ mission, index }) {
               e.stopPropagation()
               navigate(action.url)
             }}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all duration-200 group-hover:scale-105"
+            className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:bg-[#2E9BDA] hover:border-[#2E9BDA] hover:text-white text-[11px] font-extrabold flex items-center gap-1.5 shadow-sm transition-all duration-200"
           >
             {action.label} <ArrowRight className="w-3.5 h-3.5" />
           </button>
@@ -138,11 +129,11 @@ function MissionRow({ mission, index }) {
 
 function SectionHeader({ title }) {
   return (
-    <div className="flex items-center gap-3 mb-4 mt-6 first:mt-0">
-      <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 bg-white pr-2 relative z-10">
+    <div className="flex items-center gap-3 mb-3.5 mt-5 first:mt-0">
+      <h4 className="text-[11px] font-extrabold uppercase tracking-widest text-[#1d6fa5] bg-white pr-2 relative z-10">
         {title}
       </h4>
-      <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+      <div className="h-px flex-1 bg-slate-100" />
     </div>
   )
 }
@@ -179,32 +170,31 @@ export default function MissionList({ profile }) {
 
   if (loading) {
     return (
-      <Card className="p-6 h-full flex flex-col items-center justify-center min-h-[400px]">
-        <Loader className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-        <p className="text-sm font-bold text-slate-400">Loading Quests...</p>
+      <Card className="p-6 h-full flex flex-col items-center justify-center min-h-[400px] border border-slate-200/80 shadow-sm bg-white rounded-3xl">
+        <Loader className="w-7 h-7 text-[#2E9BDA] animate-spin mb-3" />
+        <p className="text-[13px] font-bold text-slate-400">Loading Quests...</p>
       </Card>
     )
   }
 
   return (
-    <Card className="p-0 overflow-hidden">
+    <Card className="p-0 overflow-hidden border border-slate-200/80 shadow-sm rounded-3xl bg-white">
       {/* Quest Log Header */}
-      <div className="p-6 sm:p-8 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 relative overflow-hidden">
-        <Sparkles className="absolute -top-4 -right-4 w-24 h-24 text-slate-100 rotate-12" />
+      <div className="p-6 sm:p-7 bg-slate-50/70 border-b border-slate-200/60 relative overflow-hidden">
         <div className="relative z-10">
-          <h3 className="font-extrabold text-2xl text-slate-800 tracking-tight flex items-center gap-2">
+          <h3 className="font-extrabold text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
             Quest Log
           </h3>
-          <p className="text-sm font-medium text-slate-500 mt-1">Complete objectives to earn massive XP</p>
+          <p className="text-[13px] font-medium text-slate-500 mt-1">Complete objectives to earn XP</p>
         </div>
       </div>
 
       {/* Scrollable Missions Area */}
-      <div className="p-6 sm:p-8 flex-1 overflow-y-auto space-y-2">
+      <div className="p-6 sm:p-7 flex-1 overflow-y-auto space-y-2">
         <SectionHeader title="Daily Quests" />
         {missions.daily.length === 0 ? (
-          <div className="bg-slate-50 border border-slate-100 border-dashed rounded-2xl p-6 text-center">
-             <p className="text-sm font-bold text-slate-500">No daily missions available today.</p>
+          <div className="bg-slate-50 border border-slate-200/60 border-dashed rounded-2xl p-6 text-center shadow-sm">
+             <p className="text-[13px] font-medium text-slate-400">No daily missions available today.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -224,4 +214,4 @@ export default function MissionList({ profile }) {
       </div>
     </Card>
   )
-}
+}

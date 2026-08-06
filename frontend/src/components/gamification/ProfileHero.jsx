@@ -1,33 +1,33 @@
 import { motion } from 'framer-motion'
-import { Flame, Medal, TrendingUp, Sparkles } from 'lucide-react'
+import { Flame, Medal, TrendingUp, Sparkles, Trophy } from 'lucide-react'
 import { deriveLeagueName } from './mockConfig'
 import Card from './Card'
 
 function StatChip({ icon: Icon, value, label, color }) {
   const colorStyles = {
-    orange: 'text-orange-600 bg-orange-100 border-orange-200',
-    blue: 'text-blue-600 bg-blue-100 border-blue-200',
-    purple: 'text-purple-600 bg-purple-100 border-purple-200'
+    amber: 'text-amber-600 bg-amber-50/60 border-amber-200/60',
+    blue: 'text-[#1d6fa5] bg-blue-50/60 border-blue-200/60',
+    slate: 'text-slate-700 bg-slate-100/70 border-slate-200/70'
   }
   const activeColor = colorStyles[color] || colorStyles.blue
 
   return (
     <motion.div 
-      whileHover={{ y: -2, scale: 1.02 }}
-      className="flex items-center gap-3 bg-white/60 backdrop-blur-md border border-white rounded-2xl px-4 py-3 shadow-[0_4px_15px_rgba(0,0,0,0.03)]"
+      whileHover={{ y: -2 }}
+      className="flex items-center gap-3 bg-white border border-slate-200/70 rounded-2xl px-4 py-3 shadow-sm"
     >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner ${activeColor}`}>
-        <Icon className="w-5 h-5 drop-shadow-sm" />
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${activeColor}`}>
+        <Icon className="w-5 h-5" />
       </div>
       <div className="leading-tight">
-        <p className="text-lg font-black text-slate-800">{value}</p>
-        <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{label}</p>
+        <p className="text-[19px] font-black text-slate-900">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">{label}</p>
       </div>
     </motion.div>
   )
 }
 
-export default function ProfileHero({ profile, name, badgeCount }) {
+export default function ProfileHero({ profile, name, badgeCount, leaderboard = [], currentUserId }) {
   const level = profile?.level_info?.level || 1
   const levelName = profile?.level_info?.name || 'Beginner'
   const totalPoints = profile?.total_points || 0
@@ -37,70 +37,74 @@ export default function ProfileHero({ profile, name, badgeCount }) {
   const avgPct = Math.round((profile?.average_score || 0) * 100)
   const league = deriveLeagueName(profile)
 
-  return (
-    <Card className="p-0 overflow-hidden relative">
-      {/* Dynamic Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 opacity-80" />
-      <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-400/20 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl animate-pulse delay-1000" />
-      <Sparkles className="absolute top-6 right-10 w-20 h-20 text-indigo-200/50 rotate-12" />
+  const myEntry = leaderboard.find((e) => e.user_id === currentUserId || e.user_id === profile?.user_id)
+  const userRank = profile?.rank || myEntry?.rank || (totalPoints > 0 ? 1 : '-')
 
-      <div className="relative z-10 p-6 sm:p-8 flex flex-col md:flex-row md:items-center gap-8">
+  return (
+    <Card className="p-0 overflow-hidden relative border border-slate-200/80 shadow-sm rounded-3xl bg-white">
+      {/* Subtle Ambient Background Accent */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-slate-50/80 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative z-10 p-6 sm:p-7 flex flex-col md:flex-row md:items-center gap-6 sm:gap-8">
         
-        {/* User Badge & Info */}
+        {/* User Badge & Profile Overview */}
         <div className="flex items-center gap-5 shrink-0">
           <div className="relative w-20 h-20 shrink-0">
-            <motion.div 
-              initial={{ scale: 0.8, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring" }}
-              className="w-full h-full rounded-[2rem] bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shadow-[0_10px_25px_rgba(79,70,229,0.4)] shadow-[inset_0_-4px_6px_rgba(0,0,0,0.2)] border-4 border-white"
-            >
-              <span className="font-display font-black text-3xl text-white drop-shadow-md">{level}</span>
-            </motion.div>
-            <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-orange-500 border-2 border-white flex items-center justify-center shadow-lg">
-              <Medal className="w-4 h-4 text-white" />
+            <div className="w-full h-full rounded-2xl bg-[#0f172a] text-white flex items-center justify-center shadow-md border border-slate-700">
+              <span className={`font-black ${String(userRank).length > 2 ? 'text-xl' : 'text-2xl sm:text-3xl'} text-white`}>
+                #{userRank}
+              </span>
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center shadow-sm">
+              <Trophy className="w-3.5 h-3.5 text-white" />
             </div>
           </div>
+          
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-1.5 border border-indigo-200">
-              <Sparkles className="w-3 h-3" />
-              Level {level} · {league}
+            <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider mb-1.5 border border-slate-200">
+              <Sparkles className="w-3 h-3 text-[#2E9BDA]" />
+              Level {level} • {league}
             </div>
-            <h1 className="font-extrabold text-3xl text-slate-800 leading-tight truncate tracking-tight">
+            <h1 className="font-extrabold text-2xl sm:text-3xl text-slate-900 leading-tight truncate tracking-tight">
               {name ? name : levelName}
             </h1>
-            <p className="text-sm font-bold text-slate-500 mt-1">{levelName} Rank</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[11.5px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200/70">
+                Rank #{userRank}
+              </span>
+              <span className="text-[12.5px] font-medium text-slate-500">• {levelName} Tier</span>
+            </div>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="flex-1 min-w-[200px] bg-white/50 backdrop-blur-sm p-4 rounded-3xl border border-white shadow-sm">
+        {/* Progress Bar Container */}
+        <div className="flex-1 min-w-[200px] bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/60">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-extrabold text-slate-700">{totalPoints.toLocaleString()} XP</span>
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-              {pointsToNext > 0 ? `${pointsToNext.toLocaleString()} XP to next` : 'MAX LEVEL'}
+            <span className="text-[13.5px] font-extrabold text-slate-900">{totalPoints.toLocaleString()} XP</span>
+            <span className="text-[11px] font-bold text-[#1d6fa5] bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100 uppercase tracking-wide">
+              {pointsToNext > 0 ? `${pointsToNext.toLocaleString()} XP to next level` : 'MAX LEVEL'}
             </span>
           </div>
-          <div className="h-3.5 rounded-full bg-slate-200/50 overflow-hidden shadow-inner relative">
+          <div className="h-2.5 rounded-full bg-slate-200/70 overflow-hidden relative">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(100, progressPct)}%` }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              className="h-full rounded-full bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 relative"
-            >
-               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
-            </motion.div>
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              className="h-full rounded-full bg-[#2E9BDA]"
+            />
           </div>
         </div>
       </div>
 
-      {/* Glassmorphism Stat Chips */}
-      <div className="relative z-10 px-6 sm:px-8 pb-6 sm:pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatChip icon={Flame} value={streak} label="Day Streak" color="orange" />
+      {/* Stat Chips Overview */}
+      <div className="relative z-10 px-6 sm:px-7 pb-6 sm:pb-7">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatChip icon={Trophy} value={`#${userRank}`} label="Global Rank" color="amber" />
+          <StatChip icon={Flame} value={streak} label="Day Streak" color="amber" />
           <StatChip icon={TrendingUp} value={`${avgPct}%`} label="Avg Score" color="blue" />
-          <StatChip icon={Medal} value={badgeCount} label="Badges Won" color="purple" />
+          <StatChip icon={Medal} value={badgeCount} label="Badges Won" color="slate" />
         </div>
       </div>
     </Card>
   )
-}
+}

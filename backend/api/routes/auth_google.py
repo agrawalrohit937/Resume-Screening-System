@@ -21,7 +21,7 @@ async def google_auth(
     payload: dict,  # {"token": "...", "role": "..."}
     user_repo: UserRepository = Depends(get_user_repo),
 ):
-    """Authenticate via Google Access Token.
+    """Authenticate via Google Access Token or ID Token.
     
     Uses the multi-provider auth model:
     - Finds user by email
@@ -35,23 +35,43 @@ async def google_auth(
     if not google_token:
         raise HTTPException(status_code=400, detail="Google token is missing")
 
-    # 1. Fetch user info from Google using the access token
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {google_token}"}
-        )
+    idinfo = None
+    # 1. Try fetching user info using access token format first
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {google_token}"}
+            )
+            if response.status_code == 200:
+                idinfo = response.json()
+            else:
+                # 2. If access_token userinfo failed, try ID token verification endpoint
+                id_response = await client.get(
+                    "https://oauth2.googleapis.com/tokeninfo",
+                    params={"id_token": google_token}
+                )
+                if id_response.status_code == 200:
+                    idinfo = id_response.json()
+                else:
+                    logger.error(
+                        "Google token verification failed",
+                        userinfo_status=response.status_code,
+                        tokeninfo_status=id_response.status_code,
+                        userinfo_text=response.text,
+                        tokeninfo_text=id_response.text,
+                    )
+        except Exception as exc:
+            logger.error("Exception verifying Google token", error=str(exc))
+            raise HTTPException(status_code=500, detail=f"Failed to communicate with Google auth server: {str(exc)}")
 
-    # 2. Check if the token was valid
-    if response.status_code != 200:
-        logger.error("Google token verification failed", status_code=response.status_code, text=response.text)
-        raise HTTPException(status_code=401, detail="Invalid Google Access Token")
-
-    idinfo = response.json()
+    # Check if we got valid user info
+    if not idinfo:
+        raise HTTPException(status_code=401, detail="Invalid or expired Google Token")
 
     # 3. Extract the user data
     email = idinfo.get("email", "").lower()
-    full_name = idinfo.get("name", "")
+    full_name = idinfo.get("name", idinfo.get("given_name", ""))
     profile_pic = idinfo.get("picture")
     google_sub = idinfo.get("sub")
     

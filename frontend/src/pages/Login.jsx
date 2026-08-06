@@ -50,18 +50,21 @@ export default function Login() {
     onSuccess: async (codeResponse) => {
       setLoading(true)
       try {
-        // Note: useGoogleLogin returns an access_token, not a credential. 
-        // Ensure your backend / googleLogin context handles this correctly.
+        // Note: useGoogleLogin returns an access_token in codeResponse.access_token
         await googleLogin(codeResponse.access_token, selectedRole)
         toast.success('Welcome! 🚀')
         navigate('/dashboard')
       } catch (err) {
+        console.error('Google Auth Backend Error:', err)
         toast.error(err.response?.data?.detail || 'Google login failed')
       } finally {
         setLoading(false)
       }
     },
-    onError: () => toast.error('Google Sign-In failed')
+    onError: (errorResponse) => {
+      console.error('Google Sign-In Failed (Frontend):', errorResponse)
+      toast.error('Google Sign-In failed. Please check origin configuration in Google Cloud Console.')
+    }
   });
 
   // ── CHANGED: login() may now return { requires_otp: true, challenge_token }

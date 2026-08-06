@@ -16,25 +16,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
+import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 
-// Generate 1-2 letter initials from a full name: "Ansh Gupta" → "AG"
-function getInitials(fullName) {
-  if (!fullName) return 'U'
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return parts[0][0].toUpperCase()
-}
-
-// Resolve the best avatar URL (custom FTP upload > google_picture > null)
-function resolveAvatarUrl(user) {
-  if (!user) return null
-  if (user.profile_picture && user.profile_picture.startsWith('http')) return user.profile_picture
-  if (user.display_picture && user.display_picture.startsWith('http')) return user.display_picture
-  if (user.google_picture && user.google_picture.startsWith('http')) return user.google_picture
-  return null
-}
-
-function SidebarAvatar({ user, isPremium }) {
+function SidebarAvatar({ user, isPremium, isPro }) {
   const [imgError, setImgError] = useState(false)
   const avatarUrl = resolveAvatarUrl(user)
 
@@ -42,13 +26,23 @@ function SidebarAvatar({ user, isPremium }) {
 
   const initials = getInitials(user?.full_name)
 
+  const ringStyle = isPremium
+    ? 'ring-[#F3C24B]/60 border-[#F3C24B]'
+    : isPro
+    ? 'ring-slate-300 border-slate-300'
+    : 'ring-white border-slate-200'
+
+  const glowStyle = isPremium
+    ? 'bg-[#F3C24B]'
+    : isPro
+    ? 'bg-slate-400'
+    : 'bg-[#2E9BDA]'
+
   return (
     <div className="relative shrink-0 group cursor-pointer">
-      <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-40 blur-md transition-opacity duration-300 ${isPremium ? 'bg-[#F3C24B]' : 'bg-[#2E9BDA]'}`} />
+      <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-40 blur-md transition-opacity duration-300 ${glowStyle}`} />
       
-      <div className={`relative w-11 h-11 rounded-full overflow-hidden shadow-sm border bg-white ring-2 ${
-        isPremium ? 'ring-[#F3C24B]/60 border-[#F3C24B]' : 'ring-white border-slate-200'
-      }`}>
+      <div className={`relative w-11 h-11 rounded-full overflow-hidden shadow-sm border bg-white ring-2 ${ringStyle}`}>
         {avatarUrl && !imgError ? (
           <img
             src={avatarUrl}
@@ -58,15 +52,15 @@ function SidebarAvatar({ user, isPremium }) {
           />
         ) : (
           <div className={`w-full h-full flex items-center justify-center text-white font-black text-sm ${
-            isPremium ? 'bg-gradient-to-br from-[#F3C24B] to-[#B9812A]' : 'bg-gradient-to-br from-[#38AEEA] to-[#1d6fa5]'
+            isPremium
+              ? 'bg-gradient-to-br from-[#F3C24B] to-[#B9812A]'
+              : isPro
+              ? 'bg-gradient-to-br from-slate-500 to-slate-700'
+              : 'bg-gradient-to-br from-[#38AEEA] to-[#1d6fa5]'
           }`}>
             {initials}
           </div>
         )}
-      </div>
-
-      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-[2.5px] border-white shadow-sm flex items-center justify-center z-10">
-         <div className="w-1 h-1 bg-white rounded-full animate-pulse" />
       </div>
     </div>
   )
@@ -84,26 +78,29 @@ const Icons = {
   logout: <LogOut className="w-4 h-4" strokeWidth={2.2} />,
 }
 
-const Crown = ({ size = 22, gradId }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FFF3C8" />
-        <stop offset="45%" stopColor="#F3C24B" />
-        <stop offset="100%" stopColor="#B9812A" />
-      </linearGradient>
-    </defs>
-    <path d="M4.2 17.2h15.6v2a1 1 0 01-1 1H5.2a1 1 0 01-1-1v-2z" fill={`url(#${gradId})`} />
-    <path
-      d="M3.1 16.4 1.9 8.7a.62.62 0 01.98-.58l3.66 2.86 4.4-5.5a1.14 1.14 0 011.78 0l4.4 5.5 3.66-2.86a.62.62 0 01.98.58l-1.2 7.7a1 1 0 01-1 .84H4.1a1 1 0 01-1-.84z"
-      fill={`url(#${gradId})`}
-    />
-    <circle cx="6.6" cy="10.4" r="1" fill="#FFFAE6" />
-    <circle cx="12" cy="6.7" r="1.25" fill="#FFFAE6" />
-    <circle cx="17.4" cy="10.4" r="1" fill="#FFFAE6" />
-    <rect x="10.7" y="17.55" width="2.6" height="2.6" rx="0.4" fill="#8A5A14" transform="rotate(45 12 18.85)" />
-  </svg>
-)
+const Crown = ({ size = 22, gradId, variant = 'gold' }) => {
+  const isSilver = variant === 'silver'
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={isSilver ? "#F8FAFC" : "#FFF3C8"} />
+          <stop offset="45%" stopColor={isSilver ? "#CBD5E1" : "#F3C24B"} />
+          <stop offset="100%" stopColor={isSilver ? "#64748B" : "#B9812A"} />
+        </linearGradient>
+      </defs>
+      <path d="M4.2 17.2h15.6v2a1 1 0 01-1 1H5.2a1 1 0 01-1-1v-2z" fill={`url(#${gradId})`} />
+      <path
+        d="M3.1 16.4 1.9 8.7a.62.62 0 01.98-.58l3.66 2.86 4.4-5.5a1.14 1.14 0 011.78 0l4.4 5.5 3.66-2.86a.62.62 0 01.98.58l-1.2 7.7a1 1 0 01-1 .84H4.1a1 1 0 01-1-.84z"
+        fill={`url(#${gradId})`}
+      />
+      <circle cx="6.6" cy="10.4" r="1" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
+      <circle cx="12" cy="6.7" r="1.25" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
+      <circle cx="17.4" cy="10.4" r="1" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
+      <rect x="10.7" y="17.55" width="2.6" height="2.6" rx="0.4" fill={isSilver ? "#334155" : "#8A5A14"} transform="rotate(45 12 18.85)" />
+    </svg>
+  )
+}
 
 const NAV_SECTIONS = [
   {
@@ -205,7 +202,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   }
 
   const visibleSections = getNavSections()
-  const isPremium = user?.plan === 'premium'
+  const userPlan = (user?.plan || user?.subscription_tier || '').toLowerCase()
+  const isPremium = userPlan.includes('premium')
+  const isPro = userPlan.includes('pro')
+  const hasCrown = isPremium || isPro
 
   const prevPathRef = useRef(location.pathname)
   useEffect(() => {
@@ -488,16 +488,16 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       <div className="border-t border-slate-100 p-3 shrink-0 space-y-2">
         <div className={`relative flex items-center gap-2.5 p-1.5 rounded-2xl transition-colors ${
           isCompact ? 'justify-center' : ''
-        } ${isPremium ? 'bg-gradient-to-r from-[#F3C24B]/10 to-transparent hover:from-[#F3C24B]/20' : 'hover:bg-slate-50'}`}>
+        } ${isPremium ? 'bg-gradient-to-r from-[#F3C24B]/10 to-transparent hover:from-[#F3C24B]/20' : isPro ? 'bg-slate-100/60 hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
           
           <div className="relative">
             <AvatarRing user={user} ringSize={44} shape="squircle">
-              <SidebarAvatar user={user} isPremium={isPremium} />
+              <SidebarAvatar user={user} isPremium={isPremium} isPro={isPro} />
             </AvatarRing>
             
-            {isPremium && (
+            {hasCrown && (
               <div className="absolute -top-2.5 -right-2 z-20 rotate-[15deg] drop-shadow-md">
-                <Crown size={16} gradId="profileCrown" />
+                <Crown size={16} gradId="profileCrown" variant={isPremium ? 'gold' : 'silver'} />
               </div>
             )}
           </div>
@@ -512,6 +512,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                 {isPremium ? (
                   <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-[#8A5A14] bg-gradient-to-r from-[#F3C24B]/30 to-[#F3C24B]/10 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-[#F3C24B]/30 shadow-sm">
                     Premium
+                  </span>
+                ) : isPro ? (
+                  <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-slate-700 bg-slate-200/80 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-slate-300 shadow-sm">
+                    Pro Member
                   </span>
                 ) : (
                   <span className="inline-block mt-0.5 text-[9.5px] font-semibold text-[#1d6fa5] bg-[#2E9BDA]/10 px-1.5 py-[1px] rounded-md capitalize leading-none">
