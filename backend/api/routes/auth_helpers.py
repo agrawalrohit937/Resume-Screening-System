@@ -245,20 +245,15 @@ async def link_or_create_user(
     Returns:
         The UserModel (existing or newly created).
     """
-    # Before linking, check if existing user has a custom uploaded profile picture
+    # Before linking, check if existing user already has a profile picture
     existing_user = await user_repo.get_by_email(email)
     
-    # If user exists and has a custom upload (profile_picture_public_id or Cloudinary URL), strip profile_picture from updates
-    # so we never overwrite a custom uploaded photo with an OAuth provider picture
+    # If user exists and already has a profile_picture set, strip profile_picture from updates
+    # so we never overwrite an existing user photo with an OAuth provider picture on subsequent logins
     clean_updates = user_updates.copy() if user_updates else None
-    if existing_user and clean_updates:
-        has_custom_photo = bool(
-            existing_user.profile_picture_public_id or
-            (existing_user.profile_picture and "cloudinary" in existing_user.profile_picture.lower())
-        )
-        if has_custom_photo:
-            clean_updates.pop("profile_picture", None)
-            clean_updates.pop("profile_picture_public_id", None)
+    if existing_user and clean_updates and existing_user.profile_picture:
+        clean_updates.pop("profile_picture", None)
+        clean_updates.pop("profile_picture_public_id", None)
 
     # STEP 1: Try to link existing user atomically
     existing = await user_repo.find_by_email_and_update_linked(

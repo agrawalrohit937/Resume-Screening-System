@@ -14,13 +14,15 @@ import {
   LayoutDashboard,
   Trophy,
   Settings,
-  Flame
+  Flame,
+  Crown
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getGamificationProfile } from '../services/interviewApi'
 import ProfilePlanDropdown from './ProfilePlanDropdown'
 import AvatarRing from './AvatarRing'
 import NotificationBell from './NotificationBell'
+import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 
 // --- Search Routing Dictionary ---
 const SEARCH_ROUTES = [
@@ -36,20 +38,6 @@ const SEARCH_ROUTES = [
   { name: 'Billing & Premium', path: '/billing', icon: Settings, keywords: ['billing', 'upgrade', 'pro'] },
   { name: 'Profile Settings', path: '/profile', icon: Settings, keywords: ['profile', 'account'] },
 ]
-
-// --- Utility Functions ---
-function getInitials(fullName) {
-  if (!fullName) return '?'
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return parts[0][0].toUpperCase()
-}
-
-function resolveAvatarUrl(user) {
-  if (!user) return null
-  const pics = [user.profile_picture, user.display_picture, user.google_picture]
-  return pics.find(pic => pic && String(pic).startsWith('http')) || null
-}
 
 function UserAvatar({ user, size = 'sm' }) {
   const [imgError, setImgError] = useState(false)
@@ -304,8 +292,14 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             <AvatarRing user={user} ringSize={34} shape="circle">
               <UserAvatar user={user} size="sm" />
             </AvatarRing>
-            <span className="hidden sm:block text-sm font-extrabold text-slate-800 tracking-tight">
+            <span className="hidden sm:flex items-center gap-1 text-sm font-extrabold text-slate-800 tracking-tight">
               {user?.full_name?.split(' ')[0] || 'User'}
+              {(user?.plan === 'premium' || user?.subscription_tier === 'premium') && (
+                <Crown size={13} className="text-amber-500 fill-amber-400 drop-shadow-sm ml-0.5" />
+              )}
+              {(user?.plan === 'pro' || user?.subscription_tier === 'pro') && (
+                <Crown size={13} className="text-slate-400 fill-slate-300 drop-shadow-sm ml-0.5" />
+              )}
             </span>
             <ChevronDown size={14} strokeWidth={3} className="text-slate-400 hidden sm:block ml-1" />
           </motion.button>

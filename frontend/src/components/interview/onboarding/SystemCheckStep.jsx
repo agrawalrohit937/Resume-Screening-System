@@ -24,7 +24,7 @@ function useMicLevelTest() {
     cancelAnimationFrame(rafRef.current)
     clearTimeout(timeoutRef.current)
     streamRef.current?.getTracks().forEach((t) => t.stop())
-    if (ctxRef.current && ctxRef.current.state !== 'closed') ctxRef.current.close().catch(() => {})
+    if (ctxRef.current && ctxRef.current.state !== 'closed') ctxRef.current.close().catch(() => { })
     streamRef.current = null
     ctxRef.current = null
   }, [])
@@ -132,7 +132,7 @@ export default function SystemCheckStep({
         osc.start()
         osc.stop(ctx.currentTime + 1.2)
         osc.onended = () => ctx.close()
-      } catch {}
+      } catch { }
     }
   }
 
@@ -195,9 +195,8 @@ export default function SystemCheckStep({
                 ['microphone', 'Microphone', Mic],
                 ['speaker', 'Speaker', Volume2],
               ].map(([key, label, Icon]) => (
-                <div key={key} className={`flex items-center justify-between rounded-xl px-3 py-2 border text-[12px] font-mono font-semibold transition-colors ${
-                  checklist[key] ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : step === key ? 'bg-white/10 border-white/20 text-white' : 'bg-white/[0.03] border-white/10 text-blue-300'
-                }`}>
+                <div key={key} className={`flex items-center justify-between rounded-xl px-3 py-2 border text-[12px] font-mono font-semibold transition-colors ${checklist[key] ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : step === key ? 'bg-white/10 border-white/20 text-white' : 'bg-white/[0.03] border-white/10 text-blue-300'
+                  }`}>
                   <span className="flex items-center gap-2"><Icon className="h-3.5 w-3.5" /> {label}</span>
                   {checklist[key] ? <CheckCircle2 className="h-4 w-4" /> : <span className="text-[10px] uppercase tracking-wider opacity-60">{step === key ? 'Checking' : 'Pending'}</span>}
                 </div>

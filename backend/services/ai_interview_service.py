@@ -5,6 +5,8 @@ Extends existing interview_service.py with real AI capabilities
 
 import json
 import re
+import uuid
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 import httpx
@@ -31,6 +33,48 @@ class AIInterviewService:
 
     # ─── FULL INTERVIEW SESSION GENERATION ────────────────────────────────────
 
+    async def generate_interview(
+        self,
+        resume: ResumeModel,
+        job_description: Optional[str] = None,
+        job_title: Optional[str] = None,
+        difficulty: str = "medium",
+        interview_type: str = "mixed",
+        num_questions: int = 10,
+    ) -> Dict[str, Any]:
+        """Generate full interview session matching InterviewResponse schema."""
+        target_title = job_title or (
+            resume.parsed_data.target_roles[0]
+            if resume.parsed_data and getattr(resume.parsed_data, 'target_roles', None)
+            else "Software Engineer"
+        )
+        
+        result = await self.generate_ai_questions(
+            resume=resume,
+            job_title=target_title,
+            job_description=job_description or "",
+            difficulty=difficulty,
+            interview_type=interview_type,
+            num_questions=num_questions,
+        )
+
+        prep_tips = [
+            "Review your listed technical skills and prepare real-world examples from past projects.",
+            f"For {difficulty}-level questions, explain your reasoning clearly and cover trade-offs.",
+            "Structure behavioral responses using the STAR method (Situation, Task, Action, Result).",
+            "Pause for 5-10 seconds to organize your thought process before answering."
+        ]
+
+        return {
+            "interview_id": str(uuid.uuid4()),
+            "resume_id": str(resume.id if resume.id else ""),
+            "job_title": target_title,
+            "questions": result.get("questions", []),
+            "preparation_tips": prep_tips,
+            "estimated_duration_minutes": result.get("session_metadata", {}).get("estimated_duration_minutes", num_questions * 5),
+            "created_at": datetime.now(timezone.utc),
+        }
+
     async def generate_ai_questions(
         self,
         resume: ResumeModel,
@@ -44,9 +88,9 @@ class AIInterviewService:
         if not resume.parsed_data:
             raise ValueError("Resume must be parsed first.")
 
-        skills = resume.parsed_data.technical_skills[:12]
-        exp_years = resume.parsed_data.total_experience_years
-        experience_titles = [e.title for e in (resume.parsed_data.work_experience or [])[:3]]
+        skills = (resume.parsed_data.technical_skills or resume.parsed_data.skills or [])[:12]
+        exp_years = getattr(resume.parsed_data, 'total_experience_years', 0.0) or 0.0
+        experience_titles = [getattr(e, 'title', '') for e in (resume.parsed_data.work_experience or [])[:3] if getattr(e, 'title', None)]
 
         prompt = self._build_generation_prompt(
             skills=skills,

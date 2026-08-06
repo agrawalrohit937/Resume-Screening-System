@@ -137,7 +137,8 @@ async def delete_file(public_id: str, resource_type: str = "auto") -> None:
 
 async def upload_profile_picture(file_bytes: bytes, user_id: str, ext: str = "jpg") -> Tuple[str, str]:
     """Upload user profile picture. Returns (secure_url, public_id)."""
-    public_id = f"profile_{user_id}"
+    import time
+    public_id = f"profile_{user_id}_{int(time.time())}"
     return await upload_file(file_bytes, FOLDER_PROFILE_PICTURES, public_id=public_id, resource_type="image")
 
 

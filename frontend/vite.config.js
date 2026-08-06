@@ -19,8 +19,8 @@ export default defineConfig({
   server: {
     port: 5173,
     headers: {
-      // This allows the Google Popup to talk back to your app
-      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+      // Allow Google OAuth Popup postMessage communication in local development
+      "Cross-Origin-Opener-Policy": "unsafe-none",
       "Cross-Origin-Embedder-Policy": "unsafe-none", 
     },
     proxy: {

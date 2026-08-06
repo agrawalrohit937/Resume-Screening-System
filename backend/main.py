@@ -84,7 +84,10 @@ def create_application() -> FastAPI:
     raw_origins = settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [str(settings.ALLOWED_ORIGINS)]
     cors_origins = list(set(raw_origins) | {
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
         "https://resume-screening-system-lyart.vercel.app",
         "https://careershala.tech",
         "https://www.careershala.tech",

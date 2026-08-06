@@ -1,24 +1,41 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Briefcase, Sliders, Layers, Disc, Sparkles, ArrowRight, Zap, Target, Crosshair, Rocket } from 'lucide-react'
+import {
+  Briefcase, Sliders, Layers, Sparkles, ArrowRight, Zap, Target,
+  Crosshair, Rocket, CheckCircle2, Search, Bot, Clock, List, Check, Star
+} from 'lucide-react'
 import FlowStepper from '../components/interview/onboarding/FlowStepper'
 
 const DIFFICULTIES = [
-  { id: 'easy', label: 'Standard', sub: 'Warm-up pace', time: 2, icon: Target },
-  { id: 'medium', label: 'Advanced', sub: 'Realistic pace', time: 3, icon: Crosshair },
-  { id: 'hard', label: 'Executive', sub: 'High pressure', time: 4, icon: Rocket },
+  { id: 'easy', label: 'Warm-up', sub: 'Great for building confidence.', time: 2, icon: Target, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  { id: 'medium', label: 'Real Interview', sub: 'Realistic experience for preparation.', time: 3, icon: Crosshair, color: 'text-[#2E9BDA]', bg: 'bg-[#2E9BDA]/10', border: 'border-[#2E9BDA]', recommended: true },
+  { id: 'hard', label: 'Challenge', sub: 'High pressure, advanced questions.', time: 4, icon: Rocket, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-200' },
 ]
 
 const INTERVIEW_TYPES = [
-  { id: 'mixed', label: 'All-in-One', desc: 'A balanced mix of technical, experience, and workplace scenario questions.' },
-  { id: 'technical', label: 'Technical Core', desc: 'Deep dive into core skills, engineering concepts, and hands-on execution.' },
-  { id: 'behavioral', label: 'Behavioral', desc: 'Past projects, teamwork dynamics, communication, and leadership.' },
-  { id: 'situational', label: 'Situational', desc: 'How you respond to real-time challenges and critical incidents.' },
+  { id: 'mixed', label: 'All-in-One', desc: 'Technical, experience & workplace scenarios.', icon: Layers },
+  { id: 'technical', label: 'Technical Core', desc: 'Core skills and hands-on execution.', icon: Briefcase },
+  { id: 'behavioral', label: 'Behavioral', desc: 'Past projects, teamwork & leadership.', icon: CheckCircle2 },
+  { id: 'situational', label: 'Situational', desc: 'Real-time challenges & critical calls.', icon: Zap },
+]
+
+const POPULAR_ROLES = ['Python Backend', 'AI Engineer', 'ML Engineer', 'Data Scientist', 'Frontend', 'Full Stack']
+
+const QUESTION_PRESETS = [
+  { id: 'short', label: 'Sprint', count: 3, icon: Zap },
+  { id: 'standard', label: 'Standard', count: 8, icon: Target },
+  { id: 'complete', label: 'Full Interview', count: 15, icon: Crosshair },
+]
+
+const CHECKLIST = [
+  'Adaptive to your performance',
+  'Real-time AI feedback',
+  'Detailed scorecard & insights',
 ]
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
-  show: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] } }),
+  hidden: { opacity: 0, y: 10 },
+  show: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.04, duration: 0.3, ease: [0.16, 1, 0.3, 1] } }),
 }
 
 export default function RoleConfigStep({ onContinue, loading, navState }) {
@@ -39,116 +56,176 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
   const isFormValid = form.job_title.trim().length > 1
 
   return (
-    <div className="min-h-screen w-full bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased selection:bg-blue-500/10">
-      {/* Ambient backdrop glow — sets the "this is a live simulator" tone without being loud */}
-      <div className="pointer-events-none absolute -top-40 -right-40 h-[520px] w-[520px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
-      <div className="pointer-events-none absolute top-1/3 -left-32 h-[360px] w-[360px] rounded-full bg-indigo-400/10 blur-3xl" />
+    // ADDED NEGATIVE MARGINS (-m-4 sm:-m-6 lg:-m-8) AND min-h-[calc(100vh-80px)]
+    // This pulls the background out to cover the dashboard padding.
+    <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-80px)] bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased flex flex-col">
+      <div className="pointer-events-none absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-indigo-400/5 blur-3xl" />
 
-      <div className="relative mx-auto max-w-7xl py-8 sm:py-10 px-4 sm:px-6 lg:px-8">
-        <motion.div initial="hidden" animate="show" custom={0} variants={fadeUp} className="mb-8">
-          <FlowStepper current={1} />
-        </motion.div>
+      <div className="relative mx-auto max-w-[1200px] w-full px-4 sm:px-6 lg:px-8 py-4 h-full flex flex-col flex-1">
+        
+        <div className="flex justify-end mb-3">
+          <div className="w-[70%]">
+            <FlowStepper current={1} />
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-          {/* Left: hero + live summary */}
-          <motion.div
-            initial="hidden" animate="show" custom={1} variants={fadeUp}
-            className="lg:col-span-4 space-y-4 lg:sticky lg:top-8"
-          >
-            <div className="bg-white border border-blue-200/70 rounded-3xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#2E9BDA]/10 border border-[#2E9BDA]/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#1d6fa5]">
-                <Zap className="h-3.5 w-3.5" /> Step 1 of 3
-              </div>
-
-              <div className="space-y-2.5">
-                <h1 className="text-[32px] sm:text-[38px] font-extrabold tracking-[-0.02em] text-blue-950 leading-[1.05]">
-                  Build your <span className="bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] bg-clip-text text-transparent">mock interview.</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch flex-1 min-h-0">
+          
+          {/* ── LEFT PANEL ── */}
+          <motion.div initial="hidden" animate="show" custom={1} variants={fadeUp} className="lg:col-span-4 flex flex-col h-full">
+            <div className="bg-white border border-blue-100 rounded-[28px] p-6 shadow-[0_2px_10px_rgba(15,23,42,0.03)] flex flex-col h-full justify-between">
+              
+              <div className="text-center pb-4 border-b border-blue-50">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#2E9BDA]/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#1d6fa5] mb-4">
+                  <Sparkles className="h-3.5 w-3.5" /> Step 1 of 3
+                </div>
+                <h1 className="text-[30px] font-black tracking-tight text-blue-950 leading-tight mb-2">
+                  AI Interview <br /><span className="text-[#2E9BDA]">Studio</span>
                 </h1>
-                <p className="text-[14px] leading-relaxed text-blue-900/60 font-medium">
-                  Tell us the role and pace you want. The AI interviewer adapts its questions and difficulty in real time to match.
-                </p>
+                <p className="text-[14px] text-blue-900/50 font-medium">Real interviews. Real feedback. Real results.</p>
+
+                <div className="mt-8 relative flex justify-center items-center h-28">
+                  <motion.div 
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.7, 0.4] }} 
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} 
+                    className="absolute w-24 h-24 bg-gradient-to-tr from-[#2E9BDA]/30 to-blue-300/30 rounded-full blur-xl" 
+                  />
+                  <motion.div 
+                    animate={{ y: [0, -8, 0] }} 
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="relative z-10 w-16 h-16 bg-gradient-to-b from-white to-blue-50 rounded-2xl border-4 border-white shadow-[0_10px_25px_rgba(46,155,218,0.2)] flex items-center justify-center"
+                  >
+                    <Bot className="h-8 w-8 text-[#1d6fa5]" />
+                  </motion.div>
+                  <div className="absolute bottom-2 w-28 h-6 border-[2px] border-[#2E9BDA]/15 rounded-[100%] shadow-[0_5px_15px_rgba(46,155,218,0.08)]" />
+                  <div className="absolute bottom-3 w-16 h-3 border-[1px] border-[#2E9BDA]/25 rounded-[100%]" />
+                </div>
               </div>
 
-              <div className="border-t border-blue-100 pt-5 space-y-3">
-                {[
-                  ['Questions', `${form.num_questions}`],
-                  ['Est. duration', `~${etaMin} min`],
-                  ['Track', INTERVIEW_TYPES.find((t) => t.id === form.interview_type)?.label],
-                ].map(([label, val]) => (
-                  <div key={label} className="flex justify-between items-center text-[13px]">
-                    <span className="text-blue-900/50 font-semibold">{label}</span>
-                    <span className="font-mono font-bold text-blue-950 tabular-nums">{val}</span>
+              <div className="py-4">
+                <h3 className="text-[13px] font-extrabold text-blue-950 mb-3">Your Interview Summary</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-[13.5px] font-semibold text-blue-900/60">
+                      <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center"><List className="h-3 w-3 text-[#2E9BDA]" /></div>
+                      Questions
+                    </div>
+                    <span className="font-black text-blue-950 text-[15px]">{form.num_questions}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-[13.5px] font-semibold text-blue-900/60">
+                      <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center"><Clock className="h-3 w-3 text-[#2E9BDA]" /></div>
+                      Estimated Time
+                    </div>
+                    <span className="font-black text-[#2E9BDA] text-[15px]">~{etaMin} min</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 text-[13.5px] font-semibold text-blue-900/60">
+                      <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center"><Target className="h-3 w-3 text-[#2E9BDA]" /></div>
+                      Interview Mode
+                    </div>
+                    <span className="font-bold text-blue-950 text-[14px]">{INTERVIEW_TYPES.find(t => t.id === form.interview_type)?.label}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#F0F7FF] rounded-xl p-3.5 space-y-2 mt-auto">
+                {CHECKLIST.map((item) => (
+                  <div key={item} className="flex items-start gap-2 text-[12px] font-semibold text-[#1d6fa5]">
+                    <div className="bg-white rounded-full p-[1.5px] mt-0.5 shadow-sm">
+                      <Check className="h-3 w-3 text-[#2E9BDA]" strokeWidth={3} />
+                    </div>
+                    {item}
                   </div>
                 ))}
               </div>
             </div>
-
-            <div className="bg-gradient-to-br from-blue-950 to-[#0B1220] text-white rounded-2xl p-5 flex items-start gap-3">
-              <Sparkles className="h-4 w-4 text-[#5FC3F0] shrink-0 mt-0.5" />
-              <p className="text-[12px] font-medium leading-relaxed text-blue-100/70">
-                Everything below updates live — try a few combinations until the practice mix feels right for you.
-              </p>
-            </div>
           </motion.div>
 
-          {/* Right: form */}
-          <div className="lg:col-span-8 space-y-5">
-            <motion.div
-              initial="hidden" animate="show" custom={2} variants={fadeUp}
-              className={`bg-white border rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all ${focused ? 'border-[#2E9BDA] ring-2 ring-[#2E9BDA]/15' : 'border-blue-200/70'}`}
-            >
-              <div className="flex items-center gap-2 text-[#1d6fa5] font-bold text-[11px] tracking-wider uppercase mb-3">
-                <Briefcase className="h-4 w-4" />
-                <span>What role are you interviewing for?</span>
+          {/* ── RIGHT PANEL ── */}
+          <motion.div initial="hidden" animate="show" custom={2} variants={fadeUp} className="lg:col-span-8 flex flex-col gap-4">
+            
+            {/* 1. ROLE INPUT */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[#1d6fa5] font-extrabold text-[13px] mb-2">
+                <Briefcase className="h-4 w-4" /> What role are you interviewing for?
+              </label>
+              <div className={`relative flex items-center bg-white border rounded-xl p-1.5 transition-all ${focused ? 'border-[#2E9BDA] shadow-[0_0_0_3px_rgba(46,155,218,0.1)]' : 'border-blue-200/70'}`}>
+                <Search className="h-4 w-4 text-blue-900/30 ml-2 mr-1.5" />
+                <input
+                  type="text"
+                  value={form.job_title}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
+                  placeholder="e.g. Senior Software Engineer"
+                  className="w-full bg-transparent text-[17px] font-bold text-blue-950 outline-none placeholder:text-blue-900/30 py-2"
+                />
               </div>
-              <input
-                type="text"
-                value={form.job_title}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
-                placeholder="e.g. Senior Software Engineer"
-                className="w-full bg-transparent text-[20px] sm:text-[22px] font-bold text-blue-950 outline-none placeholder:text-blue-200 placeholder:font-semibold"
-              />
-              <div className={`mt-3 h-[2px] rounded-full transition-all duration-300 ${focused ? 'bg-[#2E9BDA]' : 'bg-blue-100'}`} />
-            </motion.div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <span className="text-[12px] font-semibold text-slate-400 mr-1">Popular:</span>
+                {POPULAR_ROLES.map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, job_title: role }))}
+                    className={`flex items-center gap-1 text-[12px] font-bold px-3 py-1.5 rounded-full border transition-all ${
+                      form.job_title === role ? 'bg-[#2E9BDA]/10 border-[#2E9BDA] text-[#1d6fa5]' : 'bg-white border-blue-100 text-blue-900/50 hover:border-blue-300'
+                    }`}
+                  >
+                    {role === 'Python Backend' && '🐍'}
+                    {role === 'AI Engineer' && '✨'}
+                    {role === 'ML Engineer' && '🧠'}
+                    {role === 'Data Scientist' && '📊'}
+                    {role === 'Frontend' && '⚛️'}
+                    {role === 'Full Stack' && '📚'}
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            <motion.div initial="hidden" animate="show" custom={3} variants={fadeUp} className="space-y-2.5">
-              <div className="flex items-center gap-2 text-[#1d6fa5] font-bold text-[11px] tracking-wider uppercase pl-1">
-                <Layers className="h-4 w-4" />
-                <span>Choose your interview type</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* 2. INTERVIEW FOCUS */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[#1d6fa5] font-extrabold text-[13px] mb-2">
+                <Layers className="h-4 w-4" /> Choose Interview Focus
+              </label>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {INTERVIEW_TYPES.map((t) => {
                   const active = form.interview_type === t.id
+                  const Icon = t.icon
                   return (
                     <button
                       key={t.id}
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, interview_type: t.id }))}
-                      className={`group flex flex-col p-4 text-left rounded-2xl border transition-all duration-200 ${
-                        active ? 'border-[#2E9BDA] bg-[#2E9BDA]/[0.06] ring-2 ring-[#2E9BDA]/20 shadow-sm' : 'border-blue-200/70 bg-white hover:border-blue-300 hover:-translate-y-0.5'
+                      className={`relative flex flex-col items-center text-center p-3 rounded-xl border-2 transition-all ${
+                        active ? 'bg-[#F0F7FF] border-[#2E9BDA] shadow-sm' : 'bg-white border-blue-50 hover:border-blue-200'
                       }`}
                     >
-                      <div className="flex w-full items-center justify-between mb-1.5">
-                        <span className="text-[14px] font-bold text-blue-950">{t.label}</span>
-                        <div className={`h-4.5 w-4.5 h-[18px] w-[18px] rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${active ? 'border-[#2E9BDA] bg-[#2E9BDA]' : 'border-blue-300 group-hover:border-blue-400'}`}>
-                          {active && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      {active && (
+                        <div className="absolute top-1.5 right-1.5 h-4 w-4 bg-[#2E9BDA] rounded-full flex items-center justify-center">
+                          <Check className="h-2.5 w-2.5 text-white" strokeWidth={4} />
                         </div>
+                      )}
+                      <div className={`p-2.5 rounded-lg mb-2 transition-colors ${active ? 'bg-[#2E9BDA] text-white' : 'bg-blue-50 text-[#1d6fa5]'}`}>
+                        <Icon className="h-4 w-4" />
                       </div>
-                      <span className="text-[12.5px] font-medium text-blue-900/55 leading-relaxed">{t.desc}</span>
+                      <span className="text-[14px] font-extrabold text-blue-950 mb-1">{t.label}</span>
+                      <span className="text-[11px] font-medium text-blue-900/50 leading-tight">{t.desc}</span>
                     </button>
                   )
                 })}
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div initial="hidden" animate="show" custom={4} variants={fadeUp} className="space-y-2.5">
-              <div className="flex items-center gap-2 text-[#1d6fa5] font-bold text-[11px] tracking-wider uppercase pl-1">
-                <Sliders className="h-4 w-4" />
-                <span>Select difficulty level</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2.5">
+            {/* 3. SET DIFFICULTY */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[#1d6fa5] font-extrabold text-[13px] mb-2">
+                <Sliders className="h-4 w-4" /> Set Difficulty
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                 {DIFFICULTIES.map((d) => {
                   const active = form.difficulty === d.id
                   const Icon = d.icon
@@ -157,88 +234,78 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
                       key={d.id}
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, difficulty: d.id }))}
-                      className={`relative overflow-hidden py-3.5 px-3 rounded-2xl text-center border transition-all duration-200 ${
-                        active ? 'border-transparent bg-gradient-to-br from-[#2E9BDA] to-[#1d6fa5] text-white shadow-lg shadow-[#2E9BDA]/25 scale-[1.02]' : 'border-blue-200/70 bg-white text-blue-900/70 hover:border-blue-300'
+                      className={`relative text-left p-3.5 rounded-xl border-2 transition-all ${
+                        active ? `${d.bg} ${d.border} shadow-sm` : 'bg-white border-blue-50 hover:border-blue-200'
                       }`}
                     >
-                      <Icon className={`h-4 w-4 mx-auto mb-1.5 ${active ? 'text-white' : 'text-[#2E9BDA]'}`} />
-                      <span className="block text-[13px] font-bold">{d.label}</span>
-                      <span className={`block text-[10px] font-medium mt-0.5 ${active ? 'text-blue-50/80' : 'text-blue-900/40'}`}>{d.sub}</span>
+                      {active && (
+                        <div className="absolute top-2.5 right-2.5">
+                          <div className={`h-3.5 w-3.5 rounded-full border-[3px] ${d.border} ${d.bg} flex items-center justify-center`}>
+                            <div className={`h-1.5 w-1.5 rounded-full ${d.color.replace('text-', 'bg-')}`} />
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Icon className={`h-4.5 w-4.5 ${active ? d.color : 'text-blue-900/30'}`} />
+                        <span className={`text-[14px] font-extrabold ${active ? 'text-blue-950' : 'text-blue-900/60'}`}>{d.label}</span>
+                      </div>
+                      <span className="text-[11px] font-medium text-blue-900/50 leading-tight block mt-1">{d.sub}</span>
                     </button>
                   )
                 })}
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div initial="hidden" animate="show" custom={5} variants={fadeUp} className="space-y-2.5">
-              <div className="flex items-center gap-2 text-[#1d6fa5] font-bold text-[11px] tracking-wider uppercase pl-1">
-                <Disc className="h-4 w-4" />
-                <span>Number of questions</span>
+            {/* 4. SESSION LENGTH */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[#1d6fa5] font-extrabold text-[13px] mb-2">
+                <Clock className="h-4 w-4" /> Choose Session Length
+              </label>
+              <div className="flex bg-white border border-blue-50 rounded-xl p-1 shadow-sm">
+                {QUESTION_PRESETS.map((p) => {
+                  const active = form.num_questions === p.count
+                  const Icon = p.icon
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, num_questions: p.count }))}
+                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-all ${
+                        active ? 'bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] border border-blue-100' : 'hover:bg-blue-50/50 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Icon className={`h-4 w-4 ${active ? 'text-[#1d6fa5]' : 'text-blue-900/30'}`} />
+                        <span className={`text-[14px] font-extrabold ${active ? 'text-blue-950' : 'text-blue-900/50'}`}>{p.label}</span>
+                      </div>
+                      <span className={`text-[11.5px] font-semibold ${active ? 'text-blue-900/60' : 'text-blue-900/40'}`}>
+                        {p.count} Qs · ~{Math.round(p.count * (selectedDiff?.time || 3))} min
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-              <div className="bg-white border border-blue-200/70 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                <div className="md:col-span-5 flex items-center justify-between border border-blue-200 rounded-2xl p-1.5 bg-slate-50/60">
-                  <button
-                    type="button"
-                    disabled={form.num_questions <= 3}
-                    onClick={() => setForm((f) => ({ ...f, num_questions: Math.max(3, f.num_questions - 1) }))}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center border border-blue-200 bg-white font-bold text-lg text-blue-950 hover:border-[#2E9BDA] hover:text-[#2E9BDA] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95"
-                  >
-                    −
-                  </button>
-                  <div className="text-center">
-                    <span className="block text-2xl font-black text-blue-950 font-mono leading-none tabular-nums">{form.num_questions}</span>
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-blue-400 block mt-1">Questions</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={form.num_questions >= 15}
-                    onClick={() => setForm((f) => ({ ...f, num_questions: Math.min(15, f.num_questions + 1) }))}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center border border-blue-200 bg-white font-bold text-lg text-blue-950 hover:border-[#2E9BDA] hover:text-[#2E9BDA] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95"
-                  >
-                    +
-                  </button>
-                </div>
+            </div>
 
-                <div className="md:col-span-7 grid grid-cols-3 gap-2">
-                  {[{ label: 'Short', count: 3 }, { label: 'Standard', count: 8 }, { label: 'Complete', count: 15 }].map((tier) => {
-                    const isCurrentTier = form.num_questions === tier.count
-                    return (
-                      <button
-                        key={tier.label}
-                        type="button"
-                        onClick={() => setForm((f) => ({ ...f, num_questions: tier.count }))}
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-center transition-all ${
-                          isCurrentTier ? 'border-blue-950 bg-blue-950 text-white shadow-sm font-bold' : 'border-blue-200/80 bg-white text-blue-950 hover:border-blue-400'
-                        }`}
-                      >
-                        <span className="text-[12px] font-bold block">{tier.label}</span>
-                        <span className={`text-[9px] font-mono mt-0.5 block ${isCurrentTier ? 'text-blue-200' : 'text-blue-500'}`}>{tier.count} items</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial="hidden" animate="show" custom={6} variants={fadeUp}
-              className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-            >
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-400 uppercase tracking-widest">
-                <Sparkles className="h-3.5 w-3.5 text-[#2E9BDA] animate-pulse" /> AI Interview Simulator Ready
-              </div>
+            {/* 5. CONTINUE BUTTON */}
+            <div className="mt-auto pt-1">
               <motion.button
                 type="button"
-                whileHover={{ scale: isFormValid && !loading ? 1.02 : 1 }}
-                whileTap={{ scale: isFormValid && !loading ? 0.98 : 1 }}
+                whileHover={{ scale: isFormValid && !loading ? 1.01 : 1 }}
+                whileTap={{ scale: isFormValid && !loading ? 0.99 : 1 }}
                 disabled={loading || !isFormValid}
                 onClick={() => onContinue(form)}
-                className="w-full sm:w-auto inline-flex h-[50px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] px-8 text-[14px] font-bold text-white shadow-lg shadow-[#2E9BDA]/25 transition-all disabled:opacity-30 disabled:pointer-events-none disabled:shadow-none"
+                className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8ba3c7] to-[#9cb2d4] hover:from-[#2E9BDA] hover:to-[#1d6fa5] px-8 text-[15px] font-bold text-white shadow-md transition-all duration-300 disabled:opacity-40"
               >
-                {loading ? 'Preparing setup…' : <>Continue to Guidelines <ArrowRight className="h-4 w-4" /></>}
+                {loading ? 'Preparing setup...' : (
+                  <>
+                    <Sparkles className="h-4.5 w-4.5" /> Continue to Guidelines <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </motion.button>
-            </motion.div>
-          </div>
+            </div>
+
+          </motion.div>
         </div>
       </div>
     </div>

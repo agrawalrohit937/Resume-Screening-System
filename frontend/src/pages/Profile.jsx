@@ -2,63 +2,49 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDropzone } from 'react-dropzone'
-import { 
-  Camera, Pencil, X, Mail, Loader2, Upload, MapPin, 
-  Link as LinkIcon, Github, Linkedin, FileText, CheckCircle 
+import {
+  Camera, Pencil, X, Mail, Loader2, Upload, MapPin,
+  Link as LinkIcon, Github, Linkedin, FileText, CheckCircle
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing, { getUserPlan } from '../components/AvatarRing'
-import { uploadResume } from '../services/api' 
-
-// --- Utility Functions ---
-function resolveAvatarUrl(user) {
-  if (!user) return null
-  const pics = [user.profile_picture, user.display_picture, user.google_picture]
-  const found = pics.find(pic => pic && String(pic).startsWith('http'))
-  if (found) return found
-  if (user.profile_picture) return `/uploads/profile/${user.profile_picture}`
-  return null
-}
-
-function getInitials(fullName) {
-  if (!fullName) return '?'
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return parts[0][0].toUpperCase()
-}
+import { uploadResume } from '../services/api'
+import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 
 // --- Components ---
-const Crown = ({ size = 28, gradId }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
-    <defs>
-      <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FFF3C8" />
-        <stop offset="45%" stopColor="#F3C24B" />
-        <stop offset="100%" stopColor="#B9812A" />
-      </linearGradient>
-    </defs>
-    <path d="M4.2 17.2h15.6v2a1 1 0 01-1 1H5.2a1 1 0 01-1-1v-2z" fill={`url(#${gradId})`} />
-    <path d="M3.1 16.4 1.9 8.7a.62.62 0 01.98-.58l3.66 2.86 4.4-5.5a1.14 1.14 0 011.78 0l4.4 5.5 3.66-2.86a.62.62 0 01.98.58l-1.2 7.7a1 1 0 01-1 .84H4.1a1 1 0 01-1-.84z" fill={`url(#${gradId})`} />
-    <circle cx="6.6" cy="10.4" r="1" fill="#FFFAE6" />
-    <circle cx="12" cy="6.7" r="1.25" fill="#FFFAE6" />
-    <circle cx="17.4" cy="10.4" r="1" fill="#FFFAE6" />
-    <rect x="10.7" y="17.55" width="2.6" height="2.6" rx="0.4" fill="#8A5A14" transform="rotate(45 12 18.85)" />
-  </svg>
-)
+const Crown = ({ size = 28, gradId, variant = 'gold' }) => {
+  const isSilver = variant === 'silver'
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={isSilver ? "#F8FAFC" : "#FFF3C8"} />
+          <stop offset="45%" stopColor={isSilver ? "#CBD5E1" : "#F3C24B"} />
+          <stop offset="100%" stopColor={isSilver ? "#64748B" : "#B9812A"} />
+        </linearGradient>
+      </defs>
+      <path d="M4.2 17.2h15.6v2a1 1 0 01-1 1H5.2a1 1 0 01-1-1v-2z" fill={`url(#${gradId})`} />
+      <path d="M3.1 16.4 1.9 8.7a.62.62 0 01.98-.58l3.66 2.86 4.4-5.5a1.14 1.14 0 011.78 0l4.4 5.5 3.66-2.86a.62.62 0 01.98.58l-1.2 7.7a1 1 0 01-1 .84H4.1a1 1 0 01-1-.84z" fill={`url(#${gradId})`} />
+      <circle cx="6.6" cy="10.4" r="1" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
+      <circle cx="12" cy="6.7" r="1.25" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
+      <circle cx="17.4" cy="10.4" r="1" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
+      <rect x="10.7" y="17.55" width="2.6" height="2.6" rx="0.4" fill={isSilver ? "#334155" : "#8A5A14"} transform="rotate(45 12 18.85)" />
+    </svg>
+  )
+}
 
 function PlanBadge({ user }) {
   const plan = getUserPlan(user)
   if (plan === 'free') return null
 
   const isPremium = plan === 'premium'
-  
+
   return (
-    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold tracking-wide shadow-sm ${
-      isPremium 
-        ? 'bg-amber-100 text-amber-800 border-amber-300' 
-        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-    }`}>
-      <span className="text-sm">{isPremium ? '👑' : '✨'}</span>
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold tracking-wide shadow-sm ${isPremium
+        ? 'bg-amber-100 text-amber-800 border-amber-300'
+        : 'bg-slate-100 text-slate-700 border-slate-300'
+      }`}>
+      <span className="text-sm">{isPremium ? '👑' : '🥈'}</span>
       {isPremium ? 'Premium' : 'Pro'}
     </div>
   )
@@ -80,7 +66,7 @@ function InfoItem({ label, value, icon: Icon }) {
 
 function Input({ label, value, onChange, textarea, placeholder, icon: Icon }) {
   const baseClasses = "w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm text-slate-800 placeholder:text-slate-400 font-medium shadow-sm"
-  
+
   return (
     <div className="flex flex-col gap-2">
       <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">{label}</label>
@@ -91,19 +77,19 @@ function Input({ label, value, onChange, textarea, placeholder, icon: Icon }) {
           </div>
         )}
         {textarea ? (
-          <textarea 
-            className={`w-full p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm text-slate-800 placeholder:text-slate-400 font-medium shadow-sm resize-none`} 
-            rows={4} 
-            value={value} 
+          <textarea
+            className={`w-full p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm text-slate-800 placeholder:text-slate-400 font-medium shadow-sm resize-none`}
+            rows={4}
+            value={value}
             placeholder={placeholder}
-            onChange={(e) => onChange(e.target.value)} 
+            onChange={(e) => onChange(e.target.value)}
           />
         ) : (
-          <input 
-            className={`${baseClasses} ${!Icon ? 'pl-4' : ''}`} 
-            value={value} 
+          <input
+            className={`${baseClasses} ${!Icon ? 'pl-4' : ''}`}
+            value={value}
             placeholder={placeholder}
-            onChange={(e) => onChange(e.target.value)} 
+            onChange={(e) => onChange(e.target.value)}
           />
         )}
       </div>
@@ -116,7 +102,10 @@ export default function Profile() {
   const { user, updateProfile, uploadProfilePhoto, refreshUser } = useAuth()
   const fileInputRef = useRef(null)
 
-  const isPremium = getUserPlan(user) === 'premium'
+  const userPlan = getUserPlan(user)
+  const isPremium = userPlan === 'premium'
+  const isPro = userPlan === 'pro'
+  const hasCrown = isPremium || isPro
 
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -208,7 +197,7 @@ export default function Profile() {
   const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    e.target.value = '' 
+    e.target.value = ''
 
     const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!allowed.includes(file.type)) {
@@ -258,28 +247,27 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
-        
+
         {/* ── Hero / Header Section ───────────────────────────────────────────── */}
         <div className="bg-white rounded-[2rem] border border-slate-200/60 p-8 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-8 shadow-sm relative overflow-hidden">
-          
+
           {/* Subtle Background Accent */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-100/40 to-purple-100/40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           {/* Avatar Area */}
           <div className="flex flex-col items-center gap-5 z-10">
             <div className="relative group">
-              
+
               {/* Premium Background Glow */}
               {isPremium && (
                 <div className="absolute inset-0 rounded-full bg-[#F3C24B] opacity-0 group-hover:opacity-40 blur-xl transition-opacity duration-500 z-0" />
               )}
 
               <AvatarRing user={user} ringSize={128} shape="circle">
-                <div className={`relative z-10 w-[120px] h-[120px] rounded-full overflow-hidden flex items-center justify-center text-white text-4xl font-black select-none border-4 shadow-xl transition-transform duration-300 group-hover:scale-105 ${
-                  isPremium 
-                    ? 'border-[#F3C24B] bg-gradient-to-br from-[#F3C24B] to-[#B9812A] shadow-[#F3C24B]/30' 
+                <div className={`relative z-10 w-[120px] h-[120px] rounded-full overflow-hidden flex items-center justify-center text-white text-4xl font-black select-none border-4 shadow-xl transition-transform duration-300 group-hover:scale-105 ${isPremium
+                    ? 'border-[#F3C24B] bg-gradient-to-br from-[#F3C24B] to-[#B9812A] shadow-[#F3C24B]/30'
                     : 'border-white bg-gradient-to-br from-indigo-500 to-purple-600'
-                }`}>
+                  }`}>
                   {displayedAvatarUrl && !imgError ? (
                     <img
                       src={displayedAvatarUrl}
@@ -293,10 +281,10 @@ export default function Profile() {
                 </div>
               </AvatarRing>
 
-              {/* Tiny Floating Crown for Premium Users */}
-              {isPremium && (
+              {/* Floating Crown for Premium (Gold) and Pro (Silver) Users */}
+              {hasCrown && (
                 <div className="absolute -top-4 -right-1 z-20 rotate-[15deg] drop-shadow-xl">
-                  <Crown size={34} gradId="profilePageCrown" />
+                  <Crown size={34} gradId="profilePageCrown" variant={isPremium ? 'gold' : 'silver'} />
                 </div>
               )}
 
@@ -354,7 +342,7 @@ export default function Profile() {
               <h1 className="text-3xl font-black text-slate-900 tracking-tight">{user.full_name}</h1>
               <PlanBadge user={user} />
             </div>
-            
+
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-sm font-semibold text-slate-500">
               <span className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-100 shadow-sm">
                 <Mail size={16} className="text-indigo-400" /> {user.email}
@@ -369,7 +357,7 @@ export default function Profile() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* ── Left Column: Resume Upload ───────────────────────────────────── */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white rounded-[2rem] border border-slate-200/60 p-6 md:p-8 shadow-sm">
@@ -383,16 +371,15 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div 
-                {...getResumeRootProps()} 
-                className={`flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer min-h-[220px] ${
-                  resumeDrag ? 'border-indigo-400 bg-indigo-50/50 scale-[1.02]' : 
-                  uploadDone ? 'border-emerald-400 bg-emerald-50/30' : 
-                  'border-slate-200 bg-slate-50 hover:bg-slate-100/50 hover:border-indigo-300'
-                }`}
+              <div
+                {...getResumeRootProps()}
+                className={`flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer min-h-[220px] ${resumeDrag ? 'border-indigo-400 bg-indigo-50/50 scale-[1.02]' :
+                    uploadDone ? 'border-emerald-400 bg-emerald-50/30' :
+                      'border-slate-200 bg-slate-50 hover:bg-slate-100/50 hover:border-indigo-300'
+                  }`}
               >
                 <input {...getResumeInputProps()} />
-                
+
                 {uploadingResume ? (
                   <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="flex flex-col items-center">
                     <div className="relative w-16 h-16 mb-4">
@@ -408,13 +395,13 @@ export default function Profile() {
                     </div>
                     <p className="text-sm font-bold text-slate-700">Uploading & Parsing...</p>
                   </motion.div>
-                  ) : uploadDone ? (
+                ) : uploadDone ? (
                   <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="flex flex-col items-center text-center max-w-full px-2">
                     <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3 shrink-0">
                       <CheckCircle className="text-emerald-500" size={24} />
                     </div>
                     {/* Method 1: break-all ya truncate karke overflow roko */}
-                    <p 
+                    <p
                       className="text-sm font-bold text-emerald-700 max-w-full truncate px-2"
                       title={resumeFile?.name || 'Resume Ready'}
                     >
@@ -437,7 +424,7 @@ export default function Profile() {
 
           {/* ── Right Column: Data / Form Section ──────────────────────────────── */}
           <div className="lg:col-span-2 bg-white rounded-[2rem] border border-slate-200/60 overflow-hidden shadow-sm flex flex-col">
-            
+
             {/* Section Header */}
             <div className="px-8 py-6 border-b border-slate-100/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/50 backdrop-blur-sm">
               <div>
@@ -449,11 +436,10 @@ export default function Profile() {
                   if (editing) setForm({ ...user }) // reset form if cancelling
                   setEditing(!editing)
                 }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${
-                  editing 
-                    ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50' 
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${editing
+                    ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                     : 'bg-indigo-600 border border-transparent text-white hover:bg-indigo-700 hover:shadow-md hover:shadow-indigo-200/50'
-                }`}
+                  }`}
               >
                 {editing ? <><X size={16} /> Cancel</> : <><Pencil size={16} /> Edit Profile</>}
               </button>
@@ -475,7 +461,7 @@ export default function Profile() {
                     <InfoItem label="Graduation Year" value={user.graduation_year} />
                     <InfoItem label="College / University" value={user.college} />
                     <InfoItem label="Degree" value={user.degree} />
-                    
+
                     <div className="md:col-span-2 mt-2 p-6 rounded-2xl bg-indigo-50/30 border border-indigo-100/50">
                       <dt className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3">About / Bio</dt>
                       <dd className="text-sm font-medium text-slate-700 leading-relaxed max-w-3xl">
@@ -502,27 +488,27 @@ export default function Profile() {
                     className="space-y-6"
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Input label="Full Name" value={form.full_name} onChange={(v) => setForm({...form, full_name: v})} />
-                      <Input label="Phone Number" value={form.phone} onChange={(v) => setForm({...form, phone: v})} placeholder="+1 (555) 000-0000" />
-                      <Input label="College / University" value={form.college} onChange={(v) => setForm({...form, college: v})} />
-                      <Input label="Degree" value={form.degree} onChange={(v) => setForm({...form, degree: v})} placeholder="B.S. Computer Science" />
-                      <Input label="Graduation Year" value={form.graduation_year} onChange={(v) => setForm({...form, graduation_year: v})} placeholder="2024" />
-                      <Input label="Location" value={form.location} onChange={(v) => setForm({...form, location: v})} placeholder="City, State" />
+                      <Input label="Full Name" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
+                      <Input label="Phone Number" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="+1 (555) 000-0000" />
+                      <Input label="College / University" value={form.college} onChange={(v) => setForm({ ...form, college: v })} />
+                      <Input label="Degree" value={form.degree} onChange={(v) => setForm({ ...form, degree: v })} placeholder="B.S. Computer Science" />
+                      <Input label="Graduation Year" value={form.graduation_year} onChange={(v) => setForm({ ...form, graduation_year: v })} placeholder="2024" />
+                      <Input label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="City, State" />
                     </div>
 
                     <div className="pt-2">
-                      <Input label="Bio" value={form.bio} onChange={(v) => setForm({...form, bio: v})} textarea placeholder="Tell us a little bit about yourself..." />
+                      <Input label="Bio" value={form.bio} onChange={(v) => setForm({ ...form, bio: v })} textarea placeholder="Tell us a little bit about yourself..." />
                     </div>
 
                     <div className="pt-6 border-t border-slate-100/50 grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <Input label="LinkedIn URL" icon={Linkedin} value={form.linkedin_url} onChange={(v) => setForm({...form, linkedin_url: v})} placeholder="linkedin.com/in/..." />
-                      <Input label="GitHub URL" icon={Github} value={form.github_url} onChange={(v) => setForm({...form, github_url: v})} placeholder="github.com/..." />
-                      <Input label="Portfolio URL" icon={LinkIcon} value={form.portfolio_url} onChange={(v) => setForm({...form, portfolio_url: v})} placeholder="yourwebsite.com" />
+                      <Input label="LinkedIn URL" icon={Linkedin} value={form.linkedin_url} onChange={(v) => setForm({ ...form, linkedin_url: v })} placeholder="linkedin.com/in/..." />
+                      <Input label="GitHub URL" icon={Github} value={form.github_url} onChange={(v) => setForm({ ...form, github_url: v })} placeholder="github.com/..." />
+                      <Input label="Portfolio URL" icon={LinkIcon} value={form.portfolio_url} onChange={(v) => setForm({ ...form, portfolio_url: v })} placeholder="yourwebsite.com" />
                     </div>
 
                     <div className="pt-8 flex justify-end gap-3">
                       <button
-                        onClick={() => { setForm({...user}); setEditing(false); }}
+                        onClick={() => { setForm({ ...user }); setEditing(false); }}
                         className="px-6 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                       >
                         Cancel
@@ -541,7 +527,7 @@ export default function Profile() {
               </AnimatePresence>
             </div>
           </div>
-          
+
         </div>
       </div>
     </div>
