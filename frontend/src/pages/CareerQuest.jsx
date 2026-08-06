@@ -84,11 +84,11 @@ export default function CareerQuest() {
         currentUserId={currentUserId}
       />
 
-      <div className="flex flex-col sm:flex-row gap-5">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-stretch sm:items-center">
         <div className="flex-1 min-w-0">
           <CopilotInsight profile={profile} catalog={catalog} onOpenCopilot={openCopilot} />
         </div>
-        <div className="shrink-0">
+        <div className="w-full sm:w-auto shrink-0">
           <SectionTabs active={activeTab} onChange={setActiveTab} />
         </div>
       </div>

@@ -352,32 +352,27 @@ export default function AICopilotWidget() {
   return (
     <>
       {/* Floating launcher trigger button */}
-      <motion.button
-        onClick={() => setIsOpen(v => !v)}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-2xl flex items-center justify-center text-white cursor-pointer shadow-lg select-none"
-        style={{
-          background: 'linear-gradient(135deg, #4f46e5, #6366f1 60%, #06b6d4)',
-          boxShadow: '0 12px 30px -8px rgba(79,70,229,0.5)',
-        }}
-        title="CareerShala AI Copilot"
-        aria-label="Toggle AI Copilot"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          {isOpen ? (
-            <motion.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <X className="w-6 h-6" strokeWidth={2.2} />
-            </motion.span>
-          ) : (
-            <motion.span key="sparkle" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <Sparkles className="w-6 h-6 animate-pulse" strokeWidth={2.2} />
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.button>
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.button
+            onClick={() => setIsOpen(true)}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[60] w-13 h-13 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-white cursor-pointer shadow-lg select-none"
+            style={{
+              background: 'linear-gradient(135deg, #4f46e5, #6366f1 60%, #06b6d4)',
+              boxShadow: '0 12px 30px -8px rgba(79,70,229,0.5)',
+            }}
+            title="CareerShala AI Copilot"
+            aria-label="Open AI Copilot"
+          >
+            <Sparkles className="w-6 h-6 animate-pulse" strokeWidth={2.2} />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Chat popup container */}
       <AnimatePresence>
@@ -389,22 +384,29 @@ export default function AICopilotWidget() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-xs sm:hidden"
+              onTouchEnd={(e) => {
+                e.preventDefault()
+                setIsOpen(false)
+              }}
+              className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs sm:hidden"
             />
 
             <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.96 }}
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.97 }}
+              exit={{ opacity: 0, y: 30, scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-              className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 sm:right-6 w-full sm:w-[410px] h-[82vh] sm:h-[620px] max-h-[740px] flex flex-col overflow-hidden sm:rounded-3xl border border-white bg-white/95 backdrop-blur-lg shadow-2xl"
-              style={{ boxShadow: '0 25px 60px -15px rgba(15,23,42,0.18)' }}
+              className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 sm:right-6 w-full sm:w-[410px] h-[85dvh] max-h-[85vh] sm:h-[620px] sm:max-h-[740px] flex flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl border-t border-x sm:border border-slate-200/80 sm:border-white bg-white/95 backdrop-blur-xl shadow-2xl"
+              style={{ boxShadow: '0 25px 60px -15px rgba(15,23,42,0.22)' }}
               role="dialog"
               aria-label="CareerShala AI Copilot"
             >
+              {/* Mobile Bottom Sheet Pull Bar */}
+              <div className="w-12 h-1 rounded-full bg-slate-300/80 mx-auto my-1.5 shrink-0 sm:hidden" />
+
               {/* Premium Header */}
               <div
-                className="relative flex items-center justify-between px-4 py-3.5 shrink-0 select-none shadow-sm"
+                className="relative flex items-center justify-between px-4 py-3 shrink-0 select-none shadow-sm"
                 style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)' }}
               >
                 <div className="flex items-center gap-2.5">
@@ -420,18 +422,18 @@ export default function AICopilotWidget() {
                   {messages.length > 1 && (
                     <button
                       onClick={handleClearHistory}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
                       title="Clear Chat History"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                    className="w-8.5 h-8.5 rounded-xl flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
                     aria-label="Close panel"
                   >
-                    <X className="w-4 h-4" strokeWidth={2.2} />
+                    <X className="w-5 h-5" strokeWidth={2.2} />
                   </button>
                 </div>
               </div>
@@ -506,13 +508,16 @@ export default function AICopilotWidget() {
               )}
 
               {/* Input Form */}
-              <form onSubmit={handleSubmit} className="shrink-0 p-3 bg-white border-t border-slate-100 flex items-center gap-2">
+              <form
+                onSubmit={handleSubmit}
+                className="shrink-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-white border-t border-slate-100 flex items-center gap-2"
+              >
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask copilot about your career / resume..."
-                  className="flex-1 h-10 px-4 rounded-xl bg-slate-100 text-[13px] text-slate-700 placeholder-slate-400 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 border border-transparent transition-all"
+                  className="flex-1 h-10 px-4 rounded-xl bg-slate-100 text-base sm:text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 border border-transparent transition-all"
                 />
                 <button
                   type="submit"

@@ -1596,9 +1596,10 @@ const TABS = ['AI Keyword Match', 'AI Skill Match', 'Strict ATS Check', 'Roadmap
                 <div style={{ width: 60, height: 60, margin: '0 auto 16px', position: 'relative' }}>
                   <svg width="60" height="60" style={{ transform: 'rotate(-90deg)' }}>
                     <circle cx="30" cy="30" r="26" fill="none" stroke="#E2E8F0" strokeWidth="6" />
-                    <circle cx="30" cy="30" r="26" fill="none" stroke="#3B82F6" strokeWidth="6" strokeLinecap="round"
+                    <circle cx="30" cy="30" r="26" fill="none" stroke="#3B82F6" strokeWidth="6"
+                      strokeLinecap={uploadProgress > 0 ? "round" : "butt"}
                       strokeDasharray={163} strokeDashoffset={163 - (uploadProgress / 100) * 163}
-                      style={{ transition: 'stroke-dashoffset 0.3s ease' }} />
+                      style={{ transition: 'stroke-dashoffset 0.3s ease', opacity: uploadProgress > 0 ? 1 : 0 }} />
                   </svg>
                   <div style={{
                     position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

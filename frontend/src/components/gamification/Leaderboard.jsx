@@ -72,18 +72,18 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
   return (
     <Card className="p-0 overflow-hidden border border-slate-200/80 shadow-sm rounded-3xl bg-white relative">
       {/* Header */}
-      <div className="p-6 sm:p-7 border-b border-slate-200/60 flex items-center justify-between bg-slate-50/70 relative overflow-hidden">
-        <div className="relative z-10">
-          <h3 className="font-extrabold text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
+      <div className="p-4 sm:p-7 border-b border-slate-200/60 flex items-center justify-between bg-slate-50/70 relative overflow-hidden">
+        <div className="relative z-10 min-w-0">
+          <h3 className="font-extrabold text-xl sm:text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
             Leaderboard
           </h3>
-          <p className="text-[13px] font-medium text-slate-500 mt-1">{getDynamicSubtitle(candidateLeaderboard.length)}</p>
+          <p className="text-xs sm:text-[13px] font-medium text-slate-500 mt-0.5 sm:mt-1 truncate">{getDynamicSubtitle(candidateLeaderboard.length)}</p>
         </div>
 
         {myEntry && (
-          <div className="text-right relative z-10 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm">
-            <p className="text-[10px] font-extrabold text-[#1d6fa5] uppercase tracking-wider">Your Rank</p>
-            <p className="font-extrabold text-2xl text-slate-900 leading-none mt-1">#{myEntry.rank}</p>
+          <div className="text-right relative z-10 bg-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl border border-slate-200 shadow-sm shrink-0 ml-2">
+            <p className="text-[9px] sm:text-[10px] font-extrabold text-[#1d6fa5] uppercase tracking-wider">Your Rank</p>
+            <p className="font-extrabold text-xl sm:text-2xl text-slate-900 leading-none mt-0.5 sm:mt-1">#{myEntry.rank}</p>
           </div>
         )}
       </div>
@@ -106,7 +106,7 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
       ) : (
         /* Leaderboard List */
         <motion.div 
-          className="p-3 space-y-1.5"
+          className="p-2 sm:p-3 space-y-1.5"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -127,25 +127,25 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
                 key={entry.user_id || i}
                 variants={itemVariants}
                 whileHover={{ scale: 1.01, transition: { type: 'spring', stiffness: 400 } }}
-                className={`relative flex items-center gap-4 px-4 py-3 rounded-[20px] transition-all duration-200 
+                className={`relative flex items-center gap-2.5 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl sm:rounded-[20px] transition-all duration-200 
                   ${isTop3 ? `${rankStyle.bg} border ${rankStyle.border}` : 'bg-white border border-transparent hover:bg-slate-50 hover:border-slate-100'}
                   ${isMe && !isTop3 ? 'ring-1 ring-[#2E9BDA]/40 shadow-sm bg-blue-50/30' : ''}
                 `}
               >
                 {/* Glowing ring for current user */}
-                {isMe && <div className="absolute inset-0 rounded-[20px] ring-2 ring-[#2E9BDA]/30 animate-pulse opacity-50 pointer-events-none" />}
+                {isMe && <div className="absolute inset-0 rounded-2xl sm:rounded-[20px] ring-2 ring-[#2E9BDA]/30 animate-pulse opacity-50 pointer-events-none" />}
 
                 {/* Rank Number / Icon */}
-                <div className="w-8 flex items-center justify-center shrink-0 relative z-10">
+                <div className="w-6 sm:w-8 flex items-center justify-center shrink-0 relative z-10">
                   {isTop3 ? (
-                    <RankIcon className={`w-5.5 h-5.5 ${rankStyle.iconColor}`} />
+                    <RankIcon className={`w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 ${rankStyle.iconColor}`} />
                   ) : (
-                    <span className="text-[14px] font-extrabold text-slate-400">#{actualRank}</span>
+                    <span className="text-xs sm:text-[14px] font-extrabold text-slate-400">#{actualRank}</span>
                   )}
                 </div>
 
-                {/* 3D Avatar */}
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 relative z-10
+                {/* Avatar */}
+                <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-[13px] font-bold shrink-0 relative z-10
                   ${isTop3 ? `${rankStyle.avatar} text-white` : 'bg-slate-100 text-slate-600 border border-slate-200 shadow-sm'}
                 `}>
                   {displayName.charAt(0).toUpperCase()}
@@ -153,34 +153,34 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
 
                 {/* User Info */}
                 <div className="flex-1 min-w-0 relative z-10">
-                  <div className="flex items-center gap-2">
-                    <p className={`text-[13.5px] font-bold truncate ${isTop3 ? rankStyle.text : isMe ? 'text-[#1d6fa5]' : 'text-blue-950'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <p className={`text-xs sm:text-[13.5px] font-bold truncate ${isTop3 ? rankStyle.text : isMe ? 'text-[#1d6fa5]' : 'text-blue-950'}`}>
                       {displayName}
                     </p>
                     {isMe && (
-                      <span className="bg-[#2E9BDA]/10 text-[#1d6fa5] text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border border-[#2E9BDA]/20">
+                      <span className="bg-[#2E9BDA]/10 text-[#1d6fa5] text-[8.5px] sm:text-[9px] font-extrabold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full border border-[#2E9BDA]/20 shrink-0">
                         You
                       </span>
                     )}
                   </div>
                   
                   {/* Badges/Streaks */}
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-white/60 px-2 py-0.5 rounded-md border border-slate-200/60 shadow-sm">
-                      <Flame className="w-3 h-3 text-amber-500" /> {entry.current_streak || 0}
+                  <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1">
+                    <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-[11px] font-bold text-slate-500 bg-white/60 px-1.5 sm:px-2 py-0.5 rounded-md border border-slate-200/60 shadow-sm">
+                      <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500" /> {entry.current_streak || 0}
                     </span>
-                    <span className="flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-white/60 px-2 py-0.5 rounded-md border border-slate-200/60 shadow-sm">
-                      <Medal className="w-3 h-3 text-slate-400" /> {entry.badge_count || 0}
+                    <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-[11px] font-bold text-slate-500 bg-white/60 px-2 py-0.5 rounded-md border border-slate-200/60 shadow-sm">
+                      <Medal className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" /> {entry.badge_count || 0}
                     </span>
                   </div>
                 </div>
 
                 {/* XP / Points */}
-                <div className={`shrink-0 relative z-10 px-3 py-1.5 rounded-xl font-extrabold text-[13px] border shadow-sm
+                <div className={`shrink-0 relative z-10 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl font-extrabold text-xs sm:text-[13px] border shadow-sm
                   ${isTop3 ? rankStyle.points : 'bg-slate-50 text-blue-950 border-slate-200'}
                   ${isMe && !isTop3 ? 'bg-[#2E9BDA] text-white border-[#1d6fa5]' : ''}
                 `}>
-                  {(entry.total_points || 0).toLocaleString()} <span className={`text-[9.5px] ${isMe && !isTop3 ? 'text-blue-100' : 'text-slate-400'}`}>XP</span>
+                  {(entry.total_points || 0).toLocaleString()} <span className={`text-[8.5px] sm:text-[9.5px] ${isMe && !isTop3 ? 'text-blue-100' : 'text-slate-400'}`}>XP</span>
                 </div>
               </motion.div>
             )
