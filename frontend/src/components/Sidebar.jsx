@@ -216,7 +216,11 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   }, [location.pathname, mobile, onNavigate])
 
   const handleItemClick = (path) => {
-    onNavigate?.()
+    // Close drawer FIRST (immediately), then navigate
+    // This ensures sidebar closes before route change on mobile
+    if (mobile && onNavigate) {
+      onNavigate()
+    }
     if (path) navigate(path)
   }
 
@@ -261,8 +265,17 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         {mobile && (
           <button
             type="button"
-            onClick={onNavigate}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition active:scale-95 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onNavigate?.()
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onNavigate?.()
+            }}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition active:scale-95 shrink-0 touch-manipulation cursor-pointer"
             aria-label="Close menu drawer"
           >
             <X className="w-4 h-4" strokeWidth={2.5} />
@@ -296,7 +309,11 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    onClick={() => handleItemClick()}
+                    onClick={(e) => {
+                      // Stop event from bubbling to backdrop and triggering double-close
+                      e.stopPropagation()
+                      handleItemClick(item.to)
+                    }}
                     onMouseEnter={() => prefetchRoute(item.to)}
                     onTouchStart={() => prefetchRoute(item.to)}
                     title={isCompact ? item.label : undefined}

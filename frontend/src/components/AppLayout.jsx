@@ -13,7 +13,7 @@ import AvatarRing from './AvatarRing'
 const PAGE_TITLES = {
   '/dashboard': { title: 'Dashboard', sub: 'Career intelligence overview' },
   '/upload': { title: 'Resume Library', sub: 'Upload and manage your resumes' },
-  '/results': { title: 'ATS Matcher', sub: 'Hybrid BERT + TF-IDF scoring' },
+  '/results': { title: 'ATS Matcher', sub: 'AI Semantic & Keyword scoring' },
   '/analytics': { title: 'Analytics', sub: 'Performance trends & insights' },
   '/interview': { title: 'Quick Practice', sub: 'Fast mock interview sessions' },
   '/live-interview': { title: 'Live AI Interview', sub: 'Full session with camera & AI feedback' },
@@ -131,8 +131,17 @@ export default function AppLayout() {
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
+    // Escape key se sidebar band karo
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+
     return () => {
       document.body.style.overflow = originalOverflow
+      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isMobileMenuOpen])
 
@@ -174,7 +183,7 @@ export default function AppLayout() {
 
       <AnimatePresence>
         {isMobileMenuOpen && !isFullscreenActive && user?.role !== 'recruiter' && (
-          <div className="fixed inset-0 z-[100] md:hidden flex">
+          <div className="fixed inset-0 z-[100] md:hidden flex" style={{ pointerEvents: 'auto' }}>
             {/* Dark Backdrop Overlay — Tapping anywhere outside the drawer closes it */}
             <motion.div
               key="mobile-drawer-backdrop"
@@ -185,16 +194,25 @@ export default function AppLayout() {
               role="button"
               tabIndex={0}
               aria-label="Close menu backdrop"
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsMobileMenuOpen(false)
+              }}
               onTouchEnd={(e) => {
+                e.stopPropagation()
                 e.preventDefault()
                 setIsMobileMenuOpen(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+                  setIsMobileMenuOpen(false)
+                }
               }}
               className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm cursor-pointer"
             />
 
             {/* Mobile Sidebar Drawer Container */}
-            <div className="relative z-10 h-full">
+            <div className="relative z-10 h-full" style={{ pointerEvents: 'auto' }}>
               <Sidebar
                 mobile
                 collapsed={false}

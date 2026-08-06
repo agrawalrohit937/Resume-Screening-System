@@ -6,12 +6,24 @@ export default defineConfig({
   build: {
     target: 'es2020',
     cssCodeSplit: true,
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-ui': ['framer-motion', 'lucide-react', 'react-hot-toast'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('framer-motion')) {
+              return 'vendor-framer';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'vendor-pdf';
+            }
+          }
         }
       }
     }
@@ -19,7 +31,6 @@ export default defineConfig({
   server: {
     port: 5173,
     headers: {
-      // Allow Google OAuth Popup postMessage communication in local development
       "Cross-Origin-Opener-Policy": "unsafe-none",
       "Cross-Origin-Embedder-Policy": "unsafe-none", 
     },
