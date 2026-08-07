@@ -258,13 +258,14 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
 
         {/* AI Copilot */}
         <motion.button
-          whileHover={{ scale: 1.02, y: -1 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={openCopilot}
-          className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white border border-indigo-500 shadow-[0_4px_15px_rgba(79,70,229,0.3)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.4)] transition-all"
+          className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white border border-indigo-500 shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:shadow-[0_6px_16px_rgba(79,70,229,0.4)] transition-all cursor-pointer touch-manipulation"
+          title="Open AI Copilot"
         >
-          <Sparkles size={16} strokeWidth={2.5} className="text-indigo-100" />
-          <span className="text-xs font-black uppercase tracking-widest">Copilot</span>
+          <Sparkles size={16} strokeWidth={2.4} className="text-indigo-100 shrink-0 animate-pulse" />
+          <span className="hidden sm:inline text-xs font-black uppercase tracking-widest">Copilot</span>
         </motion.button>
 
         {/* Notifications */}
@@ -287,11 +288,23 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            className="flex items-center gap-2 sm:gap-2.5 pl-1.5 pr-2.5 sm:pr-4 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           >
-            <AvatarRing user={user} ringSize={34} shape="circle">
-              <UserAvatar user={user} size="sm" />
-            </AvatarRing>
+            <div className="relative">
+              <AvatarRing user={user} ringSize={34} shape="circle">
+                <UserAvatar user={user} size="sm" />
+              </AvatarRing>
+              {(user?.plan === 'premium' || user?.subscription_tier === 'premium') && (
+                <div className="sm:hidden absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
+                  <Crown size={14} className="text-amber-500 fill-amber-400" />
+                </div>
+              )}
+              {(user?.plan === 'pro' || user?.subscription_tier === 'pro') && (
+                <div className="sm:hidden absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
+                  <Crown size={14} className="text-slate-400 fill-slate-300" />
+                </div>
+              )}
+            </div>
             <span className="hidden sm:flex items-center gap-1 text-sm font-extrabold text-slate-800 tracking-tight">
               {user?.full_name?.split(' ')[0] || 'User'}
               {(user?.plan === 'premium' || user?.subscription_tier === 'premium') && (

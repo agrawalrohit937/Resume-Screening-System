@@ -19,7 +19,7 @@ export default function SectionTabs({ active, onChange }) {
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(i)}
-            className={`relative flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all touch-manipulation cursor-pointer ${
+            className={`relative flex-1 sm:flex-initial flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-4 py-2 sm:py-2 rounded-xl text-[11px] sm:text-sm font-bold transition-all touch-manipulation cursor-pointer min-w-0 ${
               isActive ? 'text-blue-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >

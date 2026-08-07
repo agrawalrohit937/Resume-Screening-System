@@ -19,6 +19,7 @@ import {
   Briefcase,
   Users,
   ChevronDown,
+  Crown as LucideCrown,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
@@ -85,27 +86,18 @@ const Icons = {
   logout: <LogOut className="w-4 h-4" strokeWidth={2.2} />,
 }
 
-const Crown = ({ size = 22, gradId, variant = 'gold' }) => {
+const Crown = ({ size = 22, variant = 'gold', className = '' }) => {
   const isSilver = variant === 'silver'
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={isSilver ? "#F8FAFC" : "#FFF3C8"} />
-          <stop offset="45%" stopColor={isSilver ? "#CBD5E1" : "#F3C24B"} />
-          <stop offset="100%" stopColor={isSilver ? "#64748B" : "#B9812A"} />
-        </linearGradient>
-      </defs>
-      <path d="M4.2 17.2h15.6v2a1 1 0 01-1 1H5.2a1 1 0 01-1-1v-2z" fill={`url(#${gradId})`} />
-      <path
-        d="M3.1 16.4 1.9 8.7a.62.62 0 01.98-.58l3.66 2.86 4.4-5.5a1.14 1.14 0 011.78 0l4.4 5.5 3.66-2.86a.62.62 0 01.98.58l-1.2 7.7a1 1 0 01-1 .84H4.1a1 1 0 01-1-.84z"
-        fill={`url(#${gradId})`}
-      />
-      <circle cx="6.6" cy="10.4" r="1" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
-      <circle cx="12" cy="6.7" r="1.25" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
-      <circle cx="17.4" cy="10.4" r="1" fill={isSilver ? "#F8FAFC" : "#FFFAE6"} />
-      <rect x="10.7" y="17.55" width="2.6" height="2.6" rx="0.4" fill={isSilver ? "#334155" : "#8A5A14"} transform="rotate(45 12 18.85)" />
-    </svg>
+    <LucideCrown
+      size={size}
+      strokeWidth={2.2}
+      className={`${
+        isSilver
+          ? 'text-slate-300 fill-slate-200 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]'
+          : 'text-amber-400 fill-amber-400 drop-shadow-[0_2px_8px_rgba(243,194,75,0.7)]'
+      } ${className}`}
+    />
   )
 }
 
@@ -273,7 +265,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
   const visibleSections = getNavSections()
   const currentViewMode = VIEW_MODES.find(v => v.key === adminViewMode) || VIEW_MODES[0]
-  const userPlan = (user?.plan || user?.subscription_tier || '').toLowerCase()
+  const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
+  const userPlan = String(rawPlan).toLowerCase()
   const isPremium = userPlan.includes('premium')
   const isPro = userPlan.includes('pro')
   const hasCrown = isPremium || isPro
@@ -365,8 +358,9 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             /* Expanded: dropdown selector */
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setViewModeOpen(p => !p)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm active:scale-[0.98]"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm active:scale-[0.98] cursor-pointer touch-manipulation"
                 style={{
                   backgroundColor: currentViewMode.color + '08',
                   borderColor: currentViewMode.color + '25',
@@ -390,7 +384,13 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
               <AnimatePresence>
                 {viewModeOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setViewModeOpen(false)} />
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setViewModeOpen(false)
+                      }}
+                    />
                     <motion.div
                       initial={{ opacity: 0, y: -4, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -404,11 +404,12 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                           return (
                             <button
                               key={v.key}
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 switchViewMode(v.key)
                               }}
-                              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all ${
+                              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all cursor-pointer touch-manipulation ${
                                 active
                                   ? 'font-bold'
                                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
@@ -436,7 +437,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-none">
+      <nav className="flex-1 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-6 scrollbar-none">
         {visibleSections.map((section, idx) => (
           <div key={idx} className="space-y-1.5">
             <AnimatePresence>
@@ -679,9 +680,16 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
           <AnimatePresence>
             {!isCompact && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0">
-                <p className={`text-[13px] font-bold truncate leading-tight ${isPremium ? 'text-slate-900' : 'text-slate-800'}`}>
-                  {user?.full_name || 'User'}
-                </p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className={`text-[13px] font-bold truncate leading-tight ${isPremium ? 'text-slate-900' : 'text-slate-800'}`}>
+                    {user?.full_name || 'User'}
+                  </p>
+                  {hasCrown && (
+                    <div className="shrink-0">
+                      <Crown size={14} gradId="profileInlineCrown" variant={isPremium ? 'gold' : 'silver'} />
+                    </div>
+                  )}
+                </div>
                 
                 {isPremium ? (
                   <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-[#8A5A14] bg-gradient-to-r from-[#F3C24B]/30 to-[#F3C24B]/10 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-[#F3C24B]/30 shadow-sm">

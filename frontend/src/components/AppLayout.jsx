@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu } from 'lucide-react'
+import { Menu, Crown } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
@@ -32,6 +32,9 @@ function MobileHeader({ onMenuToggle }) {
   const userAvatar = user?.profile_picture || user?.display_picture || user?.google_picture
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileMenuRef = useRef(null)
+
+  const isPremium = user?.plan === 'premium' || user?.subscription_tier === 'premium'
+  const isPro = user?.plan === 'pro' || user?.subscription_tier === 'pro'
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -76,7 +79,7 @@ function MobileHeader({ onMenuToggle }) {
           </div>
         </div>
 
-        {/* Right: User Avatar Dropdown Button */}
+        {/* Right: User Avatar Dropdown Button with Crown Badge */}
         <div className="relative shrink-0" ref={profileMenuRef}>
           <button
             type="button"
@@ -84,19 +87,31 @@ function MobileHeader({ onMenuToggle }) {
             className="flex items-center justify-center rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/20 active:scale-95 transition-transform touch-manipulation cursor-pointer"
             aria-label="Open profile menu"
           >
-            <AvatarRing user={user} ringSize={40} shape="circle">
-              {userAvatar ? (
-                <img
-                  src={userAvatar}
-                  alt={user?.full_name || 'User'}
-                  className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm"
-                />
-              ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
-                  {user?.full_name?.[0]?.toUpperCase() || 'U'}
+            <div className="relative">
+              <AvatarRing user={user} ringSize={40} shape="circle">
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt={user?.full_name || 'User'}
+                    className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
+                    {user?.full_name?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
+              </AvatarRing>
+              {isPremium && (
+                <div className="absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
+                  <Crown size={15} className="text-amber-500 fill-amber-400" />
                 </div>
               )}
-            </AvatarRing>
+              {isPro && (
+                <div className="absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
+                  <Crown size={15} className="text-slate-400 fill-slate-300" />
+                </div>
+              )}
+            </div>
           </button>
 
           <AnimatePresence>
@@ -198,11 +213,6 @@ export default function AppLayout() {
                 e.stopPropagation()
                 setIsMobileMenuOpen(false)
               }}
-              onTouchEnd={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                setIsMobileMenuOpen(false)
-              }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
                   setIsMobileMenuOpen(false)
@@ -212,7 +222,12 @@ export default function AppLayout() {
             />
 
             {/* Mobile Sidebar Drawer Container */}
-            <div className="relative z-10 h-full transform-gpu" style={{ pointerEvents: 'auto' }}>
+            <div
+              className="relative z-10 h-full transform-gpu overflow-hidden"
+              style={{ pointerEvents: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
               <Sidebar
                 mobile
                 collapsed={false}

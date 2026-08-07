@@ -14,13 +14,22 @@ free, and 100% deterministic/reproducible for a given input.
 from __future__ import annotations
 
 import gc
+import math
+import os
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+import requests
 import structlog
+from services.nlp_extractor import extract_skills_deterministic
+from services.skill_ontology import evaluate_skill_fulfillment
 
 logger = structlog.get_logger(__name__)
+
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+HF_API_URL = os.getenv("HF_API_URL", "https://api-inference.huggingface.co/models/BAAI/bge-large-en-v1.5")
 
 
 # ══════════════════════════════════════════════════════════════════════════

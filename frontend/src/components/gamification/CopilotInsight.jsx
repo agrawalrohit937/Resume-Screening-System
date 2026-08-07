@@ -42,7 +42,7 @@ export default function CopilotInsight({ profile, catalog, onOpenCopilot }) {
           <Sparkles className="w-3 h-3 text-indigo-500" />
           AI Interview Agent • Recommendation
         </p>
-        <p className="text-[13px] sm:text-[14px] font-bold text-slate-800 leading-snug truncate sm:whitespace-normal">
+        <p className="text-[12.5px] sm:text-[14px] font-bold text-slate-800 leading-snug break-words">
           {message}
         </p>
       </div>

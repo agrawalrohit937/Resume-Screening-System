@@ -75,7 +75,7 @@ export default function CareerQuest() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto p-4 md:p-6 lg:p-8 space-y-6 pb-16 w-full">
+    <div className="max-w-[1200px] mx-auto p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-16 w-full overflow-hidden">
       <ProfileHero
         profile={profile}
         name={user?.full_name || user?.name || user?.username}
