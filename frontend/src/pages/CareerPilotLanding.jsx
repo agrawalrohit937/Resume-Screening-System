@@ -42,6 +42,8 @@ import {
   Linkedin,
   Github,
   Twitter,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { verifyCertificate } from '../services/certificateApi';
@@ -130,6 +132,7 @@ export default function CareerPilotLanding() {
 
   // State
   const [isAnnual, setIsAnnual] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [certQuery, setCertQuery] = useState('');
   const [certResult, setCertResult] = useState(null);
   const [verifyingCert, setVerifyingCert] = useState(false);
@@ -219,20 +222,20 @@ export default function CareerPilotLanding() {
       </div>
 
       {/* ── Header Navigation Bar ────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-slate-200/60 shadow-sm transition-all duration-300">
-        <div className="max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 h-20 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200/80 shadow-sm transition-all duration-300">
+        <div className="max-w-[1536px] mx-auto px-4 sm:px-8 lg:px-12 h-16 sm:h-20 flex items-center justify-between gap-3">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group shrink-0">
-            <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:shadow-md group-hover:scale-105 transition-all duration-300 p-1.5">
+          <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:shadow-md group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
               <img src="/logo_t.png" alt="CareerShala Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-slate-900 group-hover:opacity-80 transition-opacity">
+            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 group-hover:opacity-80 transition-opacity">
               Career<span className="text-[#2E9BDA]">Shala</span>
             </span>
           </Link>
 
-          {/* Navigation Links */}
+          {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center gap-3.5 xl:gap-6 text-[11px] xl:text-xs font-extrabold uppercase tracking-wider text-slate-500 whitespace-nowrap">
             <a href="#ats-suite" className="hover:text-[#2E9BDA] transition-colors">ATS Scanner</a>
             <a href="#interviews" className="hover:text-[#2E9BDA] transition-colors">AI Interview</a>
@@ -249,35 +252,181 @@ export default function CareerPilotLanding() {
             <a href="#pricing" className="hover:text-[#2E9BDA] transition-colors">Pricing</a>
           </nav>
 
-          {/* Auth Actions */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Top Bar Actions */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {user ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#165a88] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#2E9BDA]/20 hover:shadow-[#2E9BDA]/40 hover:-translate-y-0.5 transition-all duration-300"
+                className="flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#165a88] text-white font-bold text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all whitespace-nowrap"
               >
-                Go to Dashboard
-                <ArrowRight size={15} />
+                <span>Dashboard</span>
+                <ArrowRight size={14} className="hidden sm:inline" />
               </button>
             ) : (
               <>
                 <Link
                   to="/login"
-                  className="px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:text-slate-900 transition-colors"
+                  className="hidden sm:inline-flex px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:text-slate-900 transition-colors whitespace-nowrap"
                 >
                   Log In
                 </Link>
                 <button
                   onClick={() => navigate('/signup')}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#165a88] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#2E9BDA]/20 hover:shadow-xl hover:shadow-[#2E9BDA]/40 hover:-translate-y-0.5 transition-all duration-300"
+                  className="flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#165a88] text-white font-bold text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all whitespace-nowrap shrink-0"
                 >
-                  Get Started Free
-                  <ArrowRight size={15} />
+                  <span>Get Started<span className="hidden sm:inline"> Free</span></span>
+                  <ArrowRight size={14} className="hidden sm:inline" />
                 </button>
               </>
             )}
+
+            {/* Mobile Hamburger Toggle Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(prev => !prev)}
+              className="lg:hidden p-2.5 rounded-xl text-slate-800 bg-slate-100/90 hover:bg-slate-200/90 active:scale-95 transition-all focus:outline-none flex items-center justify-center border border-slate-200/80 shadow-sm"
+              aria-label="Toggle navigation menu"
+            >
+              {isMobileMenuOpen ? <X size={20} strokeWidth={2.5} /> : <Menu size={20} strokeWidth={2.5} />}
+            </button>
           </div>
         </div>
+
+        {/* ── Mobile Navigation Drawer / Dropdown ────────────────────────────── */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:hidden border-t border-slate-200/80 bg-white/95 backdrop-blur-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="px-4 pt-4 pb-6 space-y-4 max-h-[calc(100vh-80px)] overflow-y-auto">
+                <nav className="flex flex-col space-y-1">
+                  <a
+                    href="#ats-suite"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-[#2E9BDA] hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <FileText size={16} className="text-[#2E9BDA]" />
+                      ATS Scanner
+                    </span>
+                    <ChevronRight size={15} className="text-slate-400" />
+                  </a>
+
+                  <a
+                    href="#interviews"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-[#2E9BDA] hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Video size={16} className="text-indigo-500" />
+                      AI Interview
+                    </span>
+                    <ChevronRight size={15} className="text-slate-400" />
+                  </a>
+
+                  <a
+                    href="#portfolio"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-emerald-700 hover:bg-emerald-50/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Briefcase size={16} className="text-emerald-500" />
+                      Free Portfolio
+                      <span className="px-2 py-0.5 rounded-full text-[9px] bg-emerald-100 text-emerald-700 font-extrabold ml-1">FREE</span>
+                    </span>
+                    <ChevronRight size={15} className="text-emerald-500" />
+                  </a>
+
+                  <a
+                    href="#100-club"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-[#2E9BDA] hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Trophy size={16} className="text-amber-500" />
+                      100% Club
+                    </span>
+                    <ChevronRight size={15} className="text-slate-400" />
+                  </a>
+
+                  <a
+                    href="#recruiter-portal"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-[#2E9BDA] hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Users size={16} className="text-purple-500" />
+                      For Recruiters
+                    </span>
+                    <ChevronRight size={15} className="text-slate-400" />
+                  </a>
+
+                  <Link
+                    to="/careers"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50/60 border border-amber-200/60 hover:bg-amber-100/60 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Flame size={16} className="text-amber-500 fill-amber-500 animate-pulse" />
+                      We're Hiring!
+                    </span>
+                    <ChevronRight size={15} className="text-amber-500" />
+                  </Link>
+
+                  <a
+                    href="#pricing"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-[#2E9BDA] hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Zap size={16} className="text-sky-500" />
+                      Pricing
+                    </span>
+                    <ChevronRight size={15} className="text-slate-400" />
+                  </a>
+                </nav>
+
+                <div className="pt-3 border-t border-slate-200/80 flex flex-col gap-2.5">
+                  {user ? (
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false)
+                        navigate('/dashboard')
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-gradient-to-r from-[#2E9BDA] to-[#165a88] text-white font-bold text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all"
+                    >
+                      <span>Go to Dashboard</span>
+                      <ArrowRight size={16} />
+                    </button>
+                  ) : (
+                    <div className="flex flex-col gap-2.5">
+                      <Link
+                        to="/login"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="w-full flex items-center justify-center py-3 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-bold uppercase tracking-wider hover:bg-slate-100 transition-colors text-center shadow-sm"
+                      >
+                        Log In
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false)
+                          navigate('/signup')
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-[#2E9BDA] to-[#165a88] text-white text-xs font-bold uppercase tracking-wider shadow-md hover:shadow-lg transition-all text-center"
+                      >
+                        <span>Get Started Free</span>
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* ── HERO SECTION ────────────────────────────────────────────────────── */}

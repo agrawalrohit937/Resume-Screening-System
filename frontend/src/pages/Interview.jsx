@@ -83,17 +83,17 @@ function TabBtn({ active, onClick, icon, children }) {
             onClick={onClick}
             whileHover={{ scale: active ? 1 : 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`relative flex flex-1 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all duration-200 select-none outline-none ${active
+            className={`relative flex flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-sm font-bold transition-all duration-200 select-none outline-none min-w-0 ${active
                 ? 'text-white bg-indigo-600 shadow-md shadow-indigo-200/70'
                 : 'text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent'
                 }`}
         >
-            <span className={`inline-flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg sm:rounded-xl ${active ? 'bg-white/20' : 'bg-slate-200/60 sm:bg-slate-100'}`}>
+            <span className={`inline-flex h-5 w-5 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg sm:rounded-xl ${active ? 'bg-white/20' : 'bg-slate-200/60 sm:bg-slate-100'}`}>
                 {icon}
             </span>
-            <span className="whitespace-nowrap truncate">{children}</span>
+            <span className="truncate">{children}</span>
             {active && (
-                <span className="pointer-events-none absolute -bottom-1 left-3 right-3 sm:left-5 sm:right-5 h-0.5 rounded-full bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300" />
+                <span className="pointer-events-none absolute -bottom-1 left-2 right-2 sm:left-5 sm:right-5 h-0.5 rounded-full bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300" />
             )}
         </motion.button>
     )
@@ -968,9 +968,23 @@ export default function Interview() {
                                 ))}
                             </div>
                         </div>
-                        <div className="flex w-full sm:w-auto gap-1.5 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1.5 shadow-sm sm:bg-white self-stretch lg:self-end">
-                            <TabBtn active={activeTab === 'mcq'} onClick={() => setActiveTab('mcq')} icon={<Zap className="h-4 w-4" />}>Quick MCQ Practice</TabBtn>
-                            <TabBtn active={activeTab === 'mock'} onClick={() => setActiveTab('mock')} icon={<Mic className="h-4 w-4" />}>Full Mock Interview</TabBtn>
+                        <div className="grid grid-cols-2 w-full sm:flex sm:w-auto gap-1 sm:gap-1.5 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 sm:p-1.5 shadow-sm sm:bg-white self-stretch lg:self-end">
+                            <TabBtn
+                                active={activeTab === 'mcq'}
+                                onClick={() => setActiveTab('mcq')}
+                                icon={<Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                            >
+                                <span className="sm:hidden">Quick MCQ</span>
+                                <span className="hidden sm:inline">Quick MCQ Practice</span>
+                            </TabBtn>
+                            <TabBtn
+                                active={activeTab === 'mock'}
+                                onClick={() => setActiveTab('mock')}
+                                icon={<Mic className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                            >
+                                <span className="sm:hidden">Full Mock</span>
+                                <span className="hidden sm:inline">Full Mock Interview</span>
+                            </TabBtn>
                         </div>
                     </div>
                 </motion.div>

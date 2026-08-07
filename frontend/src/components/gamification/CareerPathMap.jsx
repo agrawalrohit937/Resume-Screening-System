@@ -63,28 +63,28 @@ export default function CareerPathMap({ profile, levels }) {
   }, [rankData.length, currentIdx]);
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 overflow-hidden relative">
+    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-4 sm:p-8 overflow-hidden relative">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-3 sm:gap-4">
         <div>
-          <h3 className="font-extrabold text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
+          <h3 className="font-extrabold text-[20px] sm:text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
             Career Path
           </h3>
-          <p className="text-[13px] text-slate-500 mt-1 font-medium">Earn XP to unlock your next milestone</p>
+          <p className="text-xs sm:text-[13px] text-slate-500 mt-0.5 sm:mt-1 font-medium">Earn XP to unlock your next milestone</p>
         </div>
-        <div className="flex items-center gap-4 text-[11px] font-bold text-slate-600 bg-slate-50 px-4 py-2 rounded-full border border-slate-200/70 uppercase tracking-wider">
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /> Completed</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2E9BDA] shadow-sm ring-2 ring-[#2E9BDA]/20" /> Current</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300 shadow-sm" /> Locked</span>
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 text-[10px] sm:text-[11px] font-bold text-slate-600 bg-slate-50 px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl sm:rounded-full border border-slate-200/70 uppercase tracking-wider">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500 shadow-sm shrink-0" /> Completed</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#2E9BDA] shadow-sm ring-2 ring-[#2E9BDA]/20 shrink-0" /> Current</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-slate-300 shadow-sm shrink-0" /> Locked</span>
         </div>
       </div>
 
       {/* Scrollable Timeline */}
-      <div ref={scrollerRef} className="relative overflow-x-auto scrollbar-hide -mx-2 px-2 pb-8 pt-4">
+      <div ref={scrollerRef} className="relative overflow-x-auto scrollbar-hide -mx-2 px-2 pb-10 pt-4">
         <motion.div
           className="relative flex items-start pt-16"
-          style={{ minWidth: rankData.length * COL_WIDTH, height: 200 }}
+          style={{ minWidth: rankData.length * COL_WIDTH, height: 230 }}
           initial="hidden" animate="visible"
           variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
         >

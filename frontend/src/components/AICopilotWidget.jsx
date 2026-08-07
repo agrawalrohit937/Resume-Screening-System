@@ -361,15 +361,15 @@ export default function AICopilotWidget() {
             exit={{ scale: 0, opacity: 0 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[60] w-13 h-13 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-white cursor-pointer shadow-lg select-none"
+            className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-[60] w-[50px] h-[50px] sm:w-[54px] sm:h-[54px] rounded-2xl flex items-center justify-center text-white cursor-pointer shadow-lg select-none active:scale-95 transition-transform touch-manipulation"
             style={{
               background: 'linear-gradient(135deg, #4f46e5, #6366f1 60%, #06b6d4)',
-              boxShadow: '0 12px 30px -8px rgba(79,70,229,0.5)',
+              boxShadow: '0 8px 24px -4px rgba(79,70,229,0.45)',
             }}
             title="CareerShala AI Copilot"
             aria-label="Open AI Copilot"
           >
-            <Sparkles className="w-6 h-6 animate-pulse" strokeWidth={2.2} />
+            <Sparkles className="w-[22px] h-[22px] sm:w-6 sm:h-6 animate-pulse text-white" strokeWidth={2.2} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -384,10 +384,6 @@ export default function AICopilotWidget() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              onTouchEnd={(e) => {
-                e.preventDefault()
-                setIsOpen(false)
-              }}
               className="fixed inset-0 z-40 bg-slate-950/50 sm:backdrop-blur-xs transform-gpu"
             />
 
