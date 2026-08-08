@@ -11,17 +11,29 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'vendor-react';
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+              return 'vendor-react-core';
+            }
+            if (id.includes('react-router') || id.includes('react-router-dom')) {
+              return 'vendor-router';
+            }
+            if (id.includes('@react-oauth')) {
+              return 'vendor-oauth';
             }
             if (id.includes('framer-motion')) {
               return 'vendor-framer';
             }
-            if (id.includes('lucide-react')) {
+            if (id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('lucide-react') || id.includes('react-icons')) {
               return 'vendor-icons';
             }
-            if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas')) {
+            if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas') || id.includes('mammoth')) {
               return 'vendor-pdf';
+            }
+            if (id.includes('axios') || id.includes('date-fns') || id.includes('react-hot-toast') || id.includes('clsx')) {
+              return 'vendor-utils';
             }
           }
         }

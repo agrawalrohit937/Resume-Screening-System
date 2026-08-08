@@ -1,26 +1,28 @@
 /**
- * Centralized profile avatar resolution helper for CareerShala.
+ * Centralized profile avatar resolution & Cloudinary optimization helper for CareerShala.
  *
- * Priority order:
- * 1. user.display_picture (Server-side resolved primary picture - custom upload or provider)
- * 2. user.profile_picture (Cloudinary URL or saved picture)
- * 3. user.google_picture / linked provider pictures
- * 4. null (Triggers initial avatar fallback)
+ * Injects `q_auto,f_auto,w_100,c_fill` parameters on Cloudinary URLs to reduce image sizes
+ * from ~167 KB to ~5-10 KB on mobile and desktop viewports.
  */
-export function resolveAvatarUrl(user) {
-  if (!user) return null
 
-  const getValidUrl = (url) => {
-    if (!url || typeof url !== 'string') return null
-    const trimmed = url.trim()
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
-      if (trimmed.includes('res.cloudinary.com') && !trimmed.includes('q_auto')) {
-        return trimmed.replace('/upload/', '/upload/q_auto,f_auto,w_150,c_fill/')
-      }
-      return trimmed
-    }
+export function optimizeCloudinaryUrl(url, width = 100) {
+  if (!url || typeof url !== 'string') return null
+  const trimmed = url.trim()
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('/')) {
     return null
   }
+  if (trimmed.includes('res.cloudinary.com')) {
+    if (!trimmed.includes('q_auto')) {
+      return trimmed.replace('/upload/', `/upload/q_auto,f_auto,w_${width},c_fill/`)
+    }
+  }
+  return trimmed
+}
+
+export function resolveAvatarUrl(user, width = 100) {
+  if (!user) return null
+
+  const getValidUrl = (url) => optimizeCloudinaryUrl(url, width)
 
   return (
     getValidUrl(user.display_picture) ||

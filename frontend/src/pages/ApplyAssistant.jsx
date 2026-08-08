@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,10 +13,11 @@ import { getResumes } from '../services/api';
 import { useApplyAssistant, STEPS } from '../hooks/useApplyAssistant';
 import { applyAssistantApi } from '../services/applyAssistantApi';
 import JobDetailsForm from '../components/apply/JobDetailsForm';
-import DraftEditor from '../components/apply/DraftEditor';
-import SendConfirmationModal from '../components/apply/SendConfirmationModal';
-import ApplicationHistoryTable from '../components/apply/ApplicationHistoryTable';
 import ScoreRing from '../components/ScoreRing';
+
+const DraftEditor = lazy(() => import('../components/apply/DraftEditor'));
+const SendConfirmationModal = lazy(() => import('../components/apply/SendConfirmationModal'));
+const ApplicationHistoryTable = lazy(() => import('../components/apply/ApplicationHistoryTable'));
 
 // --- Helper Components ---
 function StepIndicator({ currentStep }) {
@@ -507,12 +508,14 @@ export default function ApplyAssistant() {
                       </div>
 
                       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                        <DraftEditor
-                          draft={draft}
-                          onSave={(edits) => updateDraft(edits)}
-                          onApproveSend={() => setShowConfirm(true)}
-                          isSubmitting={isSubmitting}
-                        />
+                        <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500 font-medium">Loading editor...</div>}>
+                          <DraftEditor
+                            draft={draft}
+                            onSave={(edits) => updateDraft(edits)}
+                            onApproveSend={() => setShowConfirm(true)}
+                            isSubmitting={isSubmitting}
+                          />
+                        </Suspense>
                       </div>
                     </motion.div>
                   )}
@@ -572,15 +575,17 @@ export default function ApplyAssistant() {
         </AnimatePresence>
       </div>
 
-      <SendConfirmationModal
-        isOpen={showConfirm}
-        hrEmail={draft?.hr_email}
-        onConfirm={handleConfirmSend}
-        onCancel={() => setShowConfirm(false)}
-        onConnectGmail={handleConnectGmail}
-        isSubmitting={isSubmitting}
-        isGmailConnected={isGmailConnected === true}
-      />
+      <Suspense fallback={null}>
+        <SendConfirmationModal
+          isOpen={showConfirm}
+          hrEmail={draft?.hr_email}
+          onConfirm={handleConfirmSend}
+          onCancel={() => setShowConfirm(false)}
+          onConnectGmail={handleConnectGmail}
+          isSubmitting={isSubmitting}
+          isGmailConnected={isGmailConnected === true}
+        />
+      </Suspense>
     </div>
   );
 }

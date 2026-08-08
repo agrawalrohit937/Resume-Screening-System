@@ -5,9 +5,10 @@ import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import RouteErrorBoundary from './RouteErrorBoundary'
-import ProfilePlanDropdown from './ProfilePlanDropdown'
 import AvatarRing from './AvatarRing'
+import { resolveAvatarUrl } from '../utils/avatarUtils'
 
+const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
 const AICopilotWidget = lazy(() => import('./AICopilotWidget'))
 
 const PAGE_TITLES = {
@@ -29,7 +30,7 @@ function MobileHeader({ onMenuToggle }) {
   const { pathname } = location
   const { user } = useAuth()
   const meta = PAGE_TITLES[pathname] || { title: 'Overview', sub: '' }
-  const userAvatar = user?.profile_picture || user?.display_picture || user?.google_picture
+  const userAvatar = resolveAvatarUrl(user, 100)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileMenuRef = useRef(null)
   const dropdownRef = useRef(null)
@@ -129,10 +130,12 @@ function MobileHeader({ onMenuToggle }) {
             ref={dropdownRef}
             className="fixed top-[64px] right-3 left-3 sm:left-auto sm:w-[340px] max-w-[350px] ml-auto z-[110] shadow-2xl rounded-3xl overflow-hidden"
           >
-            <ProfilePlanDropdown
-              user={user}
-              onClose={() => setIsProfileOpen(false)}
-            />
+            <Suspense fallback={null}>
+              <ProfilePlanDropdown
+                user={user}
+                onClose={() => setIsProfileOpen(false)}
+              />
+            </Suspense>
           </div>
         </>
       )}

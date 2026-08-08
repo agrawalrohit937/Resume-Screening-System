@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo } from 'react'
+import { useState, useRef, useEffect, memo, lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -19,10 +19,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getGamificationProfile } from '../services/interviewApi'
-import ProfilePlanDropdown from './ProfilePlanDropdown'
 import AvatarRing from './AvatarRing'
 import NotificationBell from './NotificationBell'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
+
+const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
 
 // --- Search Routing Dictionary ---
 const SEARCH_ROUTES = [
@@ -350,7 +351,9 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
                   transition={{ duration: 0.15 }}
                   className="absolute right-0 mt-3 rounded-3xl shadow-[0_10px_40px_rgba(30,58,138,0.12)] border border-slate-200/80 bg-white/95 backdrop-blur-xl overflow-hidden z-50 w-[calc(100vw-24px)] sm:w-[340px] max-w-[340px]"
                 >
-                  <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
+                  <Suspense fallback={<div className="p-4 text-center text-xs text-slate-500 font-medium">Loading...</div>}>
+                    <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
+                  </Suspense>
                 </motion.div>
               </>
             )}
