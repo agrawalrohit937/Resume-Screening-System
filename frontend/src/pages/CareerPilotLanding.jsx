@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { isMobileViewport } from '../utils/motionUtils';
 import {
   Sparkles,
   CheckCircle2,
@@ -198,8 +199,11 @@ export default function CareerPilotLanding() {
     }, 900);
   };
 
+  const isMobile = isMobileViewport();
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-[#2E9BDA] selection:text-white relative overflow-x-hidden">
+    <MotionConfig reducedMotion={isMobile ? "always" : "user"}>
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
       
       {/* ── Background Ambient Lighting & Mesh (Subtle) ────────────────────── */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden flex justify-center">
@@ -1623,5 +1627,6 @@ export default function CareerPilotLanding() {
         </div>
       </footer>
     </div>
+    </MotionConfig>
   );
 }
