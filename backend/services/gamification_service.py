@@ -209,14 +209,9 @@ class GamificationService:
         old_streak = doc.get("current_streak", 0)
 
         # Backfill active_dates for legacy profiles if active_dates is empty but last_practice_date exists
-        if not active_dates and last_str and old_streak > 0:
+        if not active_dates and last_str:
             try:
-                last_d = date.fromisoformat(last_str[:10])
-                reconstructed = [
-                    (last_d - timedelta(days=i)).isoformat()
-                    for i in range(old_streak)
-                ]
-                active_dates = sorted(reconstructed)
+                active_dates = [last_str[:10]]
                 doc["active_dates"] = active_dates
                 await self.collection.update_one(
                     {"user_id": user_id},
@@ -230,15 +225,14 @@ class GamificationService:
         doc["current_streak"] = streak_info["current_streak"]
         doc["longest_streak"] = max(doc.get("longest_streak", 0), streak_info["longest_streak"])
 
-        # Auto-heal database if current_streak in DB was mismatched
-        if doc["current_streak"] != old_streak:
-            await self.collection.update_one(
-                {"user_id": user_id},
-                {"$set": {
-                    "current_streak": doc["current_streak"],
-                    "longest_streak": doc["longest_streak"]
-                }}
-            )
+        # Auto-heal database to ensure current_streak and longest_streak are always in sync
+        await self.collection.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "current_streak": doc["current_streak"],
+                "longest_streak": doc["longest_streak"]
+            }}
+        )
 
         doc["level_info"] = self._compute_level(doc.get("total_points", 0))
 

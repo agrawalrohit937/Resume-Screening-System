@@ -67,7 +67,7 @@ export default function StreakCard({ profile }) {
         : []
     )
 
-    if (!profile?.active_dates || !Array.isArray(profile.active_dates)) {
+    if (!profile?.active_dates || !Array.isArray(profile.active_dates) || profile.active_dates.length === 0) {
       if (streak > 0) {
         // Mark actual consecutive days of current streak ending today or yesterday
         const lastPracticeStr = profile?.last_practice_date ? String(profile.last_practice_date).slice(0, 10) : ''

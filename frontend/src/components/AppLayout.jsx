@@ -37,6 +37,10 @@ function MobileHeader({ onMenuToggle }) {
   const isPro = user?.plan === 'pro' || user?.subscription_tier === 'pro'
 
   useEffect(() => {
+    setIsProfileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
     const handleClickOutside = (e) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
         setIsProfileOpen(false)
@@ -123,16 +127,16 @@ function MobileHeader({ onMenuToggle }) {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setIsProfileOpen(false)}
-                  className="fixed inset-0 z-50 bg-black/20 backdrop-blur-xs"
+                  className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-xs"
                 />
 
-                {/* Positioned Dropdown Container */}
+                {/* Viewport-fixed Mobile Dropdown Container — Bounded, zero overflow */}
                 <motion.div
-                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                  initial={{ opacity: 0, y: -8, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
                   transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute right-0 top-[calc(100%+8px)] z-50 w-[calc(100vw-24px)] max-w-[340px] shadow-2xl rounded-3xl overflow-hidden"
+                  className="fixed top-[64px] right-3 left-3 sm:left-auto sm:w-[340px] max-w-[350px] ml-auto z-[110] shadow-2xl rounded-3xl overflow-hidden"
                 >
                   <ProfilePlanDropdown
                     user={user}
