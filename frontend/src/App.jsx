@@ -161,7 +161,6 @@ export default function App() {
               <Route element={<ProtectedRoute><RouteErrorBoundary><AppLayout /></RouteErrorBoundary></ProtectedRoute>}>
                 {/* Core */}
                 <Route path="dashboard" element={<Dashboard />} />
-                <Route path="analytics" element={<Dashboard />} />
                 <Route path="profile" element={<Profile />} />
 
                 <Route path="results" element={<Results />} />
