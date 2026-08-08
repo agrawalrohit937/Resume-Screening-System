@@ -133,6 +133,11 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   }, [])
 
   useEffect(() => {
+    setIsOpen(false)
+    setIsSearchFocused(false)
+  }, [location.pathname])
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()

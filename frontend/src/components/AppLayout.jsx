@@ -26,7 +26,8 @@ const PAGE_TITLES = {
 }
 
 function MobileHeader({ onMenuToggle }) {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const { pathname } = location
   const { user } = useAuth()
   const meta = PAGE_TITLES[pathname] || { title: 'Overview', sub: '' }
   const userAvatar = user?.profile_picture || user?.display_picture || user?.google_picture
@@ -38,7 +39,7 @@ function MobileHeader({ onMenuToggle }) {
 
   useEffect(() => {
     setIsProfileOpen(false)
-  }, [pathname])
+  }, [location.pathname, location.key])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
