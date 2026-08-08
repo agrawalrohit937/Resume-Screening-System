@@ -159,14 +159,15 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
           whileHover={{ scale: 1.05, backgroundColor: 'rgb(226 232 240)' }}
           whileTap={{ scale: 0.95 }}
           onClick={onMenuToggle} 
-          className="p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          aria-label="Toggle navigation menu"
+          className="p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
         >
           <Menu size={20} strokeWidth={2.5} />
         </motion.button>
         
         {/* The Breadcrumb */}
-        <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-400 select-none">
-          <span className="hover:text-slate-600 transition-colors cursor-pointer" onClick={() => navigate('/')}>Home</span>
+        <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-500 select-none">
+          <span className="hover:text-slate-700 transition-colors cursor-pointer" onClick={() => navigate('/')}>Home</span>
           <span>/</span>
           <span className="text-slate-800 tracking-tight">{currentRouteName}</span>
         </div>
@@ -179,7 +180,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
           transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
           className="relative group mx-auto"
         >
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors z-10" strokeWidth={2.5} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-600 transition-colors z-10" strokeWidth={2.5} />
           
           <input
             ref={searchInputRef}
@@ -188,7 +189,8 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
             placeholder="Search ATS, Mock Interviews, or settings..."
-            className="w-full h-11 pl-11 pr-16 rounded-2xl bg-white border border-slate-200/80 focus:border-indigo-400 focus:ring-[4px] focus:ring-indigo-500/10 outline-none text-sm font-semibold text-slate-900 placeholder-slate-400 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] group-focus-within:shadow-[0_8px_30px_rgba(99,102,241,0.1)]"
+            aria-label="Search ATS, Mock Interviews, or settings"
+            className="w-full h-11 pl-11 pr-16 rounded-2xl bg-white border border-slate-200/80 focus:border-indigo-400 focus:ring-[4px] focus:ring-indigo-500/10 outline-none text-sm font-semibold text-slate-900 placeholder-slate-500 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] group-focus-within:shadow-[0_8px_30px_rgba(99,102,241,0.1)]"
           />
           
           <AnimatePresence>
@@ -197,8 +199,8 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 shadow-sm pointer-events-none"
               >
-                <Command size={10} className="text-slate-400" strokeWidth={3} />
-                <span className="text-[10px] font-extrabold text-slate-400">K</span>
+                <Command size={10} className="text-slate-500" strokeWidth={3} />
+                <span className="text-[10px] font-extrabold text-slate-500">K</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -215,7 +217,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             >
               {searchResults.length > 0 ? (
                 <div className="p-2">
-                  <p className="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Jump To</p>
+                  <p className="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Jump To</p>
                   {searchResults.map((result, idx) => (
                     <motion.button
                       key={idx}
@@ -223,7 +225,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
                       onClick={() => handleNavigate(result.path)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left group"
                     >
-                      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-transparent group-hover:border-indigo-100">
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-transparent group-hover:border-indigo-100">
                         <result.icon size={16} strokeWidth={2.5} />
                       </div>
                       <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">
@@ -235,7 +237,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
               ) : (
                 <div className="p-8 text-center">
                   <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
-                    <Search className="w-5 h-5 text-slate-300" strokeWidth={3} />
+                    <Search className="w-5 h-5 text-slate-400" strokeWidth={3} />
                   </div>
                   <p className="text-sm font-extrabold text-slate-900">No results found</p>
                 </div>
@@ -249,7 +251,11 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
       <div className="flex items-center gap-3 shrink-0">
         
         {/* Mobile Search Icon */}
-        <motion.button whileTap={{ scale: 0.95 }} className="sm:hidden p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          aria-label="Open search"
+          className="sm:hidden p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm"
+        >
           <Search size={18} strokeWidth={2.5} />
         </motion.button>
 
@@ -266,6 +272,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={openCopilot}
+          aria-label="Open AI Copilot"
           className="flex items-center gap-1.5 p-2 sm:px-3.5 sm:py-2 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white border border-indigo-500 shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:shadow-[0_6px_16px_rgba(79,70,229,0.4)] transition-all cursor-pointer touch-manipulation"
           title="Open AI Copilot"
         >
@@ -280,7 +287,8 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
         <motion.button 
           whileHover={{ scale: 1.05, backgroundColor: 'white' }}
           whileTap={{ scale: 0.95 }}
-          className="hidden sm:flex p-2.5 rounded-2xl text-slate-500 border border-transparent hover:border-slate-200 hover:shadow-sm transition-all"
+          aria-label="Help and documentation"
+          className="hidden sm:flex p-2.5 rounded-2xl text-slate-600 border border-transparent hover:border-slate-200 hover:shadow-sm transition-all"
         >
           <HelpCircle size={20} strokeWidth={2.5} />
         </motion.button>
@@ -293,7 +301,8 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 sm:gap-2.5 pl-1.5 pr-2.5 sm:pr-4 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            aria-label="User account menu"
+            className="flex items-center gap-2 sm:gap-2.5 pl-1.5 pr-2.5 sm:pr-4 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
           >
             <div className="relative">
               <AvatarRing user={user} ringSize={34} shape="circle">
