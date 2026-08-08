@@ -169,7 +169,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
   const currentConfig = planConfigs[plan] || planConfigs.free
 
   return (
-    <div className="w-[340px] max-w-[95vw] bg-white/95 backdrop-blur-2xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.15)] overflow-hidden flex flex-col font-sans">
+    <div className="w-full max-w-[340px] bg-white/95 backdrop-blur-2xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.15)] overflow-hidden flex flex-col font-sans">
       
       {/* Top Subtle Tier Accent Bar */}
       <div className={`h-1.5 w-full ${currentConfig.accentBar}`} />
