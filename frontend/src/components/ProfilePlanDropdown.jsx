@@ -175,7 +175,15 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       <div className={`h-1.5 w-full ${currentConfig.accentBar}`} />
 
       {/* 1. Header Section */}
-      <div className="p-5 pb-4 border-b border-slate-100 flex items-center gap-3.5 relative">
+      <div 
+        onClick={() => {
+          navigate('/profile')
+          onClose?.()
+        }}
+        className="p-5 pb-4 border-b border-slate-100 flex items-center gap-3.5 relative cursor-pointer hover:bg-slate-50/60 transition-colors"
+        role="button"
+        tabIndex={0}
+      >
         <DropdownAvatar user={user} plan={plan} />
 
         <div className="flex flex-col min-w-0 flex-1">
