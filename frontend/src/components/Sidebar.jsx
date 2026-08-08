@@ -54,6 +54,8 @@ function SidebarAvatar({ user, isPremium, isPro }) {
           <img
             src={avatarUrl}
             alt={user?.full_name || 'User'}
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             onError={() => setImgError(true)}
           />
