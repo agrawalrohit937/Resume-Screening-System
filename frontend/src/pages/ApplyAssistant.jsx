@@ -104,6 +104,10 @@ export default function ApplyAssistant() {
             restored = true;
           }
         } catch (e) {
+          if (e?.response?.status === 404) {
+            sessionStorage.removeItem('pending_application_id');
+            sessionStorage.removeItem('pending_application_draft');
+          }
           console.error('[ApplyAssistant] Failed to fetch draft by stored ID', e);
         }
       }
@@ -115,9 +119,17 @@ export default function ApplyAssistant() {
             restoreDraft(active);
             sessionStorage.setItem('pending_application_draft', JSON.stringify(active));
             sessionStorage.setItem('pending_application_id', active.application_id);
+          } else {
+            reset();
           }
-        } catch {
-          // No active draft, remain on initial step
+        } catch (err) {
+          // Gracefully catch 404 when no active draft exists
+          if (err?.response?.status === 404) {
+            reset();
+          } else {
+            console.error('[ApplyAssistant] Error checking active draft:', err);
+            reset();
+          }
         }
       }
 
@@ -138,7 +150,7 @@ export default function ApplyAssistant() {
     };
 
     checkAndRestore();
-  }, [location.search, restoreDraft]);
+  }, [location.search, restoreDraft, reset]);
 
   // 👇 Fetch the primary parsed resume from the backend on load
   useEffect(() => {

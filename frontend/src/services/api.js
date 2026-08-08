@@ -51,16 +51,18 @@ api.interceptors.response.use(
     const originalRequest = err.config;
 
     // ===== DEBUG LOGS =====
-    console.group("[API ERROR]");
-    console.log("URL:", originalRequest?.url);
-    console.log("Method:", originalRequest?.method);
-    console.log("Status:", err.response?.status);
-    console.log(
-      "Response Data:",
-      JSON.stringify(err.response?.data, null, 2)
-    );
-    console.log("Full Error:", err);
-    console.groupEnd();
+    if (!originalRequest?.suppressErrorLog) {
+      console.group("[API ERROR]");
+      console.log("URL:", originalRequest?.url);
+      console.log("Method:", originalRequest?.method);
+      console.log("Status:", err.response?.status);
+      console.log(
+        "Response Data:",
+        JSON.stringify(err.response?.data, null, 2)
+      );
+      console.log("Full Error:", err);
+      console.groupEnd();
+    }
 
     // ===== REFRESH ONLY FOR 401 =====
     if (
