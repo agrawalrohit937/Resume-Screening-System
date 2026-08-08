@@ -111,8 +111,8 @@ export default function Loader({ show = true, onExitComplete }) {
                 muted={true}
                 loop
                 playsInline
-                preload="none"
-                src={logoVideo}
+                preload="metadata"
+                poster="/logo_t.png"
                 className="hidden md:block"
                 onError={(e) => {
                   console.warn('[Loader] Video failed to load or autoplay:', e)
