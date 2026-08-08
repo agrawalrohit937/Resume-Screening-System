@@ -226,9 +226,6 @@ export default function AppLayout() {
               className="relative z-10 h-full transform-gpu overflow-hidden"
               style={{ pointerEvents: 'auto' }}
               onClick={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchMove={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}
             >
               <Sidebar
                 mobile

@@ -210,25 +210,6 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
   // ⚠️ These hooks MUST be declared before any early return — React requires
   // hooks to always be called in the same order on every render.
-  const touchStartYRef = useRef(0)
-  const isScrollingRef = useRef(false)
-
-  const handleTouchStart = (e) => {
-    if (e.touches && e.touches[0]) {
-      touchStartYRef.current = e.touches[0].clientY
-      isScrollingRef.current = false
-    }
-  }
-
-  const handleTouchMove = (e) => {
-    if (e.touches && e.touches[0]) {
-      const deltaY = Math.abs(e.touches[0].clientY - touchStartYRef.current)
-      if (deltaY > 8) {
-        isScrollingRef.current = true
-      }
-    }
-  }
-
   const prevPathRef = useRef(location.pathname)
   useEffect(() => {
     if (mobile && prevPathRef.current !== location.pathname) {
@@ -453,11 +434,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         </div>
       )}
 
-      <nav
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        className="flex-1 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-6 scrollbar-none"
-      >
+      <nav className="flex-1 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-6 scrollbar-none">
         {visibleSections.map((section, idx) => (
           <div key={idx} className="space-y-1.5">
             <AnimatePresence>
@@ -483,12 +460,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    onClick={(e) => {
-                      if (isScrollingRef.current) {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        return
-                      }
+                    onClick={() => {
                       setViewModeOpen(false)
                       onNavigate?.()
                     }}
