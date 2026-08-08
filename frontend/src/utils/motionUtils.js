@@ -15,10 +15,11 @@ export const isMobileViewport = () => {
 export const getMobileOptimizedProps = (desktopProps = {}) => {
   if (isMobileViewport()) {
     return {
-      initial: { opacity: 1 },
-      animate: { opacity: 1 },
-      exit: { opacity: 0 },
-      transition: { duration: 0.15 }
+      initial: false,
+      animate: false,
+      whileHover: undefined,
+      whileTap: undefined,
+      transition: { duration: 0 }
     }
   }
   return desktopProps
