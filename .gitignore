@@ -15,9 +15,9 @@ htmlcov/
 backend/.env
 backend/.env.*
 uploads/
+azure-app-settings.json
+backend/azure-app-settings.json
 
-# Node / frontend
-# Node / frontend
 frontend/node_modules/
 frontend/dist/
 frontend/build/

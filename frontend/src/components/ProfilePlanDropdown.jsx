@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard,
@@ -33,7 +32,7 @@ function DropdownAvatar({ user, plan }) {
   return (
     <div className="relative shrink-0 select-none">
       <AvatarRing user={user} ringSize={52} shape="circle">
-        <div className="w-[52px] h-[52px] rounded-full overflow-hidden border-2 border-white shadow-md bg-gradient-to-br from-indigo-500 via-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold text-base">
+        <div className="w-[52px] h-[52px] rounded-full overflow-hidden border-2 border-white shadow-sm bg-gradient-to-br from-indigo-500 via-blue-600 to-indigo-700 flex items-center justify-center text-white font-extrabold text-base">
           {imgUrl ? (
             <img
               src={imgUrl}
@@ -95,7 +94,6 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
   const plan = getUserPlan(user)
   const email = user?.email || 'No email provided'
 
-  // Fetch real analytics data
   const [analytics, setAnalytics] = useState(null)
 
   useEffect(() => {
@@ -116,17 +114,13 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
     }
   }, [])
 
-  // Real Stats Data from user object & analytics API
   const resumeCount = safeNumber(user?.total_resumes, analytics?.summary?.total_resumes ?? 0)
   const totalAtsChecks = safeNumber(user?.total_ats_checks, analytics?.summary?.total_ats_checks ?? 0)
-
   const rawAtsScore = analytics?.summary?.best_score ?? analytics?.summary?.average_score ?? user?.ats?.best_score ?? user?.ats_score ?? 0
   const atsScore = totalAtsChecks > 0 ? (rawAtsScore > 1 ? Math.round(rawAtsScore) : Math.round(rawAtsScore * 100)) : 0
-
   const careerScore = safeNumber(user?.profile_completion_percent ?? analytics?.profile_completeness?.percentage, 0)
   const trend = totalAtsChecks > 0 && atsScore >= 80 ? 'Top 10%' : totalAtsChecks > 0 && atsScore >= 60 ? 'Good' : null
 
-  // Plan Tier Configurations
   const planConfigs = {
     free: {
       badge: 'Free Member',
@@ -136,7 +130,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       action: { 
         label: 'Upgrade to Pro', 
         icon: Zap, 
-        style: 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700 shadow-md shadow-indigo-500/20 border-transparent', 
+        style: 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700 shadow-md border-transparent', 
         path: '/premium' 
       }
     },
@@ -160,7 +154,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       action: { 
         label: 'Premium Hub', 
         icon: Sparkles, 
-        style: 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-amber-950 hover:brightness-105 shadow-md shadow-amber-500/20 border-transparent font-black', 
+        style: 'bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-amber-950 shadow-md border-transparent font-black', 
         path: '/premium' 
       }
     }
@@ -169,16 +163,17 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
   const currentConfig = planConfigs[plan] || planConfigs.free
 
   return (
-    <div className="w-full max-w-[340px] bg-white/95 backdrop-blur-2xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.15)] overflow-hidden flex flex-col font-sans">
+    <div className="w-full max-w-[340px] bg-white rounded-[24px] shadow-xl overflow-hidden flex flex-col font-sans isolate ring-1 ring-slate-200/50 relative z-50">
+      {/* YAHAN CLEANUP KIYA HAI: isolate class add ki hai aur shadow ko optimize kiya hai */}
       
       {/* Top Subtle Tier Accent Bar */}
-      <div className={`h-1.5 w-full ${currentConfig.accentBar}`} />
+      <div className={`h-1.5 w-full shrink-0 ${currentConfig.accentBar}`} />
 
       {/* 1. Header Section */}
       <div 
         onClick={() => {
-          navigate('/profile')
           onClose?.()
+          navigate('/profile')
         }}
         className="p-5 pb-4 border-b border-slate-100 flex items-center gap-3.5 relative cursor-pointer hover:bg-slate-50/60 transition-colors"
         role="button"
@@ -195,7 +190,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
           <p className="text-xs text-slate-500 truncate font-medium mb-1.5">{email}</p>
           
           <div>
-            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border shadow-2xs ${currentConfig.badgeStyle}`}>
+            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${currentConfig.badgeStyle}`}>
               {plan === 'premium' && <span>👑</span>}
               {plan === 'pro' && <span>🥈</span>}
               {currentConfig.badge}
@@ -225,11 +220,8 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
               <CheckCircle2 
                 size={14} 
                 className={
-                  plan === 'premium' 
-                    ? 'text-amber-500 shrink-0' 
-                    : plan === 'pro' 
-                    ? 'text-slate-600 shrink-0' 
-                    : 'text-indigo-500 shrink-0'
+                  plan === 'premium' ? 'text-amber-500 shrink-0' : 
+                  plan === 'pro' ? 'text-slate-600 shrink-0' : 'text-indigo-500 shrink-0'
                 } 
               />
               <span className="truncate">{feat}</span>
@@ -242,8 +234,8 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2">
         <button
           onClick={() => {
-            navigate(currentConfig.action.path)
             onClose?.()
+            navigate(currentConfig.action.path)
           }}
           className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 ${currentConfig.action.style}`}
         >
@@ -255,15 +247,21 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
         <div className="flex gap-2">
           {(plan === 'pro' || plan === 'premium') && (
             <button
-              onClick={() => { navigate('/billing'); onClose?.() }}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 transition-colors"
+              onClick={() => {
+                onClose?.()
+                navigate('/billing')
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors"
             >
               <CreditCard size={13} className="text-slate-500" /> Billing
             </button>
           )}
           <button
-            onClick={() => { navigate('/profile'); onClose?.() }}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 transition-colors"
+            onClick={() => {
+              onClose?.()
+              navigate('/profile')
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors"
           >
             <Settings size={13} className="text-slate-500" /> Settings
           </button>
