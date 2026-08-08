@@ -5,6 +5,20 @@ import toast from 'react-hot-toast';
 import { isMobileViewport } from '../utils/motionUtils';
 
 const AmbientMotionBg = lazy(() => import('../components/landing/AmbientMotionBg'));
+
+const AmbientFallback = () => (
+  <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden hidden md:flex justify-center">
+    <div className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-gradient-to-br from-[#2E9BDA]/10 to-[#6366F1]/10 rounded-full blur-[120px] opacity-60" />
+    <div className="absolute top-[40%] -left-[10%] w-[600px] h-[600px] bg-gradient-to-tr from-[#3B82F6]/10 to-[#8B5CF6]/10 rounded-full blur-[140px] opacity-60" />
+    <div
+      className="absolute inset-0 opacity-[0.3]"
+      style={{
+        backgroundImage: `radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.05) 1px, transparent 0)`,
+        backgroundSize: '40px 40px',
+      }}
+    />
+  </div>
+)
 import {
   Sparkles,
   CheckCircle2,
@@ -207,8 +221,8 @@ export default function CareerPilotLanding() {
     <MotionConfig reducedMotion={isMobile ? "always" : "user"}>
       <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
       
-      {/* ── Background Ambient Lighting & Mesh (Lazy Loaded) ────────────────────── */}
-      <Suspense fallback={null}>
+      {/* ── Background Ambient Lighting & Mesh (Lazy Loaded with Instant Fallback) ────────────────────── */}
+      <Suspense fallback={<AmbientFallback />}>
         <AmbientMotionBg />
       </Suspense>
 
