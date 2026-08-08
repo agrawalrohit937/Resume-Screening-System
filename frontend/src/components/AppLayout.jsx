@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, Crown } from 'lucide-react'
@@ -116,10 +116,30 @@ function MobileHeader({ onMenuToggle }) {
 
           <AnimatePresence>
             {isProfileOpen && (
-              <ProfilePlanDropdown
-                user={user}
-                onClose={() => setIsProfileOpen(false)}
-              />
+              <>
+                {/* Backdrop overlay for tap-outside dismiss on mobile */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsProfileOpen(false)}
+                  className="fixed inset-0 z-50 bg-black/20 backdrop-blur-xs"
+                />
+
+                {/* Positioned Dropdown Container */}
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-[calc(100%+8px)] z-50 w-[calc(100vw-24px)] max-w-[340px] shadow-2xl rounded-3xl overflow-hidden"
+                >
+                  <ProfilePlanDropdown
+                    user={user}
+                    onClose={() => setIsProfileOpen(false)}
+                  />
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>
@@ -133,6 +153,10 @@ export default function AppLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
+
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false)
+  }, [])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
@@ -198,24 +222,27 @@ export default function AppLayout() {
 
       <AnimatePresence>
         {isMobileMenuOpen && !isFullscreenActive && user?.role !== 'recruiter' && (
-          <div className="fixed inset-0 z-[100] md:hidden flex" style={{ pointerEvents: 'auto' }}>
+          <motion.div
+            key="mobile-drawer-wrapper"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[100] md:hidden flex"
+            style={{ pointerEvents: 'auto' }}
+          >
             {/* Dark Backdrop Overlay — Tapping anywhere outside the drawer closes it */}
-            <motion.div
-              key="mobile-drawer-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
+            <div
               role="button"
               tabIndex={0}
               aria-label="Close menu backdrop"
               onClick={(e) => {
                 e.stopPropagation()
-                setIsMobileMenuOpen(false)
+                closeMobileMenu()
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-                  setIsMobileMenuOpen(false)
+                  closeMobileMenu()
                 }
               }}
               className="absolute inset-0 h-full w-full bg-black/60 sm:backdrop-blur-xs cursor-pointer transform-gpu"
@@ -230,10 +257,10 @@ export default function AppLayout() {
               <Sidebar
                 mobile
                 collapsed={false}
-                onNavigate={() => setIsMobileMenuOpen(false)}
+                onNavigate={closeMobileMenu}
               />
             </div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

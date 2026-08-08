@@ -139,6 +139,62 @@ class GamificationService:
         self.collection = db.user_gamification
         self.events_col = db.gamification_events
 
+    # ─── Dynamic Streak Calculation ──────────────────────────────────────────
+    def _calculate_streak(self, active_dates: List[str], today: Optional[date] = None) -> Dict[str, int]:
+        if not today:
+            today = datetime.now(timezone.utc).date()
+        if not active_dates:
+            return {"current_streak": 0, "longest_streak": 0}
+
+        # Parse and sort unique valid dates
+        parsed_dates = []
+        for d_str in active_dates:
+            try:
+                if d_str and isinstance(d_str, str):
+                    parsed_dates.append(date.fromisoformat(d_str[:10]))
+            except Exception:
+                pass
+        parsed_dates = sorted(set(parsed_dates))
+
+        if not parsed_dates:
+            return {"current_streak": 0, "longest_streak": 0}
+
+        date_set = set(parsed_dates)
+
+        # Current streak: check if today or yesterday is in date_set
+        yesterday = today - timedelta(days=1)
+        current_streak = 0
+
+        if today in date_set:
+            check_date = today
+        elif yesterday in date_set:
+            check_date = yesterday
+        else:
+            check_date = None
+
+        if check_date:
+            while check_date in date_set:
+                current_streak += 1
+                check_date -= timedelta(days=1)
+
+        # Longest streak calculation across all time
+        longest_streak = 0
+        temp_streak = 0
+        prev_d = None
+        for d in parsed_dates:
+            if prev_d is None or d == prev_d + timedelta(days=1):
+                temp_streak += 1
+            else:
+                temp_streak = 1
+            if temp_streak > longest_streak:
+                longest_streak = temp_streak
+            prev_d = d
+
+        return {
+            "current_streak": current_streak,
+            "longest_streak": max(longest_streak, current_streak)
+        }
+
     # ─── Get or Create Profile ────────────────────────────────────────────────
     async def get_profile(self, user_id: str) -> Dict:
         doc = await self.collection.find_one({"user_id": user_id})
@@ -146,22 +202,43 @@ class GamificationService:
             doc = await self._create_profile(user_id)
         doc["_id"] = str(doc["_id"])
 
-        # ── STREAK EXPIRATION RESET ──────────────────────────────────────────────
-        # If user hasn't practiced since before yesterday, their current streak is broken (0)
         now = datetime.now(timezone.utc)
         today = now.date()
+        active_dates = doc.get("active_dates") or []
         last_str = doc.get("last_practice_date")
-        if last_str and doc.get("current_streak", 0) > 0:
+        old_streak = doc.get("current_streak", 0)
+
+        # Backfill active_dates for legacy profiles if active_dates is empty but last_practice_date exists
+        if not active_dates and last_str and old_streak > 0:
             try:
-                last_date = date.fromisoformat(last_str[:10])
-                if last_date < (today - timedelta(days=1)):
-                    doc["current_streak"] = 0
-                    await self.collection.update_one(
-                        {"user_id": user_id},
-                        {"$set": {"current_streak": 0}}
-                    )
+                last_d = date.fromisoformat(last_str[:10])
+                reconstructed = [
+                    (last_d - timedelta(days=i)).isoformat()
+                    for i in range(old_streak)
+                ]
+                active_dates = sorted(reconstructed)
+                doc["active_dates"] = active_dates
+                await self.collection.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"active_dates": active_dates}}
+                )
             except Exception:
                 pass
+
+        # Compute accurate dynamic streak strictly derived from active_dates
+        streak_info = self._calculate_streak(active_dates, today)
+        doc["current_streak"] = streak_info["current_streak"]
+        doc["longest_streak"] = max(doc.get("longest_streak", 0), streak_info["longest_streak"])
+
+        # Auto-heal database if current_streak in DB was mismatched
+        if doc["current_streak"] != old_streak:
+            await self.collection.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "current_streak": doc["current_streak"],
+                    "longest_streak": doc["longest_streak"]
+                }}
+            )
 
         doc["level_info"] = self._compute_level(doc.get("total_points", 0))
 
@@ -372,25 +449,26 @@ class GamificationService:
         today = now.date()
         today_str = today.isoformat()
         last_str = profile.get("last_practice_date")
-        current_streak = profile.get("current_streak", 0)
-        streak_bonus = 0
 
+        # Combine existing active_dates with today
+        existing_active = list(profile.get("active_dates") or [])
+        if today_str not in existing_active:
+            existing_active.append(today_str)
+
+        # Calculate accurate streak from active_dates
+        streak_info = self._calculate_streak(existing_active, today)
+        new_streak = streak_info["current_streak"]
+        longest = max(profile.get("longest_streak", 0), streak_info["longest_streak"])
+
+        # Determine streak bonus
+        streak_bonus = 0
         if last_str:
             try:
                 last_date = date.fromisoformat(last_str[:10])
-                if last_date == today:
-                    new_streak = current_streak if current_streak > 0 else 1
-                elif last_date == today - timedelta(days=1):
-                    new_streak = current_streak + 1
+                if last_date == today - timedelta(days=1):
                     streak_bonus = POINT_RULES["streak_bonus_daily"] * new_streak
-                else:
-                    new_streak = 1
             except Exception:
-                new_streak = 1
-        else:
-            new_streak = 1
-
-        longest = max(profile.get("longest_streak", 0), new_streak)
+                pass
 
         await self.collection.update_one(
             {"user_id": user_id},
@@ -507,6 +585,7 @@ class GamificationService:
             if not full_name or full_name.lower() == "unknown":
                 full_name = "Anonymous Candidate"
 
+            streak_info = self._calculate_streak(doc.get("active_dates") or [])
             result.append({
                 "rank": rank,
                 "user_id": doc["user_id"],
@@ -514,7 +593,7 @@ class GamificationService:
                 "role": user_role,
                 "total_points": doc.get("total_points", 0),
                 "level_info": self._compute_level(doc.get("total_points", 0)),
-                "current_streak": doc.get("current_streak", 0),
+                "current_streak": streak_info["current_streak"],
                 "total_interviews": doc.get("total_interviews", 0),
                 "average_score": doc.get("average_score", 0.0),
                 "badge_count": len(doc.get("badges", [])),

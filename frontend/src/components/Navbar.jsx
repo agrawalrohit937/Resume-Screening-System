@@ -319,15 +319,24 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
 
           <AnimatePresence>
             {isOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-3 rounded-3xl shadow-[0_10px_40px_rgba(30,58,138,0.12)] border border-slate-200/80 bg-white/95 backdrop-blur-xl overflow-hidden z-50 min-w-[240px]"
-              >
-                <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
-              </motion.div>
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsOpen(false)}
+                  className="fixed inset-0 z-40 bg-black/10 backdrop-blur-xs sm:bg-transparent sm:backdrop-blur-none"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-3 rounded-3xl shadow-[0_10px_40px_rgba(30,58,138,0.12)] border border-slate-200/80 bg-white/95 backdrop-blur-xl overflow-hidden z-50 w-[calc(100vw-24px)] sm:w-[340px] max-w-[340px]"
+                >
+                  <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>

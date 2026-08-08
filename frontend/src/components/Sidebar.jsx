@@ -282,11 +282,16 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       aria-modal={mobile ? 'true' : undefined}
     >
       <div className={`flex items-center py-4 min-h-[64px] shrink-0 border-b border-slate-100 px-4 sm:px-5 ${isCompact ? 'justify-center' : 'justify-between w-full'}`}>
-        <div className="flex items-center gap-2.5">
+        <div
+          onClick={() => handleItemClick('/dashboard')}
+          className="flex items-center gap-2.5 cursor-pointer group"
+          role="button"
+          tabIndex={0}
+        >
           <img 
             src="/logo_t.png"
             alt="CareerShala" 
-            className="w-9 h-9 object-contain shrink-0" 
+            className="w-9 h-9 object-contain shrink-0 group-hover:scale-105 transition-transform" 
           />
           
           <AnimatePresence>
