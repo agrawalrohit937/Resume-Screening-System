@@ -124,7 +124,9 @@ def create_application() -> FastAPI:
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
             "img-src 'self' data: blob: https:; "
-            "connect-src 'self' https: ws: wss:;"
+            "connect-src 'self' https: ws: wss:; "
+            "object-src 'none'; "
+            "base-uri 'self';"
         )
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
