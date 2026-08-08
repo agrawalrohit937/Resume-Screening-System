@@ -100,20 +100,14 @@ export default function Loader({ show = true, onExitComplete }) {
                 maskImage: 'radial-gradient(ellipse closest-side, black 50%, transparent 90%)',
               }}
             >
-              <img 
-                src="/logo_t.png" 
-                alt="CareerShala Logo" 
-                className="w-20 h-20 object-contain md:hidden my-4" 
-              />
               <video
                 ref={videoRef}
                 autoPlay
                 muted={true}
                 loop
                 playsInline
-                preload="metadata"
-                poster="/logo_t.png"
-                className="hidden md:block"
+                preload="auto"
+                src={logoVideo}
                 onError={(e) => {
                   console.warn('[Loader] Video failed to load or autoplay:', e)
                   setVideoError(true)
