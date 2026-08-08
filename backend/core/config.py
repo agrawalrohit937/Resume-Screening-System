@@ -123,7 +123,14 @@ class Settings(BaseSettings):
 
     # ── PDF Generation ──────────────────────────────────────────────────────────
     PDF_TIMEOUT_SECONDS: int = 60
-    PUBLIC_PDF_URL_BASE: str = "https://resume-screening-system-hb2d.onrender.com/generated/"
+    PUBLIC_PDF_URL_BASE: str = Field(
+        default_factory=lambda: os.getenv(
+            "PUBLIC_PDF_URL_BASE",
+            "https://careershala-hghwgae4ebesdsb3.centralindia-01.azurewebsites.net/generated/"
+            if (os.getenv("ENVIRONMENT") == "production" or os.getenv("WEBSITE_SITE_NAME") or os.getenv("AZURE_HTTP_USER_AGENT"))
+            else "http://localhost:8000/generated/"
+        )
+    )
 
     # ── NLP / ML ──────────────────────────────────────────────────────────────
     BERT_MODEL_NAME: str = "all-MiniLM-L6-v2"
