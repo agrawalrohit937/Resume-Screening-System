@@ -227,6 +227,8 @@ export default function AppLayout() {
               style={{ pointerEvents: 'auto' }}
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
             >
               <Sidebar
                 mobile
