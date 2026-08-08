@@ -14,6 +14,9 @@ export function resolveAvatarUrl(user) {
     if (!url || typeof url !== 'string') return null
     const trimmed = url.trim()
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+      if (trimmed.includes('res.cloudinary.com') && !trimmed.includes('q_auto')) {
+        return trimmed.replace('/upload/', '/upload/q_auto,f_auto,w_150,c_fill/')
+      }
       return trimmed
     }
     return null

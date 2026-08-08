@@ -1,13 +1,14 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { Menu, Crown } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
 import RouteErrorBoundary from './RouteErrorBoundary'
-import AICopilotWidget from './AICopilotWidget'
 import ProfilePlanDropdown from './ProfilePlanDropdown'
 import AvatarRing from './AvatarRing'
+
+const AICopilotWidget = lazy(() => import('./AICopilotWidget'))
 
 const PAGE_TITLES = {
   '/dashboard': { title: 'Dashboard', sub: 'Career intelligence overview' },
@@ -78,7 +79,7 @@ function MobileHeader({ onMenuToggle }) {
               <p className="truncate text-sm font-extrabold text-slate-900 leading-tight">
                 Career<span className="text-[#2E9BDA]">Shala</span>
               </p>
-              <p className="truncate text-[10.5px] font-semibold text-slate-400 leading-none mt-0.5">
+              <p className="truncate text-[10.5px] font-semibold text-slate-500 leading-none mt-0.5">
                 {meta.title}
               </p>
             </div>
@@ -259,7 +260,11 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
-      {!isFullscreenActive && <AICopilotWidget />}
+      {!isFullscreenActive && (
+        <Suspense fallback={null}>
+          <AICopilotWidget />
+        </Suspense>
+      )}
     </div>
   )
 }

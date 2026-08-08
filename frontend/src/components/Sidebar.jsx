@@ -530,6 +530,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
               {isPremium ? (
                 <button
                   title="Premium Active (Manage)"
+                  aria-label="Manage Premium subscription"
                   onClick={() => handleItemClick('/billing')}
                   className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
                   style={{
@@ -543,6 +544,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
               ) : (
                 <button
                   title="Upgrade to Pro"
+                  aria-label="Upgrade to Pro"
                   onClick={() => handleItemClick('/premium')}
                   className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
                   style={{
@@ -714,6 +716,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             handleItemClick()
           }}
           title="Logout"
+          aria-label="Log out of account"
           className={`flex items-center gap-2 w-full rounded-xl py-2.5 text-[12px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 active:scale-[0.98] transition-all ring-1 ring-rose-100
             ${isCompact ? 'justify-center px-0' : 'justify-center px-3'}`}
         >
@@ -724,7 +727,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       {!mobile && (
         <button onClick={onToggle}
           title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          className="absolute -right-3 top-[18px] w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-[#2E9BDA] hover:border-blue-200 transition-all z-10">
+          aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="absolute -right-3 top-[18px] w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-[#2E9BDA] hover:border-blue-200 transition-all z-10 cursor-pointer">
           <ChevronLeft className={`w-3.5 h-3.5 transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-180'}`} strokeWidth={2.5} />
         </button>
       )}

@@ -420,6 +420,7 @@ export default function AICopilotWidget() {
                       onClick={handleClearHistory}
                       className="w-8 h-8 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
                       title="Clear Chat History"
+                      aria-label="Clear chat history"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
