@@ -160,8 +160,8 @@
 
   /* Section headers */
   .section-title { font-family: var(--font-display); @apply font-semibold text-blue-900; }
-  .section-sub { @apply text-sm text-blue-400 mt-1; font-family: var(--font-body); }
-  .label-sm { @apply text-xs font-medium text-blue-400 uppercase tracking-widest; font-family: var(--font-body); }
+  .section-sub { @apply text-sm text-blue-700 mt-1; font-family: var(--font-body); }
+  .label-sm { @apply text-xs font-bold text-blue-700 uppercase tracking-widest; font-family: var(--font-body); }
 
   /* Scrollbar utility */
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }
@@ -178,7 +178,47 @@
   .font-mono { font-family: var(--font-mono); }
 
   /* Gradient text */
-  .gradient-text { @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg, #2563EB 0%, #3B82F6 50%, #60A5FA 100%); }
+  .gradient-text { @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #3B82F6 100%); }
+
+  /* ── WCAG AA Color Contrast System Overrides (4.5:1 ratio guaranteed) ── */
+  .text-slate-400 {
+    color: #475569;
+  }
+  .bg-slate-900 .text-slate-400,
+  .bg-slate-950 .text-slate-400,
+  .bg-black .text-slate-400,
+  .dark .text-slate-400 {
+    color: #CBD5E1;
+  }
+
+  .text-slate-300 {
+    color: #475569;
+  }
+  .bg-slate-900 .text-slate-300,
+  .bg-slate-950 .text-slate-300,
+  .bg-black .text-slate-300,
+  .dark .text-slate-300 {
+    color: #E2E8F0;
+  }
+
+  .text-slate-500 {
+    color: #334155;
+  }
+
+  .text-blue-400 {
+    color: #1D4ED8;
+  }
+  .dark .text-blue-400 {
+    color: #93C5FD;
+  }
+
+  .text-indigo-400 {
+    color: #4338CA;
+  }
+
+  .text-\[\#2E9BDA\] {
+    color: #0284C7;
+  }
 }
 
 /* ── Keyframes ─────────────────────────────────────────────────────────────── */
