@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { isMobileViewport } from '../utils/motionUtils';
+
+const AmbientMotionBg = lazy(() => import('../components/landing/AmbientMotionBg'));
 import {
   Sparkles,
   CheckCircle2,
@@ -205,29 +207,10 @@ export default function CareerPilotLanding() {
     <MotionConfig reducedMotion={isMobile ? "always" : "user"}>
       <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
       
-      {/* ── Background Ambient Lighting & Mesh (Subtle) ────────────────────── */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden flex justify-center">
-        {!isMobile && (
-          <>
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ duration: 150, repeat: Infinity, ease: "linear" }}
-              className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-gradient-to-br from-[#2E9BDA]/10 to-[#6366F1]/10 rounded-full blur-[120px]" 
-            />
-            <motion.div 
-              animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
-              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-[40%] -left-[10%] w-[600px] h-[600px] bg-gradient-to-tr from-[#3B82F6]/10 to-[#8B5CF6]/10 rounded-full blur-[140px]" 
-            />
-          </>
-        )}
-        <div className="absolute inset-0 opacity-[0.3]"
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.05) 1px, transparent 0)`,
-            backgroundSize: '40px 40px',
-          }}
-        />
-      </div>
+      {/* ── Background Ambient Lighting & Mesh (Lazy Loaded) ────────────────────── */}
+      <Suspense fallback={null}>
+        <AmbientMotionBg />
+      </Suspense>
 
       {/* ── Header Navigation Bar ────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-slate-200/80 shadow-sm transition-all duration-300">
