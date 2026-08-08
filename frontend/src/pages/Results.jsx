@@ -1177,7 +1177,8 @@ export default function Results() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()
   useEffect(() => {
-    fetch("https://resume-screening-system-hb2d.onrender.com/health")
+    const backendBase = import.meta.env.VITE_API_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:8000'
+    fetch(`${backendBase}/health`)
       .catch(() => console.log("Warmup check failed"))
   }, [])
 
