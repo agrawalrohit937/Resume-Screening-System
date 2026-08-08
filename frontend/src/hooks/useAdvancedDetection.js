@@ -165,12 +165,35 @@ export function useAdvancedDetection({
     }
   }, [])
 
+const loadMediaPipeCDN = async () => {
+  if (window.FaceMesh && window.Camera) return true;
+  const loadScript = (src) => new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const script = document.createElement('script');
+    script.src = src;
+    script.crossOrigin = 'anonymous';
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  try {
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
+    return true;
+  } catch (e) {
+    console.error('[Detection] Failed to load MediaPipe CDN scripts:', e);
+    return false;
+  }
+};
+
   // ── Init MediaPipe FaceMesh ───────────────────────────────────────────────
 const initMediaPipe = useCallback(async () => {
+  await loadMediaPipeCDN();
   // Wait for script to be globally available
   let retries = 0;
   while (!window.FaceMesh && retries < 30) {
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 200));
     retries++;
   }
 
