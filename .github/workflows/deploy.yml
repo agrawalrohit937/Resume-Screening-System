@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/RSS-28-live-interview
 
 jobs:
   build-and-deploy:
