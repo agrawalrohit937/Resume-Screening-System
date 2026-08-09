@@ -5,7 +5,8 @@ export default function CheatingAlert({ onEvent, active = true }) {
   const [alerts, setAlerts] = useState([])
   const [eventLog, setEventLog] = useState([])
   const [totalEvents, setTotalEvents] = useState(0)
-  const alertIdRef = useRef(0)
+  const onEventRef = useRef(onEvent)
+  onEventRef.current = onEvent
 
   const pushAlert = useCallback((type, message, severity = 'medium') => {
     const id = ++alertIdRef.current
@@ -14,11 +15,11 @@ export default function CheatingAlert({ onEvent, active = true }) {
     setAlerts(prev => [...prev.slice(-2), { id, message, severity, type }])
     setEventLog(prev => [...prev, event])
     setTotalEvents(n => n + 1)
-    onEvent?.(event)
+    onEventRef.current?.(event)
 
     // Auto-dismiss
     setTimeout(() => setAlerts(prev => prev.filter(a => a.id !== id)), 5000)
-  }, [onEvent])
+  }, [])
 
   // ── Tab Visibility Detection ─────────────────────────────────────────────
   useEffect(() => {

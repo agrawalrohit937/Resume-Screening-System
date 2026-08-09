@@ -78,6 +78,8 @@ export function useAdvancedDetection({
   })
 
   // ── Refs ──────────────────────────────────────────────────────────────────
+  const onEventRef      = useRef(onEvent)
+  onEventRef.current    = onEvent
   const faceMeshRef     = useRef(null)
   const cocoModelRef    = useRef(null)
   const lookAwayStart   = useRef(null)
@@ -724,11 +726,12 @@ const runEmotionDetection = useCallback(async () => {
 
   // ── Event emitter with 6s throttle ────────────────────────────────────────
   function emitEvent(type, severity, details) {
-    if (!onEvent) return
+    const fn = onEventRef.current
+    if (!fn) return
     const now = Date.now()
     if (lastEvents.current[type] && now - lastEvents.current[type] < 6000) return
     lastEvents.current[type] = now
-    onEvent({ event_type: type, severity, details, timestamp: new Date().toISOString() })
+    fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })
   }
 
   return status

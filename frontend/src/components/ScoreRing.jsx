@@ -24,6 +24,7 @@ export default function ScoreRing({ score = 0, size = 140, strokeWidth = 10, lab
       setDisplayScore(score)
       return
     }
+    let rafId = null
     const start = Date.now()
     const duration = 1200
     const from = 0
@@ -34,11 +35,14 @@ export default function ScoreRing({ score = 0, size = 140, strokeWidth = 10, lab
       // Custom swift out, gentle snap-in cubic easing function
       const ease = 1 - Math.pow(1 - t, 4) 
       setDisplayScore(from + (to - from) * ease)
-      if (t < 1) requestAnimationFrame(tick)
+      if (t < 1) rafId = requestAnimationFrame(tick)
     }
     
-    const timer = setTimeout(() => requestAnimationFrame(tick), 150)
-    return () => clearTimeout(timer)
+    const timer = setTimeout(() => { rafId = requestAnimationFrame(tick) }, 150)
+    return () => {
+      clearTimeout(timer)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
   }, [score, animated])
 
   // System Theme & Configuration Palette
