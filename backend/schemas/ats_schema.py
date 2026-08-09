@@ -79,6 +79,9 @@ class ATSMatchResponse(BaseModel):
     parsing_confidence: float = 1.0
     parsing_warnings: List[str] = Field(default_factory=list)
 
+    # ── HITL wizard support ──
+    contact_snapshot: Optional[Dict[str, Any]] = None
+
 
 class BulkATSResultItem(BaseModel):
     resume_id: str
