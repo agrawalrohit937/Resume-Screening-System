@@ -14,6 +14,7 @@ Post-install step (one-time, also in Dockerfile):
 import gc
 import asyncio
 import os
+import re
 
 import structlog
 from jinja2 import Environment, FileSystemLoader
@@ -141,14 +142,49 @@ class PDFGeneratorService:
                 elif hasattr(item, "__dict__"):
                     item = item.__dict__
                 if item:
-                    normalized.append(item)
+                    item_copy = dict(item)
+                    # Clean company string if location is duplicated at end
+                    company = (item_copy.get("company") or "").strip()
+                    loc = (item_copy.get("location") or "").strip()
+                    if company and loc and company.lower().endswith(f", {loc.lower()}"):
+                        item_copy["company"] = company[:-len(f", {loc}")].strip()
+
+                    # Clean bullet highlights (strip leading •, -, ▸, *, ›)
+                    if "highlights" in item_copy and isinstance(item_copy["highlights"], list):
+                        item_copy["highlights"] = [
+                            re.sub(r"^[\s\u2022\u25b8\u25b6\u2013\u2014\-\*\>\›\.]+", "", str(h)).strip()
+                            for h in item_copy["highlights"]
+                            if h and str(h).strip()
+                        ]
+                    # Normalize technologies list so Jinja2 never text-shreds a string
+                    techs = item_copy.get("technologies") or item_copy.get("tech_stack") or item_copy.get("stack")
+                    if isinstance(techs, str):
+                        item_copy["technologies"] = [t.strip() for t in techs.split(",") if t and t.strip()]
+                    elif isinstance(techs, list):
+                        cleaned_techs = []
+                        for t in techs:
+                            if isinstance(t, str):
+                                cleaned_techs.extend([sub.strip() for sub in t.split(",") if sub.strip()])
+                            elif t:
+                                cleaned_techs.append(str(t).strip())
+                    # Ensure duration / dates / period / year is captured regardless of key name
+                    duration = (item_copy.get("duration") or item_copy.get("dates") or item_copy.get("period") or item_copy.get("year") or "").strip()
+                    item_copy["duration"] = duration
+                    item_copy["dates"] = duration
+
+                    # Preserve project links (link and github)
+                    item_copy["name"] = (item_copy.get("name") or item_copy.get("title") or "").strip()
+                    item_copy["link"] = (item_copy.get("link") or item_copy.get("live_demo") or item_copy.get("url") or "").strip()
+                    item_copy["github"] = (item_copy.get("github") or item_copy.get("repo") or item_copy.get("github_url") or "").strip()
+                    normalized.append(item_copy)
             return normalized
 
         return {
-            "full_name": (resume_data.get("full_name") or "").strip(),
-            "role_title": (resume_data.get("target_role") or "").strip(),
+            "full_name": (resume_data.get("full_name") or contact.get("full_name") or "").strip(),
+            "role_title": (resume_data.get("target_role") or resume_data.get("role_title") or "").strip(),
             "email": (contact.get("email") or "").strip(),
             "phone": (contact.get("phone") or "").strip(),
+            "location": (contact.get("location") or resume_data.get("location") or "").strip(),
             "linkedin": (contact.get("linkedin") or "").strip(),
             "github": (contact.get("github") or "").strip(),
             "portfolio": (contact.get("portfolio") or "").strip(),
@@ -159,20 +195,24 @@ class PDFGeneratorService:
             "projects": as_dict_list(resume_data.get("projects", [])),
             "education": as_dict_list(resume_data.get("education", [])),
 
-            # skills may be a Dict[str, List[str]] (categorised, new format) or
-            # a flat List[str] (legacy).  Never run the dict through the list
-            # deduper — iterating a dict yields only keys, losing all values.
             "skills": (
                 resume_data.get("skills") or {}
                 if isinstance(resume_data.get("skills"), dict)
                 else self._dedupe_preserve_order(resume_data.get("skills", []))
             ),
 
-            "certifications": resume_data.get("certifications", []) or [],
-            "achievements": resume_data.get("achievements", []) or [],
+            "certifications": [
+                re.sub(r"^[\s\u2022\u25b8\u2013\u2014\-\*\>]+", "", str(c)).strip()
+                for c in (resume_data.get("certifications", []) or [])
+                if c and str(c).strip()
+            ],
+            "achievements": [
+                re.sub(r"^[\s\u2022\u25b8\u2013\u2014\-\*\>]+", "", str(a)).strip()
+                for a in (resume_data.get("achievements", []) or [])
+                if a and str(a).strip()
+            ],
 
-            # Growth checklist only — the template intentionally does NOT
-            # print this on the resume.
+            # Growth checklist only
             "recommended_skills": self._dedupe_preserve_order(
                 resume_data.get("recommended_skills", [])
             ),
