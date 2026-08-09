@@ -117,7 +117,8 @@ async def match_resume(
     print(f"  Extracted skills from parser: {extracted_skills}")
     print("=" * 80 + "\n")
 
-    # Save Job Description
+    # Save Job Description (Fail-safe)
+    jd = None
     try:
         jd = await result_repo.create_job_description({
             "user_id": str(current_user.id),
@@ -125,12 +126,7 @@ async def match_resume(
             "description": payload.job_description,
         })
     except Exception as e:
-        logger.exception("Failed to save Job Description in database", error=str(e))
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to save Job Description: {str(e)}",
-        )
+        logger.warning("Failed to save Job Description in database; continuing analysis", error=str(e))
 
     t_start = time.perf_counter()
 
@@ -223,17 +219,20 @@ async def match_resume(
     result = None
 
     if payload.save_result:
-        result = await result_repo.create_result({
-            "user_id": str(current_user.id),
-            "resume_id": payload.resume_id,
-            "job_description_id": str(jd.id),
-            **score_data,
-        })
+        try:
+            result = await result_repo.create_result({
+                "user_id": str(current_user.id),
+                "resume_id": payload.resume_id,
+                "job_description_id": str(jd.id) if jd and hasattr(jd, "id") else None,
+                **score_data,
+            })
 
-        await user_repo.increment_counter(
-            str(current_user.id),
-            "total_ats_checks",
-        )
+            await user_repo.increment_counter(
+                str(current_user.id),
+                "total_ats_checks",
+            )
+        except Exception as e:
+            logger.warning("Failed to save ATS result in database", error=str(e))
 
     logger.info(
         "ATS analysis completed",
