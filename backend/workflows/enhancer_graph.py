@@ -44,18 +44,6 @@ class EnhancementState(TypedDict):
     # bullet points are never truncated. Passed in by the route handler.
     original_parsed_dict: Optional[Dict[str, Any]]
 
-# ── Retry Logic for LLM Calls ──────────────────────────────────────────────────
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(RateLimitError),
-    reraise=True
-)
-async def _call_llm_with_retry(chain, input_data):
-    """Calls the LLM chain with retry capability for rate limits."""
-    return await chain.ainvoke(input_data)
-
-
 
 # ── Ground-truth formatting helpers ────────────────────────────────────────────
 def _format_verified_skills(skills: List[str]) -> str:
