@@ -184,6 +184,7 @@ def create_application() -> FastAPI:
     app.include_router(payment.router, prefix=f"{p}/payment", tags=["Payment"])
     app.include_router(copilot_router, prefix=f"{p}/copilot", tags=["AI Copilot"])
     app.include_router(apply_assistant_router, prefix=f"{p}", tags=["Apply Assistant"])
+    app.include_router(apply_assistant_router, prefix="/api", tags=["Apply Assistant Direct"])
     app.include_router(support_router, prefix=f"{p}", tags=["Support"])
     app.include_router(gmail_oauth_router, prefix=f"{p}/auth", tags=["Gmail OAuth"])
     app.include_router(notifications_router, prefix=f"{p}/notifications", tags=["Notifications"])

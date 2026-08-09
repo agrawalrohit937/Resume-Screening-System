@@ -36,20 +36,30 @@ def _user_id(current_user) -> str:
 @router.post("/extract-job-details", response_model=JobDetailsExtractionResponse)
 async def extract_from_screenshot(
     request: Request,
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
     current_user=Depends(get_current_user),
 ):
     """
     Extract job posting details (company_name, job_title, hr_email, job_description)
     from one or multiple screenshot images using AI Vision OCR.
     """
-    form = await request.form()
     upload_list = []
 
-    for key in form.keys():
-        values = form.getlist(key)
-        for val in values:
-            if hasattr(val, "read") and hasattr(val, "filename") and val.filename:
-                upload_list.append(val)
+    if files:
+        upload_list.extend([f for f in files if f and hasattr(f, "filename") and f.filename])
+    if file and hasattr(file, "filename") and file.filename:
+        upload_list.append(file)
+
+    try:
+        form = await request.form()
+        for key in form.keys():
+            for val in form.getlist(key):
+                if hasattr(val, "read") and hasattr(val, "filename") and val.filename:
+                    if val not in upload_list:
+                        upload_list.append(val)
+    except Exception as err:
+        logger.warning("Could not parse request form directly", error=str(err))
 
     if not upload_list:
         raise HTTPException(
