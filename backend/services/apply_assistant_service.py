@@ -17,11 +17,114 @@ from services.email_service import send_with_attachments, send_application_via_g
 from repositories.user_repo import UserRepository
 
 
+import base64
+import json
+import re
+from google import genai
+from google.genai import types
+import structlog
+from core.llm_client import gemini_key_pool, groq_key_pool
+
+logger = structlog.get_logger(__name__)
+
+
 class ApplyAssistantService:
     def __init__(self, db=None):
         self._db = db
         self._repo = None
         self._resume_repo = None
+
+    async def extract_job_details_from_screenshots(self, image_files: List[Tuple[bytes, str]]) -> dict:
+        """
+        Extract company_name, job_title, hr_email, and job_description from screenshot images using AI Vision.
+        """
+        prompt = (
+            "You are an expert AI Job Application Assistant with Vision OCR capabilities.\n"
+            "Analyze the provided screenshot(s) of a job posting or career listing carefully.\n\n"
+            "Perform OCR and semantic extraction to pull the following 4 fields:\n"
+            "1. 'company_name': Name of the hiring company posting the job.\n"
+            "2. 'job_title': The exact title of the job position (e.g. Senior Full-Stack Developer).\n"
+            "3. 'hr_email': Contact HR or recruiter email address if present in the screenshot, else an empty string ''.\n"
+            "4. 'job_description': A comprehensive, complete text summary of the job description, responsibilities, requirements, and qualifications shown in the screenshot(s).\n\n"
+            "Return ONLY a valid JSON object matching this exact schema:\n"
+            "{\n"
+            '  "company_name": "string",\n'
+            '  "job_title": "string",\n'
+            '  "hr_email": "string",\n'
+            '  "job_description": "string"\n'
+            "}"
+        )
+
+        async def _gemini_extract(client: genai.Client) -> str:
+            parts = []
+            for img_bytes, mime_type in image_files:
+                parts.append(types.Part.from_bytes(data=img_bytes, mime_type=mime_type))
+            parts.append(prompt)
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=parts,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1,
+                )
+            )
+            return response.text
+
+        raw_response = None
+        try:
+            raw_response = await gemini_key_pool.execute_async_with_fallback(_gemini_extract)
+        except Exception as gemini_err:
+            logger.warning("Gemini Vision extraction failed, attempting Groq Vision fallback", error=str(gemini_err))
+
+            async def _groq_extract(key: str) -> str:
+                from langchain_groq import ChatGroq
+                llm = ChatGroq(model_name="llama-3.2-11b-vision-preview", groq_api_key=key, temperature=0.1)
+                content_list = []
+                for img_bytes, mime_type in image_files:
+                    b64 = base64.b64encode(img_bytes).decode("utf-8")
+                    content_list.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime_type};base64,{b64}"}
+                    })
+                content_list.append({"type": "text", "text": prompt})
+                msg = [("user", content_list)]
+                res = await llm.ainvoke(msg)
+                return res.content
+
+            try:
+                raw_response = await groq_key_pool.execute_async_with_fallback(_groq_extract)
+            except Exception as groq_err:
+                logger.error("Groq Vision fallback also failed", error=str(groq_err))
+                raise HTTPException(
+                    status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to process screenshots with AI Vision: {str(groq_err)}",
+                )
+
+        if not raw_response:
+            return {"company_name": "", "job_title": "", "hr_email": "", "job_description": ""}
+
+        cleaned = raw_response.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+        elif cleaned.startswith("```"):
+            cleaned = cleaned.split("```")[1].split("```")[0].strip()
+
+        try:
+            data = json.loads(cleaned)
+        except Exception:
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+            else:
+                data = {}
+
+        return {
+            "company_name": str(data.get("company_name", "") or "").strip(),
+            "job_title": str(data.get("job_title", "") or "").strip(),
+            "hr_email": str(data.get("hr_email", "") or "").strip(),
+            "job_description": str(data.get("job_description", "") or "").strip(),
+        }
 
     @property
     def repo(self) -> ApplicationRepository:

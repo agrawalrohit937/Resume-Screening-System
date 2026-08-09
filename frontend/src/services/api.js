@@ -176,7 +176,14 @@ export const deleteResume = (id) => api.delete(`/resume/${id}`)
 
 export const reparseResume = (id) => api.post(`/resume/${id}/reparse`)
 
-export const matchATS = (p) => api.post('/ats/match', p)
+export const matchATS = (p) => {
+  if (typeof FormData !== 'undefined' && p instanceof FormData) {
+    return api.post('/ats/match', p, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+  return api.post('/ats/match', p)
+}
 
 export const getATSHistory = (p, config) => api.get('/ats/history', { params: p, ...config })
 

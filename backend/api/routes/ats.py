@@ -2,8 +2,10 @@
 # ATS Routes — Single match, bulk match, history
 # """
 
+import tempfile
+from pathlib import Path
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
 from typing import Optional
 from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
@@ -15,6 +17,7 @@ from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
 from repositories.user_repo import UserRepository
+from services.parser_service import ParserService
 
 from schemas.ats_schema import (
     ATSMatchRequest, ATSMatchResponse, BulkATSMatchRequest,
@@ -58,29 +61,104 @@ def _extract_contact_snapshot(extracted_data: dict) -> dict:
 
 @router.post("/match", response_model=ATSMatchResponse)
 async def match_resume(
-    payload: ATSMatchRequest,
+    request: Request,
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
     result_repo: ResultRepository = Depends(get_result_repo),
     user_repo: UserRepository = Depends(get_user_repo),
 ):
-    """Score a resume against a job description with BOTH engines:
-
-    1. The existing LangGraph + Groq semantic evaluator (the "AI Potential
-       Score" — generous, context-aware).
-    2. The deterministic strict_ats_service (the "Strict ATS Score" — a
-       dumb, literal keyword/knockout check simulating real corporate ATS
-       software).
-
-    Also returns `contact_snapshot`, reused by the frontend HITL wizard so
-    it can silently skip asking for a LinkedIn/GitHub/Portfolio link the
-    resume already has.
+    """Score a resume against a job description with BOTH engines.
+    Supports both JSON and multipart/form-data file uploads for JD (PDF, DOCX, TXT).
     """
 
-    validate_object_id(payload.resume_id, "resume_id")
+    content_type = request.headers.get("content-type", "").lower()
+
+    resume_id = None
+    job_title = "Target Role"
+    job_description = ""
+    required_skills = []
+    save_result = True
+    jd_file: Optional[UploadFile] = None
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        resume_id = form.get("resume_id")
+        job_title = form.get("job_title") or "Target Role"
+        job_description = form.get("job_description") or ""
+
+        req_skills_raw = form.getlist("required_skills") or form.get("required_skills")
+        if isinstance(req_skills_raw, str):
+            required_skills = [s.strip().lower() for s in req_skills_raw.split(",") if s and s.strip()]
+        elif isinstance(req_skills_raw, list):
+            required_skills = [s.strip().lower() for s in req_skills_raw if isinstance(s, str) and s.strip()]
+
+        save_res_raw = form.get("save_result")
+        if save_res_raw is not None:
+            save_result = str(save_res_raw).lower() in ("true", "1", "yes")
+
+        form_file = form.get("jd_file")
+        if isinstance(form_file, UploadFile):
+            jd_file = form_file
+    else:
+        json_data = await request.json()
+        payload = ATSMatchRequest(**json_data)
+        resume_id = payload.resume_id
+        job_title = payload.job_title
+        job_description = payload.job_description
+        required_skills = payload.required_skills
+        save_result = payload.save_result
+
+    # ── Handle uploaded JD file text extraction using ParserService ─────────
+    if jd_file and hasattr(jd_file, "filename") and jd_file.filename:
+        filename = jd_file.filename
+        ext = Path(filename).suffix.lower().lstrip(".")
+        if ext not in ("pdf", "docx", "doc", "txt"):
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported JD file type. Please upload a PDF, DOCX, or TXT file.",
+            )
+
+        contents = await jd_file.read()
+        if not contents:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded JD file is empty.",
+            )
+
+        if ext == "txt":
+            extracted_text = contents.decode("utf-8", errors="ignore").strip()
+        else:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
+                tmp.write(contents)
+                tmp_path = tmp.name
+            try:
+                parser = ParserService()
+                extracted_text = await parser._extract_raw_text(tmp_path, ext)
+            except Exception as parse_err:
+                logger.error("Failed to parse JD file", error=str(parse_err))
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Failed to extract text from JD file '{filename}': {str(parse_err)}",
+                )
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+
+        if extracted_text and len(extracted_text.strip()) > 0:
+            job_description = extracted_text.strip()
+
+    if not resume_id:
+        raise HTTPException(status_code=422, detail="resume_id is required.")
+
+    if not job_description or len(job_description.strip()) < 10:
+        raise HTTPException(
+            status_code=422,
+            detail="Job description text (or uploaded file) is required and must contain valid text.",
+        )
+
+    validate_object_id(resume_id, "resume_id")
 
     resume = await resume_repo.get_by_id_and_user(
-        payload.resume_id,
+        resume_id,
         str(current_user.id),
     )
 
@@ -122,8 +200,8 @@ async def match_resume(
     try:
         jd = await result_repo.create_job_description({
             "user_id": str(current_user.id),
-            "title": payload.job_title,
-            "description": payload.job_description,
+            "title": job_title,
+            "description": job_description,
         })
     except Exception as e:
         logger.warning("Failed to save Job Description in database; continuing analysis", error=str(e))
@@ -133,8 +211,8 @@ async def match_resume(
     try:
         graph_result = await ats_engine.ainvoke({
             "resume_text": raw_text,
-            "jd_text": payload.job_description,
-            "required_skills": payload.required_skills or [],   # Optional skills from UI
+            "jd_text": job_description,
+            "required_skills": required_skills or [],   # Optional skills from UI
         })
     except Exception as e:
         logger.exception("ATS graph execution failed", error=str(e))
@@ -173,13 +251,13 @@ async def match_resume(
     extracted_data = graph_result.get("extracted_data", {}) or {}
 
     # ── Strict / Corporate ATS engine (deterministic, no LLM) ──────────────
-    skill_universe = list(payload.required_skills or []) + list(graph_result.get("matched_skills") or []) + list(graph_result.get("missing_skills") or [])
+    skill_universe = list(required_skills or []) + list(graph_result.get("matched_skills") or []) + list(graph_result.get("missing_skills") or [])
 
     try:
         strict_result = run_strict_ats_check(
             raw_text=raw_text,
             extracted_data=extracted_data,
-            jd_text=payload.job_description,
+            jd_text=job_description,
             skill_universe=skill_universe,
         )
     except Exception:
@@ -219,11 +297,11 @@ async def match_resume(
 
     result = None
 
-    if payload.save_result:
+    if save_result:
         try:
             result = await result_repo.create_result({
                 "user_id": str(current_user.id),
-                "resume_id": payload.resume_id,
+                "resume_id": resume_id,
                 "job_description_id": str(jd.id) if jd and hasattr(jd, "id") else None,
                 **score_data,
             })
@@ -237,7 +315,7 @@ async def match_resume(
 
     logger.info(
         "ATS analysis completed",
-        resume_id=payload.resume_id,
+        resume_id=resume_id,
         score=score_data["final_score"],
         strict_score=score_data["strict_ats_score"],
         is_knockout=score_data["is_knockout"],
@@ -248,8 +326,8 @@ async def match_resume(
 
     return _build_ats_response(
         result_id=result_id,
-        resume_id=payload.resume_id,
-        job_title=payload.job_title,
+        resume_id=resume_id,
+        job_title=job_title,
         data=score_data,
     )
 

@@ -6,6 +6,15 @@ const BASE = '/apply';
 const AUTH = '/auth';
 
 export const applyAssistantApi = {
+  extractFromScreenshot: (files) => {
+    const formData = new FormData();
+    const fileList = Array.isArray(files) ? files : [files];
+    fileList.forEach((f) => formData.append('files', f));
+    return api.post(`${BASE}/extract-from-screenshot`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
+
   checkATSScore: (payload) => api.post(`${BASE}/ats-score`, payload).then((r) => r.data),
 
   generateDraft: (payload) => api.post(`${BASE}/draft`, payload).then((r) => r.data),

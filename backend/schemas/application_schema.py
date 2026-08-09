@@ -103,3 +103,10 @@ class ATSScoreResponse(BaseModel):
     matched_keywords: List[str] = Field(default_factory=list)
     missing_keywords: List[str] = Field(default_factory=list)
     is_low_score: bool = Field(default=False, description="True if score is below 80")
+
+
+class JobDetailsExtractionResponse(BaseModel):
+    company_name: str = Field(default="", description="Extracted company name")
+    job_title: str = Field(default="", description="Extracted job title")
+    hr_email: str = Field(default="", description="Extracted HR/recruiter email address")
+    job_description: str = Field(default="", description="Extracted job description text")

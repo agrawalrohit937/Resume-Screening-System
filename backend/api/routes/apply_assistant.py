@@ -2,7 +2,8 @@
 API routes for the AI Apply Assistant.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status as http_status, File, UploadFile, Request
 from fastapi.responses import FileResponse
 
 from api.deps import get_current_user, get_user_repo
@@ -17,6 +18,7 @@ from schemas.application_schema import (
     ATSResultSummary,
     ATSScoreRequest,
     ATSScoreResponse,
+    JobDetailsExtractionResponse,
 )
 from services.apply_assistant_service import ApplyAssistantService
 from repositories.resume_repo import ResumeRepository
@@ -28,6 +30,60 @@ service = ApplyAssistantService()
 
 def _user_id(current_user) -> str:
     return str(getattr(current_user, "id", None) or current_user["_id"])
+
+
+@router.post("/extract-from-screenshot", response_model=JobDetailsExtractionResponse)
+@router.post("/extract-job-details", response_model=JobDetailsExtractionResponse)
+async def extract_from_screenshot(
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    """
+    Extract job posting details (company_name, job_title, hr_email, job_description)
+    from one or multiple screenshot images using AI Vision OCR.
+    """
+    form = await request.form()
+    upload_list = []
+
+    for key in form.keys():
+        values = form.getlist(key)
+        for val in values:
+            if hasattr(val, "read") and hasattr(val, "filename") and val.filename:
+                upload_list.append(val)
+
+    if not upload_list:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="At least one screenshot image file is required.",
+        )
+
+    image_data_list = []
+    for f in upload_list:
+        filename = f.filename or ""
+        ext = filename.split(".")[-1].lower() if "." in filename else ""
+        content_type = getattr(f, "content_type", "") or ""
+
+        content = await f.read()
+        if not content:
+            continue
+
+        mime_type = content_type if content_type.startswith("image/") else f"image/{ext if ext != 'jpg' else 'jpeg'}"
+        image_data_list.append((content, mime_type))
+
+    if not image_data_list:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="No valid image content found in uploaded files.",
+        )
+
+    extracted_dict = await service.extract_job_details_from_screenshots(image_data_list)
+
+    return JobDetailsExtractionResponse(
+        company_name=extracted_dict.get("company_name", "") or "",
+        job_title=extracted_dict.get("job_title", "") or "",
+        hr_email=extracted_dict.get("hr_email", "") or "",
+        job_description=extracted_dict.get("job_description", "") or "",
+    )
 
 
 def _to_draft_response(doc: dict) -> ApplyDraftResponse:
@@ -128,7 +184,7 @@ async def get_draft(application_id: str, current_user=Depends(get_current_user))
     return _to_draft_response(doc)
 
 
-@router.get("/active-draft", response_model=ApplyDraftResponse)
+@router.get("/active-draft", response_model=Optional[ApplyDraftResponse])
 async def get_active_draft(current_user=Depends(get_current_user)):
     items, total = await service.get_history(user_id=_user_id(current_user), page=1, page_size=5)
     for item in items:
@@ -136,7 +192,7 @@ async def get_active_draft(current_user=Depends(get_current_user)):
             full_doc = await service.repo.get_by_id(str(item["_id"]), _user_id(current_user))
             if full_doc:
                 return _to_draft_response(full_doc)
-    raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="No active draft found")
+    return None
 
 
 @router.get("/draft/{application_id}/preview")
