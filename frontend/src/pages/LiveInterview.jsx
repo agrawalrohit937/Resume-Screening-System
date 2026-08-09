@@ -369,6 +369,14 @@ export default function LiveInterviewV2() {
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const spokenForQRef = useRef(-1)
 
+  const handleCheatingEvent = useCallback((event) => {
+    // if (session.phase !== SESSION_PHASE.ACTIVE) return
+    session.recordCheatingEvent(event)
+    setCurrentWarning(event)
+    clearTimeout(warningTimerRef.current)
+    warningTimerRef.current = setTimeout(() => setCurrentWarning(null), 6000)
+  }, [session])
+
   const fsGate = useFullscreenImmersive({
     onUnexpectedExit: () => handleCheatingEvent({ event_type: 'fullscreen_exit', severity: 'high', details: 'Exited full-screen mode' }),
   })
@@ -469,13 +477,6 @@ export default function LiveInterviewV2() {
     }
   }, [session.phase])
 
-  const handleCheatingEvent = useCallback((event) => {
-    // if (session.phase !== SESSION_PHASE.ACTIVE) return
-    session.recordCheatingEvent(event)
-    setCurrentWarning(event)
-    clearTimeout(warningTimerRef.current)
-    warningTimerRef.current = setTimeout(() => setCurrentWarning(null), 6000)
-  }, [session])
 
   const handleSubmitAnswer = useCallback(async ({ answerText: text, answerSource }) => {
     tts.stop()
