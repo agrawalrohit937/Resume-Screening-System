@@ -551,6 +551,7 @@ def evaluate_knockout_math(extracted_data: dict, jd_text: str, skill_universe: L
     - Experience (30%)
     - Education (20%)
     """
+    extracted_data = extracted_data or {}
     cand_skills = extracted_data.get("skills", []) or extracted_data.get("technical_skills", [])
     jd_skills = skill_universe or extract_skills_deterministic(jd_text)
 

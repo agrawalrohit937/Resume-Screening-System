@@ -167,7 +167,7 @@ def get_tfidf_similarity(text1: str, text2: str) -> float:
             stop_words="english",
             sublinear_tf=True,      # dampen high-freq terms — better for short docs
             min_df=1,
-            max_df=0.95,
+            max_df=1.0,
         )
         matrix = vectorizer.fit_transform([t1, t2])
         sim = cosine_similarity(matrix[0:1], matrix[1:2])[0][0]

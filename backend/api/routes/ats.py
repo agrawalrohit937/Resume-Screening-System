@@ -84,13 +84,13 @@ async def match_resume(
         str(current_user.id),
     )
 
-    if not resume or resume.status != ResumeStatus.PARSED:
+    if not resume or resume.status != ResumeStatus.PARSED or not resume.parsed_data:
         raise HTTPException(
             status_code=404,
             detail="Parsed resume not found.",
         )
 
-    raw_text = (resume.parsed_data.raw_text or "").strip()
+    raw_text = (resume.parsed_data.raw_text or "").strip() if resume.parsed_data else ""
 
     if not raw_text:
         raise HTTPException(
@@ -113,7 +113,7 @@ async def match_resume(
         found = needle.lower() in raw_text.lower()
         print(f"    {'✅' if found else '❌'} '{needle}': {'FOUND' if found else 'NOT FOUND'}")
     # Check all extracted skills from the parsed data
-    extracted_skills = resume.parsed_data.skills or []
+    extracted_skills = (resume.parsed_data.skills if resume.parsed_data else []) or []
     print(f"  Extracted skills from parser: {extracted_skills}")
     print("=" * 80 + "\n")
 
@@ -140,9 +140,10 @@ async def match_resume(
         logger.exception("ATS graph execution failed", error=str(e))
         print(f"[ATS ROUTE ERROR] ats_engine.ainvoke failed: {e}")
         traceback.print_exc()
+        err_detail = str(e).strip() or repr(e)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to analyze resume: {str(e)}",
+            detail=f"Failed to analyze resume: {err_detail}",
         )
 
     processing_time_ms = int((time.perf_counter() - t_start) * 1000)
@@ -396,28 +397,28 @@ def _build_ats_response(result_id: str, resume_id: str, job_title: str, data: di
         result_id=result_id,
         resume_id=resume_id,
         job_title=job_title,
-        final_score=data["final_score"],
-        recommendation=data["recommendation"],
-        matched_skills=data["matched_skills"],
-        missing_skills=data["missing_skills"],
-        experience_score=data["experience_score"],
-        education_score=data["education_score"],
-        feedback_suggestions=data["feedback_suggestions"],
-        processing_time_ms=data["processing_time_ms"],
+        final_score=float(data.get("final_score") or 0.0),
+        recommendation=str(data.get("recommendation") or "Low Match"),
+        matched_skills=data.get("matched_skills") or [],
+        missing_skills=data.get("missing_skills") or [],
+        experience_score=float(data.get("experience_score") or 0.0),
+        education_score=float(data.get("education_score") or 0.0),
+        feedback_suggestions=data.get("feedback_suggestions") or [],
+        processing_time_ms=int(data.get("processing_time_ms") or 0),
 
-        # Strict engine fields — see schemas/ats_schema_ADDITIONS.py
-        is_knockout=data["is_knockout"],
-        knockout_reasons=data["knockout_reasons"],
-        knockout_advisories=data["knockout_advisories"],
-        strict_ats_score=data["strict_ats_score"],
-        strict_matched_keywords=data["strict_matched_keywords"],
-        strict_missing_keywords=data["strict_missing_keywords"],
-        parsing_is_healthy=data["parsing_is_healthy"],
-        parsing_confidence=data["parsing_confidence"],
-        parsing_warnings=data["parsing_warnings"],
+        # Strict engine fields
+        is_knockout=bool(data.get("is_knockout", False)),
+        knockout_reasons=data.get("knockout_reasons") or [],
+        knockout_advisories=data.get("knockout_advisories") or [],
+        strict_ats_score=float(data.get("strict_ats_score") or 0.0),
+        strict_matched_keywords=data.get("strict_matched_keywords") or [],
+        strict_missing_keywords=data.get("strict_missing_keywords") or [],
+        parsing_is_healthy=bool(data.get("parsing_is_healthy", True)),
+        parsing_confidence=float(data.get("parsing_confidence") if data.get("parsing_confidence") is not None else 1.0),
+        parsing_warnings=data.get("parsing_warnings") or [],
 
-        # HITL wizard support — see resume_schema_ADDITIONS_v2_hitl.py, section 3
-        contact_snapshot=data["contact_snapshot"],
+        # HITL wizard support
+        contact_snapshot=data.get("contact_snapshot"),
     )
 
 
