@@ -25,6 +25,7 @@ from workflows.ats_graph import ats_engine
 from services.strict_ats_service import run_strict_ats_check
 from utils.validators import validate_object_id
 import time
+import traceback
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -117,26 +118,35 @@ async def match_resume(
     print("=" * 80 + "\n")
 
     # Save Job Description
-    jd = await result_repo.create_job_description({
-        "user_id": str(current_user.id),
-        "title": payload.job_title,
-        "description": payload.job_description,
-    })
+    try:
+        jd = await result_repo.create_job_description({
+            "user_id": str(current_user.id),
+            "title": payload.job_title,
+            "description": payload.job_description,
+        })
+    except Exception as e:
+        logger.exception("Failed to save Job Description in database", error=str(e))
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save Job Description: {str(e)}",
+        )
 
     t_start = time.perf_counter()
 
     try:
         graph_result = await ats_engine.ainvoke({
-
             "resume_text": raw_text,
             "jd_text": payload.job_description,
-            "required_skills": payload.required_skills,   # Optional skills from UI
+            "required_skills": payload.required_skills or [],   # Optional skills from UI
         })
-    except Exception:
-        logger.exception("ATS graph execution failed")
+    except Exception as e:
+        logger.exception("ATS graph execution failed", error=str(e))
+        print(f"[ATS ROUTE ERROR] ats_engine.ainvoke failed: {e}")
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail="Failed to analyze resume.",
+            detail=f"Failed to analyze resume: {str(e)}",
         )
 
     processing_time_ms = int((time.perf_counter() - t_start) * 1000)
