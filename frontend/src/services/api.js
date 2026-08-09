@@ -91,7 +91,15 @@ api.interceptors.response.use(
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
 
-          window.location.href = "/login";
+          // CRITICAL FIX: Never execute window.location.href hard reloads for /auth/me
+          // or when already on /login or public landing pages! Hard reloads force
+          // AuthContext to remount, call /auth/me, get 401, and reload in an infinite loop.
+          const isAuthMe = originalRequest?.url?.includes('/auth/me');
+          const isAlreadyOnLogin = typeof window !== 'undefined' && window.location.pathname === '/login';
+
+          if (!isAuthMe && !isAlreadyOnLogin) {
+            window.location.href = "/login";
+          }
           return Promise.reject(err);
         }
 
@@ -133,7 +141,12 @@ api.interceptors.response.use(
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
 
-        window.location.href = "/login?reason=auth_expired";
+        const isAuthMe = originalRequest?.url?.includes('/auth/me');
+        const isAlreadyOnLogin = typeof window !== 'undefined' && window.location.pathname === '/login';
+
+        if (!isAuthMe && !isAlreadyOnLogin) {
+          window.location.href = "/login?reason=auth_expired";
+        }
 
         return Promise.reject(refreshError);
       }
