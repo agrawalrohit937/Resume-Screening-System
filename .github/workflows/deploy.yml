@@ -3,7 +3,8 @@ name: Deploy CareerShala API to Azure
 on:
   push:
     branches:
-      - main  # Jab bhi 'main' branch par code aayega, pipeline chalegi
+      - main
+      - feature/RSS-28-live-interview  # Jab bhi 'main' branch par code aayega, pipeline chalegi
 
 jobs:
   build-and-deploy:
