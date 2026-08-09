@@ -114,6 +114,10 @@ export default function Login() {
           <img
             src="/logo_t.png"
             alt="CareerShala Logo"
+            width={40}
+            height={40}
+            decoding="async"
+            loading="eager"
             className="w-10 h-10 object-contain shrink-0"
           />
           <span className="font-display text-[22px] font-bold text-[#111827]">
@@ -159,6 +163,10 @@ export default function Login() {
             <img
               src="/logo_t.png"
               alt="CareerShala Logo"
+              width={36}
+              height={36}
+              decoding="async"
+              loading="eager"
               className="w-9 h-9 object-contain shrink-0"
             />
             <span className="font-display text-[19px] font-bold text-[#111827]">

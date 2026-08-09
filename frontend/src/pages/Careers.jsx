@@ -105,7 +105,7 @@ export default function Careers() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group shrink-0">
             <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:shadow-md group-hover:scale-105 transition-all duration-300 p-1.5">
-              <img src="/logo_t.png" alt="CareerShala Logo" className="w-full h-full object-contain" />
+              <img src="/logo_t.png" alt="CareerShala Logo" width={40} height={40} decoding="async" loading="eager" className="w-full h-full object-contain" />
             </div>
             <span className="text-xl font-extrabold tracking-tight text-slate-900 group-hover:opacity-80 transition-opacity">
               Career<span className="text-[#2E9BDA]">Shala</span> <span className="text-xs font-bold text-slate-400 font-mono">/ Careers</span>

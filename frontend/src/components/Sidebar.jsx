@@ -292,7 +292,11 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         >
           <img 
             src="/logo_t.png"
-            alt="CareerShala" 
+            alt="CareerShala"
+            width={36}
+            height={36}
+            decoding="async"
+            loading="eager" 
             className="w-9 h-9 object-contain shrink-0 group-hover:scale-105 transition-transform" 
           />
           
