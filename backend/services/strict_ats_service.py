@@ -527,10 +527,14 @@ def compute_vector_similarity(resume_text: str, jd_text: str) -> float:
         try:
             response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=12)
             if response.status_code == 200:
-                similarity_score = response.json()[0]
-                val = float(similarity_score)
-                val_pct = val * 100.0 if val <= 1.0 else val
-                return max(0.0, min(100.0, round(val_pct, 1)))
+                raw_json = response.json()
+                if isinstance(raw_json, list) and raw_json:
+                    val_item = raw_json[0]
+                    if isinstance(val_item, list) and val_item:
+                        val_item = val_item[0]
+                    val = float(val_item)
+                    val_pct = val * 100.0 if val <= 1.0 else val
+                    return max(0.0, min(100.0, round(val_pct, 1)))
             else:
                 logger.warning("HuggingFace API returned non-200 status", status=response.status_code, response=response.text)
         except Exception as e:
