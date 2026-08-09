@@ -469,13 +469,13 @@ export default function LiveInterviewV2() {
     }
   }, [session.phase])
 
-  function handleCheatingEvent(event) {
+  const handleCheatingEvent = useCallback((event) => {
     // if (session.phase !== SESSION_PHASE.ACTIVE) return
     session.recordCheatingEvent(event)
     setCurrentWarning(event)
     clearTimeout(warningTimerRef.current)
     warningTimerRef.current = setTimeout(() => setCurrentWarning(null), 6000)
-  }
+  }, [session])
 
   const handleSubmitAnswer = useCallback(async ({ answerText: text, answerSource }) => {
     tts.stop()

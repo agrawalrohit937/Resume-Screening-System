@@ -12,6 +12,7 @@ export default function ScoreGauge({ score = 0, maxScore = 10, size = 160, label
   const offset = arcLength - (animated / (maxScore || 1)) * arcLength
 
   useEffect(() => {
+    let rafId = null
     const t = setTimeout(() => {
       const start = Date.now()
       const duration = 1400
@@ -19,11 +20,14 @@ export default function ScoreGauge({ score = 0, maxScore = 10, size = 160, label
         const p = Math.min((Date.now() - start) / duration, 1)
         const ease = 1 - Math.pow(1 - p, 4)
         setAnimated(parseFloat((score * ease).toFixed(2)))
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) rafId = requestAnimationFrame(tick)
       }
-      requestAnimationFrame(tick)
+      rafId = requestAnimationFrame(tick)
     }, 200)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
   }, [score])
 
   const palette = (p) => {
