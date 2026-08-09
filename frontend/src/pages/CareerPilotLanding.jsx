@@ -63,7 +63,6 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { verifyCertificate } from '../services/certificateApi';
 
 // ── Motion Animation Variants ───────────────────────────────────────────────
 const customEasing = [0.16, 1, 0.3, 1];
@@ -150,9 +149,6 @@ export default function CareerPilotLanding() {
   // State
   const [isAnnual, setIsAnnual] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [certQuery, setCertQuery] = useState('');
-  const [certResult, setCertResult] = useState(null);
-  const [verifyingCert, setVerifyingCert] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribing, setSubscribing] = useState(false);
@@ -162,27 +158,6 @@ export default function CareerPilotLanding() {
   const [analyzingPlayground, setAnalyzingPlayground] = useState(false);
   const [playgroundResult, setPlaygroundResult] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
-
-  // Handlers
-  const handleVerifyCert = async (e) => {
-    e.preventDefault();
-    if (!certQuery.trim()) return;
-    setVerifyingCert(true);
-    setCertResult(null);
-    try {
-      const data = await verifyCertificate(certQuery.trim());
-      setCertResult({ success: true, data });
-      toast.success('Certificate verified valid! 🏆');
-    } catch (err) {
-      setCertResult({
-        success: false,
-        error: err.response?.data?.detail || 'Certificate ID not found or invalid.',
-      });
-      toast.error('Verification failed');
-    } finally {
-      setVerifyingCert(false);
-    }
-  };
 
   const handleNewsletterSubmit = (e) => {
     e.preventDefault();
@@ -1233,73 +1208,6 @@ export default function CareerPilotLanding() {
         </div>
       </motion.section>
 
-      {/* ── INSTANT CERTIFICATE VERIFIER WIDGET ──────────────────────────────── */}
-      <motion.section initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} variants={scaleUp} id="verify" className="relative z-10 py-12 md:py-16 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="p-6 sm:p-10 rounded-[2.5rem] bg-white/90 backdrop-blur-xl border border-white shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-[#2E9BDA]/10 transition-colors duration-1000" />
-
-          <div className="relative z-10 space-y-6 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase tracking-widest shadow-sm">
-              <Award size={14} /> Tamper-Proof Verification
-            </div>
-
-            <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-              Verify Any CareerShala Certificate
-            </h2>
-
-            <p className="text-slate-500 text-base font-medium leading-relaxed">
-              Employers, hiring managers, and recruiters can enter any official CareerShala Certificate ID below to verify its authenticity in real time.
-            </p>
-
-            <form onSubmit={handleVerifyCert} className="flex flex-col sm:flex-row gap-4 pt-2">
-              <input
-                type="text"
-                value={certQuery}
-                onChange={(e) => setCertQuery(e.target.value)}
-                placeholder="e.g. CERT-PY-88219"
-                className="flex-1 px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-900 font-mono font-bold text-sm placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#2E9BDA] focus:ring-2 focus:ring-[#2E9BDA]/20 focus:bg-white transition-all shadow-sm"
-              />
-              <button
-                type="submit"
-                disabled={verifyingCert}
-                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:shadow-2xl hover:shadow-slate-900/40 transition-all flex items-center justify-center gap-2 shrink-0 hover:-translate-y-1"
-              >
-                {verifyingCert ? 'Verifying...' : 'Verify Now'}
-                <Search size={16} />
-              </button>
-            </form>
-
-            <AnimatePresence>
-              {certResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -10, height: 0 }}
-                  className={`p-5 rounded-2xl border text-sm font-medium mt-4 shadow-sm ${
-                    certResult.success
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                      : 'bg-rose-50 border-rose-200 text-rose-900'
-                  }`}
-                >
-                  {certResult.success ? (
-                    <div className="space-y-2">
-                      <p className="font-black text-emerald-800 flex items-center gap-2 text-base">
-                        <CheckCircle2 size={20} /> Official Certificate Verified Valid
-                      </p>
-                      <p className="text-xs text-slate-600 font-bold">
-                        Issuer: CareerShala · Issued to candidate with verified ID: <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-100">{certQuery}</span>
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="font-bold flex items-center gap-2"><XSquare size={18} /> {certResult.error}</p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </motion.section>
-
       {/* ── PRICING SECTION ─────────────────────────────────────────────────── */}
       <motion.section initial="hidden" whileInView="visible" viewport={{ once: true }} variants={staggerContainer} id="pricing" className="relative z-10 pt-16 pb-12 md:pt-20 md:pb-16 bg-slate-900 text-white rounded-t-[2.5rem] sm:rounded-t-[3.5rem] mt-10">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1e3a5f] via-slate-900 to-slate-900 rounded-t-[2.5rem] sm:rounded-t-[3.5rem]" />
@@ -1561,7 +1469,6 @@ export default function CareerPilotLanding() {
               </h4>
               <ul className="space-y-3 font-medium text-xs text-slate-400">
                 <li><Link to="/recruiter" className="hover:text-white transition-colors flex items-center gap-1.5"><ChevronRight size={12} className="text-indigo-400" /> Talent Shortlist Dashboard</Link></li>
-                <li><a href="#verify" className="hover:text-white transition-colors flex items-center gap-1.5"><ChevronRight size={12} className="text-indigo-400" /> Verify QR Certificates</a></li>
                 <li><a href="#comparison" className="hover:text-white transition-colors flex items-center gap-1.5"><ChevronRight size={12} className="text-indigo-400" /> Feature Matrix</a></li>
                 <li><Link to="/support" className="hover:text-white transition-colors flex items-center gap-1.5"><ChevronRight size={12} className="text-indigo-400" /> Enterprise Hiring SLA</Link></li>
                 <li><Link to="/billing" className="hover:text-white transition-colors flex items-center gap-1.5"><ChevronRight size={12} className="text-indigo-400" /> Recruiter Billing Plans</Link></li>

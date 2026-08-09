@@ -10,6 +10,7 @@ import httpx
 import structlog
 
 from core.config import settings
+from core.llm_client import groq_key_pool
 
 logger = structlog.get_logger(__name__)
 
@@ -120,13 +121,11 @@ Evaluate strictly and return ONLY valid JSON — no markdown, no explanation, no
 
     # ── Groq API call ─────────────────────────────────────────────────────────
     async def _call_groq(self, prompt: str) -> Optional[str]:
-        key = getattr(settings, "GROQ_API_KEY", None)
+        async def _make_request(key: str) -> Optional[str]:
+            if not key:
+                logger.warning("GROQ_API_KEY not set — using heuristic evaluation")
+                return None
 
-        if not key:
-            logger.warning("GROQ_API_KEY not set — using heuristic evaluation")
-            return None
-
-        try:
             async with httpx.AsyncClient(timeout=25.0) as client:
                 r = await client.post(
                     GROQ_URL,
@@ -141,22 +140,20 @@ Evaluate strictly and return ONLY valid JSON — no markdown, no explanation, no
                         "temperature": 0.3,
                     },
                 )
-
                 data = r.json()
 
-                # 🔥 IMPORTANT FIX
                 if r.status_code != 200:
-                    logger.error("Groq API failed", status=r.status_code, response=data)
-                    return None
+                    raise RuntimeError(f"Groq HTTP {r.status_code}: {data}")
 
-                if "choices" not in data:
-                    logger.error("Groq invalid response", response=data)
-                    return None
+                if "choices" not in data or not data["choices"]:
+                    raise ValueError(f"Groq invalid response: {data}")
 
                 return data["choices"][0]["message"]["content"].strip()
 
+        try:
+            return await groq_key_pool.execute_async_with_fallback(_make_request)
         except Exception as e:
-            logger.error("Groq API error", error=str(e))
+            logger.error("Groq API error after rotation", error=str(e))
             return None
 
     # ── Parse LLM JSON response ───────────────────────────────────────────────

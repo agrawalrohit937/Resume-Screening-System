@@ -14,6 +14,7 @@ import httpx
 import structlog
 
 from core.config import settings
+from core.llm_client import groq_key_pool
 from config.db import get_database
 from models.certificate_model import CertificateRecord
 from repositories.resume_repo import ResumeRepository
@@ -348,7 +349,7 @@ GUIDELINES:
         messages.append({"role": "user", "content": message})
 
         # Try to stream using configured providers
-        if hasattr(settings, 'GROQ_API_KEY') and settings.GROQ_API_KEY:
+        if settings.groq_api_keys:
             async for chunk in self._stream_groq(messages):
                 yield chunk
         elif hasattr(settings, 'MISTRAL_API_KEY') and settings.MISTRAL_API_KEY:
@@ -374,40 +375,59 @@ GUIDELINES:
     # --- Provider SSE Stream Readers ---
 
     async def _stream_groq(self, messages: List[dict]) -> AsyncGenerator[str, None]:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                async with client.stream(
-                    "POST",
-                    GROQ_BASE,
-                    headers={
-                        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": GROQ_MODEL,
-                        "messages": messages,
-                        "stream": True,
-                        "temperature": 0.5,
-                        "max_tokens": 1000
-                    }
-                ) as r:
-                    async for line in r.aiter_lines():
-                        if not line.strip():
+        keys = settings.groq_api_keys
+        if not keys:
+            yield "\n[System Error: No Groq API keys configured]"
+            return
+
+        for attempt in range(len(keys)):
+            key = groq_key_pool.get_next_key()
+            if not key:
+                break
+            success = False
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with client.stream(
+                        "POST",
+                        GROQ_BASE,
+                        headers={
+                            "Authorization": f"Bearer {key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": GROQ_MODEL,
+                            "messages": messages,
+                            "stream": True,
+                            "temperature": 0.5,
+                            "max_tokens": 1000
+                        }
+                    ) as r:
+                        if r.status_code != 200:
+                            err_body = await r.aread()
+                            logger.warning("Groq stream key rate limited, rotating to next key", key_prefix=key[:8] + "...", status=r.status_code, error=err_body.decode("utf-8", errors="ignore"))
                             continue
-                        if line.startswith("data: "):
-                            data_str = line[6:].strip()
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                delta = data["choices"][0]["delta"]
-                                if "content" in delta:
-                                    yield delta["content"]
-                            except Exception:
-                                pass
-        except Exception as e:
-            logger.error("Groq stream error", error=str(e))
-            yield f"\n[System Error streaming response from Groq: {str(e)}]"
+
+                        success = True
+                        async for line in r.aiter_lines():
+                            if not line.strip():
+                                continue
+                            if line.startswith("data: "):
+                                data_str = line[6:].strip()
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    data = json.loads(data_str)
+                                    delta = data["choices"][0]["delta"]
+                                    if "content" in delta:
+                                        yield delta["content"]
+                                except Exception:
+                                    pass
+                        if success:
+                            return
+            except Exception as e:
+                logger.error("Groq stream error", key_prefix=key[:8] + "...", error=str(e))
+                if attempt == len(keys) - 1:
+                    yield f"\n[System Error streaming response from Groq: {str(e)}]"
 
     async def _stream_mistral(self, messages: List[dict]) -> AsyncGenerator[str, None]:
         try:

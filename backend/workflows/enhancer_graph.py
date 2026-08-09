@@ -14,15 +14,14 @@ v3 changes (HITL wizard):
     to risk that when we already have the verbatim, human-provided value.
 """
 
-from groq import RateLimitError
-from langgraph.graph import StateGraph, END
-from typing import TypedDict, List, Optional, Dict, Any
+import json
 import re
+from typing import TypedDict, List, Optional, Dict, Any
 
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+from google import genai
+from langgraph.graph import StateGraph, END
+from core.llm_client import gemini_key_pool
 from schemas.enhancement_schema import EnhancedResumeSection
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # ── State ─────────────────────────────────────────────────────────────────────
 class EnhancementState(TypedDict):
@@ -104,155 +103,104 @@ def _merge_verified_links(enhanced_data: dict, links: Optional[Dict[str, Optiona
     return enhanced_data
 
 
-# ── Node 1: Enhance Resume via LLM ────────────────────────────────────────────
+# ── Node 1: Enhance Resume via Gemini LLM ─────────────────────────────────────
 async def enhance_resume_content(state: EnhancementState) -> dict:
     """
-    Calls Groq LLM with structured output (full EnhancedResumeSection) to
-    enhance the resume.  The aggressive STRICT PARSER MODE prompt instructs
-    the model to copy every bullet point verbatim and never truncate arrays.
-    Falls back with a RuntimeError if the LLM fails after retries.
+    Calls Google Gemini LLM (gemini-1.5-flash) with structured JSON output and
+    automatic 5-key pool rotation to enhance the resume.
     """
-    llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.0)  # 0.0 = max determinism
-    structured_llm = llm.with_structured_output(EnhancedResumeSection)
-
-    prompt = ChatPromptTemplate.from_messages([
-    (
-    "system",
-    """
-You are an ATS Resume Data Extraction and Optimization API. Your ONLY job is to output a
-clean JSON representing the candidate's resume while upgrading the professional summary
-and skills list.
-
-=========================
-STRICT PARSER MODE (DO NOT TRUNCATE ARRAYS)
-=========================
-1. You are acting as a strict JSON structuring engine.
-2. You MUST extract and map EVERY single project, EVERY single education entry, and
-   EVERY single work experience from the raw text into the JSON schema. Omitting even
-   one entry is a critical failure.
-3. For the `highlights` arrays in Experience and Projects: You are FORBIDDEN from
-   summarizing or dropping bullet points. You must copy every single bullet point from
-   the raw text exactly as written. If the raw text has 4 bullet points for a project,
-   your JSON array MUST contain exactly 4 strings. Count them before you output.
-4. DO NOT drop contact information (email, phone, linkedin, github, portfolio).
-5. Certifications must be output as a flat list of strings — copy them verbatim.
-6. Skills must be a flat list of strings without any category prefixes. Output just the raw skill names.
-
-=========================
-CRITICAL: ATS SCORE MUST NEVER DECREASE
-=========================
-- You MUST preserve EVERY single skill, technology, tool, programming language, framework,
-  and domain keyword from the original resume. NOTHING may be removed.
-- The ATS match score of the output MUST be >= the original. You may ADD keywords from
-  the JD and from the Human-Verified Ground Truth, but you must NEVER drop any existing
-  keyword.
-- This is the single most important rule. Every keyword that existed in the original
-  resume must also exist in the output — even if it seems redundant, minor, or obvious.
-
-=========================
-CRITICAL RULE — ZERO DATA DELETION
-=========================
-- You MUST preserve every Experience, Project, and Education entry EXACTLY.
-- DO NOT summarize, shorten, merge, or remove ANY bullet points.
-- Every technical term, metric, tool name, and domain-specific jargon MUST survive in your output.
-
-=========================
-PRESERVE UNIQUE PROFESSIONAL IDENTITY (UNIVERSAL RULE)
-=========================
-- Carefully analyze the candidate's raw text to determine their exact profession, seniority level, and specific niche.
-- NEVER dilute highly specialized expertise into generic titles. For example:
-  * If they are an "Embedded Systems C++ Engineer", do NOT change it to "Software Developer".
-  * If they are a "Pediatric ICU Nurse", do NOT change it to "Healthcare Professional".
-  * If they are a "B2B SaaS Enterprise Sales Executive", do NOT change it to "Sales Representative".
-- You may add keywords from the Job Description to make it ATS-friendly, but you MUST fiercely protect their core specialization and domain-specific terminology.
-
-=========================
-SKILLS HANDLING (CATEGORISED DICTIONARY)
-=========================
-- Output the `skills` field as a JSON object (dictionary), NOT a list.
-- Keys are logical category names that make sense for this candidate's specific industry (e.g., "Design Tools", "Frontend", "Medical Procedures", "Accounting Software").
-- Values are arrays of raw skill name strings.
-- YOU MUST INCLUDE EVERY SKILL FROM THE ORIGINAL RESUME in the output skills dictionary.
-  Do not drop any skill, even if you think it is not relevant to the JD.
-- Inject JD missing keywords into the most logical category only if the candidate has clear evidence for them.
-
-=========================
-HUMAN-VERIFIED DATA (MANDATORY ENFORCEMENT)
-=========================
-The sections below contain Human-Verified Ground Truth data that the user explicitly
-confirmed. You MUST treat this data as factual and include it in the output.
-
-- Verified Skills: The user confirmed they possess these skills. You MUST include EVERY
-  single verified skill in the `skills` dictionary under the most appropriate category.
-  Do not skip any. Never drop a verified skill.
-- Impact Metrics: The user provided these real metrics. Append ONE new bullet point at
-  the end of the most relevant Experience or Project highlights list for each metric.
-  Do not alter existing bullets — only append.
-
-=========================
-YOU MUST IMPROVE (only these fields)
-=========================
-1. Write a professional headline (`target_role`). It MUST accurately reflect their specific niche and experience level based on their raw resume, rather than defaulting to generic industry titles.
-2. Rewrite the Professional Summary to be highly ATS-friendly and incorporate missing keywords, but DO NOT erase their unique achievements and professional identity.
-3. Populate `skills` as a categorised dictionary, reordering by JD relevance.
-
-Return ONLY valid JSON matching the EnhancedResumeSection schema.
-"""
-    ),
-    (
-    "human",
-    """
-Resume Raw Text:
-{resume_text}
-
-Job Description:
-{jd_text}
-
-Required Skills:
-{required_skills}
-
-Strict-ATS Missing Keywords:
-{strict_missing_keywords}
-
-Human-Verified Ground Truth (YOU MUST INCLUDE ALL OF THESE IN THE OUTPUT):
-Verified Skills (user confirmed they possess these — include every one): {verified_skills}
-Impact Metrics:
-{impact_metrics}
-"""
-    )
-    ])
-
-    chain = prompt | structured_llm
-
     user_verified = state.get("user_verified") or {}
     verified_skills = user_verified.get("verified_skills") or []
     impact_metrics = user_verified.get("impact_metrics") or []
     verified_links = user_verified.get("links") or None
 
-    try:
-        # Retry-enabled function call
-        result = await _call_llm_with_retry(
-            chain,
-            {
-                "resume_text": state["resume_text"],
-                "jd_text": state.get("jd_text", ""),
-                "required_skills": ", ".join(state.get("required_skills", []))
-                    if state.get("required_skills")
-                    else "Not provided",
-                "strict_missing_keywords": ", ".join(state.get("strict_missing_keywords", []))
-                    if state.get("strict_missing_keywords")
-                    else "None provided",
-                "verified_skills": _format_verified_skills(verified_skills),
-                "impact_metrics": _format_impact_metrics(impact_metrics),
-            },
-        )
-        enhanced_dict = result.model_dump()
+    req_skills_str = ", ".join(state.get("required_skills", [])) if state.get("required_skills") else "Not provided"
+    strict_missing_str = ", ".join(state.get("strict_missing_keywords", [])) if state.get("strict_missing_keywords") else "None provided"
+    ver_skills_str = _format_verified_skills(verified_skills)
+    imp_metrics_str = _format_impact_metrics(impact_metrics)
 
+    prompt_text = f"""You are an ATS Resume Data Extraction and Optimization API. Your ONLY job is to output a clean JSON representing the candidate's resume while upgrading the professional summary and skills list.
+
+=========================
+STRICT PARSER MODE (DO NOT TRUNCATE ARRAYS)
+=========================
+1. You are acting as a strict JSON structuring engine.
+2. You MUST extract and map EVERY single project, EVERY single education entry, and EVERY single work experience from the raw text into the JSON schema. Omitting even one entry is a critical failure.
+3. For the `highlights` arrays in Experience and Projects: Copy every single bullet point from the raw text exactly as written.
+4. DO NOT drop contact information (email, phone, linkedin, github, portfolio).
+5. Certifications must be output as a flat list of strings — copy them verbatim.
+6. Output the `skills` field as a JSON object (dictionary) mapping logical categories (e.g. "Programming Languages", "Frameworks & Tools") to arrays of skill strings.
+
+=========================
+CRITICAL: ATS SCORE MUST NEVER DECREASE
+=========================
+- You MUST preserve EVERY single skill, technology, tool, programming language, framework, and domain keyword from the original resume. NOTHING may be removed.
+- Include all Human-Verified Ground Truth skills in the `skills` dictionary.
+
+=========================
+YOU MUST IMPROVE (only these fields)
+=========================
+1. Write a professional headline (`target_role`) matching their specific niche.
+2. Rewrite the Professional Summary to be highly ATS-friendly and incorporate missing keywords without erasing identity.
+3. Populate `skills` as a categorised dictionary, reordering by JD relevance.
+
+=========================
+INPUT DATA
+=========================
+Resume Raw Text:
+{state["resume_text"]}
+
+Job Description:
+{state.get("jd_text", "")}
+
+Required Skills:
+{req_skills_str}
+
+Strict-ATS Missing Keywords:
+{strict_missing_str}
+
+Human-Verified Ground Truth:
+Verified Skills: {ver_skills_str}
+Impact Metrics:
+{imp_metrics_str}
+
+Output ONLY valid JSON matching this schema structure:
+{{
+  "contact": {{"full_name": "", "email": "", "phone": "", "location": "", "linkedin": "", "github": "", "portfolio": ""}},
+  "target_role": "",
+  "summary": "",
+  "skills": {{"Category Name": ["skill1", "skill2"]}},
+  "experience": [{{"company": "", "role": "", "dates": "", "location": "", "highlights": [""]}}],
+  "projects": [{{"title": "", "technologies": "", "dates": "", "highlights": [""]}}],
+  "education": [{{"institution": "", "degree": "", "dates": "", "location": "", "details": ""}}],
+  "certifications": [""]
+}}
+"""
+
+    async def _enhance_with_gemini(client: genai.Client):
+        if not client:
+            raise ValueError("No Gemini API key available")
+        
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt_text,
+            config={"response_mime_type": "application/json"}
+        )
+        if not response or not response.text:
+            raise ValueError("Empty response from Gemini")
+
+        raw_text = response.text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+
+        return json.loads(raw_text)
+
+    try:
+        enhanced_dict = await gemini_key_pool.execute_async_with_fallback(_enhance_with_gemini)
     except Exception as e:
-        print(f"[EnhancerGraph] LLM Enhancement Error after retries: {e}")
-        raise RuntimeError(
-            "Unable to enhance the resume using the AI model."
-        ) from e
+        print(f"[EnhancerGraph] Gemini LLM Enhancement Error after retries: {e}")
+        raise RuntimeError("Unable to enhance the resume using the Gemini AI model.") from e
 
     # ── Python Bullet Restore ─────────────────────────────────────────────────
     # The LLM may truncate highlights even with strict prompting.

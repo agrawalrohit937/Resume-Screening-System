@@ -73,26 +73,77 @@ def _register_fonts(template_dir: str, layout: dict) -> dict:
     return resolved
 
 
+def _draw_auto_scaled_text(
+    c: canvas.Canvas,
+    text: str,
+    x: float,
+    y: float,
+    font_name: str,
+    base_size: float,
+    min_size: float,
+    color: str,
+    align: str = "center",
+    max_width_pt: float = None,
+    max_size: float = None,
+) -> float:
+    """Calculates rendered text width using pdfmetrics.stringWidth and scales font
+    size down (or up towards max_size) to perfectly fit max_width_pt."""
+    font_size = base_size
+    if max_width_pt and max_width_pt > 0 and text:
+        cur_width = pdfmetrics.stringWidth(text, font_name, base_size)
+        if cur_width > max_width_pt:
+            scale = max_width_pt / cur_width
+            font_size = max(min_size, base_size * scale)
+        elif max_size and cur_width < max_width_pt * 0.7:
+            scale = (max_width_pt * 0.75) / cur_width
+            font_size = min(max_size, base_size * scale)
+
+    c.setFont(font_name, font_size)
+    c.setFillColor(HexColor(color))
+
+    if align == "center":
+        c.drawCentredString(x, y, text)
+    elif align == "right":
+        c.drawRightString(x, y, text)
+    else:
+        c.drawString(x, y, text)
+
+    return font_size
+
+
 def _draw_text_fields(c: canvas.Canvas, layout: dict, fonts: dict, context: dict,
                       page_width: float, page_height: float) -> None:
     for field_name, cfg in layout["text_fields"].items():
+        if field_name == "skill_name":
+            continue  # skill_name is drawn separately in _draw_skill_name with custom scaling/wrapping logic
+
         value = context.get(field_name)
         if value in (None, ""):
             continue  # field not provided for this certificate_type — skip silently
 
         x = cfg["x_frac"] * page_width
         y = cfg["y_frac"] * page_height
-        c.setFont(fonts[cfg["font"]], cfg["size"])
-        c.setFillColor(HexColor(cfg["color"]))
-
+        font_alias = fonts[cfg["font"]]
+        base_size = cfg["size"]
+        color = cfg["color"]
         align = cfg.get("align", "center")
         text = str(value)
-        if align == "center":
-            c.drawCentredString(x, y, text)
-        elif align == "right":
-            c.drawRightString(x, y, text)
+
+        max_width_frac = cfg.get("max_width_frac")
+        if max_width_frac:
+            max_width_pt = max_width_frac * page_width
+            min_size = cfg.get("min_size", 8)
+            max_size = cfg.get("max_size", base_size)
+            _draw_auto_scaled_text(c, text, x, y, font_alias, base_size, min_size, color, align, max_width_pt, max_size)
         else:
-            c.drawString(x, y, text)
+            c.setFont(font_alias, base_size)
+            c.setFillColor(HexColor(color))
+            if align == "center":
+                c.drawCentredString(x, y, text)
+            elif align == "right":
+                c.drawRightString(x, y, text)
+            else:
+                c.drawString(x, y, text)
 
 
 def _draw_image_fields(c: canvas.Canvas, layout: dict, context: dict,
@@ -111,6 +162,7 @@ def _draw_image_fields(c: canvas.Canvas, layout: dict, context: dict,
         except Exception as img_exc:
             logger.warning("Skipping image field (draw failed)", field=field_name, error=str(img_exc))
 
+
 def _draw_skill_name(
     c,
     layout,
@@ -128,11 +180,54 @@ def _draw_skill_name(
 
     x = cfg["x_frac"] * page_width
     y = cfg["y_frac"] * page_height
+    font_alias = fonts[cfg["font"]]
+    base_size = cfg.get("size", 12)
+    color = cfg.get("color", "#FFFFFF")
 
-    c.setFont(fonts[cfg["font"]], cfg["size"])
-    c.setFillColor(HexColor(cfg["color"]))
+    max_width_frac = cfg.get("max_width_frac", 0.138)
+    max_width_pt = max_width_frac * page_width
+    min_size = cfg.get("min_size", 7.5)
+    max_size = cfg.get("max_size", 13.5)
 
-    c.drawCentredString(x, y, skill)
+    cur_width = pdfmetrics.stringWidth(skill, font_alias, base_size)
+    words = skill.split()
+
+    # If text is multi-word and would shrink too much on a single line, wrap onto 2 lines
+    if len(words) >= 2 and (cur_width > max_width_pt * 1.35):
+        mid = len(words) // 2
+        line1 = " ".join(words[:mid])
+        line2 = " ".join(words[mid:])
+
+        w1 = pdfmetrics.stringWidth(line1, font_alias, base_size)
+        w2 = pdfmetrics.stringWidth(line2, font_alias, base_size)
+        max_w = max(w1, w2)
+
+        line_font_size = base_size
+        if max_w > max_width_pt:
+            line_font_size = max(min_size, base_size * (max_width_pt / max_w))
+
+        leading = line_font_size * 1.15
+        y1 = y + (leading * 0.4)
+        y2 = y - (leading * 0.6)
+
+        c.setFont(font_alias, line_font_size)
+        c.setFillColor(HexColor(color))
+        c.drawCentredString(x, y1, line1)
+        c.drawCentredString(x, y2, line2)
+    else:
+        _draw_auto_scaled_text(
+            c,
+            text=skill,
+            x=x,
+            y=y,
+            font_name=font_alias,
+            base_size=base_size,
+            min_size=min_size,
+            color=color,
+            align="center",
+            max_width_pt=max_width_pt,
+            max_size=max_size,
+        )
 
 
 def _draw_overlay(layout: dict, fonts: dict, context: dict,
