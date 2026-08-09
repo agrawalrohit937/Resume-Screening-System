@@ -208,7 +208,7 @@ export default function CareerPilotLanding() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group shrink-0">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:shadow-md group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
-              <img src="/logo_t.png" alt="CareerShala Logo" className="w-full h-full object-contain" />
+              <img src="/logo_t.png" alt="CareerShala Logo" width={40} height={40} decoding="async" loading="eager" className="w-full h-full object-contain" />
             </div>
             <span className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 group-hover:opacity-80 transition-opacity">
               Career<span className="text-[#2E9BDA]">Shala</span>
@@ -1406,7 +1406,7 @@ export default function CareerPilotLanding() {
             <div className="space-y-6 lg:col-span-2 pr-0 lg:pr-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-lg p-2">
-                  <img src="/logo_t.png" alt="CareerShala" className="w-full h-full object-contain" />
+                  <img src="/logo_t.png" alt="CareerShala" width={44} height={44} decoding="async" loading="lazy" className="w-full h-full object-contain" />
                 </div>
                 <span className="text-2xl font-black text-white tracking-tight">Career<span className="text-[#2E9BDA]">Shala</span></span>
               </div>

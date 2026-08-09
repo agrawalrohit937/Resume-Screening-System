@@ -75,7 +75,7 @@ function MobileHeader({ onMenuToggle }) {
 
           {/* Center: Brand Identity */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-center px-1">
-            <img src="/logo_t.png" alt="CareerShala" className="w-7 h-7 object-contain shrink-0" />
+            <img src="/logo_t.png" alt="CareerShala" width={28} height={28} decoding="async" loading="eager" className="w-7 h-7 object-contain shrink-0" />
             <div className="min-w-0 text-left">
               <p className="truncate text-sm font-extrabold text-slate-900 leading-tight">
                 Career<span className="text-[#2E9BDA]">Shala</span>

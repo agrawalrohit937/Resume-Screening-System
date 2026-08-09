@@ -106,8 +106,8 @@ export default function Loader({ show = true, onExitComplete }) {
                 muted={true}
                 loop
                 playsInline
-                preload="auto"
-                src={logoVideo}
+                preload="none"
+                src={show ? logoVideo : undefined}
                 onError={(e) => {
                   console.warn('[Loader] Video failed to load or autoplay:', e)
                   setVideoError(true)
@@ -125,7 +125,7 @@ export default function Loader({ show = true, onExitComplete }) {
                   transformOrigin: 'center center',
                 }}
               >
-                <source src={logoVideo} type="video/mp4" />
+                {show && <source src={logoVideo} type="video/mp4" />}
               </video>
             </motion.div>
 
