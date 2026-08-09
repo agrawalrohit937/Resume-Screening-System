@@ -23,8 +23,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 import structlog
-from services.nlp_extractor import extract_skills_deterministic
-from services.skill_ontology import evaluate_skill_fulfillment
+try:
+    from services.nlp_extractor import extract_skills_deterministic
+except Exception:
+    extract_skills_deterministic = None
+
+try:
+    from services.skill_ontology import evaluate_skill_fulfillment
+except Exception:
+    evaluate_skill_fulfillment = None
 
 logger = structlog.get_logger(__name__)
 
@@ -553,14 +560,36 @@ def evaluate_knockout_math(extracted_data: dict, jd_text: str, skill_universe: L
     """
     extracted_data = extracted_data or {}
     cand_skills = extracted_data.get("skills", []) or extracted_data.get("technical_skills", [])
-    jd_skills = skill_universe or extract_skills_deterministic(jd_text)
+    
+    # Defensive resolution to prevent NameError in production
+    extractor_func = extract_skills_deterministic
+    if extractor_func is None:
+        try:
+            from services.nlp_extractor import extract_skills_deterministic as extractor_func
+        except Exception:
+            extractor_func = lambda text: []
+
+    fulfillment_func = evaluate_skill_fulfillment
+    if fulfillment_func is None:
+        try:
+            from services.skill_ontology import evaluate_skill_fulfillment as fulfillment_func
+        except Exception:
+            fulfillment_func = lambda req, cand: ((req or "").lower() in [c.lower() for c in (cand or [])], None)
+
+    jd_skills = skill_universe or (extractor_func(jd_text) if extractor_func else [])
 
     matched_skills = []
     missing_skills = []
 
     if jd_skills:
         for req_skill in jd_skills:
-            is_fulfilled, _ = evaluate_skill_fulfillment(req_skill, cand_skills)
+            is_fulfilled = False
+            if fulfillment_func:
+                res = fulfillment_func(req_skill, cand_skills)
+                is_fulfilled = res[0] if isinstance(res, tuple) else bool(res)
+            else:
+                is_fulfilled = (req_skill or "").lower() in [c.lower() for c in (cand_skills or [])]
+
             if is_fulfilled:
                 matched_skills.append(req_skill)
             else:
