@@ -32,7 +32,11 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   } else {
-    console.warn('[API] No token found for:', config.url);
+    // Only warn for requests that expect authentication (exclude public/auth endpoints)
+    const isPublic = ['/auth/login', '/auth/signup', '/auth/google', '/auth/github', '/auth/linkedin', '/auth/otp', '/health'].some(path => config.url?.includes(path));
+    if (!isPublic) {
+      console.warn('[API] No token found for:', config.url);
+    }
   }
 
   return config;
@@ -65,10 +69,14 @@ api.interceptors.response.use(
     }
 
     // ===== REFRESH ONLY FOR 401 =====
+    // Endpoints that MUST NOT attempt refresh on 401 (e.g. login, refresh itself, OAuth initiation)
+    const nonRefreshable = ['/auth/login', '/auth/refresh', '/auth/signup', '/auth/otp', '/auth/google', '/auth/github', '/auth/linkedin'];
+    const isNonRefreshable = nonRefreshable.some(path => originalRequest?.url?.includes(path));
+
     if (
       err.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url.includes("/auth/")
+      !isNonRefreshable
     ) {
       originalRequest._retry = true;
 

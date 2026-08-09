@@ -23,6 +23,16 @@ import config.db
 from api.deps import get_db, get_current_user
 from models.user_model import UserModel
 
+sample_user_doc = {
+    "_id": "665f1a2b3c4d5e6f7a8b9c0d",
+    "email": "test@example.com",
+    "full_name": "Test User",
+    "role": "candidate",
+    "status": "active",
+    "created_at": "2026-07-27T00:00:00Z",
+    "updated_at": "2026-07-27T00:00:00Z",
+}
+
 sample_doc = {
     "_id": "665f1a2b3c4d5e6f7a8b9c0d",
     "user_id": "665f1a2b3c4d5e6f7a8b9c0d",
@@ -36,18 +46,24 @@ sample_doc = {
     "updated_at": "2026-07-27T00:00:00Z",
 }
 
+mock_user_col = MagicMock()
+mock_user_col.find_one = AsyncMock(return_value=sample_user_doc)
+mock_user_col.insert_one = AsyncMock(return_value=MagicMock(inserted_id="665f1a2b3c4d5e6f7a8b9c0d"))
+mock_user_col.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+mock_user_col.find_one_and_update = AsyncMock(return_value=sample_user_doc)
+
 mock_col = MagicMock()
 mock_col.find_one = AsyncMock(return_value=sample_doc)
-
 mock_col.insert_one = AsyncMock(return_value=MagicMock(inserted_id="665f1a2b3c4d5e6f7a8b9c0d"))
 mock_col.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+mock_col.find_one_and_update = AsyncMock(return_value=sample_doc)
 mock_col.delete_many = AsyncMock(return_value=None)
 mock_col.count_documents = AsyncMock(return_value=0)
 
 mock_db = MagicMock()
 mock_db.__getitem__.return_value = mock_col
 mock_db.otps = mock_col
-mock_db.users = mock_col
+mock_db.users = mock_user_col
 mock_db.resumes = mock_col
 mock_db.results = mock_col
 mock_db.job_descriptions = mock_col
