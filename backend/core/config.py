@@ -192,6 +192,34 @@ class Settings(BaseSettings):
     MAX_PAGE_SIZE: int = 100
 
     GROQ_API_KEY: str | None = None
+    GROQ_API_KEY_1: Optional[str] = None
+    GROQ_API_KEY_2: Optional[str] = None
+    GROQ_API_KEY_3: Optional[str] = None
+    GROQ_API_KEY_4: Optional[str] = None
+    GROQ_API_KEY_5: Optional[str] = None
+    GROQ_API_KEY_6: Optional[str] = None
+    GROQ_API_KEY_7: Optional[str] = None
+    GROQ_API_KEY_8: Optional[str] = None
+    GROQ_API_KEY_9: Optional[str] = None
+    GROQ_API_KEY_10: Optional[str] = None
+    GROQ_API_KEYS: Optional[str] = None
+
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY_1: Optional[str] = None
+    GEMINI_API_KEY_2: Optional[str] = None
+    GEMINI_API_KEY_3: Optional[str] = None
+    GEMINI_API_KEY_4: Optional[str] = None
+    GEMINI_API_KEY_5: Optional[str] = None
+    GEMINI_API_KEYS: Optional[str] = None
+
+    GOOGLE_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY_1: Optional[str] = None
+    GOOGLE_API_KEY_2: Optional[str] = None
+    GOOGLE_API_KEY_3: Optional[str] = None
+    GOOGLE_API_KEY_4: Optional[str] = None
+    GOOGLE_API_KEY_5: Optional[str] = None
+    GOOGLE_API_KEYS: Optional[str] = None
+
     MISTRAL_API_KEY: str | None = None
     GAMIFICATION_ENABLED: bool = True
     LEADERBOARD_SIZE: int = 50
@@ -276,6 +304,72 @@ class Settings(BaseSettings):
                 base = (self.APP_BASE_URL or self.FRONTEND_URL or "http://localhost:5173").rstrip("/")
                 
         return f"{base}/verify"
+
+    @property
+    def groq_api_keys(self) -> List[str]:
+        """Discovers all available Groq API keys from settings and environment variables.
+        Checks GROQ_API_KEY_1..10, GROQ_API_KEYS (comma-separated), and GROQ_API_KEY as fallback."""
+        keys: List[str] = []
+        i = 1
+        while True:
+            val = getattr(self, f"GROQ_API_KEY_{i}", None) or os.getenv(f"GROQ_API_KEY_{i}")
+            if val and str(val).strip():
+                k = str(val).strip()
+                if k not in keys:
+                    keys.append(k)
+                i += 1
+            else:
+                break
+
+        groq_keys_str = self.GROQ_API_KEYS or os.getenv("GROQ_API_KEYS")
+        if groq_keys_str:
+            for k in str(groq_keys_str).split(","):
+                if k.strip() and k.strip() not in keys:
+                    keys.append(k.strip())
+
+        if self.GROQ_API_KEY and self.GROQ_API_KEY.strip() and self.GROQ_API_KEY.strip() not in keys:
+            keys.append(self.GROQ_API_KEY.strip())
+
+        single_env = os.getenv("GROQ_API_KEY")
+        if single_env and single_env.strip() and single_env.strip() not in keys:
+            keys.append(single_env.strip())
+
+        return keys
+
+    @property
+    def gemini_api_keys(self) -> List[str]:
+        """Discovers all available Gemini/Google API keys from settings and environment variables.
+        Checks GEMINI_API_KEY_1..5, GOOGLE_API_KEY_1..5, GEMINI_API_KEYS / GOOGLE_API_KEYS, and single fallbacks."""
+        keys: List[str] = []
+        i = 1
+        while True:
+            val = (
+                getattr(self, f"GEMINI_API_KEY_{i}", None)
+                or os.getenv(f"GEMINI_API_KEY_{i}")
+                or getattr(self, f"GOOGLE_API_KEY_{i}", None)
+                or os.getenv(f"GOOGLE_API_KEY_{i}")
+            )
+            if val and str(val).strip():
+                k = str(val).strip()
+                if k not in keys:
+                    keys.append(k)
+                i += 1
+            else:
+                break
+
+        for env_name in ["GEMINI_API_KEYS", "GOOGLE_API_KEYS"]:
+            env_str = getattr(self, env_name, None) or os.getenv(env_name)
+            if env_str:
+                for k in str(env_str).split(","):
+                    if k.strip() and k.strip() not in keys:
+                        keys.append(k.strip())
+
+        for key_attr in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
+            single_k = getattr(self, key_attr, None) or os.getenv(key_attr)
+            if single_k and str(single_k).strip() and str(single_k).strip() not in keys:
+                keys.append(str(single_k).strip())
+
+        return keys
 
 
 @lru_cache()

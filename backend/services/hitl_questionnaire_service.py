@@ -24,8 +24,8 @@ import json
 from typing import Any, Dict, List
 
 import structlog
+from core.llm_client import get_groq_client
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger(__name__)
@@ -147,7 +147,7 @@ def generate_hitl_questions(
     # sending raw_text (large) and keeps token cost low.
     resume_summary = _slim_resume(parsed_resume)
 
-    llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.0)
+    llm = get_groq_client(model_name="llama-3.3-70b-versatile", temperature=0.0)
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", _SYSTEM_PROMPT),

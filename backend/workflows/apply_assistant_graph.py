@@ -17,7 +17,7 @@ from langgraph.graph import StateGraph, END
 
 # LLM Imports
 from langchain_core.prompts import ChatPromptTemplate
-from core.llm_client import get_groq_client  # Your existing Groq factory
+from core.llm_client import get_groq_client, gemini_key_pool
 
 from google import genai
 import os
@@ -70,18 +70,20 @@ async def jd_analyzer_node(state: ApplyAssistantState) -> dict:
     return {"jd_analysis": jd_analysis}
 
 
-# ─── NODE 2: EMAIL GENERATOR (DIRECT GEMINI CLIENT WITH FALLBACK) ───────────
+# ─── NODE 2: EMAIL GENERATOR (DIRECT GEMINI CLIENT WITH KEY POOL FALLBACK) ───
 async def email_generator_node(state: ApplyAssistantState) -> dict:
-    """Drafts the application email subject + body using Gemini Direct SDK."""
+    """Drafts the application email subject + body using Gemini Direct SDK with automatic key pool rotation."""
     job_title = state.get("job_title", "Position")
     company_name = state.get("company_name", "Company")
-    api_key = os.getenv("GOOGLE_API_KEY")
 
-    if api_key:
-        try:
-            raw_prompt_text = _load_prompt("email_generation.txt")
-            if raw_prompt_text.strip():
-                formatted_prompt = f"""You are an expert AI career assistant. Output ONLY the requested professional text. Do not include any meta-commentary.
+    async def _generate(client: genai.Client):
+        if not client:
+            raise ValueError("No Gemini API key available")
+        raw_prompt_text = _load_prompt("email_generation.txt")
+        if not raw_prompt_text.strip():
+            raise ValueError("Empty email prompt template")
+
+        formatted_prompt = f"""You are an expert AI career assistant. Output ONLY the requested professional text. Do not include any meta-commentary.
 
 {raw_prompt_text.format(
     resume_text=state.get("resume_text", "No resume provided."),
@@ -92,26 +94,28 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
     ats_result=state.get("ats_result", {}),
     previous_issues=state.get("validation_issues", []) or "none",
 )}"""
-                client = genai.Client(api_key=api_key)
-                response = client.models.generate_content(
-                    model="gemini-1.5-flash",
-                    contents=formatted_prompt,
-                )
-                
-                content = response.text.strip()
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=formatted_prompt,
+        )
 
-                if content.lower().startswith("subject:"):
-                    first_line, _, rest = content.partition("\n")
-                    subject = first_line.split(":", 1)[1].strip()
-                    body = rest.strip()
-                else:
-                    subject = f"Application for {job_title} at {company_name}"
-                    body = content
+        content = response.text.strip()
 
-                formatted_body = body.replace("\n\n", "<br><br>").replace("\n", "<br>")
-                return {"email_subject": subject, "email_body": formatted_body}
-        except Exception:
-            pass
+        if content.lower().startswith("subject:"):
+            first_line, _, rest = content.partition("\n")
+            subject = first_line.split(":", 1)[1].strip()
+            body = rest.strip()
+        else:
+            subject = f"Application for {job_title} at {company_name}"
+            body = content
+
+        formatted_body = body.replace("\n\n", "<br><br>").replace("\n", "<br>")
+        return {"email_subject": subject, "email_body": formatted_body}
+
+    try:
+        return await gemini_key_pool.execute_async_with_fallback(_generate)
+    except Exception:
+        pass
 
     # Fallback professional email template
     subject = f"Application for {job_title} at {company_name}"
@@ -126,18 +130,20 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
     return {"email_subject": subject, "email_body": body}
 
 
-# ─── NODE 3: COVER LETTER GENERATOR (DIRECT GEMINI CLIENT WITH FALLBACK) ────
+# ─── NODE 3: COVER LETTER GENERATOR (DIRECT GEMINI CLIENT WITH KEY POOL FALLBACK) ────
 async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
-    """Drafts the cover letter BODY TEXT using Gemini Direct SDK."""
+    """Drafts the cover letter BODY TEXT using Gemini Direct SDK with automatic key pool rotation."""
     job_title = state.get("job_title", "Position")
     company_name = state.get("company_name", "Company")
-    api_key = os.getenv("GOOGLE_API_KEY")
 
-    if api_key:
-        try:
-            raw_prompt_text = _load_prompt("cover_letter.txt")
-            if raw_prompt_text.strip():
-                formatted_prompt = f"""You are an expert AI career assistant. Output ONLY the requested professional text. Do not include any meta-commentary.
+    async def _generate(client: genai.Client):
+        if not client:
+            raise ValueError("No Gemini API key available")
+        raw_prompt_text = _load_prompt("cover_letter.txt")
+        if not raw_prompt_text.strip():
+            raise ValueError("Empty cover letter prompt template")
+
+        formatted_prompt = f"""You are an expert AI career assistant. Output ONLY the requested professional text. Do not include any meta-commentary.
 
 {raw_prompt_text.format(
     resume_text=state.get("resume_text", "No resume provided."),
@@ -147,16 +153,19 @@ async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
     jd_analysis=state.get("jd_analysis", {}),
 )}"""
 
-                client = genai.Client(api_key=api_key)
-                response = client.models.generate_content(
-                    model="gemini-1.5-flash",
-                    contents=formatted_prompt,
-                )
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=formatted_prompt,
+        )
 
-                if response and response.text:
-                    return {"cover_letter_text": response.text.strip()}
-        except Exception:
-            pass
+        if response and response.text:
+            return {"cover_letter_text": response.text.strip()}
+        raise ValueError("Empty response from Gemini")
+
+    try:
+        return await gemini_key_pool.execute_async_with_fallback(_generate)
+    except Exception:
+        pass
 
     # Fallback professional cover letter template
     cover_letter_text = (

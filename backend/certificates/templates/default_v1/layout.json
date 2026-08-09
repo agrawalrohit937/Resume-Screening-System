@@ -36,7 +36,9 @@
       "font": "body_semibold",
       "size": 16,
       "color": "#1e293b",
-      "align": "center"
+      "align": "center",
+      "max_width_frac": 0.62,
+      "min_size": 10
     },
 
     "level": {
@@ -53,7 +55,10 @@
       "font": "body_semibold",
       "size": 12,
       "color": "#FFFFFF",
-      "align": "center"
+      "align": "center",
+      "max_width_frac": 0.138,
+      "min_size": 7.5,
+      "max_size": 13.5
     },
 
     "issued_date": {

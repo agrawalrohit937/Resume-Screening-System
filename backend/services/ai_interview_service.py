@@ -13,6 +13,7 @@ import httpx
 import structlog
 
 from core.config import settings
+from core.llm_client import groq_key_pool
 from models.resume_model import ResumeModel
 
 logger = structlog.get_logger(__name__)
@@ -413,11 +414,9 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
     async def _call_llm(self, prompt: str, max_tokens: int = 2000) -> str:
         """Try LLM providers in order."""
         # Try Groq first (fastest)
-        print("🔥----------------- GROQ KEY:", settings.GROQ_API_KEY)
-        if hasattr(settings, 'GROQ_API_KEY') and settings.GROQ_API_KEY:
-            print("-------------🚀 TRYING GROQ...")
+        if settings.groq_api_keys:
+            print("-------------🚀 TRYING GROQ KEY POOL...")
             result = await self._call_groq(prompt, max_tokens)
-            print("--------------📥 RAW RESULT:", result)
             if result:
                 self._last_model_used = f"groq/{GROQ_MODEL}"
                 return result
@@ -447,12 +446,14 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
         return ""
 
     async def _call_groq(self, prompt: str, max_tokens: int) -> Optional[str]:
-        try:
+        async def _make_request(key: str) -> Optional[str]:
+            if not key:
+                return None
             async with httpx.AsyncClient(timeout=30.0) as client:
                 r = await client.post(
                     GROQ_BASE,
                     headers={
-                        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                        "Authorization": f"Bearer {key}",
                         "Content-Type": "application/json"
                     },
                     json={
@@ -462,19 +463,17 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
                         "temperature": 0.7
                     },
                 )
-
-                print("📡 STATUS:", r.status_code)
-
                 data = r.json()
-                print("📡 FULL RESPONSE:", data)
+                if r.status_code != 200:
+                    raise RuntimeError(f"Groq HTTP {r.status_code}: {data}")
 
-                # 🔥 IMPORTANT FIX
-                if "choices" not in data:
-                    print("❌ GROQ ERROR:", data)
-                    return None
+                if "choices" not in data or not data["choices"]:
+                    raise ValueError(f"Groq invalid response: {data}")
 
                 return data["choices"][0]["message"]["content"].strip()
 
+        try:
+            return await groq_key_pool.execute_async_with_fallback(_make_request)
         except Exception as e:
             print("❌ GROQ EXCEPTION:", str(e))
             return None
