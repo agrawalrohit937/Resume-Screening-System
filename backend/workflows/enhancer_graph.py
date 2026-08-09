@@ -118,6 +118,7 @@ STRICT PARSER MODE (DO NOT TRUNCATE ARRAYS)
 4. DO NOT drop contact information (email, phone, linkedin, github, portfolio).
 5. Certifications must be output as a flat list of strings — copy them verbatim.
 6. Output the `skills` field as a JSON object (dictionary) mapping logical categories (e.g. "Programming Languages", "Frameworks & Tools") to arrays of skill strings.
+7. For projects: Extract and preserve BOTH the Live Demo URL ('link') and GitHub Repository URL ('github'). Never drop project links.
 
 =========================
 CRITICAL: ATS SCORE MUST NEVER DECREASE
@@ -159,7 +160,7 @@ Output ONLY valid JSON matching this schema structure:
   "summary": "",
   "skills": {{"Category Name": ["skill1", "skill2"]}},
   "experience": [{{"company": "", "role": "", "dates": "", "location": "", "highlights": [""]}}],
-  "projects": [{{"title": "", "technologies": "", "dates": "", "highlights": [""]}}],
+  "projects": [{{"title": "", "link": "", "github": "", "technologies": ["tech1", "tech2"], "dates": "", "highlights": [""]}}],
   "education": [{{"institution": "", "degree": "", "dates": "", "location": "", "details": ""}}],
   "certifications": [""]
 }}
@@ -170,7 +171,7 @@ Output ONLY valid JSON matching this schema structure:
             raise ValueError("No Gemini API key available")
         
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=prompt_text,
             config={"response_mime_type": "application/json"}
         )

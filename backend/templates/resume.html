@@ -82,6 +82,8 @@
         border-bottom: 1px solid #bfdbfe;
         padding-bottom: 1px;
         margin-bottom: 4px;
+        page-break-after: avoid;
+        break-after: avoid;
     }
 
     /* ── SUMMARY ─────────────────────────────────────────────────────────────── */
@@ -92,18 +94,6 @@
     }
 
     /* ── SKILLS ──────────────────────────────────────────────────────────────── */
-    /*
-     * The skills array may arrive in TWO formats:
-     *   A) "Category: Skill1, Skill2, Skill3"   — LLM auto-categorised
-     *   B) "Python", "FastAPI", "Docker"          — flat list (raw parse)
-     *
-     * For format A: we split on the first colon and bold the label.
-     * For format B: the Jinja2 block below renders them as a single dense
-     *               comma-separated paragraph as a safe fallback.
-     *
-     * The template detects format A vs B by checking whether the first item
-     * contains a colon.
-     */
     .skills-grid { display: flex; flex-direction: column; gap: 1.5px; }
 
     .skill-row { font-size: 9pt; color: #1f2937; line-height: 1.35; }
@@ -114,13 +104,9 @@
     .skills-flat { font-size: 9pt; color: #1f2937; line-height: 1.4; }
 
     /* ── ENTRY (Experience / Projects / Education) ───────────────────────────── */
-    .entry { margin-bottom: 6px; page-break-inside: avoid; }
+    .entry { margin-bottom: 6px; page-break-inside: avoid; break-inside: avoid; }
     .entry:last-child { margin-bottom: 0; }
 
-    /*
-     * Flexbox header: left title-group locked at 68%, right meta takes rest.
-     * 68% prevents long project/role names from waterfall-wrapping.
-     */
     .entry-header {
         display: flex;
         justify-content: space-between;
@@ -130,8 +116,7 @@
     }
 
     .entry-title-group {
-        flex: 0 0 68%;
-        max-width: 68%;
+        flex: 1;
         min-width: 0;
     }
 
@@ -161,7 +146,7 @@
 
     /* Right column: date + location stacked */
     .entry-meta {
-        flex: 1;
+        flex: 0 0 auto;
         text-align: right;
         font-size: 8.2pt;
         color: #4b5563;
@@ -224,31 +209,42 @@
     <h1>{{ full_name }}</h1>
     {% if role_title %}<p class="role-title">{{ role_title }}</p>{% endif %}
 
-    {# Row 1: email · phone (plain text, not links) #}
-    {% if email or phone %}
+    {# Row 1: email · phone · location #}
+    {% if email or phone or location %}
     <div class="contact-basic">
-        {% if email %}{{ email }}{% endif %}
-        {% if email and phone %}<span class="sep">|</span>{% endif %}
-        {% if phone %}{{ phone }}{% endif %}
+        {% set ns = namespace(first=true) %}
+        {% if email %}
+            {{ email }}
+            {% set ns.first = false %}
+        {% endif %}
+        {% if phone %}
+            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            {{ phone }}
+            {% set ns.first = false %}
+        {% endif %}
+        {% if location %}
+            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            {{ location }}
+        {% endif %}
     </div>
     {% endif %}
 
     {# Row 2: LinkedIn · GitHub · Portfolio (linked) #}
     {% if linkedin or github or portfolio %}
     <div class="contact-links">
-        {% set ns = namespace(first=true) %}
+        {% set ns2 = namespace(first=true) %}
         {% if linkedin %}
-            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            {% if not ns2.first %}<span class="sep">|</span>{% endif %}
             <a href="{{ linkedin }}">LinkedIn</a>
-            {% set ns.first = false %}
+            {% set ns2.first = false %}
         {% endif %}
         {% if github %}
-            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            {% if not ns2.first %}<span class="sep">|</span>{% endif %}
             <a href="{{ github }}">GitHub</a>
-            {% set ns.first = false %}
+            {% set ns2.first = false %}
         {% endif %}
         {% if portfolio %}
-            {% if not ns.first %}<span class="sep">|</span>{% endif %}
+            {% if not ns2.first %}<span class="sep">|</span>{% endif %}
             <a href="{{ portfolio }}">Portfolio</a>
         {% endif %}
     </div>
@@ -311,7 +307,8 @@
                 </span>
             </div>
             <div class="entry-meta">
-                {% if exp.duration %}<span class="entry-date">{{ exp.duration }}</span>{% endif %}
+                {% set exp_dur = exp.duration or exp.dates %}
+                {% if exp_dur %}<span class="entry-date">{{ exp_dur }}</span>{% endif %}
                 {% if exp.location %}<span class="entry-location">{{ exp.location }}</span>{% endif %}
             </div>
         </div>
@@ -321,7 +318,14 @@
         </ul>
         {% endif %}
         {% if exp.technologies %}
-        <div class="tech-line"><strong>Tech/Stack:</strong> {{ exp.technologies | join(', ') }}</div>
+        <div class="tech-line">
+            <strong>Stack:</strong> 
+            {% if exp.technologies is string %}
+                {{ exp.technologies }}
+            {% else %}
+                {{ exp.technologies | join(', ') }}
+            {% endif %}
+        </div>
         {% endif %}
     </div>
     {% endfor %}
@@ -340,13 +344,26 @@
     <div class="entry">
         <div class="entry-header">
             <div class="entry-title-group">
-                <span class="entry-title">{{ proj.name }}</span>
+                <span class="entry-title">{{ proj.name or proj.title }}</span>
             </div>
-            {% if proj.link and proj.link != '#' and (proj.link | trim | length) > 0 %}
-            <div class="proj-link">
-                Live Demo: <a href="{{ proj.link }}">Link</a>
+            <div class="entry-meta">
+                {% set proj_dur = proj.duration or proj.dates %}
+                {% if proj_dur %}
+                <span class="entry-date" style="margin-bottom: 2px;">{{ proj_dur }}</span>
+                {% endif %}
+                <div class="proj-link">
+                    {% set link_items = [] %}
+                    {% if proj.link and proj.link != '#' and (proj.link | trim | length) > 0 %}
+                        {% set _ = link_items.append('<a href="' ~ proj.link ~ '">Live Demo</a>') %}
+                    {% endif %}
+                    {% if proj.github and proj.github != '#' and (proj.github | trim | length) > 0 %}
+                        {% set _ = link_items.append('<a href="' ~ proj.github ~ '">GitHub</a>') %}
+                    {% endif %}
+                    {% if link_items %}
+                        {{ link_items | join(' <span class="sep" style="margin: 0 4px; color: #9ca3af;">|</span> ') | safe }}
+                    {% endif %}
+                </div>
             </div>
-            {% endif %}
         </div>
 
         {% if proj.highlights %}
@@ -358,7 +375,14 @@
         {% endif %}
 
         {% if proj.technologies %}
-        <div class="tech-line"><strong>Tech/Stack:</strong> {{ proj.technologies | join(', ') }}</div>
+        <div class="tech-line">
+            <strong>Stack:</strong> 
+            {% if proj.technologies is string %}
+                {{ proj.technologies }}
+            {% else %}
+                {{ proj.technologies | join(', ') }}
+            {% endif %}
+        </div>
         {% endif %}
     </div>
     {% endfor %}
