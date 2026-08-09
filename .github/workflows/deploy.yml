@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/RSS-28-live-interview  # Jab bhi 'main' branch par code aayega, pipeline chalegi
 
 jobs:
   build-and-deploy:
