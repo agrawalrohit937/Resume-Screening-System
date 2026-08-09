@@ -13,6 +13,7 @@ import { getResumes } from '../services/api';
 import { useApplyAssistant, STEPS } from '../hooks/useApplyAssistant';
 import { applyAssistantApi } from '../services/applyAssistantApi';
 import JobDetailsForm from '../components/apply/JobDetailsForm';
+import ScreenshotUploadZone from '../components/apply/ScreenshotUploadZone';
 import ScoreRing from '../components/ScoreRing';
 
 const DraftEditor = lazy(() => import('../components/apply/DraftEditor'));
@@ -77,6 +78,14 @@ export default function ApplyAssistant() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState('apply'); // 'apply' | 'history'
   const [isGmailConnected, setIsGmailConnected] = useState(null); // null = loading
+
+  const [formValues, setFormValues] = useState({
+    company_name: '',
+    job_title: '',
+    hr_email: '',
+    job_description: '',
+  });
+  const [extractingDetails, setExtractingDetails] = useState(false);
 
   // 👇 Restore pending draft and check Gmail connection status on mount / return from /gmail-callback
   useEffect(() => {
@@ -396,7 +405,7 @@ export default function ApplyAssistant() {
                     </motion.div>
                   )}
 
-                  {/* STEP 1: JOB DETAILS */}
+                  {/* STEP 1: JOB DETAILS (SPLIT-SCREEN WORKFLOW) */}
                   {step === STEPS.JOB_DETAILS && (
                     <motion.div
                       key="step-details"
@@ -405,68 +414,93 @@ export default function ApplyAssistant() {
                       animate="animate"
                       exit="exit"
                       transition={{ duration: 0.2 }}
-                      className="grid grid-cols-1 md:grid-cols-2 gap-10"
+                      className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start"
                     >
-                      {/* Left: Resume Display */}
-                      <div className="space-y-4">
-                        <div>
-                          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                            <FileText size={18} className="text-slate-400" /> Candidate Profile
-                          </h2>
-                          <p className="text-sm text-slate-500 mt-1">We'll use your primary profile resume for this application.</p>
+                      {/* ── Left Column: Candidate Profile & Input Screenshot Zone ── */}
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <div>
+                            <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                              <FileText size={18} className="text-indigo-600" /> Candidate Profile
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">We'll use your primary profile resume for this application.</p>
+                          </div>
+
+                          {/* Profile Resume Attached Card */}
+                          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+                              <FileText size={20} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3
+                                className="text-xs font-bold text-slate-900 truncate max-w-[220px] sm:max-w-xs"
+                                title={user?.profile_resume_name || "Resume not found"}
+                              >
+                                {user?.profile_resume_name || "Resume not found"}
+                              </h3>
+                              {user?.profile_resume_url ? (
+                                <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 mt-0.5">
+                                  <CheckCircle size={12} className="shrink-0" /> Linked from Profile
+                                </p>
+                              ) : (
+                                <p className="text-[11px] font-semibold text-rose-500 flex items-center gap-1 mt-0.5">
+                                  Please upload a resume in your profile.
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        {/* 👇 Profile Resume Attached Card */}
-                        <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center shrink-0">
-                            <FileText size={24} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h3
-                              className="text-sm font-bold text-slate-900 truncate max-w-[220px] sm:max-w-xs md:max-w-md"
-                              title={user?.profile_resume_name || "Resume not found"}
-                            >
-                              {user?.profile_resume_name || "Resume not found"}
-                            </h3>
-                            {user?.profile_resume_url ? (
-                              <p className="text-xs font-medium text-emerald-600 flex items-center gap-1 mt-0.5">
-                                <CheckCircle size={12} className="shrink-0" /> Automatically linked from Profile
-                              </p>
-                            ) : (
-                              <p className="text-xs font-medium text-rose-500 flex items-center gap-1 mt-0.5">
-                                Please upload a resume in your profile.
-                              </p>
-                            )}
-                          </div>
+                        {/* Dedicated spacious Screenshot Upload Zone in Left Column */}
+                        <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                          <ScreenshotUploadZone
+                            onExtractStart={() => setExtractingDetails(true)}
+                            onExtractSuccess={(extractedData) => {
+                              setFormValues((prev) => ({
+                                company_name: extractedData.company_name || prev.company_name,
+                                job_title: extractedData.job_title || prev.job_title,
+                                hr_email: extractedData.hr_email || prev.hr_email,
+                                job_description: extractedData.job_description || prev.job_description,
+                              }));
+                              setExtractingDetails(false);
+                            }}
+                            onExtractError={() => setExtractingDetails(false)}
+                          />
                         </div>
 
                         {/* Route to Profile for updates */}
-                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-3 mt-4">
-                          <div className="p-2 bg-white rounded-lg text-slate-600 mt-0.5 shadow-sm border border-slate-200">
-                            <Sparkles size={16} />
+                        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-start gap-3">
+                          <div className="p-1.5 bg-white rounded-lg text-slate-500 mt-0.5 shadow-sm border border-slate-200 shrink-0">
+                            <Sparkles size={14} />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">Need to update your resume?</p>
-                            <p className="text-xs text-slate-500 mt-1 mb-3 leading-relaxed">
+                            <p className="text-xs font-bold text-slate-900">Need to update your resume?</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5 mb-1.5 leading-relaxed">
                               If you want to use a different resume, head over to your profile to upload the latest version.
                             </p>
-                            <Link to="/profile" className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
-                              Go to Profile <ArrowRight size={14} />
+                            <Link to="/profile" className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+                              Go to Profile <ArrowRight size={12} />
                             </Link>
                           </div>
                         </div>
                       </div>
 
-                      {/* Right: Job Details */}
+                      {/* ── Right Column: Output Form ── */}
                       <div className="space-y-4">
                         <div>
                           <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-                            <Briefcase size={18} className="text-slate-400" /> Job Information
+                            <Briefcase size={18} className="text-indigo-600" /> Job Information
                           </h2>
-                          <p className="text-sm text-slate-500 mt-1">Provide the details of the target role.</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Review or complete the target job details below.</p>
                         </div>
-                        <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
-                          <JobDetailsForm onSubmit={handleJobDetailsSubmit} isSubmitting={isSubmitting} />
+                        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                          <JobDetailsForm
+                            values={formValues}
+                            setValues={setFormValues}
+                            extracting={extractingDetails}
+                            onSubmit={handleJobDetailsSubmit}
+                            isSubmitting={isSubmitting}
+                          />
                         </div>
                       </div>
                     </motion.div>

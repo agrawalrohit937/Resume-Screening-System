@@ -1332,12 +1332,25 @@ export default function Results() {
     setInvalidDocData(null);
 
     try {
-      const payload = {
-        resume_id: resumeId,
-        job_title: jobTitle || 'Target Role',
-        job_description: jd || `Attached file: ${jdFile?.name}`,
-        required_skills: requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
-        save_result: true,
+      let payload;
+      if (jdFile) {
+        payload = new FormData()
+        payload.append('resume_id', resumeId)
+        payload.append('job_title', jobTitle || 'Target Role')
+        payload.append('job_description', jd || `File: ${jdFile.name}`)
+        payload.append('jd_file', jdFile)
+        payload.append('save_result', 'true')
+        requiredSkills.split(',').forEach(s => {
+          if (s.trim()) payload.append('required_skills', s.trim())
+        })
+      } else {
+        payload = {
+          resume_id: resumeId,
+          job_title: jobTitle || 'Target Role',
+          job_description: jd,
+          required_skills: requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
+          save_result: true,
+        }
       }
 
       let data;
@@ -1572,90 +1585,226 @@ const TABS = ['AI Keyword Match', 'AI Skill Match', 'Strict ATS Check', 'Roadmap
 
       {/* ── Setup Section ── */}
       <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24, alignItems: 'stretch' }}>
 
-        {/* LEFT COLUMN: Resume */}
-        <div style={{ flex: '1 1 350px', ...cardStyle, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#EFF6FF', color: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📄</div>
+        {/* LEFT COLUMN: Resume / Candidate Profile */}
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📄</div>
             <div>
-              <h3 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 18, fontWeight: 700, color: '#0F172A', margin: 0 }}>Candidate Profile</h3>
-              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B', margin: 0 }}>Upload your current resume</p>
+              <h3 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, fontWeight: 700, color: '#0F172A', margin: 0 }}>Candidate Profile</h3>
+              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B', margin: 0 }}>Upload your resume (PDF or DOCX)</p>
             </div>
           </div>
 
-          <label style={labelStyle}>Step 1: Upload PDF or DOCX</label>
-          <div {...getResumeRootProps()} style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '40px 20px', borderRadius: 20, border: `2px dashed ${resumeDrag ? '#3B82F6' : uploadDone ? '#10B981' : '#CBD5E1'}`,
-            background: resumeDrag ? '#EFF6FF' : uploadDone ? '#F0FDF4' : '#F8FAFC',
-            textAlign: 'center', cursor: uploading ? 'wait' : 'pointer', transition: 'all 0.2s', minHeight: 220
-          }}>
-            <input {...getResumeInputProps()} />
-            {uploading ? (
-              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
-                <div style={{ width: 60, height: 60, margin: '0 auto 16px', position: 'relative' }}>
-                  <svg width="60" height="60" style={{ transform: 'rotate(-90deg)' }}>
-                    <circle cx="30" cy="30" r="26" fill="none" stroke="#E2E8F0" strokeWidth="6" />
-                    <circle cx="30" cy="30" r="26" fill="none" stroke="#3B82F6" strokeWidth="6"
-                      strokeLinecap={uploadProgress > 0 ? "round" : "butt"}
-                      strokeDasharray={163} strokeDashoffset={163 - (uploadProgress / 100) * 163}
-                      style={{ transition: 'stroke-dashoffset 0.3s ease', opacity: uploadProgress > 0 ? 1 : 0 }} />
-                  </svg>
-                  <div style={{
-                    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 14, color: '#3B82F6'
-                  }}>{uploadProgress}%</div>
+          {/* Success State: Sleek File Attached Card vs Compact Dropzone */}
+          {uploadDone ? (
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+              padding: '20px', borderRadius: 18, background: '#F0FDF4', border: '1px solid #A7F3D0', minHeight: 180
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 46, height: 46, borderRadius: 14, background: '#D1FAE5', color: '#059669',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0
+                }}>
+                  📄
                 </div>
-                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, fontWeight: 600, color: '#334155' }}>Processing Document...</p>
-              </motion.div>
-            ) : uploadDone ? (
-              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: '#065F46' }}>
-                  {resumeFile?.name || 'Resume Ready'}
-                </p>
-                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B', marginTop: 6 }}>Click or drag to replace</p>
-              </motion.div>
-            ) : (
-              <div>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>📥</div>
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 600, fontSize: 16, color: '#334155' }}>
-                  Drag & Drop Resume
-                </p>
-                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B', marginTop: 8 }}>Supported formats: PDF, DOCX (Max 10MB)</p>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <h4 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 14, fontWeight: 700, color: '#065F46', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    title={resumeFile?.name || 'Resume Ready'}>
+                    {resumeFile?.name || 'Resume Attached'}
+                  </h4>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#047857', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    ✓ Parsed & Ready for ATS Analysis
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setUploadDone(false); setResumeFile(null); }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 10, border: '1px solid #CBD5E1', background: 'white',
+                    color: '#334155', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  ✏️ Change File
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div {...getResumeRootProps()} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '30px 20px', borderRadius: 18, border: `2px dashed ${resumeDrag ? '#2563EB' : '#CBD5E1'}`,
+              background: resumeDrag ? '#EFF6FF' : '#F8FAFC',
+              textAlign: 'center', cursor: uploading ? 'wait' : 'pointer', transition: 'all 0.2s ease', minHeight: 180
+            }}>
+              <input {...getResumeInputProps()} />
+              {uploading ? (
+                <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
+                  <div style={{ width: 50, height: 50, margin: '0 auto 12px', position: 'relative' }}>
+                    <svg width="50" height="50" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="25" cy="25" r="21" fill="none" stroke="#E2E8F0" strokeWidth="5" />
+                      <circle cx="25" cy="25" r="21" fill="none" stroke="#2563EB" strokeWidth="5"
+                        strokeLinecap={uploadProgress > 0 ? "round" : "butt"}
+                        strokeDasharray={132} strokeDashoffset={132 - (uploadProgress / 100) * 132}
+                        style={{ transition: 'stroke-dashoffset 0.3s ease', opacity: uploadProgress > 0 ? 1 : 0 }} />
+                    </svg>
+                    <div style={{
+                      position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 12, color: '#2563EB'
+                    }}>{uploadProgress}%</div>
+                  </div>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 600, color: '#334155' }}>Processing Document...</p>
+                </motion.div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📥</div>
+                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: '#1E293B', margin: '0 0 4px' }}>
+                    Drag & Drop Resume
+                  </p>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#64748B', margin: 0 }}>
+                    PDF or DOCX files up to 10MB
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT COLUMN: Target Role & JD */}
-        <div style={{ flex: '1 1 450px', ...cardStyle }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        {/* RIGHT COLUMN: Target Role Setup */}
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: '#FFFBEB', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎯</div>
             <div>
-              <h3 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 18, fontWeight: 700, color: '#0F172A', margin: 0 }}>Target Role Setup</h3>
-              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B', margin: 0 }}>Define the job you want to match</p>
+              <h3 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 17, fontWeight: 700, color: '#0F172A', margin: 0 }}>Target Role Setup</h3>
+              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#64748B', margin: 0 }}>Define the job position & requirements</p>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Step 2: Job Title *</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Job Title *</label>
               <input value={jobTitle} onChange={e => setJobTitle(e.target.value)}
                 placeholder="e.g. Senior Frontend Engineer" style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Step 3: Core Skills (Optional)</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Core Skills (Optional)</label>
               <input value={requiredSkills} onChange={e => setRequiredSkills(e.target.value)}
                 placeholder="React, TypeScript, AWS..." style={inputStyle} />
             </div>
           </div>
 
-          <label style={labelStyle}>Step 4: Job Description</label>
-          <textarea value={jdText} onChange={e => setJdText(e.target.value)}
-            placeholder="Paste the full job description here..."
-            style={{ ...inputStyle, height: 180, resize: 'none' }} />
+          {/* Segmented Control Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', margin: 0 }}>Job Description *</label>
+
+            {/* Pill-shaped Segmented Control */}
+            <div style={{ display: 'inline-flex', background: '#F1F5F9', padding: '3px', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+              <button
+                type="button"
+                onClick={() => setJdMode('paste')}
+                style={{
+                  padding: '4px 12px', borderRadius: 9, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
+                  background: jdMode === 'paste' ? 'white' : 'transparent',
+                  color: jdMode === 'paste' ? '#0F172A' : '#64748B',
+                  boxShadow: jdMode === 'paste' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                📝 Copy-Paste Text
+              </button>
+              <button
+                type="button"
+                onClick={() => setJdMode('upload')}
+                style={{
+                  padding: '4px 12px', borderRadius: 9, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
+                  background: jdMode === 'upload' ? 'white' : 'transparent',
+                  color: jdMode === 'upload' ? '#2563EB' : '#64748B',
+                  boxShadow: jdMode === 'upload' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                📄 Upload File (PDF/DOCX/TXT)
+              </button>
+            </div>
+          </div>
+
+          {/* Fixed Height Footprint (180px) for both modes */}
+          {jdMode === 'upload' ? (
+            <div
+              {...getJDRootProps()}
+              style={{
+                height: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '20px', borderRadius: 16, border: `2px dashed ${jdDrag ? '#2563EB' : jdFile ? '#10B981' : '#CBD5E1'}`,
+                background: jdDrag ? '#EFF6FF' : jdFile ? '#F0FDF4' : '#F8FAFC',
+                textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s ease', boxSizing: 'border-box'
+              }}
+            >
+              <input {...getJDInputProps()} />
+              {jdFile ? (
+                <div>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
+                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 13, color: '#065F46', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>
+                    {jdFile.name}
+                  </p>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: '#64748B', margin: 0 }}>
+                    {(jdFile.size / 1024).toFixed(1)} KB {jdText ? `· Extracted ${jdText.length} chars` : ''}
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setJdFile(null); }}
+                      style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #FCA5A5', background: '#FEF2F2', color: '#991B1B', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ✕ Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setJdMode('paste'); }}
+                      style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #CBD5E1', background: 'white', color: '#475569', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ✏️ Edit Text
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>📁</div>
+                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 600, fontSize: 14, color: '#334155', margin: '0 0 2px' }}>
+                    Drag & Drop Job Description File
+                  </p>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: '#64748B', margin: 0 }}>
+                    Supports PDF, DOCX, and TXT files (Max 10MB)
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ height: 180, display: 'flex', flexDirection: 'column' }}>
+              <textarea
+                value={jdText}
+                onChange={e => setJdText(e.target.value)}
+                placeholder="Paste the full job description here..."
+                style={{ ...inputStyle, height: '100%', resize: 'none', boxSizing: 'border-box' }}
+              />
+              {jdFile && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, fontSize: 11, color: '#059669', fontWeight: 600 }}>
+                  <span>✓ Extracted from {jdFile.name} ({jdText.length} chars)</span>
+                  <button
+                    type="button"
+                    onClick={() => setJdFile(null)}
+                    style={{ border: 'none', background: 'none', color: '#DC2626', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Clear File Link
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </motion.div>
 
