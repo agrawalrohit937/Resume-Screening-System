@@ -404,7 +404,7 @@ export default function LiveInterviewV2() {
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
     active: session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING,
-    faceInterval: 1200, objectInterval: 800, emotionInterval: 4000,
+    faceInterval: 800, objectInterval: 350, emotionInterval: 4000,
   })
 
   const startCamera = useCallback(async () => {
