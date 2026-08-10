@@ -40,10 +40,11 @@ const LEFT_CHEEK        = 234
 const RIGHT_CHEEK       = 454
 const FOREHEAD          = 10
 
-// ── Phone-like objects COCO-SSD detects ──────────────────────────────────────
+// ── Phone-like objects COCO-SSD detects (high sensitivity for partial/half phone edges) ──
 const SUSPICIOUS_OBJECTS = new Set([
   'cell phone', 'mobile phone', 'phone', 'laptop', 'book', 'remote', 'keyboard', 'mouse',
-  'tablet', 'ipad', 'tv', 'monitor',
+  'tablet', 'ipad', 'tv', 'monitor', 'camera', 'calculator', 'electronic', 'device',
+  'handbag', 'wallet', 'clock', 'scissors'
 ])
 
 // ── Suspicious emotions ───────────────────────────────────────────────────────
@@ -524,14 +525,14 @@ const initFaceApi = useCallback(async () => {
     try {
       const predictions = await cocoModelRef.current.detect(vid)
 
-      // 1. Detect suspicious restricted objects (cell phone, book, laptop, etc.)
+      // 1. Detect suspicious restricted objects (cell phone, partial phone, book, laptop, etc.)
       const suspiciousObjects = predictions.filter(p =>
-        SUSPICIOUS_OBJECTS.has(p.class.toLowerCase()) && p.score > 0.45
+        SUSPICIOUS_OBJECTS.has(p.class.toLowerCase()) && p.score > 0.22
       )
 
       // 2. Detect multiple persons via COCO-SSD
       const persons = predictions.filter(p =>
-        p.class.toLowerCase() === 'person' && p.score > 0.45
+        p.class.toLowerCase() === 'person' && p.score > 0.40
       )
 
       if (suspiciousObjects.length > 0) {
@@ -708,10 +709,21 @@ const runEmotionDetection = useCallback(async () => {
     // Emotion detection
     emoTimerRef.current = setInterval(runEmotionDetection, emotionInterval)
 
+    // DevTools / Console open detector
+    const checkDevTools = () => {
+      const widthDiff = window.outerWidth - window.innerWidth > 160
+      const heightDiff = window.outerHeight - window.innerHeight > 160
+      if (widthDiff || heightDiff) {
+        emitEvent('devtools_opened', 'high', 'Browser Developer Console / Inspect Element opened')
+      }
+    }
+    const devToolsTimer = setInterval(checkDevTools, 2000)
+
     return () => {
       clearInterval(faceTimerRef.current)
       clearInterval(objTimerRef.current)
       clearInterval(emoTimerRef.current)
+      clearInterval(devToolsTimer)
     }
   }, [active, faceInterval, objectInterval, emotionInterval, runObjectDetection, runEmotionDetection, status.mpReady])
 
@@ -778,12 +790,12 @@ const runEmotionDetection = useCallback(async () => {
     })
   }
 
-  // ── Event emitter (3.5s throttle for high severity events like phone/multi-faces) ─
+  // ── Event emitter (1.5s rapid throttle for high severity events like phone/dev-tools) ─
   function emitEvent(type, severity, details) {
     const fn = onEventRef.current
     if (!fn) return
     const now = Date.now()
-    const throttleMs = severity === 'high' ? 3500 : 6000
+    const throttleMs = severity === 'high' ? 1500 : 5000
     if (lastEvents.current[type] && now - lastEvents.current[type] < throttleMs) return
     lastEvents.current[type] = now
     fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })

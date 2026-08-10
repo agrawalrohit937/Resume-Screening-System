@@ -404,7 +404,7 @@ export default function LiveInterviewV2() {
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
     active: session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING,
-    faceInterval: 1500, objectInterval: 2500, emotionInterval: 5000,
+    faceInterval: 1200, objectInterval: 800, emotionInterval: 4000,
   })
 
   const startCamera = useCallback(async () => {
@@ -467,15 +467,23 @@ export default function LiveInterviewV2() {
       const txt = e.clipboardData?.getData('text') || ''
       if (txt.length > 15) handleCheatingEvent({ event_type: 'copy_paste', severity: 'high', details: `${txt.length} chars pasted` })
     }
+    const onDevToolsKey = (e) => {
+      if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I', 'J', 'C', 'i', 'j', 'c'].includes(e.key))) {
+        e.preventDefault()
+        handleCheatingEvent({ event_type: 'devtools_opened', severity: 'high', details: 'Developer tools / Console shortcut key pressed' })
+      }
+    }
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('blur', onBlur)
     document.addEventListener('paste', onPaste)
+    window.addEventListener('keydown', onDevToolsKey)
     return () => {
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('blur', onBlur)
       document.removeEventListener('paste', onPaste)
+      window.removeEventListener('keydown', onDevToolsKey)
     }
-  }, [session.phase])
+  }, [session.phase, handleCheatingEvent])
 
 
   const handleSubmitAnswer = useCallback(async ({ answerText: text, answerSource }) => {
