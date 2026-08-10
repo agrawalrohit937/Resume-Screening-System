@@ -20,7 +20,7 @@ export default function LandingFooter({
             <Link to="/" className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center p-1.5 shadow-md">
                 <img
-                  src="/logo_t.png"
+                  src="/logo_t.webp"
                   alt="CareerShala Logo"
                   width={40}
                   height={40}

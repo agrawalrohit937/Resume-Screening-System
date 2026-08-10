@@ -291,7 +291,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
           tabIndex={0}
         >
           <img 
-            src="/logo_t.png"
+            src="/logo_t.webp"
             alt="CareerShala"
             width={36}
             height={36}

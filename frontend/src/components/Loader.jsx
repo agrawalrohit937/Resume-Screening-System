@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 
-const logoVideo = '/logo.mp4'
+const logoAsset = '/logo_t.webp'
 
 const MESSAGES = [
   'Initializing AI...',
@@ -29,8 +29,6 @@ const LOADER_BG = '#F2F4F7'
 export default function Loader({ show = true, onExitComplete }) {
   const prefersReducedMotion = useReducedMotion()
   const [index, setIndex] = useState(0)
-  const videoRef = useRef(null)
-  const [videoError, setVideoError] = useState(false)
 
   useEffect(() => {
     if (!show) return
@@ -70,11 +68,11 @@ export default function Loader({ show = true, onExitComplete }) {
           }}
         >
           <div className="relative flex flex-col items-center gap-6 px-6 text-center">
-            {/* ---------- Animated Logo Video (Bigger wrapper, proportional mask) ---------- */}
+            {/* ---------- Animated Logo Aura & Asset ---------- */}
             <motion.div
               initial={{
                 opacity: 0,
-                scale: 0.96,
+                scale: 0.9,
               }}
               animate={{
                 opacity: 1,
@@ -85,48 +83,43 @@ export default function Loader({ show = true, onExitComplete }) {
                 scale: 0.95,
               }}
               transition={logoTransition}
-              style={{
-                overflow: 'hidden',
-                width: '480px',
-                height: '270px',
-                borderRadius: 0,
-                lineHeight: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                // THE FIX: 'ellipse closest-side' ensures the fade matches the rectangular shape.
-                // It goes fully transparent BEFORE it hits the top or bottom edges.
-                WebkitMaskImage: 'radial-gradient(ellipse closest-side, black 50%, transparent 90%)',
-                maskImage: 'radial-gradient(ellipse closest-side, black 50%, transparent 90%)',
-              }}
+              className="relative flex items-center justify-center w-36 h-36 my-2"
             >
-              <video
-                ref={videoRef}
-                autoPlay
-                muted={true}
-                loop
-                playsInline
-                preload="none"
-                src={show ? logoVideo : undefined}
-                onError={(e) => {
-                  console.warn('[Loader] Video failed to load or autoplay:', e)
-                  setVideoError(true)
+              {/* Pulsing ambient background glow ring */}
+              <motion.div
+                animate={
+                  prefersReducedMotion
+                    ? {}
+                    : {
+                        scale: [1, 1.15, 1],
+                        opacity: [0.3, 0.6, 0.3],
+                      }
+                }
+                transition={{
+                  duration: 2.5,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
                 }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  display: videoError ? 'none' : 'block',
-                  border: 'none',
-                  outline: 'none',
-                  borderRadius: 0,
-                  boxShadow: 'none',
-                  transform: 'scale(1.15)', 
-                  transformOrigin: 'center center',
-                }}
-              >
-                {show && <source src={logoVideo} type="video/mp4" />}
-              </video>
+                className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#2E9BDA]/30 via-[#38AEEA]/20 to-indigo-500/30 blur-2xl pointer-events-none"
+              />
+
+              {/* Rotating glowing accent border */}
+              <motion.div
+                animate={prefersReducedMotion ? {} : { rotate: 360 }}
+                transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-0 rounded-full border border-dashed border-[#2E9BDA]/40 pointer-events-none"
+              />
+
+              {/* Crisp Logo Image */}
+              <img
+                src={logoAsset}
+                alt="CareerShala Logo"
+                width={88}
+                height={88}
+                decoding="async"
+                loading="eager"
+                className="relative z-10 w-22 h-22 object-contain filter drop-shadow-md"
+              />
             </motion.div>
 
             {/* ---------- Brand ---------- */}

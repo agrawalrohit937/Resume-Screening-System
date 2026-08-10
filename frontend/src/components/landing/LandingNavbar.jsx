@@ -13,7 +13,7 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
         <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group shrink-0">
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:shadow-md group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
             <img
-              src="/logo_t.png"
+              src="/logo_t.webp"
               alt="CareerShala Logo"
               width={40}
               height={40}
