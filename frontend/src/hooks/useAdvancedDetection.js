@@ -84,6 +84,7 @@ export function useAdvancedDetection({
   const faceMeshRef     = useRef(null)
   const cocoModelRef    = useRef(null)
   const lookAwayStart   = useRef(null)
+  const lookDownStart   = useRef(null)
   const lastEvents      = useRef({})        // throttle same event type
   const mountedRef      = useRef(true)
   const faceTimerRef    = useRef(null)
@@ -116,6 +117,7 @@ export function useAdvancedDetection({
       setStatus(s => ({ ...s, faceCount:0, gazeDir:'unknown' }))
       emitEvent('face_missing', 'medium', 'No face detected in camera frame')
       trackLookAway(true)
+      trackLookingDown(false)
       return
     }
     if (count > 1) {
@@ -131,6 +133,14 @@ export function useAdvancedDetection({
 
     // Combined look-away detection (iris + head pose)
     const lookingAway = gaze.dir !== 'center' || Math.abs(headPose.yaw) > 20 || Math.abs(headPose.pitch) > 20
+
+    // Downside gaze / head pitch check (looking down at notes/phone)
+    const isLookingDown = gaze.dir === 'down' || headPose.pitch > 16 || gaze.offsetY > 0.22
+    if (isLookingDown) {
+      trackLookingDown(true)
+    } else {
+      trackLookingDown(false)
+    }
 
     // ── Eye openness (drowsiness / distraction) ───────────────────────────
     const eyeOpen = computeEyeOpenness(lm)
@@ -514,6 +524,20 @@ const initFaceApi = useCallback(async () => {
     }
   }
 
+  // ── Looking Down / Reading below screen detector ──────────────────────────
+  function trackLookingDown(isDown) {
+    if (isDown) {
+      if (!lookDownStart.current) lookDownStart.current = Date.now()
+      const ms = Date.now() - lookDownStart.current
+      if (ms >= 1200) { // 1.2s looking down
+        emitEvent('looking_down', 'high', 'Looking down below screen — possible phone or notes usage')
+        lookDownStart.current = Date.now() // reset timer after event emit
+      }
+    } else {
+      lookDownStart.current = null
+    }
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // LAYER 3 — COCO-SSD Object Detection (Phone, book, laptop, multiple persons)
   // ══════════════════════════════════════════════════════════════════════════
@@ -524,15 +548,26 @@ const initFaceApi = useCallback(async () => {
 
     try {
       const predictions = await cocoModelRef.current.detect(vid)
+      const vidH = vid.videoHeight || 480
 
-      // 1. Detect suspicious restricted objects (cell phone, partial phone, book, laptop, etc.)
-      const suspiciousObjects = predictions.filter(p =>
-        SUSPICIOUS_OBJECTS.has(p.class.toLowerCase()) && p.score > 0.22
-      )
+      // 1. Detect suspicious restricted objects (cell phone, partial phone, book, laptop, camera, etc.)
+      const suspiciousObjects = predictions.filter(p => {
+        const cls = p.class.toLowerCase()
+        const isSuspiciousCategory = SUSPICIOUS_OBJECTS.has(cls)
+        // High-sensitivity score threshold for known suspicious categories
+        if (isSuspiciousCategory && p.score > 0.15) return true
+
+        // Bottom 35% camera frame edge detection (partial phone raised from bottom)
+        const [x, y, w, h] = p.bbox
+        const isNearBottomEdge = (y + h) > (vidH * 0.65)
+        if (isNearBottomEdge && cls !== 'person' && p.score > 0.18) return true
+
+        return false
+      })
 
       // 2. Detect multiple persons via COCO-SSD
       const persons = predictions.filter(p =>
-        p.class.toLowerCase() === 'person' && p.score > 0.40
+        p.class.toLowerCase() === 'person' && p.score > 0.35
       )
 
       if (suspiciousObjects.length > 0) {
