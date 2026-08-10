@@ -171,7 +171,7 @@ export function useAdvancedDetection({
 const MEDIAPIPE_VERSION = '0.4.1633559619';
 
 const loadMediaPipeCDN = async () => {
-  if (window.FaceMesh && window.Camera) return true;
+  if (typeof window.FaceMesh === 'function' && window.Camera) return true;
   const loadScript = (src) => new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) return resolve();
     const script = document.createElement('script');
