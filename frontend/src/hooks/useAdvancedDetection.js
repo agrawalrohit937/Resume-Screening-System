@@ -42,8 +42,8 @@ const FOREHEAD          = 10
 
 // ── Phone-like objects COCO-SSD detects ──────────────────────────────────────
 const SUSPICIOUS_OBJECTS = new Set([
-  'cell phone', 'laptop', 'book', 'remote', 'keyboard', 'mouse',
-  'tablet', 'ipad', 'phone',
+  'cell phone', 'mobile phone', 'phone', 'laptop', 'book', 'remote', 'keyboard', 'mouse',
+  'tablet', 'ipad', 'tv', 'monitor',
 ])
 
 // ── Suspicious emotions ───────────────────────────────────────────────────────
@@ -167,6 +167,9 @@ export function useAdvancedDetection({
     }
   }, [])
 
+// MediaPipe version pinned for exact WASM & asset binary alignment via unpkg CDN
+const MEDIAPIPE_VERSION = '0.4.1633559619';
+
 const loadMediaPipeCDN = async () => {
   if (window.FaceMesh && window.Camera) return true;
   const loadScript = (src) => new Promise((resolve, reject) => {
@@ -180,8 +183,8 @@ const loadMediaPipeCDN = async () => {
     document.head.appendChild(script);
   });
   try {
-    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
-    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
+    await loadScript(`https://unpkg.com/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js`);
+    await loadScript(`https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/face_mesh.js`);
     return true;
   } catch (e) {
     console.error('[Detection] Failed to load MediaPipe CDN scripts:', e);
@@ -201,36 +204,37 @@ const initMediaPipe = useCallback(async () => {
 
   try {
     const fm = new window.FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      locateFile: (file) => {
+        const cleanFile = file.replace(/^\//, '');
+        return `https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/${cleanFile}`;
+      },
     });
     
     fm.setOptions({
       maxNumFaces: 2,
-      refineLandmarks: true,
+      refineLandmarks: false, // Set to false to avoid external attention model fetch errors
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5,
     });
 
     fm.onResults(handleFaceMeshResults);
-    // Remove fm.initialize() if it's causing 'Module.arguments' error, 
-    // FaceMesh usually initializes on the first .send()
-      faceMeshRef.current = fm;
-      // Test send to verify ready
-      if (videoRef.current) {
-        try {
-          await fm.send({ image: videoRef.current });
-          console.log('[Detection] FaceMesh verified ready');
-        } catch (e) {
-          console.warn('[Detection] FaceMesh test send failed:', e.message);
-        }
+    faceMeshRef.current = fm;
+
+    if (videoRef?.current) {
+      try {
+        await fm.send({ image: videoRef.current });
+        console.log('[Detection] FaceMesh verified ready');
+      } catch (e) {
+        console.warn('[Detection] FaceMesh test send failed:', e.message);
       }
-      if (mountedRef.current) setStatus(s => ({ ...s, mpReady: true }));
-      return true;
+    }
+    if (mountedRef.current) setStatus(s => ({ ...s, mpReady: true }));
+    return true;
   } catch (e) {
-    console.error('[Detection] FaceMesh error:', e);
+    console.error('[Detection] FaceMesh error (will use face-api fallback):', e);
     return false;
   }
-}, [handleFaceMeshResults]);
+}, [handleFaceMeshResults, videoRef]);
 
   // ── Init TF.js + COCO-SSD ─────────────────────────────────────────────────
 const initCocoSSD = useCallback(async () => {
@@ -510,7 +514,7 @@ const initFaceApi = useCallback(async () => {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // LAYER 3 — COCO-SSD Object Detection (Phone, book, etc.)
+  // LAYER 3 — COCO-SSD Object Detection (Phone, book, laptop, multiple persons)
   // ══════════════════════════════════════════════════════════════════════════
   const runObjectDetection = useCallback(async () => {
     if (!cocoModelRef.current || !videoRef?.current) return
@@ -519,27 +523,46 @@ const initFaceApi = useCallback(async () => {
 
     try {
       const predictions = await cocoModelRef.current.detect(vid)
-      const suspicious  = predictions.filter(p =>
-        SUSPICIOUS_OBJECTS.has(p.class.toLowerCase()) && p.score > 0.55
+
+      // 1. Detect suspicious restricted objects (cell phone, book, laptop, etc.)
+      const suspiciousObjects = predictions.filter(p =>
+        SUSPICIOUS_OBJECTS.has(p.class.toLowerCase()) && p.score > 0.45
       )
 
-      if (suspicious.length > 0) {
-        const topObj = suspicious.reduce((a, b) => a.score > b.score ? a : b)
+      // 2. Detect multiple persons via COCO-SSD
+      const persons = predictions.filter(p =>
+        p.class.toLowerCase() === 'person' && p.score > 0.45
+      )
+
+      if (suspiciousObjects.length > 0) {
+        const topObj = suspiciousObjects.reduce((a, b) => a.score > b.score ? a : b)
         setStatus(s => ({ ...s, phone: true, objectLabel: topObj.class }))
         emitEvent(
-          'phone_detected', 'high',
-          `Suspicious object: "${topObj.class}" (${(topObj.score * 100).toFixed(0)}% confidence)`
+          'phone_detected',
+          'high',
+          `Restricted object detected: "${topObj.class}" (${(topObj.score * 100).toFixed(0)}% confidence)`
         )
-
-        // Draw detection box on canvas
-        if (canvasRef?.current) {
-          drawObjectBoxes(canvasRef.current, suspicious, vid.videoWidth, vid.videoHeight)
-        }
       } else {
         setStatus(s => ({ ...s, phone: false, objectLabel: null }))
       }
+
+      if (persons.length > 1) {
+        emitEvent(
+          'multiple_faces',
+          'high',
+          `Multiple people detected (${persons.length} persons in frame)`
+        )
+      }
+
+      // Draw detection bounding boxes on canvas overlay for any detected objects or multiple persons
+      if (canvasRef?.current) {
+        const boxesToDraw = [...suspiciousObjects, ...(persons.length > 1 ? persons : [])]
+        if (boxesToDraw.length > 0) {
+          drawObjectBoxes(canvasRef.current, boxesToDraw, vid.videoWidth, vid.videoHeight)
+        }
+      }
     } catch (e) {
-      // ignore transient errors
+      // ignore transient detection errors
     }
   }, [videoRef, canvasRef])
 
@@ -640,15 +663,46 @@ const runEmotionDetection = useCallback(async () => {
   useEffect(() => {
     if (!active) return
 
-    // FaceMesh — continuous via setInterval + send()
+    // Continuous face processing loop (MediaPipe with face-api.js failsafe fallback)
     faceTimerRef.current = setInterval(async () => {
-      if (!faceMeshRef.current || !videoRef?.current) return
+      if (!videoRef?.current) return
       const vid = videoRef.current
       if (vid.readyState < 2 || vid.paused) return
-      try { await faceMeshRef.current.send({ image: vid }) } catch {}
+
+      // Primary: MediaPipe FaceMesh
+      if (faceMeshRef.current && status.mpReady) {
+        try {
+          await faceMeshRef.current.send({ image: vid })
+          return
+        } catch (err) {
+          console.warn('[Detection] MediaPipe send failed, attempting fallback', err.message)
+        }
+      }
+
+      // Failsafe Fallback: face-api.js TinyFaceDetector
+      if (window.faceapi && window.faceapi.nets.tinyFaceDetector?.params) {
+        try {
+          const detections = await window.faceapi.detectAllFaces(
+            vid,
+            new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.45 })
+          )
+          const count = detections ? detections.length : 0
+          if (count === 0) {
+            setStatus(s => ({ ...s, faceCount: 0, gazeDir: 'unknown' }))
+            emitEvent('face_missing', 'medium', 'No face detected in camera frame')
+          } else if (count > 1) {
+            setStatus(s => ({ ...s, faceCount: count }))
+            emitEvent('multiple_faces', 'high', `${count} faces detected in frame`)
+          } else {
+            setStatus(s => ({ ...s, faceCount: 1, gazeDir: 'center', confidence: 0.95 }))
+          }
+        } catch (e) {
+          // ignore fallback errors
+        }
+      }
     }, faceInterval)
 
-    // COCO-SSD object detection
+    // COCO-SSD object detection (runs independently)
     objTimerRef.current = setInterval(runObjectDetection, objectInterval)
 
     // Emotion detection
@@ -659,7 +713,7 @@ const runEmotionDetection = useCallback(async () => {
       clearInterval(objTimerRef.current)
       clearInterval(emoTimerRef.current)
     }
-  }, [active, faceInterval, objectInterval, emotionInterval, runObjectDetection, runEmotionDetection])
+  }, [active, faceInterval, objectInterval, emotionInterval, runObjectDetection, runEmotionDetection, status.mpReady])
 
   // ══════════════════════════════════════════════════════════════════════════
   // CANVAS DRAWING — Visual debug overlay
@@ -724,12 +778,13 @@ const runEmotionDetection = useCallback(async () => {
     })
   }
 
-  // ── Event emitter with 6s throttle ────────────────────────────────────────
+  // ── Event emitter (3.5s throttle for high severity events like phone/multi-faces) ─
   function emitEvent(type, severity, details) {
     const fn = onEventRef.current
     if (!fn) return
     const now = Date.now()
-    if (lastEvents.current[type] && now - lastEvents.current[type] < 6000) return
+    const throttleMs = severity === 'high' ? 3500 : 6000
+    if (lastEvents.current[type] && now - lastEvents.current[type] < throttleMs) return
     lastEvents.current[type] = now
     fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })
   }
