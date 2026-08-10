@@ -403,8 +403,8 @@ export default function LiveInterviewV2() {
   // This keeps the page lightweight on phones (they can't do the interview anyway).
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
-    active: !isMobile && (session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING),
-    faceInterval: 1500, objectInterval: 4000, emotionInterval: 5000,
+    active: session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING,
+    faceInterval: 1500, objectInterval: 2500, emotionInterval: 5000,
   })
 
   const startCamera = useCallback(async () => {
