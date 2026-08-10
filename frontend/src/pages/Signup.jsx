@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import { Mail, Lock, User, Eye, EyeOff, Briefcase, ArrowRight, CheckCircle2 } from 'lucide-react'
 
-const illustration = '/illustration.png';
+const illustration = '/illustration.webp';
 
 const getOAuthRedirectUri = (envVal, path) => {
   if (envVal && typeof envVal === 'string' && !envVal.includes('localhost')) {
@@ -117,6 +117,10 @@ export default function Signup() {
           <img
             src={illustration}
             alt="Career illustration background"
+            width={600}
+            height={600}
+            decoding="async"
+            loading="eager"
             className="w-full h-full object-cover object-bottom origin-bottom opacity-70 animate-[float_6s_ease-in-out_infinite]"
           />
         </div>
@@ -124,7 +128,7 @@ export default function Signup() {
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
           <img
-            src="/logo_t.png"
+            src="/logo_t.webp"
             alt="CareerShala Logo"
             width={40}
             height={40}
@@ -176,7 +180,7 @@ export default function Signup() {
           {/* Mobile-only logo */}
           <div className="mb-6 flex items-center gap-2.5 lg:hidden">
             <img
-              src="/logo_t.png"
+              src="/logo_t.webp"
               alt="CareerShala Logo"
               width={36}
               height={36}
@@ -189,13 +193,13 @@ export default function Signup() {
             </span>
           </div>
 
-          <h1 className="font-display text-[32px] font-bold tracking-tight text-[#111827]">Join the future.</h1>
+          <h2 className="font-display text-[32px] font-bold tracking-tight text-[#111827]">Join the future.</h2>
           <p className="mt-1 text-[14px] font-medium text-[#2E9BDA]">
             Get AI-powered resume insights & job matches in seconds.
           </p>
 
           {/* ROLE SELECTOR */}
-          <div className="relative mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+          <div className="relative mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Select role">
             {['candidate', 'recruiter'].map((role) => {
               const Icon = role === 'candidate' ? User : Briefcase
               const active = selectedRole === role
@@ -204,6 +208,8 @@ export default function Signup() {
                   key={role}
                   type="button"
                   onClick={() => setValue("role", role)}
+                  aria-pressed={active}
+                  aria-label={`Sign up as ${role}`}
                   className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
                     active ? 'text-[#1d6fa5]' : 'text-slate-500 hover:text-slate-800'
                   }`}
@@ -236,9 +242,10 @@ export default function Signup() {
                   id="full_name"
                   type="text"
                   placeholder="John Doe"
+                  aria-label="Full Name"
                   disabled={loading}
                   {...register('full_name', {
-                    required: 'Name is required',
+                    required: 'Full name is required',
                     minLength: { value: 2, message: 'Name must be at least 2 characters' }
                   })}
                   className={`h-[46px] w-full rounded-xl border bg-white pl-12 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
@@ -254,7 +261,7 @@ export default function Signup() {
             {/* EMAIL */}
             <div>
               <label htmlFor="email" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Email address
+                Email Address
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
@@ -262,11 +269,12 @@ export default function Signup() {
                   id="email"
                   type="email"
                   placeholder="you@example.com"
+                  aria-label="Email Address"
                   disabled={loading}
                   {...register('email', {
                     required: 'Email is required',
                     pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      value: /^\S+@\S+$/i,
                       message: "Invalid email address"
                     }
                   })}
@@ -291,8 +299,9 @@ export default function Signup() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
+                  aria-label="Password"
                   disabled={loading}
-                  {...register('password', { required: 'Password is required', minLength: { value: 6, message: 'Min 6 chars' } })}
+                  {...register('password', { required: 'Password is required', minLength: { value: 6, message: 'Password must be at least 6 characters' } })}
                   className={`h-[46px] w-full rounded-xl border bg-white pl-12 pr-12 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
                     errors.password
                       ? 'border-red-400 focus:ring-2 focus:ring-red-100'
@@ -302,6 +311,7 @@ export default function Signup() {
                 <button
                   type="button"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => !loading && setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2E9BDA]"
                 >
@@ -341,12 +351,12 @@ export default function Signup() {
             <button
               type="submit"
               disabled={loading}
-              className="group mt-1 flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-[14px] font-bold text-white shadow-lg shadow-[#2E9BDA]/20 transition-all hover:shadow-[#2E9BDA]/35 disabled:opacity-60"
+              className="group mt-2 flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-[14px] font-bold text-white shadow-lg shadow-[#2E9BDA]/20 transition-all hover:shadow-[#2E9BDA]/35 disabled:opacity-60"
             >
               {loading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  Creating Account…
+                  Creating account…
                 </>
               ) : (
                 <>
@@ -371,6 +381,7 @@ export default function Signup() {
               onClick={() => handleGoogleLogin()}
               disabled={loading}
               title="Continue with Google"
+              aria-label="Continue with Google"
               className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -386,6 +397,7 @@ export default function Signup() {
               onClick={handleLinkedInLogin}
               disabled={loading}
               title="Continue with LinkedIn"
+              aria-label="Continue with LinkedIn"
               className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-[#0A66C2] shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -398,6 +410,7 @@ export default function Signup() {
               onClick={handleGithubLogin}
               disabled={loading}
               title="Continue with GitHub"
+              aria-label="Continue with GitHub"
               className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -416,7 +429,6 @@ export default function Signup() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
         .font-display { font-family: 'Outfit', sans-serif; }
         @keyframes float {
           0%, 100% { transform: translateY(0); }

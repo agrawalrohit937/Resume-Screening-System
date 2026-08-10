@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import { Mail, Lock, Eye, EyeOff, User, Briefcase, ArrowRight, CheckCircle2 } from 'lucide-react'
 
-const illustration = '/illustration.png';
+const illustration = '/illustration.webp';
 
 const getOAuthRedirectUri = (envVal, path) => {
   if (envVal && typeof envVal === 'string' && !envVal.includes('localhost')) {
@@ -50,7 +50,6 @@ export default function Login() {
     onSuccess: async (codeResponse) => {
       setLoading(true)
       try {
-        // Note: useGoogleLogin returns an access_token in codeResponse.access_token
         await googleLogin(codeResponse.access_token, selectedRole)
         toast.success('Welcome! 🚀')
         navigate('/dashboard')
@@ -67,16 +66,13 @@ export default function Login() {
     }
   });
 
-  // ── CHANGED: login() may now return { requires_otp: true, challenge_token }
-  // if this is a new/untrusted device (FEATURE 4 — Secure Login). In that case
-  // we send the user to /verify-email in "login" mode instead of /dashboard.
   const onSubmit = async ({ email, password }) => {
     setLoading(true)
     try {
       const result = await login(email, password, selectedRole)
 
       if (result?.requires_otp) {
-        toast('Verify it\u2019s you — check your email for a code', { icon: '🔐' })
+        toast('Verify it’s you — check your email for a code', { icon: '🔐' })
         navigate('/verify-email', {
           state: { email, challengeToken: result.challenge_token, mode: 'login' },
         })
@@ -100,11 +96,15 @@ export default function Login() {
         {/* Ambient glows */}
         <div className="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[#2E9BDA]/15 blur-3xl" />
 
-        {/* BACKGROUND ILLUSTRATION — Stretches full-width, touches left/right borders, extends up behind content */}
+        {/* BACKGROUND ILLUSTRATION */}
         <div className="absolute bottom-0 left-0 right-0 z-0 top-20 w-full h-[100%] pointer-events-none overflow-hidden">
           <img
             src={illustration}
             alt="Career illustration background"
+            width={600}
+            height={600}
+            decoding="async"
+            loading="eager"
             className="w-full h-full object-cover object-bottom origin-bottom opacity-70 animate-[float_6s_ease-in-out_infinite]"
           />
         </div>
@@ -112,7 +112,7 @@ export default function Login() {
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
           <img
-            src="/logo_t.png"
+            src="/logo_t.webp"
             alt="CareerShala Logo"
             width={40}
             height={40}
@@ -161,7 +161,7 @@ export default function Login() {
           {/* Mobile-only logo */}
           <div className="mb-6 flex items-center gap-2.5 lg:hidden">
             <img
-              src="/logo_t.png"
+              src="/logo_t.webp"
               alt="CareerShala Logo"
               width={36}
               height={36}
@@ -174,13 +174,13 @@ export default function Login() {
             </span>
           </div>
 
-          <h1 className="font-display text-[32px] font-bold tracking-tight text-[#111827]">Welcome back</h1>
+          <h2 className="font-display text-[32px] font-bold tracking-tight text-[#111827]">Welcome back</h2>
           <p className="mt-1 text-[14px] font-medium text-[#2E9BDA]">
             Great opportunities start with a single step.
           </p>
 
           {/* ROLE SELECTOR */}
-          <div className="relative mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+          <div className="relative mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Select role">
             {['candidate', 'recruiter'].map((role) => {
               const Icon = role === 'candidate' ? User : Briefcase
               const active = selectedRole === role
@@ -189,6 +189,8 @@ export default function Login() {
                   key={role}
                   type="button"
                   onClick={() => setSelectedRole(role)}
+                  aria-pressed={active}
+                  aria-label={`Login as ${role}`}
                   className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
                     active ? 'text-[#1d6fa5]' : 'text-slate-500 hover:text-slate-800'
                   }`}
@@ -219,6 +221,7 @@ export default function Login() {
                   id="email"
                   type="email"
                   placeholder="you@example.com"
+                  aria-label="Email address"
                   disabled={loading}
                   {...register('email', {
                     required: 'Email is required',
@@ -245,6 +248,7 @@ export default function Login() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
+                  aria-label="Password"
                   disabled={loading}
                   {...register('password', {
                     required: 'Password is required',
@@ -259,6 +263,7 @@ export default function Login() {
                 <button
                   type="button"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => !loading && setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2E9BDA]"
                 >
@@ -271,7 +276,7 @@ export default function Login() {
             {/* REMEMBER & FORGOT */}
             <div className="flex items-center justify-between pt-0.5 text-[13px]">
               <label className="flex items-center gap-2 text-slate-500 cursor-pointer select-none">
-                <input type="checkbox" className="h-[15px] w-[15px] rounded border-slate-300 accent-[#2E9BDA]" disabled={loading} />
+                <input type="checkbox" aria-label="Remember me" className="h-[15px] w-[15px] rounded border-slate-300 accent-[#2E9BDA]" disabled={loading} />
                 Remember me
               </label>
               <Link to="/forgot-password" className="font-semibold text-[#2E9BDA] hover:underline">
@@ -313,6 +318,7 @@ export default function Login() {
               onClick={() => handleGoogleLogin()}
               disabled={loading}
               title="Continue with Google"
+              aria-label="Continue with Google"
               className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -327,6 +333,7 @@ export default function Login() {
               onClick={handleLinkedInLogin}
               disabled={loading}
               title="Continue with LinkedIn"
+              aria-label="Continue with LinkedIn"
               className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-[#0A66C2] shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -339,6 +346,7 @@ export default function Login() {
               onClick={handleGithubLogin}
               disabled={loading}
               title="Continue with GitHub"
+              aria-label="Continue with GitHub"
               className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -357,7 +365,6 @@ export default function Login() {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
         .font-display { font-family: 'Outfit', sans-serif; }
         @keyframes float {
           0%, 100% { transform: translateY(0); }

@@ -105,7 +105,7 @@ export default function Careers() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group shrink-0">
             <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:shadow-md group-hover:scale-105 transition-all duration-300 p-1.5">
-              <img src="/logo_t.png" alt="CareerShala Logo" width={40} height={40} decoding="async" loading="eager" className="w-full h-full object-contain" />
+              <img src="/logo_t.webp" alt="CareerShala Logo" width={40} height={40} decoding="async" loading="eager" className="w-full h-full object-contain" />
             </div>
             <span className="text-xl font-extrabold tracking-tight text-slate-900 group-hover:opacity-80 transition-opacity">
               Career<span className="text-[#2E9BDA]">Shala</span> <span className="text-xs font-bold text-slate-400 font-mono">/ Careers</span>
@@ -163,11 +163,13 @@ export default function Careers() {
               {/* Full Name & Email Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                  <label htmlFor="careers_full_name" className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
                     <Users size={13} className="text-[#2E9BDA]" /> Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="careers_full_name"
                     type="text" required
+                    aria-label="Full Name"
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     placeholder="e.g. Rahul Sharma"
@@ -176,11 +178,13 @@ export default function Careers() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                  <label htmlFor="careers_email" className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
                     <Send size={13} className="text-[#2E9BDA]" /> Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="careers_email"
                     type="email" required
+                    aria-label="Email Address"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="rahul@example.com"
@@ -191,11 +195,13 @@ export default function Careers() {
 
               {/* Target Position Dropdown */}
               <div className="space-y-1.5">
-                <label className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                <label htmlFor="careers_position" className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
                   <Briefcase size={13} className="text-[#2E9BDA]" /> Target Position <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <select
+                    id="careers_position"
+                    aria-label="Target Position"
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-900 appearance-none focus:outline-none focus:border-[#2E9BDA] focus:ring-1 focus:ring-[#2E9BDA] pr-10 cursor-pointer"
@@ -212,11 +218,13 @@ export default function Careers() {
 
               {/* Portfolio / GitHub Link */}
               <div className="space-y-1.5">
-                <label className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                <label htmlFor="careers_portfolio" className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
                   <Globe size={13} className="text-[#2E9BDA]" /> Portfolio / GitHub Link <span className="text-slate-400 font-normal">(Optional)</span>
                 </label>
                 <input
+                  id="careers_portfolio"
                   type="url"
+                  aria-label="Portfolio or GitHub Link"
                   value={formData.portfolio_url}
                   onChange={(e) => setFormData({ ...formData, portfolio_url: e.target.value })}
                   placeholder="https://github.com/rahulsharma"
