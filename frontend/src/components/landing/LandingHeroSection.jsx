@@ -44,7 +44,7 @@ export default function LandingHeroSection({ user, fadeInUp, staggerContainer })
             className="text-3xl sm:text-6xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.14] max-w-5xl mb-6 sm:mb-8"
           >
             Get Your Resume Noticed & Pass AI Screening in{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-indigo-600 to-[#1d6fa5] underline decoration-sky-300/60 decoration-wavy decoration-2">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-indigo-600 to-[#1d6fa5]">
               Seconds
             </span>
           </motion.h1>
