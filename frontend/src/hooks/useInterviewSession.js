@@ -38,10 +38,10 @@ export function useInterviewSession() {
   const totalQ       = questions.length
   const isLastQ      = currentQIdx >= totalQ - 1
 
-  // ── 1. FAILSAFE: 7/3 Bug Prevention ──────────────────────────────────────
-  // Jaise hi state mein 3 warnings hon, turant abort phase mein bhej do
+  // ── 1. FAILSAFE: Warning Limit Check ─────────────────────────────────────
+  // Abort session universally on 5 warnings across all interviews
   useEffect(() => {
-    if (cheatingData.warning_count >= 3 && phase !== SESSION_PHASE.ABORTED) {
+    if (cheatingData.warning_count >= 5 && phase !== SESSION_PHASE.ABORTED) {
       console.warn("CRITICAL: Integrity limit reached. Aborting...");
       setPhase(SESSION_PHASE.ABORTED);
     }
@@ -140,11 +140,14 @@ export function useInterviewSession() {
   // ── 5. Cheating Logic ─────────────────────────────────────────────────────
   const recordCheatingEvent = useCallback((event) => {
     setCheatingData(prev => {
-      const isWarning = event.severity === 'high' || event.severity === 'medium';
+      const newEvents = [...prev.events, event]
+      const highCount = newEvents.filter(e => e.severity === 'high' || e.severity === 'critical' || e.event_type === 'looking_down').length
+      const medCount = newEvents.filter(e => e.severity === 'medium' && e.event_type !== 'looking_down').length
+      const calculatedWarnings = highCount + Math.floor(medCount / 3)
       return {
         ...prev,
-        warning_count: isWarning ? prev.warning_count + 1 : prev.warning_count,
-        events: [...prev.events, event],
+        warning_count: calculatedWarnings,
+        events: newEvents,
       };
     });
     cheatingQueue.current.push(event)
@@ -201,6 +204,7 @@ export function useInterviewSession() {
     if (!session?.session_id) return
     try {
       await api.post(`${BASE}/sessions/${session.session_id}/start`)
+      setCheatingData({ score:0, warning_count:0, events:[] })
       setPhase(SESSION_PHASE.ACTIVE)
     } catch (err) { toast.error('Failed to start session') }
   }, [session])
@@ -230,11 +234,16 @@ export function useInterviewSession() {
     setCurrentQIdx(0); setTimeElapsed(0); setCheatingData({ score:0, warning_count:0, events:[] });
   }, [])
 
+  const abortSession = useCallback((reason = 'Session aborted due to integrity violation') => {
+    console.warn('Aborting session:', reason)
+    setPhase(SESSION_PHASE.ABORTED)
+  }, [])
+
   return {
     phase, session, currentQ, currentQIdx, totalQ, isLastQ,
     answers, currentEval, cheatingData, sessionReport,
     loading, timeElapsed, questionTimer,
     createSession, startSession, submitAnswer, nextQuestion,
-    completeSession, recordCheatingEvent, resetSession, reattemptQuestion,
+    completeSession, recordCheatingEvent, resetSession, reattemptQuestion, abortSession,
   }
 }

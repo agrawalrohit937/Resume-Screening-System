@@ -16,6 +16,7 @@ const EVENT_MESSAGES = {
   face_missing:     { msg:'Please return your face to the camera frame.', sub:'Session may be paused.' },
   multiple_faces:   { msg:'Multiple people detected in frame.', sub:'Only you should be visible during the interview.' },
   looking_away:     { msg:'Please maintain eye contact with the screen.', sub:'Extended gaze deviation has been flagged.' },
+  looking_down:     { msg:'Please keep your eyes on the screen.', sub:'Looking down below screen detected (possible notes or secondary device).' },
   phone_detected:   { msg:'A phone or device was detected in frame.', sub:'All external resources are prohibited.' },
   tab_switch:       { msg:'You left the interview window.', sub:'All activity is monitored and recorded.' },
   window_blur:      { msg:'Interview window lost focus.', sub:'Please stay on this page.' },

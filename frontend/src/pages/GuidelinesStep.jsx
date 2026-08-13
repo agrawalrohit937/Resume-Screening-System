@@ -7,7 +7,7 @@ const RULES = [
   { icon: MonitorCheck, title: 'Full-screen required', desc: 'Leaving full-screen will be recorded as a distraction warning.' },
   { icon: Camera, title: 'Stay on camera', desc: 'Keep your face in frame. The system confirms visibility continuously.' },
   { icon: Mic, title: 'Speak or type', desc: 'Answer out loud or by typing. Switch methods at any time.' },
-  { icon: Eye, title: 'Maintain focus', desc: 'Avoid looking away, using phones, or having others in frame.' },
+  { icon: Eye, title: 'Maintain focus', desc: 'Avoid looking away, looking down at notes, using phones, or having others in frame.' },
   { icon: Clock4, title: 'Questions are timed', desc: 'A timer counts down. Questions auto-submit when time is up.' },
   { icon: RotateCcw, title: 'One retry option', desc: 'Made a mistake? You can restart your answer once per question.' },
   { icon: ShieldAlert, title: 'Three warnings ends the session', desc: 'Repeated flags for tab switching or missing camera will end practice early.', isCritical: true },

@@ -57,6 +57,7 @@ export function useFaceDetection({ videoRef, onEvent, active = true, intervalMs 
   }, [])
 
   const missingFaceStartTimeRef = useRef(null)
+  const lookDownStartRef = useRef(null)
 
   // Process face-api.js results
   const handleFaceApiResults = useCallback(async (detections) => {
@@ -85,8 +86,19 @@ export function useFaceDetection({ videoRef, onEvent, active = true, intervalMs 
       setGazeDir(gaze)
       if (gaze !== 'center') {
         setFaceStatus('looking_away')
-        dispatchEvent('looking_away', 'low', `Gaze: ${gaze}`)
+        if (gaze === 'down') {
+          if (!lookDownStartRef.current) lookDownStartRef.current = Date.now()
+          const ms = Date.now() - lookDownStartRef.current
+          if (ms >= 3000) {
+            dispatchEvent('looking_down', 'high', 'Sustained look down below screen detected (3.0s)')
+            lookDownStartRef.current = Date.now()
+          }
+        } else {
+          lookDownStartRef.current = null
+          dispatchEvent('looking_away', 'low', `Gaze: ${gaze}`)
+        }
       } else {
+        lookDownStartRef.current = null
         setFaceStatus('ok')
       }
     }
@@ -172,7 +184,7 @@ export function useFaceDetection({ videoRef, onEvent, active = true, intervalMs 
       // Vertical rough estimate
       const avgEyeY = (leftEyeCenter.y + rightEyeCenter.y) / 2
       if (avgEyeY < 0.35) return 'up'
-      if (avgEyeY > 0.65) return 'down'
+      if (avgEyeY > 0.55) return 'down'
       
       return 'center'
     } catch {

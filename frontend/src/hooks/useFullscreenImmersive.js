@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /**
- * Fullscreen gate for the interview.
- *
- * FIX vs previous version: the old hook fired `onUnexpectedExit` for EVERY
- * exit from fullscreen — including ones WE caused on purpose by calling
- * `exitImmersive()` ourselves (e.g. when the user clicks "End Practice").
- * That meant ending the interview normally could get logged as a cheating
- * event and, in the worst case, trip the 3-warning auto-abort.
- *
- * Now `exitImmersive()` marks the next exit as "intentional" before it
- * happens, so the fullscreenchange listener knows to swallow it silently
- * instead of reporting it as suspicious.
+ * Fullscreen gate for the interview with cross-browser vendor prefix support.
  */
+function getFullscreenElement() {
+  if (typeof document === 'undefined') return null
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement ||
+    null
+  )
+}
+
 export function useFullscreenImmersive({
   onUnexpectedExit,
   enterOnMount = false,
@@ -21,44 +22,51 @@ export function useFullscreenImmersive({
   const onUnexpectedExitRef = useRef(onUnexpectedExit)
   onUnexpectedExitRef.current = onUnexpectedExit
 
-  // When true, the very next "exit fullscreen" transition was caused by us
-  // (exitImmersive()) and should NOT be reported as unexpected.
+  // When true, the next "exit fullscreen" transition was intentional (exitImmersive)
   const intentionalExitRef = useRef(false)
 
   const syncFromDocument = useCallback(() => {
-    setImmersive(!!document.fullscreenElement)
+    setImmersive(!!getFullscreenElement())
   }, [])
 
   useEffect(() => {
     syncFromDocument()
     const handler = () => {
-      const isFs = !!document.fullscreenElement
+      const isFs = !!getFullscreenElement()
       setImmersive(isFs)
       if (!isFs) {
         if (intentionalExitRef.current) {
-          // We caused this exit on purpose (End Practice, restart, etc.) —
-          // consume the flag and do NOT treat it as a violation.
           intentionalExitRef.current = false
         } else {
           onUnexpectedExitRef.current?.()
         }
       }
     }
-    document.addEventListener('fullscreenchange', handler)
-    return () => document.removeEventListener('fullscreenchange', handler)
+
+    const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+    events.forEach((evt) => document.addEventListener(evt, handler))
+
+    return () => {
+      events.forEach((evt) => document.removeEventListener(evt, handler))
+    }
   }, [syncFromDocument])
 
   const enterImmersive = useCallback(async () => {
     try {
       const el = document.documentElement
-      if (!document.fullscreenElement) {
-        await el.requestFullscreen()
+      if (!getFullscreenElement()) {
+        const requestMethod =
+          el.requestFullscreen ||
+          el.webkitRequestFullscreen ||
+          el.mozRequestFullScreen ||
+          el.msRequestFullscreen
+
+        if (requestMethod) {
+          await requestMethod.call(el)
+        }
       }
       syncFromDocument()
     } catch (e) {
-      // Fullscreen might be blocked (e.g. not called from a direct user
-      // gesture, or the browser/OS denies it). Swallow and let the caller
-      // decide what to do — never crash the flow over this.
       syncFromDocument()
     }
   }, [syncFromDocument])
@@ -66,11 +74,17 @@ export function useFullscreenImmersive({
   const exitImmersive = useCallback(async () => {
     intentionalExitRef.current = true
     try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen()
+      if (getFullscreenElement()) {
+        const exitMethod =
+          document.exitFullscreen ||
+          document.webkitExitFullscreen ||
+          document.mozCancelFullScreen ||
+          document.msExitFullscreen
+
+        if (exitMethod) {
+          await exitMethod.call(document)
+        }
       } else {
-        // Nothing to exit — clear the flag immediately so it doesn't leak
-        // into a future *actually* unexpected exit.
         intentionalExitRef.current = false
       }
     } catch (e) {
