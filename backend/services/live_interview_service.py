@@ -289,7 +289,7 @@ Return ONLY valid JSON (no markdown fences):
         events = session.get("cheating_events", []) + [event]
         score  = self._compute_cheating_score(events)
         warnings = self._count_warnings(events)
-        aborted  = warnings >= 3
+        aborted  = warnings >= 5
 
         update = {
             "$push": {"cheating_events": event},

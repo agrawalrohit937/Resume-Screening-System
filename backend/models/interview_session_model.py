@@ -27,6 +27,7 @@ class CheatingEventType(str, Enum):
     FACE_MISSING      = "face_missing"
     MULTIPLE_FACES    = "multiple_faces"
     LOOKING_AWAY      = "looking_away"
+    LOOKING_DOWN      = "looking_down"
     PHONE_DETECTED    = "phone_detected"
     COPY_PASTE        = "copy_paste"
     DEVTOOLS_OPEN     = "devtools_open"

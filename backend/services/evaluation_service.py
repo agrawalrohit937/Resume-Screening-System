@@ -17,11 +17,10 @@ logger = structlog.get_logger(__name__)
 GROQ_URL  = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-FILLER_WORDS = {
-    "um","uh","ah","er","like","you know","basically","literally","actually",
-    "so","right","okay","i mean","kind of","sort of","just","honestly","obviously",
-    "definitely","absolutely","very","really","thing","stuff",
-}
+# Hesitation sounds vs structural transition words for ESL speech calibration
+HESITATION_SOUNDS  = {"um", "uh", "ah", "er"}
+STRUCTURAL_FILLERS = {"basically", "literally", "actually", "i mean", "you know", "kind of", "sort of"}
+FILLER_WORDS = HESITATION_SOUNDS | STRUCTURAL_FILLERS
 
 
 class EvaluationService:
@@ -39,22 +38,26 @@ class EvaluationService:
     ) -> Dict[str, Any]:
         """
         Full evaluation — returns scores + feedback.
-        Falls back to heuristic if API call fails.
+        ESL Speech & STAR Framework calibrated evaluation engine.
         """
         if not answer.strip() or len(answer.strip()) < 5:
             return self._empty_answer_result()
 
-        # Count filler words in transcript
-        words  = answer.lower().split()
-        fillers = sum(1 for w in words if w.strip(".,!?") in FILLER_WORDS)
+        # Count hesitation sounds vs structural transition words
+        words = answer.lower().split()
+        hesitations = sum(1 for w in words if w.strip(".,!?") in HESITATION_SOUNDS)
+        structurals = sum(1 for w in words if w.strip(".,!?") in STRUCTURAL_FILLERS)
+        fillers     = hesitations + structurals
 
-        # Confidence heuristic from voice metadata
+        # ESL & Accented speech confidence calibration
         conf_penalty = 0
-        if voice_pauses > 5:   conf_penalty += 10
-        if voice_pauses > 10:  conf_penalty += 15
-        if speech_rate > 0 and (speech_rate < 80 or speech_rate > 200):
-            conf_penalty += 10
-        if fillers > 5:        conf_penalty += 10
+        if voice_pauses > 6:   conf_penalty += 5
+        if voice_pauses > 12:  conf_penalty += 10
+        # Relaxed WPM cadence range for non-native English speakers (65 - 190 WPM)
+        if speech_rate > 0 and (speech_rate < 65 or speech_rate > 190):
+            conf_penalty += 8
+        if hesitations > 5:    conf_penalty += 8
+        if structurals > 7:    conf_penalty += 4 # Minimal penalty for structural transition phrases
 
         prompt = self._build_prompt(question, answer, category, difficulty, job_title, ideal_answer, fillers)
 
@@ -102,6 +105,11 @@ Evaluate strictly and return ONLY valid JSON — no markdown, no explanation, no
   "clarity_score": <0-100, how clearly structured and articulate>,
   "confidence_score": <0-100, based on language certainty and completeness>,
   "technical_score": <0-100, technical accuracy and depth>,
+  "star_scores": {{
+    "situation_task_score": <0-100, context setup clarity>,
+    "action_score": <0-100, individual contributions using I vs We>,
+    "result_score": <0-100, quantified outcomes and learnings>
+  }},
   "overall_score": <0-100, weighted composite>,
   "grade": "<A+|A|B+|B|C+|C|D|F>",
   "feedback": "<2-3 sentences of honest, constructive coach-style feedback>",

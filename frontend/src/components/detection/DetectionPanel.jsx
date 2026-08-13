@@ -189,7 +189,7 @@ export default function DetectionPanel({
     faceCount, gazeDir, gazeOffX = 0, gazeOffY = 0,
     eyeOpenness, phone, objectLabel,
     emotion, confidence, headPose = { yaw:0, pitch:0, roll:0 },
-    lookAwayMs, mpReady, tfReady, faceApiReady,
+    lookAwayMs = 0, lookDownMs = 0, mpReady, tfReady, faceApiReady,
   } = detectionStatus || {}
 
   const cheatPct = Math.round((cheatingScore || 0) * 100)
@@ -246,6 +246,17 @@ export default function DetectionPanel({
           </motion.div>
         )}
 
+        {/* Looking Down warning badge */}
+        {(gazeDir === 'down' || lookDownMs > 500) && (
+          <motion.div initial={{ opacity:0, scale:0.8 }} animate={{ opacity:1, scale:1 }}
+            style={{ position:'absolute', top:7, right: phone ? 90 : 7, padding:'3px 8px', borderRadius:20,
+              background:'rgba(239,68,68,0.85)', backdropFilter:'blur(4px)' }}>
+            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'white', fontWeight:700 }}>
+              👇 LOOKING DOWN
+            </span>
+          </motion.div>
+        )}
+
         {/* Face count badge */}
         <div style={{ position:'absolute', bottom:7, left:7, display:'flex', alignItems:'center', gap:5,
           padding:'3px 8px', borderRadius:20, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(4px)' }}>
@@ -273,6 +284,13 @@ export default function DetectionPanel({
               <div style={{ padding:'4px 8px', borderRadius:8, background:'#FFFBEB', border:'1px solid #FDE68A' }}>
                 <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#92400E', fontWeight:600 }}>
                   Away: {(lookAwayMs/1000).toFixed(1)}s
+                </span>
+              </div>
+            )}
+            {lookDownMs > 500 && (
+              <div style={{ padding:'4px 8px', borderRadius:8, background:'#FFF1F2', border:'1px solid #FECDD3' }}>
+                <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:'#991B1B', fontWeight:600 }}>
+                  Looking Down: {(lookDownMs/1000).toFixed(1)}s
                 </span>
               </div>
             )}

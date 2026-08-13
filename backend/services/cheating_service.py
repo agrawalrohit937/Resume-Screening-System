@@ -36,6 +36,7 @@ EVENT_WEIGHTS = {
     "no_face":         0.10,
     "multiple_faces":  0.20,
     "look_away":       0.05,
+    "looking_down":    0.15,
     "copy_paste":      0.18,
     "right_click":     0.04,
     "devtools_open":   0.20,
@@ -115,4 +116,6 @@ class CheatingDetectionService:
             warnings.append(f"Copy-paste detected {breakdown['copy_paste']} time(s) — may indicate external assistance.")
         if breakdown.get("window_blur", 0) >= 3:
             warnings.append(f"Window lost focus {breakdown['window_blur']} time(s) — candidate left interview window.")
+        if breakdown.get("looking_down", 0) > 0:
+            warnings.append(f"Candidate looked down below screen {breakdown['looking_down']} time(s) — possible hidden notes or phone.")
         return warnings or ["No significant violations detected."]

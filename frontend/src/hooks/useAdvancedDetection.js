@@ -40,15 +40,13 @@ const LEFT_CHEEK        = 234
 const RIGHT_CHEEK       = 454
 const FOREHEAD          = 10
 
-// ── Phone-like objects COCO-SSD detects (high sensitivity for partial/half phone edges) ──
+// ── Restricted objects COCO-SSD detects (high confidence required) ──
 const SUSPICIOUS_OBJECTS = new Set([
-  'cell phone', 'mobile phone', 'phone', 'laptop', 'book', 'remote', 'keyboard', 'mouse',
-  'tablet', 'ipad', 'tv', 'monitor', 'camera', 'calculator', 'electronic', 'device',
-  'handbag', 'wallet', 'clock', 'scissors'
+  'cell phone', 'mobile phone', 'phone', 'tablet', 'ipad', 'book'
 ])
 
-// ── Suspicious emotions ───────────────────────────────────────────────────────
-const SUSPICIOUS_EMOTIONS = new Set(['fearful', 'surprised', 'disgusted'])
+// ── Suspicious emotions (disabled to prevent facial expression false flags) ──
+const SUSPICIOUS_EMOTIONS = new Set([])
 
 // ══════════════════════════════════════════════════════════════════════════════
 export function useAdvancedDetection({
@@ -73,6 +71,7 @@ export function useAdvancedDetection({
     confidence:  1.0,        // derived confidence 0..1
     headPose:    { yaw:0, pitch:0, roll:0 },
     lookAwayMs:  0,          // cumulative ms looking away
+    lookDownMs:  0,          // cumulative ms looking down below screen
     mpReady:     false,
     tfReady:     false,
     faceApiReady:false,
@@ -85,6 +84,7 @@ export function useAdvancedDetection({
   const cocoModelRef    = useRef(null)
   const lookAwayStart   = useRef(null)
   const lookDownStart   = useRef(null)
+  const lookDownResetTimer = useRef(null)
   const lastEvents      = useRef({})        // throttle same event type
   const mountedRef      = useRef(true)
   const faceTimerRef    = useRef(null)
@@ -132,10 +132,10 @@ export function useAdvancedDetection({
     const headPose = computeHeadPose(lm)
 
     // Combined look-away detection (iris + head pose)
-    const lookingAway = gaze.dir !== 'center' || Math.abs(headPose.yaw) > 20 || Math.abs(headPose.pitch) > 20
+    const lookingAway = gaze.dir !== 'center' || Math.abs(headPose.yaw) > 28 || Math.abs(headPose.pitch) > 30
 
-    // Downside gaze / head pitch check (looking down at notes/phone)
-    const isLookingDown = gaze.dir === 'down' || headPose.pitch > 16 || gaze.offsetY > 0.22
+    // Downward gaze / head pitch check (triggers ONLY when eyes look significantly down OR head tilts down >16°)
+    const isLookingDown = gaze.dir === 'down' || gaze.offsetY > 0.22 || headPose.pitch > 16
     if (isLookingDown) {
       trackLookingDown(true)
     } else {
@@ -223,7 +223,7 @@ const initMediaPipe = useCallback(async () => {
     
     fm.setOptions({
       maxNumFaces: 2,
-      refineLandmarks: false, // Set to false to avoid external attention model fetch errors
+      refineLandmarks: true, // Enable iris & refined facial landmarks
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5,
     });
@@ -419,42 +419,66 @@ const initFaceApi = useCallback(async () => {
   //   }
   // }, [])
 
-  // ── Iris gaze computation ─────────────────────────────────────────────────
+  // ── Iris gaze computation (High Sensitivity Eye Gaze Tracker) ────────────
   function computeIrisGaze(lm) {
     try {
-      // Iris centers (MediaPipe refined landmarks 468-473)
-      const leftIris  = lm[LEFT_IRIS_CENTER]
-      const rightIris = lm[RIGHT_IRIS_CENTER]
-      if (!leftIris || !rightIris) return { dir:'center', offsetX:0, offsetY:0 }
+      const leftIris  = lm[LEFT_IRIS_CENTER]  // 468
+      const rightIris = lm[RIGHT_IRIS_CENTER] // 473
 
-      // Eye corners
       const lEyeL = lm[LEFT_EYE_LEFT];   const lEyeR = lm[LEFT_EYE_RIGHT]
       const rEyeL = lm[RIGHT_EYE_LEFT];  const rEyeR = lm[RIGHT_EYE_RIGHT]
+      const lEyeTop = lm[LEFT_EYE_TOP];  const lEyeBot = lm[LEFT_EYE_BOTTOM]
+      const rEyeTop = lm[RIGHT_EYE_TOP]; const rEyeBot = lm[RIGHT_EYE_BOTTOM]
 
-      // Iris position within the eye (0 = far left, 1 = far right)
-      const lEyeWidth  = Math.abs(lEyeR.x - lEyeL.x)
-      const rEyeWidth  = Math.abs(rEyeR.x - rEyeL.x)
-      const lIrisRelX  = (leftIris.x  - lEyeL.x) / (lEyeWidth  || 0.01)
-      const rIrisRelX  = (rightIris.x - rEyeL.x) / (rEyeWidth  || 0.01)
-      const avgRelX    = (lIrisRelX + rIrisRelX) / 2
+      // Primary Mode: Refined Iris Landmarks (478-point model)
+      if (leftIris && rightIris && lEyeTop && lEyeBot && lEyeL && lEyeR) {
+        const lEyeWidth  = Math.abs(lEyeR.x - lEyeL.x)
+        const rEyeWidth  = Math.abs(rEyeR.x - rEyeL.x)
+        const lIrisRelX  = (leftIris.x  - lEyeL.x) / (lEyeWidth  || 0.01)
+        const rIrisRelX  = (rightIris.x - rEyeL.x) / (rEyeWidth  || 0.01)
+        const avgRelX    = (lIrisRelX + rIrisRelX) / 2
 
-      // Vertical: compare iris y vs eye center
-      const lEyeTop    = lm[LEFT_EYE_TOP];  const lEyeBot = lm[LEFT_EYE_BOTTOM]
-      const lEyeHeight = Math.abs(lEyeBot.y - lEyeTop.y)
-      const lIrisRelY  = (leftIris.y - lEyeTop.y) / (lEyeHeight || 0.01)
+        const lEyeHeight = Math.abs(lEyeBot.y - lEyeTop.y)
+        const rEyeHeight = Math.abs(rEyeBot.y - rEyeTop.y)
+        const lIrisRelY  = (leftIris.y - lEyeTop.y) / (lEyeHeight || 0.01)
+        const rIrisRelY  = (rightIris.y - rEyeTop.y) / (rEyeHeight || 0.01)
+        const avgRelY    = (lIrisRelY + rIrisRelY) / 2
 
-      // Normalize to -1..1 (0.5 = centered)
-      const offsetX = (avgRelX - 0.5) * 2
-      const offsetY = (lIrisRelY - 0.5) * 2
+        // Eye corner baseline vs Iris Center Y (Detects eyes looking down with head still)
+        const eyeCornerY  = (lEyeL.y + lEyeR.y + rEyeL.y + rEyeR.y) / 4
+        const irisCenterY = (leftIris.y + rightIris.y) / 2
+        const eyeGazeDrop = (irisCenterY - eyeCornerY) / (((lEyeHeight + rEyeHeight) / 2) || 0.01)
 
-      // Thresholds
-      let dir = 'center'
-      if (offsetX >  0.35) dir = 'right'
-      else if (offsetX < -0.35) dir = 'left'
-      else if (offsetY < -0.35) dir = 'up'
-      else if (offsetY >  0.35) dir = 'down'
+        const offsetX = (avgRelX - 0.5) * 2.0
+        // offsetY combines iris position inside eyelids AND iris drop relative to eye corners
+        const offsetY = ((avgRelY - 0.38) * 3.0) + (eyeGazeDrop * 1.5)
 
-      return { dir, offsetX, offsetY }
+        let dir = 'center'
+        if (offsetX >  0.28) dir = 'right'
+        else if (offsetX < -0.28) dir = 'left'
+        else if (offsetY < -0.25) dir = 'up'
+        else if (offsetY > 0.25 || eyeGazeDrop > 0.15) dir = 'down'
+
+        return { dir, offsetX, offsetY }
+      }
+
+      // Fallback Mode: 468-point model (Eyelid vertical drop ratio)
+      if (lEyeTop && lEyeBot && lEyeL && lEyeR) {
+        const eyeCenterY = (lEyeTop.y + lEyeBot.y + (rEyeTop?.y || lEyeTop.y) + (rEyeBot?.y || lEyeBot.y)) / 4
+        const eyeCornerY = (lEyeL.y + lEyeR.y + (rEyeL?.y || lEyeL.y) + (rEyeR?.y || lEyeR.y)) / 4
+        const eyeHeight  = Math.abs(lEyeBot.y - lEyeTop.y)
+
+        const relY = (eyeCenterY - eyeCornerY) / (eyeHeight || 0.01)
+        const offsetY = relY * 2.5
+
+        let dir = 'center'
+        if (offsetY > 0.08) dir = 'down'
+        else if (offsetY < -0.25) dir = 'up'
+
+        return { dir, offsetX: 0, offsetY }
+      }
+
+      return { dir:'center', offsetX:0, offsetY:0 }
     } catch {
       return { dir:'center', offsetX:0, offsetY:0 }
     }
@@ -471,13 +495,15 @@ const initFaceApi = useCallback(async () => {
 
       const faceWidth  = Math.abs(rCheek.x - lCheek.x)
       const faceMidX   = (lCheek.x + rCheek.x) / 2
-      const yaw        = ((nose.x - faceMidX) / (faceWidth * 0.5)) * 35   // degrees approx
+      const yaw        = ((nose.x - faceMidX) / (faceWidth * 0.5 || 0.01)) * 45
       const faceHeight = Math.abs(chin.y - fore.y)
       const faceMidY   = (chin.y + fore.y) / 2
-      const pitch      = ((nose.y - faceMidY) / (faceHeight * 0.5)) * 30
+      // Standard laptop webcams sit below eye level pointing slightly upward.
+      // Subtracting 0.07 centers standard sitting posture near 0° pitch.
+      const pitch      = (((nose.y - faceMidY) / (faceHeight * 0.5 || 0.01)) - 0.07) * 40
       const roll       = Math.atan2(rCheek.y - lCheek.y, rCheek.x - lCheek.x) * (180 / Math.PI)
 
-      return { yaw: yaw*90, pitch: pitch*90, roll }
+      return { yaw, pitch, roll }
     } catch {
       return { yaw:0, pitch:0, roll:0 }
     }
@@ -524,17 +550,30 @@ const initFaceApi = useCallback(async () => {
     }
   }
 
-  // ── Looking Down / Reading below screen detector ──────────────────────────
+  // ── Looking Down / Reading below screen detector (3-Second Sustained Duration) ──────────
   function trackLookingDown(isDown) {
     if (isDown) {
+      if (lookDownResetTimer.current) {
+        clearTimeout(lookDownResetTimer.current)
+        lookDownResetTimer.current = null
+      }
       if (!lookDownStart.current) lookDownStart.current = Date.now()
       const ms = Date.now() - lookDownStart.current
-      if (ms >= 1200) { // 1.2s looking down
-        emitEvent('looking_down', 'high', 'Looking down below screen — possible phone or notes usage')
+      setStatus(s => ({ ...s, lookDownMs: ms }))
+      if (ms >= 3000) { // 3.0s sustained continuous looking down
+        emitEvent('looking_down', 'high', `Sustained look down below screen detected (${(ms/1000).toFixed(1)}s)`)
         lookDownStart.current = Date.now() // reset timer after event emit
       }
     } else {
-      lookDownStart.current = null
+      if (!lookDownResetTimer.current && lookDownStart.current) {
+        lookDownResetTimer.current = setTimeout(() => {
+          lookDownStart.current = null
+          lookDownResetTimer.current = null
+          setStatus(s => ({ ...s, lookDownMs: 0 }))
+        }, 300)
+      } else if (!lookDownStart.current) {
+        setStatus(s => ({ ...s, lookDownMs: 0 }))
+      }
     }
   }
 
@@ -542,7 +581,7 @@ const initFaceApi = useCallback(async () => {
   // LAYER 3 — COCO-SSD Object Detection (Phone, book, laptop, multiple persons)
   // ══════════════════════════════════════════════════════════════════════════
   const runObjectDetection = useCallback(async () => {
-    if (!cocoModelRef.current || !videoRef?.current) return
+    if (!status.tfReady || !cocoModelRef.current || !videoRef?.current) return
     const vid = videoRef.current
     if (vid.readyState < 2 || vid.paused) return
 
@@ -550,24 +589,16 @@ const initFaceApi = useCallback(async () => {
       const predictions = await cocoModelRef.current.detect(vid)
       const vidH = vid.videoHeight || 480
 
-      // 1. Detect suspicious restricted objects (cell phone, partial phone, book, laptop, camera, etc.)
+      // 1. Detect suspicious restricted objects (cell phone, tablet, etc. with HIGH confidence >= 65%)
       const suspiciousObjects = predictions.filter(p => {
         const cls = p.class.toLowerCase()
         const isSuspiciousCategory = SUSPICIOUS_OBJECTS.has(cls)
-        // High-sensitivity score threshold for known suspicious categories
-        if (isSuspiciousCategory && p.score > 0.15) return true
-
-        // Bottom 35% camera frame edge detection (partial phone raised from bottom)
-        const [x, y, w, h] = p.bbox
-        const isNearBottomEdge = (y + h) > (vidH * 0.65)
-        if (isNearBottomEdge && cls !== 'person' && p.score > 0.18) return true
-
-        return false
+        return isSuspiciousCategory && p.score >= 0.65
       })
 
-      // 2. Detect multiple persons via COCO-SSD
+      // 2. Detect multiple persons via COCO-SSD (high confidence >= 55%)
       const persons = predictions.filter(p =>
-        p.class.toLowerCase() === 'person' && p.score > 0.35
+        p.class.toLowerCase() === 'person' && p.score >= 0.55
       )
 
       if (suspiciousObjects.length > 0) {
@@ -600,45 +631,13 @@ const initFaceApi = useCallback(async () => {
     } catch (e) {
       // ignore transient detection errors
     }
-  }, [videoRef, canvasRef])
+  }, [videoRef, canvasRef, status.tfReady])
 
   // ══════════════════════════════════════════════════════════════════════════
   // LAYER 4 — face-api.js Emotion Detection
   // ══════════════════════════════════════════════════════════════════════════
-  // const runEmotionDetection = useCallback(async () => {
-  //   if (!window.faceapi || !videoRef?.current) return
-  //   const vid = videoRef.current
-  //   if (vid.readyState < 2) return
-
-  //   try {
-  //     const fa = window.faceapi
-  //     const detections = await fa.detectAllFaces(
-  //       vid,
-  //       new fa.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 })
-  //     ).withFaceExpressions()
-
-  //     if (!detections || detections.length === 0) return
-
-  //     const primary     = detections[0]
-  //     const expressions = primary.expressions
-  //     // Dominant emotion
-  //     const dominant = Object.entries(expressions).reduce((a, b) => a[1] > b[1] ? a : b)
-
-  //     setStatus(s => ({ ...s, emotion: dominant[0] }))
-
-  //     if (SUSPICIOUS_EMOTIONS.has(dominant[0]) && dominant[1] > 0.6) {
-  //       emitEvent(
-  //         'suspicious_emotion', 'low',
-  //         `High ${dominant[0]} detected (${(dominant[1]*100).toFixed(0)}%) — may indicate stress or dishonesty`
-  //       )
-  //     }
-  //   } catch (e) {
-  //     // face-api errors are non-critical
-  //   }
-  // }, [videoRef])
-
 const runEmotionDetection = useCallback(async () => {
-  if (!window.faceapi || !videoRef?.current) return;
+  if (!status.faceApiReady || !window.faceapi || !videoRef?.current) return;
 
   const vid = videoRef.current;
 
@@ -690,7 +689,7 @@ const runEmotionDetection = useCallback(async () => {
   } catch (e) {
     console.error("Emotion error:", e);
   }
-}, [videoRef]);
+}, [videoRef, status.faceApiReady]);
 
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -705,6 +704,9 @@ const runEmotionDetection = useCallback(async () => {
       const vid = videoRef.current
       if (vid.readyState < 2 || vid.paused) return
 
+      // DO NOT run face checks or emit face_missing if no models are ready yet
+      if (!status.mpReady && !status.faceApiReady) return
+
       // Primary: MediaPipe FaceMesh
       if (faceMeshRef.current && status.mpReady) {
         try {
@@ -716,7 +718,7 @@ const runEmotionDetection = useCallback(async () => {
       }
 
       // Failsafe Fallback: face-api.js TinyFaceDetector
-      if (window.faceapi && window.faceapi.nets.tinyFaceDetector?.params) {
+      if (status.faceApiReady && window.faceapi && window.faceapi.nets.tinyFaceDetector?.params) {
         try {
           const detections = await window.faceapi.detectAllFaces(
             vid,
@@ -760,7 +762,7 @@ const runEmotionDetection = useCallback(async () => {
       clearInterval(emoTimerRef.current)
       clearInterval(devToolsTimer)
     }
-  }, [active, faceInterval, objectInterval, emotionInterval, runObjectDetection, runEmotionDetection, status.mpReady])
+  }, [active, faceInterval, objectInterval, emotionInterval, runObjectDetection, runEmotionDetection, status.mpReady, status.faceApiReady])
 
   // ══════════════════════════════════════════════════════════════════════════
   // CANVAS DRAWING — Visual debug overlay
@@ -825,12 +827,12 @@ const runEmotionDetection = useCallback(async () => {
     })
   }
 
-  // ── Event emitter (1.5s rapid throttle for high severity events like phone/dev-tools) ─
+  // ── Event emitter (throttle for high severity / looking_down events) ─
   function emitEvent(type, severity, details) {
     const fn = onEventRef.current
     if (!fn) return
     const now = Date.now()
-    const throttleMs = severity === 'high' ? 1500 : 5000
+    const throttleMs = type === 'looking_down' ? 3000 : severity === 'high' ? 1500 : 5000
     if (lastEvents.current[type] && now - lastEvents.current[type] < throttleMs) return
     lastEvents.current[type] = now
     fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })

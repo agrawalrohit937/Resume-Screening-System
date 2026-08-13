@@ -38,12 +38,13 @@ import DetectionPanel from '../components/detection/DetectionPanel'
 
 import InterviewReport from '../components/interview/InterviewReport'
 import ImmersiveShell from '../components/interview/onboarding/ImmersiveShell'
+import CheatingWarningModal from '../components/detection/CheatingWarningModal'
 import RoleConfigStep from './RoleConfigStep'
 import GuidelinesStep from './GuidelinesStep'
 import SystemCheckStep from '../components/interview/onboarding/SystemCheckStep'
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-const MAX_WARNINGS = 3
+const MAX_WARNINGS = 5
 
 const DIFF_CONFIG = {
   easy: { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Easy', time: 120 },
@@ -370,7 +371,7 @@ export default function LiveInterviewV2() {
   const spokenForQRef = useRef(-1)
 
   const handleCheatingEvent = useCallback((event) => {
-    // if (session.phase !== SESSION_PHASE.ACTIVE) return
+    if (session.phase !== SESSION_PHASE.ACTIVE) return
     session.recordCheatingEvent(event)
     setCurrentWarning(event)
     clearTimeout(warningTimerRef.current)
@@ -400,11 +401,11 @@ export default function LiveInterviewV2() {
   }, [tts.speaking]);
 
   // On mobile: active=false prevents MediaPipe / TF.js / face-api from ever loading.
-  // This keeps the page lightweight on phones (they can't do the interview anyway).
+  // Only activate detection when in ACTIVE interview phase or during System Check step.
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
-    active: session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING,
-    faceInterval: 800, objectInterval: 350, emotionInterval: 4000,
+    active: session.phase === SESSION_PHASE.ACTIVE || (session.phase === SESSION_PHASE.BRIEFING && briefStep === 'systemcheck'),
+    faceInterval: 250, objectInterval: 3000, emotionInterval: 4000,
   })
 
   const startCamera = useCallback(async () => {
@@ -461,8 +462,16 @@ export default function LiveInterviewV2() {
 
   useEffect(() => {
     if (session.phase !== SESSION_PHASE.ACTIVE) return
-    const onHide = () => { if (document.hidden) handleCheatingEvent({ event_type: 'tab_switch', severity: 'high', details: 'Tab switched' }) }
-    const onBlur = () => handleCheatingEvent({ event_type: 'window_blur', severity: 'medium', details: 'Window blurred' })
+    const onHide = () => {
+      if (document.hidden) {
+        handleCheatingEvent({ event_type: 'tab_switch', severity: 'critical', details: 'Tab switched during active interview' })
+        session.abortSession('Tab switched during active interview')
+      }
+    }
+    const onBlur = () => {
+      handleCheatingEvent({ event_type: 'window_blur', severity: 'critical', details: 'Window focus lost / switched to another application' })
+      session.abortSession('Window focus lost / switched to another application')
+    }
     const onPaste = (e) => {
       const txt = e.clipboardData?.getData('text') || ''
       if (txt.length > 15) handleCheatingEvent({ event_type: 'copy_paste', severity: 'high', details: `${txt.length} chars pasted` })
@@ -483,7 +492,7 @@ export default function LiveInterviewV2() {
       document.removeEventListener('paste', onPaste)
       window.removeEventListener('keydown', onDevToolsKey)
     }
-  }, [session.phase, handleCheatingEvent])
+  }, [session.phase, handleCheatingEvent, session.abortSession])
 
 
   const handleSubmitAnswer = useCallback(async ({ answerText: text, answerSource }) => {
@@ -518,14 +527,43 @@ export default function LiveInterviewV2() {
     if (session.currentQ) tts.speak(session.currentQ.text)
   }
 
+  // Intercept Browser Back button / touchpad back swipe / beforeunload during active interview
+  useEffect(() => {
+    if (session.phase !== SESSION_PHASE.ACTIVE && session.phase !== SESSION_PHASE.BRIEFING) return
+
+    // Push dummy history entry so back navigation pops back to the current page
+    window.history.pushState({ interviewActive: true }, '', window.location.href)
+
+    const handlePopState = () => {
+      // Re-push history state to block immediate page pop
+      window.history.pushState({ interviewActive: true }, '', window.location.href)
+      // Open Exit Practice confirmation popup
+      setShowEndConfirm(true)
+    }
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = 'Interview in progress. Are you sure you want to leave?'
+      return e.returnValue
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [session.phase])
+
   // ── End Practice: custom modal → clean, guaranteed return to Setup ──────
   const requestEndPractice = () => setShowEndConfirm(true)
-  const confirmEndPractice = () => {
+  const confirmEndPractice = async () => {
     setShowEndConfirm(false)
     tts.stop()
     stt.stopListening?.()
     stopCamera()
-    fsGate.exitImmersive()
+    await fsGate.exitImmersive()
     session.resetSession()
   }
 
@@ -565,7 +603,7 @@ export default function LiveInterviewV2() {
           </div>
           <h2 className="text-[20px] font-extrabold text-blue-950">Session Ended Early</h2>
           <p className="text-[13px] text-blue-900/55 font-medium mt-2 leading-relaxed">
-            Too many integrity flags were raised, so this attempt was closed. You can start a fresh session any time.
+            An integrity violation or tab/window switch was detected. The interview session has been ended immediately to preserve exam security.
           </p>
           <button onClick={() => session.resetSession()} className="w-full h-11 rounded-xl bg-blue-950 text-white font-bold text-[13px] mt-6 hover:bg-blue-900 transition-all">
             Back to Setup
@@ -582,6 +620,12 @@ export default function LiveInterviewV2() {
     <ImmersiveShell active={fsGate.immersive}>
       <div className="fixed inset-0 z-[999999] w-screen h-screen bg-[#F5F7FB] flex flex-col overflow-hidden">
         <EndPracticeModal open={showEndConfirm} onCancel={() => setShowEndConfirm(false)} onConfirm={confirmEndPractice} />
+        <CheatingWarningModal
+          event={currentWarning}
+          warningCount={session.cheatingData?.warning_count || 0}
+          maxWarnings={MAX_WARNINGS}
+          onDismiss={() => setCurrentWarning(null)}
+        />
         <WarningToast warning={currentWarning} count={session.cheatingData?.warning_count} max={MAX_WARNINGS} />
 
         {/* Top bar */}
