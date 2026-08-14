@@ -119,29 +119,26 @@ function EmotionBadge({ emotion }) {
   )
 }
 
-// ── Model status row ───────────────────────────────────────────────────────────
-function ModelStatus({ mpReady, tfReady, faceApiReady }) {
-  const models = [
-    { label:'FaceMesh', ready:mpReady, icon:'👁️' },
-    { label:'COCO-SSD', ready:tfReady, icon:'📱' },
-    { label:'EmotionAI', ready:faceApiReady, icon:'😊' },
-  ]
+// ── Model status row (Web Worker AI) ───────────────────────────────────────────
+function ModelStatus({ isWorkerReady, isWorkerLoading, workerStatus }) {
+  const isReady = isWorkerReady || workerStatus === 'ready'
+  const isLoading = isWorkerLoading || workerStatus === 'loading_scripts' || workerStatus === 'loading_models'
+
   return (
     <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-      {models.map(({ label, ready, icon }) => (
-        <div key={label} style={{
-          display:'flex', alignItems:'center', gap:4, padding:'3px 8px', borderRadius:20,
-          background: ready ? '#ECFDF5' : '#F8FAFC',
-          border:`1px solid ${ready ? '#A7F3D0' : '#E2E8F0'}`,
-        }}>
-          <div style={{ width:5, height:5, borderRadius:'50%', background: ready ? '#10B981' : '#CBD5E1',
-            boxShadow: ready ? '0 0 4px rgba(16,185,129,0.5)' : 'none' }}/>
-          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:600,
-            color: ready ? '#065F46' : '#94A3B8', letterSpacing:'0.04em' }}>
-            {icon} {label}
-          </span>
-        </div>
-      ))}
+      <div style={{
+        display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+        background: isReady ? '#ECFDF5' : isLoading ? '#FFFBEB' : '#F8FAFC',
+        border:`1px solid ${isReady ? '#A7F3D0' : isLoading ? '#FDE68A' : '#E2E8F0'}`,
+      }}>
+        <div style={{ width:6, height:6, borderRadius:'50%',
+          background: isReady ? '#10B981' : isLoading ? '#F59E0B' : '#CBD5E1',
+          boxShadow: isReady ? '0 0 6px rgba(16,185,129,0.6)' : 'none' }}/>
+        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700,
+          color: isReady ? '#065F46' : isLoading ? '#92400E' : '#94A3B8', letterSpacing:'0.04em' }}>
+          {isReady ? '⚡ Worker AI (Off-Thread)' : isLoading ? '⏳ Initializing Web Worker...' : '🛡️ AI Proctoring Standby'}
+        </span>
+      </div>
     </div>
   )
 }
@@ -189,7 +186,7 @@ export default function DetectionPanel({
     faceCount, gazeDir, gazeOffX = 0, gazeOffY = 0,
     eyeOpenness, phone, objectLabel,
     emotion, confidence, headPose = { yaw:0, pitch:0, roll:0 },
-    lookAwayMs = 0, lookDownMs = 0, mpReady, tfReady, faceApiReady,
+    lookAwayMs = 0, lookDownMs = 0, isWorkerReady, isWorkerLoading, workerStatus,
   } = detectionStatus || {}
 
   const cheatPct = Math.round((cheatingScore || 0) * 100)
@@ -270,7 +267,7 @@ export default function DetectionPanel({
       </div>
 
       {/* ── Model status ── */}
-      <ModelStatus mpReady={mpReady} tfReady={tfReady} faceApiReady={faceApiReady}/>
+      <ModelStatus isWorkerReady={isWorkerReady} isWorkerLoading={isWorkerLoading} workerStatus={workerStatus}/>
 
       {/* ── Gaze tracker ── */}
       <div style={{ background:'white', borderRadius:14, border:'1px solid #E2E8F0', padding:'12px' }}>

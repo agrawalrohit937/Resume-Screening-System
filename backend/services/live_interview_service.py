@@ -23,6 +23,7 @@ CHEATING_WEIGHTS = {
     CheatingEventType.FACE_MISSING:     0.10,
     CheatingEventType.MULTIPLE_FACES:   0.22,
     CheatingEventType.LOOKING_AWAY:     0.06,
+    CheatingEventType.LOOKING_DOWN:     0.15,
     CheatingEventType.PHONE_DETECTED:   0.18,
     CheatingEventType.COPY_PASTE:       0.20,
     CheatingEventType.DEVTOOLS_OPEN:    0.25,
@@ -393,7 +394,7 @@ Return ONLY valid JSON (no markdown fences):
         return round(min(1.0, raw), 3)
 
     def _count_warnings(self, events: List[Dict]) -> int:
-        """Each HIGH/CRITICAL event is a warning; every 3 mediums is 1 warning."""
-        high_events = sum(1 for e in events if e.get("severity") in ("high","critical"))
-        med_events  = sum(1 for e in events if e.get("severity") == "medium")
+        """Each HIGH/CRITICAL or looking_down event is a warning; every 3 mediums is 1 warning."""
+        high_events = sum(1 for e in events if e.get("severity") in ("high","critical") or e.get("event_type") == "looking_down")
+        med_events  = sum(1 for e in events if e.get("severity") == "medium" and e.get("event_type") != "looking_down")
         return high_events + (med_events // 3)
