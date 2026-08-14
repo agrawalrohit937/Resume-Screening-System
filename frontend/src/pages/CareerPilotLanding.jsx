@@ -165,13 +165,13 @@ export default function CareerPilotLanding() {
 
   return (
     <MotionConfig reducedMotion={isMobile ? 'always' : 'user'}>
-      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-x-clip selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA] pt-14 sm:pt-16">
         {/* Background Ambient Lighting & Mesh (Lazy Loaded with Instant Fallback) */}
         <Suspense fallback={<AmbientFallback />}>
           <AmbientMotionBg />
         </Suspense>
 
-        {/* 1. Header Navigation Bar */}
+        {/* 1. Header Navigation Bar (Fixed & Sticky) */}
         <LandingNavbar
           user={user}
           isMobileMenuOpen={isMobileMenuOpen}
