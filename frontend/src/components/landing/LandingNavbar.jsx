@@ -35,6 +35,7 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
               height={36}
               decoding="async"
               loading="eager"
+              fetchPriority="high"
               className="w-full h-full object-contain"
             />
           </div>

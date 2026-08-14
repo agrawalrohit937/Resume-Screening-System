@@ -23,11 +23,13 @@
   <link rel="icon" type="image/webp" href="/logo_t.webp" />
   <link rel="apple-touch-icon" href="/logo_t.webp" />
 
+  <!-- Preload Critical LCP Assets (High Priority Logo & Fonts) -->
+  <link rel="preload" as="image" href="/logo_t.webp" type="image/webp" fetchpriority="high" />
+
   <!-- Essential Preconnects & Asset DNS Prefetch -->
   <link rel="preconnect" href="https://accounts.google.com" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://www.google-analytics.com" />
   <link rel="dns-prefetch" href="https://res.cloudinary.com" />
   <link rel="dns-prefetch" href="https://careershala-hghwgae4ebesdsb3.centralindia-01.azurewebsites.net" />
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
@@ -50,19 +52,42 @@
   <!-- 👆 YAHAN PAR GOOGLE ANALYTICS KHATAM 👆 -->
 
   <style>
-    /* Critical baseline — full theme is loaded via index.css */
+    /* Critical baseline & Hero styling — eliminates FCP delay */
     *, *::before, *::after { box-sizing: border-box; }
     html, body, #root {
       width: 100%;
       max-width: 100%;
       overflow-x: hidden;
+      min-height: 100%;
     }
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      background-color: #f8fafc;
+    }
     body {
       margin: 0;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    /* Prevent layout shift during font swap & hero initial load */
+    .hero-title-lcp {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      contain: layout paint;
+    }
+    @keyframes heroFadeIn {
+      from { opacity: 0; transform: translate3d(0, 12px, 0); }
+      to { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+    .animate-hero-fade {
+      animation: heroFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+      will-change: transform, opacity;
     }
   </style>
 

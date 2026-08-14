@@ -178,12 +178,8 @@ export default function CareerPilotLanding() {
           setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
-        {/* 2. Hero Section */}
-        <LandingHeroSection
-          user={user}
-          fadeInUp={fadeInUp}
-          staggerContainer={staggerContainer}
-        />
+        {/* 2. Hero Section (LCP Optimized) */}
+        <LandingHeroSection user={user} />
 
         {/* 3. Telemetry Cockpit Section */}
         <LandingCockpitSection
