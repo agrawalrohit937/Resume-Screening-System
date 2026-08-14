@@ -146,19 +146,12 @@ export default function LandingCockpitSection({
                       setActiveCockpitTab(tab.id)
                       setProgress(0)
                     }}
-                    className={`relative flex items-center gap-3 px-4 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all duration-300 text-left border ${
+                    className={`relative flex items-center gap-3 px-4 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm transition-all duration-200 text-left border ${
                       isActive
-                        ? 'bg-white text-slate-900 border-slate-300 shadow-md shadow-slate-200'
+                        ? 'bg-white text-slate-900 border-[#2E9BDA] shadow-md shadow-[#2E9BDA]/10 ring-2 ring-[#2E9BDA]/20'
                         : 'bg-slate-100/50 text-slate-500 border-transparent hover:bg-white hover:text-slate-900'
                     }`}
                   >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeTabOutlinePill"
-                        className="absolute inset-0 rounded-2xl border-2 border-[#2E9BDA] pointer-events-none"
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      />
-                    )}
                     
                     <div
                       className={`p-2.5 rounded-xl shrink-0 transition-colors ${
