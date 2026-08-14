@@ -50,8 +50,8 @@ export default function CheatingWarningModal({
       <motion.div
         initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
         style={{
-          position:'fixed', inset:0, zIndex:9999,
-          background: isLast ? 'rgba(127,29,29,0.7)' : 'rgba(0,0,0,0.35)',
+          position:'fixed', inset:0, zIndex:99999999,
+          background: isLast ? 'rgba(127,29,29,0.75)' : 'rgba(0,0,0,0.45)',
           backdropFilter:'blur(4px)',
           display:'flex', alignItems:'flex-start', justifyContent:'center',
           padding:'80px 24px 0',

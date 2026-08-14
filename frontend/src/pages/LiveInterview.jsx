@@ -400,12 +400,11 @@ export default function LiveInterviewV2() {
     }
   }, [tts.speaking]);
 
-  // On mobile: active=false prevents MediaPipe / TF.js / face-api from ever loading.
-  // Only activate detection when in ACTIVE interview phase or during System Check step.
+  // Start background worker model loading as soon as candidate is on briefing/guidelines step (on laptop)
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
-    active: session.phase === SESSION_PHASE.ACTIVE || (session.phase === SESSION_PHASE.BRIEFING && briefStep === 'systemcheck'),
-    faceInterval: 250, objectInterval: 3000, emotionInterval: 4000,
+    active: !isMobile && (session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING),
+    faceInterval: 250,
   })
 
   const startCamera = useCallback(async () => {
@@ -438,6 +437,18 @@ export default function LiveInterviewV2() {
     if (session.phase !== SESSION_PHASE.SETUP) startCamera()
     return () => { if (session.phase === SESSION_PHASE.SETUP) stopCamera() }
   }, [session.phase])
+
+  // Ensure video element has active camera stream attached when entering ACTIVE phase
+  useEffect(() => {
+    if (session.phase === SESSION_PHASE.ACTIVE) {
+      if (videoRef.current && streamRef.current && videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current
+        videoRef.current.play().catch((e) => console.warn('[LiveInterview] Camera stream play catch:', e))
+      } else if (!streamRef.current) {
+        startCamera()
+      }
+    }
+  }, [session.phase, startCamera])
 
   useEffect(() => () => stopCamera(), [])
 

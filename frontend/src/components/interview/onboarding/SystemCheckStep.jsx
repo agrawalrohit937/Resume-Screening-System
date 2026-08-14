@@ -88,6 +88,7 @@ export default function SystemCheckStep({
 }) {
   const [step, setStep] = useState('camera')
   const [enteringFs, setEnteringFs] = useState(false)
+  const [isWaitingForModels, setIsWaitingForModels] = useState(false)
   const startedRef = useRef(false)
 
   // Detect mobile: narrow screen OR touch-only (coarse pointer) device
@@ -144,12 +145,40 @@ export default function SystemCheckStep({
     }
   }
 
-  const handleEnterAndStart = async () => {
+  const handleEnterAndStart = useCallback(async () => {
+    // If models are not yet ready (and not on mobile), show waiting popup
+    const isReady = detectionStatus?.isWorkerReady || detectionStatus?.workerStatus === 'ready'
+    if (!isMobile && !isReady) {
+      setIsWaitingForModels(true)
+      return
+    }
+    setIsWaitingForModels(false)
     setEnteringFs(true)
     await fsGate?.enterImmersive?.()
     setEnteringFs(false)
     onComplete?.()
-  }
+  }, [detectionStatus?.isWorkerReady, detectionStatus?.workerStatus, fsGate, isMobile, onComplete])
+
+  // Automatically proceed to interview as soon as models finish loading
+  useEffect(() => {
+    const isReady = detectionStatus?.isWorkerReady || detectionStatus?.workerStatus === 'ready'
+    if (isWaitingForModels && isReady) {
+      setIsWaitingForModels(false)
+      handleEnterAndStart()
+    }
+  }, [isWaitingForModels, detectionStatus?.isWorkerReady, detectionStatus?.workerStatus, handleEnterAndStart])
+
+  // Safety fallback: if models take > 12s, automatically allow proceeding
+  useEffect(() => {
+    let t
+    if (isWaitingForModels) {
+      t = setTimeout(() => {
+        setIsWaitingForModels(false)
+        handleEnterAndStart()
+      }, 12000)
+    }
+    return () => clearTimeout(t)
+  }, [isWaitingForModels, handleEnterAndStart])
 
   return (
     <div className="min-h-screen w-full bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased">
@@ -408,6 +437,57 @@ export default function SystemCheckStep({
           </div>
         </div>
       </div>
+
+      {/* ── Waiting for AI Models Loading Modal ── */}
+      <AnimatePresence>
+        {isWaitingForModels && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="max-w-[420px] w-full bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-blue-100 space-y-5"
+            >
+              <div className="relative mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#2E9BDA]/20 to-[#1d6fa5]/20 flex items-center justify-center text-[#1d6fa5]">
+                <Loader2 className="w-8 h-8 animate-spin text-[#1d6fa5]" />
+                <div className="absolute inset-0 rounded-2xl border-2 border-[#2E9BDA]/30 animate-ping opacity-25" />
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-[18px] font-extrabold text-blue-950 tracking-tight">
+                  Preparing AI Proctoring
+                </h4>
+                <p className="text-[13px] text-blue-900/60 font-medium leading-relaxed">
+                  Initializing facial &amp; gaze tracking models in the background. You will automatically enter the interview room as soon as it's ready.
+                </p>
+              </div>
+
+              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 flex items-center justify-center gap-2 text-[12px] font-bold text-[#1d6fa5]">
+                <span className="w-2 h-2 rounded-full bg-[#2E9BDA] animate-pulse" />
+                <span>
+                  Status: {detectionStatus?.workerStatus === 'loading_scripts' ? 'Loading AI Engine...' : 'Loading AI Models...'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsWaitingForModels(false)
+                  handleEnterAndStart()
+                }}
+                className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 transition-colors underline underline-offset-2"
+              >
+                Skip wait and start anyway →
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
