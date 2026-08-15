@@ -79,7 +79,7 @@ class ApplyAssistantService:
 
             async def _groq_extract(key: str) -> str:
                 from langchain_groq import ChatGroq
-                llm = ChatGroq(model_name="llama-3.2-11b-vision-preview", groq_api_key=key, temperature=0.1)
+                llm = ChatGroq(model_name="openai/gpt-oss-120b", groq_api_key=key, temperature=0.1)
                 content_list = []
                 for img_bytes, mime_type in image_files:
                     b64 = base64.b64encode(img_bytes).decode("utf-8")

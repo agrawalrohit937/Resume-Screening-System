@@ -36,7 +36,7 @@ class GroqKeyPool:
             self._index = (self._index + 1) % len(keys)
             return key
 
-    def get_client(self, model_name: str = "llama-3.3-70b-versatile", temperature: float = 0.7) -> ChatGroq:
+    def get_client(self, model_name: str = "openai/gpt-oss-120b", temperature: float = 0.7) -> ChatGroq:
         key = self.get_next_key()
         if not key:
             logger.warning("Groq API Key Pool is empty. ChatGroq initialized without key.")
@@ -206,7 +206,7 @@ gemini_key_pool = GeminiKeyPool()
 
 
 # Public Accessors
-def get_groq_client(model_name: str = "llama-3.3-70b-versatile", temperature: float = 0.7) -> ChatGroq:
+def get_groq_client(model_name: str = "openai/gpt-oss-120b", temperature: float = 0.7) -> ChatGroq:
     """Returns a ChatGroq client initialized with the next rotated key in the Groq pool."""
     return groq_key_pool.get_client(model_name=model_name, temperature=temperature)
 
