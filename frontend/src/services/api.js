@@ -268,4 +268,9 @@ export const chatCopilotStream = async (message, history = [], quickAction = nul
   return response;
 };
 
+// Payment APIs
+export const createCheckout = (plan) => api.post('/payment/checkout', { plan })
+export const verifyPayment = (payload) => api.post('/payment/verify', payload)
+export const choosePlan = (plan) => api.post('/payment/choose', { plan })
+
 export default api

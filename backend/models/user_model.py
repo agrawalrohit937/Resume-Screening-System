@@ -62,6 +62,7 @@ class UserModel(BaseModel):
     plan: str = "free"  # "free" | "pro" | "premium"
     subscription_active: bool = False
     plan_updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    payment_history: List[Dict[str, Any]] = Field(default_factory=list)
 
     profile_picture: Optional[str] = None
     profile_picture_public_id: Optional[str] = None  # Cloudinary public_id for deletion

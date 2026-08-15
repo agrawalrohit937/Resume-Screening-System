@@ -120,12 +120,13 @@ def create_application() -> FastAPI:
         response = await call_next(request)
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://www.googletagmanager.com https://accounts.google.com; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://www.googletagmanager.com https://accounts.google.com; "
+            "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com; "
             "worker-src 'self' blob:; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
             "img-src 'self' data: blob: https:; "
-            "connect-src 'self' https: ws: wss: https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://raw.githubusercontent.com blob: data:; "
+            "connect-src 'self' https: ws: wss: https://api.razorpay.com https://lumberjack.razorpay.com https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://raw.githubusercontent.com blob: data:; "
             "object-src 'none'; "
             "base-uri 'self';"
         )
