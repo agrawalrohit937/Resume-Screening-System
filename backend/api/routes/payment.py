@@ -114,5 +114,15 @@ async def verify_payment(
     updated = await user_repo.update(str(current_user.id), updates)
     if not updated:
         raise HTTPException(status_code=404, detail='User not found')
+
+    payment_record = {
+        'order_id': payload.razorpay_order_id,
+        'payment_id': payload.razorpay_payment_id,
+        'plan': plan.capitalize(),
+        'amount': 299 if plan == 'pro' else 499,
+        'status': 'paid',
+        'date': datetime.now(timezone.utc).isoformat(),
+    }
+    await user_repo.add_payment_history(str(current_user.id), payment_record)
         
     return MessageResponse(message=f"Payment verified. Successfully upgraded to {plan}!")

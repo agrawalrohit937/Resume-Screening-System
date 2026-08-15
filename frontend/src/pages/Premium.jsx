@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { createCheckout, verifyPayment } from '../services/api'
 
 // Elegant Minimalist Crown SVG
 function CrownIcon({ className, size = 20 }) {
@@ -134,7 +135,7 @@ function PricingCard({
 
 export default function Premium() {
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [processingPlan, setProcessingPlan] = useState(null)
 
   // Dynamically load the external Razorpay Checkout SDK script tag
@@ -152,77 +153,56 @@ export default function Premium() {
   const handlePaymentFlow = async (planName) => {
     setProcessingPlan(planName)
     try {
-      const token = localStorage.getItem("access_token")
-      
       // Step 1: Request order instantiation from backend gateway routes
-      const checkoutRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/payment/checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ plan: planName.toLowerCase() }),
-      })
-
-      if (!checkoutRes.ok) {
-        const errData = await checkoutRes.json().catch(() => ({}))
-        throw new Error(errData?.detail || 'Failed to initialize payment gateway order.')
-      }
-
-      const orderData = await checkoutRes.json()
+      const checkoutRes = await createCheckout(planName.toLowerCase())
+      const orderData = checkoutRes.data
 
       // Ensure the runtime script has compiled into global context
       if (!window.Razorpay) {
-        throw new Error('Payment SDK is loading. Please click again in a brief second.')
+        throw new Error('Payment SDK is loading. Please try again in a moment.')
       }
 
-      // Step 2: Configure the native modal checkout system options overlay
+      // Step 2: Configure the native modal checkout options overlay
       const options = {
         key: orderData.razorpay_key_id,
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
-        name: 'Resume Screening System',
+        name: 'CareerShala Platform',
         description: `Upgrade to ${planName} Subscription`,
         order_id: orderData.id,
+        prefill: {
+          name: user?.full_name || '',
+          email: user?.email || '',
+          contact: user?.phone || ''
+        },
         modal: {
           ondismiss: function () {
             setProcessingPlan(null)
           }
         },
         handler: async function (response) {
-          // Step 3: Send verification handshake verification signatures to server
+          // Step 3: Send verification signatures to server
           setProcessingPlan(planName)
           try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/payment/verify`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {})
-              },
-              body: JSON.stringify({
-                plan: planName.toLowerCase(),
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
-              }),
+            await verifyPayment({
+              plan: planName.toLowerCase(),
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
             })
 
-            if (!verifyRes.ok) {
-              const verifyErr = await verifyRes.json().catch(() => ({}))
-              throw new Error(verifyErr.detail || 'Cryptographic verification failure.')
-            }
-
             toast.success(`Account successfully upgraded to ${planName}! 🎉`)
-            await refreshUser()
-            navigate('/dashboard')
+            if (refreshUser) await refreshUser()
+            navigate('/billing')
           } catch (verifyErr) {
-            toast.error(verifyErr.message || 'Verification failed. Please contact support.')
+            const msg = verifyErr.response?.data?.detail || verifyErr.message || 'Verification failed. Please contact support.'
+            toast.error(msg)
           } finally {
             setProcessingPlan(null)
           }
         },
         theme: {
-          color: '#0f172a' // Clean slate matching dark-mode accent parameters
+          color: '#0f172a'
         }
       }
 
@@ -230,7 +210,8 @@ export default function Premium() {
       rzpInstance.open()
 
     } catch (e) {
-      toast.error(e.message || 'Could not complete payment execution.')
+      const msg = e.response?.data?.detail || e.message || 'Could not complete payment execution.'
+      toast.error(msg)
       setProcessingPlan(null)
     }
   }

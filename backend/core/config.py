@@ -116,10 +116,9 @@ class Settings(BaseSettings):
     SMTP_USE_SSL: bool = Field(default_factory=lambda: os.getenv("SMTP_USE_SSL", "false").lower() == "true")
 
 
-    # [SEC-002] No default values — must be set via environment variables.
-    # Never commit test or live Razorpay keys to source control.
-    RAZORPAY_KEY_ID: str = Field(...)
-    RAZORPAY_KEY_SECRET: str = Field(...)
+    # ── Razorpay Settings ───────────────────────────────────────────────────────
+    RAZORPAY_KEY_ID: Optional[str] = Field(default=None)
+    RAZORPAY_KEY_SECRET: Optional[str] = Field(default=None)
 
     # ── PDF Generation ──────────────────────────────────────────────────────────
     PDF_TIMEOUT_SECONDS: int = 60

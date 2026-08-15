@@ -66,6 +66,12 @@ class UserRepository:
             {"$inc": {field: amount}}
         )
 
+    async def add_payment_history(self, user_id: str, payment_entry: dict) -> None:
+        await self.collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$push": {"payment_history": payment_entry}}
+        )
+
     async def delete(self, user_id: str) -> bool:
         result = await self.collection.delete_one({"_id": ObjectId(user_id)})
         return result.deleted_count > 0
