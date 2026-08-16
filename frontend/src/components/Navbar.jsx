@@ -334,30 +334,21 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             <ChevronDown size={14} strokeWidth={3} className="text-slate-400 hidden sm:block ml-1" />
           </motion.button>
 
-          <AnimatePresence>
-            {isOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setIsOpen(false)}
-                  className="fixed inset-0 z-40 bg-black/10 backdrop-blur-xs sm:bg-transparent sm:backdrop-blur-none"
-                />
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-3 rounded-3xl shadow-[0_10px_40px_rgba(30,58,138,0.12)] border border-slate-200/80 bg-white/95 backdrop-blur-xl overflow-hidden z-50 w-[calc(100vw-24px)] sm:w-[340px] max-w-[340px]"
-                >
-                  <Suspense fallback={<div className="p-4 text-center text-xs text-slate-500 font-medium">Loading...</div>}>
-                    <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
-                  </Suspense>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
+          {isOpen && (
+            <>
+              {/* Backdrop — closes dropdown on outside click */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsOpen(false)}
+              />
+              {/* Dropdown Card */}
+              <div className="absolute right-0 mt-3 rounded-3xl shadow-[0_10px_40px_rgba(30,58,138,0.12)] border border-slate-200/80 bg-white/95 backdrop-blur-xl overflow-hidden z-50 w-[calc(100vw-24px)] sm:w-[340px] max-w-[340px]">
+                <Suspense fallback={<div className="p-4 text-center text-xs text-slate-500 font-medium">Loading...</div>}>
+                  <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
+                </Suspense>
+              </div>
+            </>
+          )}
         </div>
 
       </div>

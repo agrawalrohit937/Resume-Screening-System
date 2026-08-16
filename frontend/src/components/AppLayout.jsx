@@ -121,7 +121,7 @@ function MobileHeader({ onMenuToggle }) {
       </header>
 
       {isProfileOpen && (
-        <>
+        <div className="md:hidden">
           <div
             onClick={() => setIsProfileOpen(false)}
             className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-xs"
@@ -137,7 +137,7 @@ function MobileHeader({ onMenuToggle }) {
               />
             </Suspense>
           </div>
-        </>
+        </div>
       )}
     </>
   )

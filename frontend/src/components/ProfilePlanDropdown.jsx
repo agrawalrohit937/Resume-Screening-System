@@ -165,6 +165,11 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
 
   const currentConfig = planConfigs[plan] || planConfigs.free
 
+  const handleNavigateAndClose = (path) => {
+    onClose?.()
+    if (path) navigate(path)
+  }
+
   return (
     <div className="w-full max-w-[340px] bg-white rounded-[24px] shadow-xl overflow-hidden flex flex-col font-sans isolate ring-1 ring-slate-200/50 relative z-50">
       {/* Top Subtle Tier Accent Bar */}
@@ -172,11 +177,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
 
       {/* 1. Header Section */}
       <div 
-        onClick={(e) => {
-          e.stopPropagation()
-          onClose?.()
-          navigate('/profile')
-        }}
+        onClick={() => handleNavigateAndClose('/profile')}
         className="p-5 pb-4 border-b border-slate-100 flex items-center gap-3.5 relative cursor-pointer hover:bg-slate-50/60 transition-colors"
         role="button"
         tabIndex={0}
@@ -209,41 +210,25 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
             label="ATS Score" 
             value={totalAtsChecks > 0 ? `${atsScore}%` : '0%'} 
             trend={trend}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-              navigate('/results')
-            }}
+            onClick={() => handleNavigateAndClose('/results')}
           />
           <StatBox 
             icon={User} 
             label="Profile Fit" 
             value={`${careerScore}%`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-              navigate('/profile')
-            }}
+            onClick={() => handleNavigateAndClose('/profile')}
           />
           <StatBox 
             icon={LayoutGrid} 
             label="Resumes" 
             value={resumeCount}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-              navigate('/upload')
-            }}
+            onClick={() => handleNavigateAndClose('/upload')}
           />
           <StatBox 
             icon={Sparkles} 
             label="ATS Checks" 
             value={totalAtsChecks}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-              navigate('/results')
-            }}
+            onClick={() => handleNavigateAndClose('/results')}
           />
         </div>
       </div>
@@ -272,11 +257,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       {/* 4. Action Area */}
       <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2">
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose?.()
-            navigate(currentConfig.action.path)
-          }}
+          onClick={() => handleNavigateAndClose(currentConfig.action.path)}
           className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${currentConfig.action.style}`}
         >
           <currentConfig.action.icon size={15} />
@@ -286,21 +267,13 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
 
         <div className="flex gap-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-              navigate('/billing')
-            }}
+            onClick={() => handleNavigateAndClose('/billing')}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <CreditCard size={13} className="text-slate-500" /> Billing
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-              navigate('/profile')
-            }}
+            onClick={() => handleNavigateAndClose('/profile')}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <Settings size={13} className="text-slate-500" /> Settings
