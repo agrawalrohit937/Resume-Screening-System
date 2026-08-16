@@ -138,7 +138,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   useEffect(() => {
     setIsOpen(false)
     setIsSearchFocused(false)
-  }, [location.pathname])
+  }, [location.pathname, location.key, location.search])
 
   useEffect(() => {
     const handleKeyDown = (e) => {

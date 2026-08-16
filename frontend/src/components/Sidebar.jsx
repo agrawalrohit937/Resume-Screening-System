@@ -228,12 +228,15 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     }
   }
 
-  // ── Admin view mode (persisted in localStorage) ──────────────────────────
   const [adminViewMode, setAdminViewMode] = useState(() => {
     if (typeof window === 'undefined') return 'admin'
     return localStorage.getItem('admin_view_mode') || 'admin'
   })
   const [viewModeOpen, setViewModeOpen] = useState(false)
+
+  useEffect(() => {
+    setViewModeOpen(false)
+  }, [location.pathname, location.key])
 
   const switchViewMode = (mode) => {
     setViewModeOpen(false)
@@ -415,6 +418,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
+                                setViewModeOpen(false)
                                 switchViewMode(v.key)
                               }}
                               className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all cursor-pointer touch-manipulation ${

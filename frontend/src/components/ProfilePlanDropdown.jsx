@@ -65,9 +65,12 @@ function DropdownAvatar({ user, plan }) {
   )
 }
 
-function StatBox({ icon: Icon, label, value, trend }) {
+function StatBox({ icon: Icon, label, value, trend, onClick }) {
   return (
-    <div className="flex flex-col p-3 rounded-2xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors">
+    <div 
+      onClick={onClick}
+      className={`flex flex-col p-3 rounded-2xl border border-slate-100 bg-slate-50/70 transition-colors ${onClick ? 'hover:bg-indigo-50/50 hover:border-indigo-100 cursor-pointer' : 'hover:bg-slate-50'}`}
+    >
       <div className="flex items-center gap-1.5 text-slate-500 mb-1">
         <div className="p-1 rounded-lg bg-white border border-slate-200/60 shadow-xs">
           <Icon size={12} className="text-slate-600" />
@@ -164,14 +167,13 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
 
   return (
     <div className="w-full max-w-[340px] bg-white rounded-[24px] shadow-xl overflow-hidden flex flex-col font-sans isolate ring-1 ring-slate-200/50 relative z-50">
-      {/* YAHAN CLEANUP KIYA HAI: isolate class add ki hai aur shadow ko optimize kiya hai */}
-      
       {/* Top Subtle Tier Accent Bar */}
       <div className={`h-1.5 w-full shrink-0 ${currentConfig.accentBar}`} />
 
       {/* 1. Header Section */}
       <div 
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation()
           onClose?.()
           navigate('/profile')
         }}
@@ -202,10 +204,47 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       {/* 2. Stats Section */}
       <div className="p-4 pb-2 bg-slate-50/40">
         <div className="grid grid-cols-2 gap-2">
-          <StatBox icon={Shield} label="ATS Score" value={totalAtsChecks > 0 ? `${atsScore}%` : '0%'} trend={trend} />
-          <StatBox icon={User} label="Profile Fit" value={`${careerScore}%`} />
-          <StatBox icon={LayoutGrid} label="Resumes" value={resumeCount} />
-          <StatBox icon={Sparkles} label="ATS Checks" value={totalAtsChecks} />
+          <StatBox 
+            icon={Shield} 
+            label="ATS Score" 
+            value={totalAtsChecks > 0 ? `${atsScore}%` : '0%'} 
+            trend={trend}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose?.()
+              navigate('/results')
+            }}
+          />
+          <StatBox 
+            icon={User} 
+            label="Profile Fit" 
+            value={`${careerScore}%`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose?.()
+              navigate('/profile')
+            }}
+          />
+          <StatBox 
+            icon={LayoutGrid} 
+            label="Resumes" 
+            value={resumeCount}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose?.()
+              navigate('/upload')
+            }}
+          />
+          <StatBox 
+            icon={Sparkles} 
+            label="ATS Checks" 
+            value={totalAtsChecks}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose?.()
+              navigate('/results')
+            }}
+          />
         </div>
       </div>
 
@@ -233,11 +272,12 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
       {/* 4. Action Area */}
       <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2">
         <button
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation()
             onClose?.()
             navigate(currentConfig.action.path)
           }}
-          className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 ${currentConfig.action.style}`}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${currentConfig.action.style}`}
         >
           <currentConfig.action.icon size={15} />
           <span>{currentConfig.action.label}</span>
@@ -245,23 +285,23 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
         </button>
 
         <div className="flex gap-2">
-          {(plan === 'pro' || plan === 'premium') && (
-            <button
-              onClick={() => {
-                onClose?.()
-                navigate('/billing')
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors"
-            >
-              <CreditCard size={13} className="text-slate-500" /> Billing
-            </button>
-          )}
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose?.()
+              navigate('/billing')
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <CreditCard size={13} className="text-slate-500" /> Billing
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
               onClose?.()
               navigate('/profile')
             }}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <Settings size={13} className="text-slate-500" /> Settings
           </button>
