@@ -9,11 +9,13 @@ import LandingHeroSection from '../components/landing/LandingHeroSection'
 import LandingCockpitSection from '../components/landing/LandingCockpitSection'
 import LandingAtsPlayground from '../components/landing/LandingAtsPlayground'
 import LandingFeaturesSection from '../components/landing/LandingFeaturesSection'
+import LandingCertificateSection from '../components/landing/LandingCertificateSection'
 import LandingWorkflowSection from '../components/landing/LandingWorkflowSection'
 import LandingComparisonSection from '../components/landing/LandingComparisonSection'
 import LandingTestimonialsSection from '../components/landing/LandingTestimonialsSection'
 import LandingPricingSection from '../components/landing/LandingPricingSection'
 import LandingFaqSection from '../components/landing/LandingFaqSection'
+import LandingFinalCtaSection from '../components/landing/LandingFinalCtaSection'
 import LandingFooter from '../components/landing/LandingFooter'
 
 const AmbientMotionBg = lazy(() => import('../components/landing/AmbientMotionBg'))
@@ -23,7 +25,7 @@ const AmbientFallback = () => (
     <div className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-gradient-to-br from-[#2E9BDA]/10 to-[#6366F1]/10 rounded-full blur-[120px] opacity-60" />
     <div className="absolute top-[40%] -left-[10%] w-[600px] h-[600px] bg-gradient-to-tr from-[#3B82F6]/10 to-[#8B5CF6]/10 rounded-full blur-[140px] opacity-60" />
     <div
-      className="absolute inset-0 opacity-[0.3]"
+      className="absolute inset-0 opacity-[0.25]"
       style={{
         backgroundImage: `radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.05) 1px, transparent 0)`,
         backgroundSize: '40px 40px',
@@ -178,7 +180,7 @@ export default function CareerPilotLanding() {
           setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
-        {/* 2. Hero Section (LCP Optimized) */}
+        {/* 2. Hero Section (LCP Optimized with Interactive Layered SaaS Mockup) */}
         <LandingHeroSection user={user} />
 
         {/* 3. Telemetry Cockpit Section */}
@@ -201,25 +203,31 @@ export default function CareerPilotLanding() {
           fadeInUp={fadeInUp}
         />
 
-        {/* 5. Core Feature Suite Section */}
+        {/* 5. Core Feature Suite Section (Asymmetric Bento Grid) */}
         <LandingFeaturesSection fadeInUp={fadeInUp} />
 
-        {/* 6. Step-by-Step Workflow Section */}
+        {/* 6. Verifiable Skill Certificate Showcase Section (3D Stacked Pedestal) */}
+        <LandingCertificateSection user={user} fadeInUp={fadeInUp} />
+
+        {/* 7. Step-by-Step Workflow Journey Section */}
         <LandingWorkflowSection activeStep={activeStep} setActiveStep={setActiveStep} />
 
-        {/* 7. Comparison Matrix Table Section */}
+        {/* 8. Comparison Matrix Table Section */}
         <LandingComparisonSection data={COMPARISON_DATA} />
 
-        {/* 8. Developer Testimonials Section */}
+        {/* 9. Developer Testimonials Section */}
         <LandingTestimonialsSection testimonials={TESTIMONIALS} />
 
-        {/* 9. Pricing Section */}
+        {/* 10. Transparent Pricing Section */}
         <LandingPricingSection isAnnual={isAnnual} setIsAnnual={setIsAnnual} />
 
-        {/* 10. FAQ Section */}
+        {/* 11. FAQ Accordion Section */}
         <LandingFaqSection items={FAQ_ITEMS} openFaq={openFaq} setOpenFaq={setOpenFaq} />
 
-        {/* 11. Mega Footer */}
+        {/* 12. Final Closing High-Conversion CTA Banner */}
+        <LandingFinalCtaSection user={user} />
+
+        {/* 13. Mega Footer */}
         <LandingFooter
           newsletterEmail={newsletterEmail}
           setNewsletterEmail={setNewsletterEmail}
