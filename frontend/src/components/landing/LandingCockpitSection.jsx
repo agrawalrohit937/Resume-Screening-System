@@ -27,10 +27,10 @@ import {
 } from 'lucide-react'
 
 const TABS = [
-  { id: 'ats', label: 'Smart ATS Optimizer', subtitle: 'Keyword & Impact Engine', icon: FileText },
+  { id: 'ats', label: 'Smart ATS Optimization', subtitle: 'Keyword & Metric Alignment', icon: FileText },
   { id: 'interview', label: 'AI Mock Interview Coach', subtitle: 'Vision & Speech Proctoring', icon: Video },
   { id: 'portfolio', label: 'GitHub Portfolio Builder', subtitle: 'Instant 1-Click Dev Site', icon: Globe },
-  { id: 'apply', label: 'AI Apply Assistant', subtitle: 'Automated HR Outreach', icon: Send },
+  { id: 'apply', label: 'AI Career Assistant', subtitle: 'Automated Outreach Copilot', icon: Send },
 ]
 
 const ROTATION_INTERVAL = 1660 // 3x speed (1.66s)
@@ -71,7 +71,7 @@ export default function LandingCockpitSection({
   }, [activeCockpitTab, isHovered, setActiveCockpitTab])
 
   return (
-    <section id="cockpit" className="py-24 sm:py-32 bg-gradient-to-b from-[#F8FAFC] via-[#F1F5F9] to-white relative overflow-hidden text-slate-900 border-y border-slate-200/80">
+    <section id="cockpit" className="py-14 sm:py-20 bg-gradient-to-b from-[#F8FAFC] via-[#F1F5F9] to-white relative overflow-hidden text-slate-900 border-y border-slate-200/80">
       
       {/* Background Lighting Glows */}
       <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] bg-gradient-to-b from-[#2E9BDA]/15 via-indigo-500/10 to-transparent blur-[140px] rounded-full" />
@@ -81,13 +81,13 @@ export default function LandingCockpitSection({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
+        <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200/90 text-[#2E9BDA] text-xs font-black tracking-widest uppercase mb-5 shadow-sm backdrop-blur-md"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200/90 text-[#2E9BDA] text-xs font-black tracking-widest uppercase mb-3 shadow-sm backdrop-blur-md"
           >
             <Cpu size={14} className="text-[#2E9BDA]" />
             <span>UNIFIED CAREER SUITE</span>
@@ -98,7 +98,7 @@ export default function LandingCockpitSection({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.14] mb-6"
+            className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.15] mb-4"
           >
             One Unified Platform for Your{' '}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-indigo-600 to-[#1d6fa5]">
@@ -111,7 +111,7 @@ export default function LandingCockpitSection({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-base sm:text-xl text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed"
+            className="text-sm sm:text-base text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed"
           >
             Explore live interactive previews of our core AI modules built for developers and engineering recruiters.
           </motion.p>

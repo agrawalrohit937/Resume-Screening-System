@@ -70,8 +70,8 @@ export default function LandingFooter({
                 </a>
               </li>
               <li>
-                <a href="#features" className="hover:text-white transition-colors flex items-center gap-1.5">
-                  <ChevronRight size={12} className="text-[#2E9BDA]" /> 100% Club Verified Badges
+                <a href="#certificates" className="hover:text-white transition-colors flex items-center gap-1.5">
+                  <ChevronRight size={12} className="text-[#2E9BDA]" /> Verified Skill Certificates
                 </a>
               </li>
               <li>
