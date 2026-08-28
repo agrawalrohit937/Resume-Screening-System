@@ -117,21 +117,29 @@ STRICT PARSER MODE (DO NOT TRUNCATE ARRAYS)
 3. For the `highlights` arrays in Experience and Projects: Copy every single bullet point from the raw text exactly as written.
 4. DO NOT drop contact information (email, phone, linkedin, github, portfolio).
 5. Certifications must be output as a flat list of strings — copy them verbatim.
-6. Output the `skills` field as a JSON object (dictionary) mapping logical categories (e.g. "Programming Languages", "Frameworks & Tools") to arrays of skill strings.
+6. SKILL CATEGORIZATION & CURATION ENGINE (STRICT RULES):
+   - STEP 1 (DEEP RESUME ANALYSIS): Analyze the entire resume first. What is the candidate's true technical specialization?
+     * For AI / ML / Data Engineers: Generate 4 to 6 specialized domain categories such as "Generative AI & LLMs", "Machine Learning & Deep Learning", "Data Engineering & Big Data", "Backend Systems & APIs", "Cloud Platforms & MLOps".
+     * For Cloud / DevOps Engineers: Generate categories such as "Cloud Architecture", "Containerization & Orchestration", "CI/CD & Infrastructure as Code", "Networking & Security", "Backend & Microservices".
+     * For Healthcare / Finance / Domain Specialists: Generate articulate domain categories matching their niche (e.g. "Quantitative Modeling", "Clinical Analytics", "Regulatory Compliance").
+   - STEP 2 (NO BLIND WEB-DEV BUCKETING): DO NOT default to generic "Frontend" or "Backend" unless the candidate is strictly a frontend/web developer.
+   - STEP 3 (STRICT CURATION - 6 TO 10 SKILLS MAX PER CATEGORY): DO NOT dump dozens of keywords into one category. Select, curate, and output ONLY the top 6 to 10 most impactful and specialized skills per category.
+   - STEP 4 (ZERO GENERIC / "OTHER" CATEGORIES): NEVER create generic leftover categories named "Other", "Others", "Miscellaneous", "General", or "Basic Skills".
+   - STEP 5 (LOGICAL ACCURACY): Ensure technologies are placed in their proper specialization (e.g., LangGraph, LlamaIndex, RAG in "Generative AI & LLMs"; PySpark, Kafka in "Data Engineering"; PyTorch, Hugging Face in "Machine Learning & Deep Learning").
 7. For projects: Extract and preserve BOTH the Live Demo URL ('link') and GitHub Repository URL ('github'). Never drop project links.
 
 =========================
-CRITICAL: ATS SCORE MUST NEVER DECREASE
+CRITICAL: ATS SCORE & REPUTATION PRESERVATION
 =========================
-- You MUST preserve EVERY single skill, technology, tool, programming language, framework, and domain keyword from the original resume. NOTHING may be removed.
-- Include all Human-Verified Ground Truth skills in the `skills` dictionary.
+- You MUST preserve all core high-impact skills, technologies, tools, programming languages, frameworks, and domain keywords from the original resume.
+- Include all Human-Verified Ground Truth skills in their respective dynamic categories in the `skills` dictionary.
 
 =========================
 YOU MUST IMPROVE (only these fields)
 =========================
 1. Write a professional headline (`target_role`) matching their specific niche.
 2. Rewrite the Professional Summary to be highly ATS-friendly and incorporate missing keywords without erasing identity.
-3. Populate `skills` as a categorised dictionary, reordering by JD relevance.
+3. Populate `skills` as a clean dynamic categorised dictionary (4 to 6 curated categories, 6 to 10 skills per category, 0 "other" categories).
 
 =========================
 INPUT DATA

@@ -50,6 +50,8 @@ const ApplyAssistant = lazy(() => import('./pages/ApplyAssistant'))
 const SupportTickets = lazy(() => import('./pages/SupportTickets'))
 const TicketDetail = lazy(() => import('./pages/TicketDetail'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const PortfolioBuilder = lazy(() => import('./pages/PortfolioBuilder'))
+const PublicPortfolio = lazy(() => import('./pages/PublicPortfolio'))
 
 // ── Route guards ────────────────────────────────────────────────────────────
 
@@ -153,15 +155,18 @@ export default function App() {
               {/* ── Dev-only: Loader test route ── */}
               <Route path="/test-loader" element={<Loader />} />
 
-              {/* ── Public Landing & Careers ── */}
+              {/* ── Public Landing, Careers & Portfolios ── */}
               <Route path="/" element={<CareerPilotLanding />} />
               <Route path="/careers" element={<Careers />} />
+              <Route path="/portfolio/:username" element={<PublicPortfolio />} />
+              <Route path="/portfolio/public/:username" element={<PublicPortfolio />} />
 
               {/* ── Protected (inside AppLayout shell - PATHLESS ROUTE) ── */}
               <Route element={<ProtectedRoute><RouteErrorBoundary><AppLayout /></RouteErrorBoundary></ProtectedRoute>}>
                 {/* Core */}
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="portfolio-builder" element={<PortfolioBuilder />} />
 
                 <Route path="results" element={<Results />} />
                 <Route path="billing" element={<Billing />} />

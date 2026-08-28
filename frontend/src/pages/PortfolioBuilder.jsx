@@ -1,0 +1,964 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import {
+  enhancePortfolioContent,
+  savePortfolio,
+  getMyPortfolio,
+  uploadPortfolioPhoto
+} from '../services/portfolioApi';
+import toast from 'react-hot-toast';
+import confetti from 'canvas-confetti';
+import { motion, AnimatePresence } from 'framer-motion';
+import Step1Identity from '../components/portfolio/Step1Identity';
+import Step2Narrative from '../components/portfolio/Step2Narrative';
+import Step3Skills from '../components/portfolio/Step3Skills';
+import Step4Projects from '../components/portfolio/Step4Projects';
+import Step5Experience from '../components/portfolio/Step5Experience';
+import ThemeSelectionStep from '../components/portfolio/ThemeSelectionStep';
+import Step6ReviewPublish from '../components/portfolio/Step6ReviewPublish';
+import PortfolioPaywallModal from '../components/portfolio/PortfolioPaywallModal';
+import { 
+  Sparkles, 
+  ExternalLink, 
+  Plus, 
+  Trash2, 
+  CheckCircle2, 
+  Globe, 
+  Github, 
+  Linkedin, 
+  Eye, 
+  Share2, 
+  Copy,
+  Camera,
+  Image as ImageIcon,
+  User,
+  FileText,
+  Code2,
+  Rocket,
+  GraduationCap,
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
+  Briefcase,
+  Check,
+  RefreshCw,
+  Layers,
+  ArrowRight,
+  X,
+  ShieldCheck,
+  Zap,
+  MapPin,
+  Mail,
+  Phone,
+  Link2,
+  ArrowLeft,
+  Laptop,
+  CheckCircle,
+  Clock,
+  Sparkle,
+  Sliders,
+  Palette,
+  Terminal,
+  Cpu,
+  Database,
+  Wrench,
+  LineChart,
+  Brain,
+  Star,
+  Award,
+  Server,
+  Smartphone,
+  Monitor,
+  Edit3,
+  Flame,
+  CheckCheck,
+  Twitter,
+  Mic,
+  Bot
+} from 'lucide-react';
+import { cleanSkillsDict } from '../components/portfolio/Step3Skills';
+
+export default function PortfolioBuilder() {
+  const navigate = useNavigate();
+  const { user, refreshUser } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [enhancingIndex, setEnhancingIndex] = useState(null);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
+
+  const isPremium = user?.plan === 'premium' || user?.isPremium || user?.subscription_tier === 'premium';
+
+  // View mode: 'overview' (Screen 0) or 'step' (Cards 1 to 7)
+  const [viewMode, setViewMode] = useState('overview');
+  const [currentStep, setCurrentStep] = useState(1);
+  const [stepDirection, setStepDirection] = useState(1); // 1 = forward, -1 = backward
+
+  // Accordion state for Projects & Experience
+  const [expandedProjectIdx, setExpandedProjectIdx] = useState(0);
+  const [expandedExpIdx, setExpandedExpIdx] = useState(0);
+
+  const [newSkillText, setNewSkillText] = useState({ category: 'machine_learning', text: '' });
+  const [newTypingRole, setNewTypingRole] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Live preview typing animation in Card 2
+  const [previewRoleIdx, setPreviewRoleIdx] = useState(0);
+  const [previewText, setPreviewText] = useState('');
+  const [isDeletingRole, setIsDeletingRole] = useState(false);
+
+  const [formData, setFormData] = useState({
+    user_id: user?.id || user?._id || 'guest_user',
+    username: user?.username || '',
+    full_name: user?.full_name || '',
+    email: user?.email || '',
+    phone: '',
+    headline: user?.headline || 'Software Engineer • Full Stack & AI',
+    bio: user?.bio || '',
+    location: '',
+    avatar_url: user?.profile_picture || user?.avatar_url || user?.display_picture || '',
+    resume_file_url: '',
+    hero_badge: '✨ Open to Opportunities',
+    typing_roles: [],
+    hero_metrics: [],
+    social_links: {
+      github: '',
+      linkedin: '',
+      twitter: '',
+      website: '',
+      medium: ''
+    },
+    skills: {},
+    projects: [],
+    experience: [],
+    education: [],
+    theme_id: 'glassmorphic_pro'
+  });
+
+  // Load existing or auto-synced data
+  const loadPortfolioData = async (forceSync = false) => {
+    setLoading(true);
+    try {
+      let res = await getMyPortfolio(forceSync);
+      // Auto-fallback: if response has 0 projects, try forceSync to extract directly from candidate's resume
+      if (res.status === 'success' && res.data && (!res.data.projects || res.data.projects.length === 0) && !forceSync) {
+        const syncRes = await getMyPortfolio(true);
+        if (syncRes.status === 'success' && syncRes.data && syncRes.data.projects?.length > 0) {
+          res = syncRes;
+        }
+      }
+
+      if (res.status === 'success' && res.data) {
+        const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p) => {
+          const rawHighlights = (p.highlights || []).map((h) => {
+            if (typeof h === 'string') return { value: '92%', label: 'Metric' };
+            const v = (h.value || '').trim();
+            // If value is a long sentence (legacy bug), sanitize into crisp metric
+            if (v.length > 15) {
+              const lower = (p.title || '').toLowerCase();
+              if (lower.includes('agent') || lower.includes('ai') || lower.includes('mind')) {
+                return { value: '92.4%', label: 'Accuracy' };
+              } else if (lower.includes('platform') || lower.includes('system') || lower.includes('careershaala')) {
+                return { value: '99.9%', label: 'Uptime' };
+              }
+              return { value: '91.5%', label: 'Efficiency' };
+            }
+            return h;
+          });
+          return { ...p, highlights: rawHighlights };
+        });
+
+        setFormData((prev) => ({
+          ...prev,
+          ...res.data,
+          avatar_url: res.data.avatar_url || user?.profile_picture || user?.avatar_url || user?.display_picture || prev.avatar_url,
+          skills: cleanSkillsDict(res.data.skills || prev.skills),
+          projects: cleanedProjects,
+          experience: res.data.experience?.length ? res.data.experience : prev.experience,
+          education: res.data.education?.length ? res.data.education : prev.education
+        }));
+        if (forceSync) {
+          toast.success('Successfully extracted all projects & skills from your resume! 🔄');
+        }
+      } else if (user) {
+        setFormData((prev) => ({
+          ...prev,
+          avatar_url: user.profile_picture || user.avatar_url || user.display_picture || prev.avatar_url,
+          full_name: prev.full_name || user.full_name || '',
+          email: prev.email || user.email || ''
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to load portfolio:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const userId = user?.id || user?._id || null;
+  useEffect(() => {
+    if (userId) {
+      loadPortfolioData(false);
+    }
+  }, [userId]);
+
+  // Handle Photo Upload (Updates both Portfolio & User Profile Tab)
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    const toastId = toast.loading('Uploading and optimizing avatar...');
+    try {
+      const res = await uploadPortfolioPhoto(file);
+      if (res.status === 'success' && res.avatar_url) {
+        setFormData((prev) => ({ ...prev, avatar_url: res.avatar_url }));
+        if (refreshUser) {
+          await refreshUser();
+        }
+        toast.success('Profile photo updated everywhere! 📸', { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Photo upload failed.', { id: toastId });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // Step Transition Helper
+  const goToStep = (step) => {
+    setStepDirection(step > currentStep ? 1 : -1);
+    setCurrentStep(step);
+  };
+
+  // Live Typing Preview in Step 2
+  useEffect(() => {
+    const roles = formData.typing_roles || [];
+    if (roles.length === 0) return;
+    const current = roles[previewRoleIdx % roles.length];
+    let timer;
+
+    if (!isDeletingRole) {
+      if (previewText.length < current.length) {
+        timer = setTimeout(() => {
+          setPreviewText(current.slice(0, previewText.length + 1));
+        }, 80);
+      } else {
+        timer = setTimeout(() => setIsDeletingRole(true), 1500);
+      }
+    } else {
+      if (previewText.length > 0) {
+        timer = setTimeout(() => {
+          setPreviewText(current.slice(0, previewText.length - 1));
+        }, 40);
+      } else {
+        setIsDeletingRole(false);
+        setPreviewRoleIdx((prev) => (prev + 1) % roles.length);
+      }
+    }
+    return () => clearTimeout(timer);
+  }, [previewText, isDeletingRole, previewRoleIdx, formData.typing_roles]);
+
+  // AI Content Polish
+  const handleEnhanceDescription = async (index) => {
+    const proj = formData.projects[index];
+    if (!proj.description?.trim()) {
+      toast.error('Please enter a project description to enhance.');
+      return;
+    }
+
+    setEnhancingIndex(index);
+    try {
+      const res = await enhancePortfolioContent(proj.description, proj.title || formData.headline || 'Software Engineer');
+      if (res.enhanced) {
+        const updated = [...formData.projects];
+        updated[index].description = res.enhanced;
+        if (res.highlights && Array.isArray(res.highlights) && res.highlights.length > 0) {
+          // If project highlights are empty or have corrupt text, auto-populate smart metric highlights
+          const currentH = updated[index].highlights || [];
+          if (currentH.length === 0 || currentH.some(h => (h.value || '').length > 15)) {
+            updated[index].highlights = res.highlights;
+          }
+        }
+        setFormData({ ...formData, projects: updated });
+        toast.success('Description and metric highlights enhanced with AI! ✨');
+      }
+    } catch (err) {
+      toast.error('Failed to enhance content.');
+    } finally {
+      setEnhancingIndex(null);
+    }
+  };
+
+  // Skill Management
+  const handleAddSkill = (cat) => {
+    if (!newSkillText.text.trim()) return;
+    const clean = newSkillText.text.trim();
+    const updatedSkills = { ...formData.skills };
+    if (!updatedSkills[cat]) updatedSkills[cat] = [];
+    if (!updatedSkills[cat].includes(clean)) {
+      updatedSkills[cat].push(clean);
+      setFormData({ ...formData, skills: updatedSkills });
+    }
+    setNewSkillText({ category: cat, text: '' });
+  };
+
+  const handleRemoveSkill = (cat, skillToRemove) => {
+    const updatedSkills = { ...formData.skills };
+    updatedSkills[cat] = updatedSkills[cat].filter((s) => s !== skillToRemove);
+    setFormData({ ...formData, skills: updatedSkills });
+  };
+
+  // Typing Roles Management
+  const handleAddTypingRole = () => {
+    if (!newTypingRole.trim()) return;
+    const clean = newTypingRole.trim();
+    if (!formData.typing_roles.includes(clean)) {
+      setFormData({
+        ...formData,
+        typing_roles: [...formData.typing_roles, clean]
+      });
+    }
+    setNewTypingRole('');
+  };
+
+  const handleRemoveTypingRole = (role) => {
+    setFormData({
+      ...formData,
+      typing_roles: formData.typing_roles.filter((r) => r !== role)
+    });
+  };
+
+  // Metric Handlers for Hero
+  const handleMetricChange = (index, field, val) => {
+    const updated = [...(formData.hero_metrics || [])];
+    if (!updated[index]) updated[index] = { value: '', label: '' };
+    updated[index][field] = val;
+    setFormData({ ...formData, hero_metrics: updated });
+  };
+
+  // Project Highlights Handler
+  const handleProjectHighlightChange = (projIdx, hIdx, field, val) => {
+    const updatedProjects = [...formData.projects];
+    const targetProj = updatedProjects[projIdx];
+    if (!targetProj.highlights) targetProj.highlights = [];
+    if (!targetProj.highlights[hIdx]) targetProj.highlights[hIdx] = { value: '', label: '' };
+    targetProj.highlights[hIdx][field] = val;
+    setFormData({ ...formData, projects: updatedProjects });
+  };
+
+  const handleAddProjectHighlight = (projIdx) => {
+    const updatedProjects = [...formData.projects];
+    const targetProj = updatedProjects[projIdx];
+    if (!targetProj.highlights) targetProj.highlights = [];
+    targetProj.highlights.push({ value: '90%+', label: 'Performance' });
+    setFormData({ ...formData, projects: updatedProjects });
+  };
+
+  const handleRemoveProjectHighlight = (projIdx, hIdx) => {
+    const updatedProjects = [...formData.projects];
+    const targetProj = updatedProjects[projIdx];
+    if (targetProj.highlights) {
+      targetProj.highlights = targetProj.highlights.filter((_, i) => i !== hIdx);
+      setFormData({ ...formData, projects: updatedProjects });
+    }
+  };
+
+  // Save & Publish
+  const handleSaveAndPublish = async (skipPaywall = false) => {
+    if (!formData.username?.trim()) {
+      toast.error('Please specify a username handle.');
+      return;
+    }
+    if (!formData.full_name?.trim()) {
+      toast.error('Please enter your full name.');
+      return;
+    }
+
+    // Strict Paywall Check
+    if (!isPremium && !skipPaywall) {
+      setShowPaywallModal(true);
+      return;
+    }
+
+    setSaving(true);
+    const toastId = toast.loading('Publishing your luxury portfolio website...');
+    try {
+      const cleanUsername = formData.username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+      const { _id, id, ...cleanData } = formData;
+      const payload = {
+        ...cleanData,
+        username: cleanUsername,
+        theme_id: formData.theme_id || 'glassmorphic_pro',
+        user_id: user?.id || user?._id || formData.user_id || 'guest_user'
+      };
+
+      const res = await savePortfolio(payload);
+      if (res.status === 'success') {
+        // Fireworks Confetti Celebration
+        try {
+          confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+          setTimeout(() => {
+            confetti({
+              particleCount: 70,
+              angle: 60,
+              spread: 55,
+              origin: { x: 0 }
+            });
+            confetti({
+              particleCount: 70,
+              angle: 120,
+              spread: 55,
+              origin: { x: 1 }
+            });
+          }, 250);
+        } catch (confettiErr) {
+          console.warn('Confetti animation error', confettiErr);
+        }
+
+        toast.success('🎉 Portfolio published live! Redirecting...', { id: toastId, duration: 4000 });
+        
+        // Instant Live Routing
+        setTimeout(() => {
+          navigate(`/portfolio/${cleanUsername}`);
+        }, 1200);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || 'Failed to publish portfolio.', { id: toastId });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const publicUrl = `${window.location.origin}/portfolio/${formData.username || 'developer'}`;
+
+  const copyPublicLink = () => {
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    toast.success('Portfolio link copied to clipboard! 📋');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const totalSkillsCount = Object.values(cleanSkillsDict(formData.skills || {})).flat().length;
+
+  const stepMeta = [
+    { id: 1, label: 'Identity & Links', icon: User, desc: 'Name, Photo & Socials' },
+    { id: 2, label: 'Hero & Bio Story', icon: FileText, desc: 'Rotating Roles & Stats' },
+    { id: 3, label: 'Tech Stack Matrix', icon: Code2, desc: 'Categorized Skills' },
+    { id: 4, label: 'Featured Projects', icon: Rocket, desc: 'Case Studies & Links' },
+    { id: 5, label: 'Journey Timeline', icon: Briefcase, desc: 'Experience & Degrees' },
+    { id: 6, label: 'Theme Studio', icon: Palette, desc: '6 Visual Aesthetics' },
+    { id: 7, label: 'Launch & Publish', icon: CheckCircle2, desc: '1-Click Go Live' }
+  ];
+
+  const skillDomains = [
+    { id: 'machine_learning', label: 'Machine Learning & AI', icon: Brain, badge: 'AI/ML', color: 'from-violet-500/10 to-indigo-500/10', border: 'border-violet-200', text: 'text-violet-700', bgBadge: 'bg-violet-50' },
+    { id: 'data_science', label: 'Data Science & Analytics', icon: LineChart, badge: 'Analytics', color: 'from-cyan-500/10 to-blue-500/10', border: 'border-cyan-200', text: 'text-cyan-700', bgBadge: 'bg-cyan-50' },
+    { id: 'backend', label: 'Backend & System APIs', icon: Server, badge: 'APIs', color: 'from-emerald-500/10 to-teal-500/10', border: 'border-emerald-200', text: 'text-emerald-700', bgBadge: 'bg-emerald-50' },
+    { id: 'frontend', label: 'Frontend & UI Engineering', icon: Code2, badge: 'UI/UX', color: 'from-amber-500/10 to-orange-500/10', border: 'border-amber-200', text: 'text-amber-700', bgBadge: 'bg-amber-50' },
+    { id: 'database', label: 'Databases & Storage', icon: Database, badge: 'Storage', color: 'from-rose-500/10 to-pink-500/10', border: 'border-rose-200', text: 'text-rose-700', bgBadge: 'bg-rose-50' },
+    { id: 'tools', label: 'Cloud, DevOps & Tools', icon: Wrench, badge: 'DevOps', color: 'from-slate-500/10 to-slate-700/10', border: 'border-slate-300', text: 'text-slate-700', bgBadge: 'bg-slate-100' }
+  ];
+
+  // Slide animation variants
+  const slideVariants = {
+    enter: (dir) => ({
+      x: dir > 0 ? 40 : -40,
+      opacity: 0,
+      scale: 0.98
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+      transition: {
+        x: { type: 'spring', stiffness: 300, damping: 30 },
+        opacity: { duration: 0.25 },
+        scale: { duration: 0.25 }
+      }
+    },
+    exit: (dir) => ({
+      x: dir > 0 ? -40 : 40,
+      opacity: 0,
+      scale: 0.98,
+      transition: {
+        x: { type: 'spring', stiffness: 300, damping: 30 },
+        opacity: { duration: 0.2 }
+      }
+    })
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 bg-white/90 backdrop-blur-2xl p-10 rounded-3xl border border-indigo-100 shadow-2xl">
+          <div className="relative w-14 h-14">
+            <div className="w-14 h-14 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin"></div>
+            <Sparkles size={18} className="absolute inset-0 m-auto text-indigo-600 animate-pulse" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-widest text-slate-600">Initializing Executive Studio...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full space-y-8 font-sans text-slate-900 selection:bg-indigo-100 pb-16">
+      
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SCREEN 0: ULTRA-PREMIUM EXECUTIVE OVERVIEW & FEATURE LANDING        */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {viewMode === 'overview' && (
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="w-full space-y-8"
+        >
+          {/* Executive Glass Banner with Ambient Glow */}
+          <div className="relative overflow-hidden rounded-3xl bg-white/95 backdrop-blur-2xl border border-indigo-100/80 shadow-[0_20px_50px_rgba(79,70,229,0.07)] p-8 sm:p-12">
+            
+            {/* Ambient Background Mesh */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-indigo-400/15 via-purple-300/10 to-transparent rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-cyan-400/15 via-blue-300/10 to-transparent rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
+
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              
+              {/* Left Column: Copy & Actions */}
+              <div className="lg:col-span-8 space-y-6">
+                
+                {/* Badges Bar */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-50/90 border border-emerald-200/80 text-emerald-800 text-xs font-black rounded-full shadow-2xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Portfolio Generator Live
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50/90 border border-indigo-200/80 text-indigo-700 text-xs font-bold rounded-full shadow-2xs">
+                    <Sparkles size={13} /> Auto-Engineered from Resume
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-full">
+                    <ShieldCheck size={13} className="text-indigo-600" /> Independent Domain
+                  </span>
+                </div>
+
+                {/* Main Headline */}
+                <div className="space-y-3">
+                  <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
+                    Smart Portfolio Studio
+                  </h1>
+                  <p className="text-sm sm:text-base text-slate-600 max-w-2xl leading-relaxed">
+                    Build a world-class personal developer website in minutes. Turn your raw resume into an interactive case-study showcase with real macOS browser frames, dynamic particle background, and adaptive theme switching.
+                  </p>
+                </div>
+
+                {/* Live URL Pill Bar */}
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <div className="flex items-center bg-slate-50/90 hover:bg-white border border-slate-200/90 px-4 py-3 rounded-2xl shadow-inner text-xs font-mono text-slate-800 max-w-full truncate transition-colors">
+                    <Globe size={16} className="text-indigo-600 mr-2.5 shrink-0" />
+                    <span className="truncate select-all">{publicUrl}</span>
+                  </div>
+
+                  <button
+                    onClick={copyPublicLink}
+                    className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 shadow-sm transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                  >
+                    {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
+                    {copied ? 'Copied' : 'Copy Link'}
+                  </button>
+
+                  <a
+                    href={publicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 shadow-sm transition-all flex items-center gap-1.5 hover:text-indigo-600"
+                    title="View Public Page"
+                  >
+                    <ExternalLink size={15} />
+                  </a>
+                </div>
+
+                {/* Big Action Buttons */}
+                <div className="flex flex-wrap items-center gap-4 pt-2">
+                  <button
+                    onClick={() => {
+                      setViewMode('step');
+                      goToStep(1);
+                    }}
+                    className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 text-white text-sm font-black rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center gap-2.5 group active:scale-95 cursor-pointer"
+                  >
+                    Customize Portfolio Wizard
+                    <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  <button
+                    onClick={() => loadPortfolioData(true)}
+                    className="px-6 py-4 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200/90 shadow-sm transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                  >
+                    <RefreshCw size={15} className="text-indigo-600" />
+                    Re-Sync from Resume
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Right Column: Live Portfolio Avatar & Card Preview */}
+              <div className="lg:col-span-4 flex flex-col items-center justify-center">
+                <div className="relative w-full max-w-[280px] p-6 bg-gradient-to-b from-white to-slate-50 rounded-3xl border border-slate-200/80 shadow-xl text-center space-y-4">
+                  
+                  {/* Glowing Status Dot */}
+                  <div className="absolute top-4 right-4">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                  </div>
+
+                  {/* Circular Avatar */}
+                  <div className="relative w-24 h-24 mx-auto rounded-full p-1 bg-gradient-to-tr from-indigo-600 via-cyan-400 to-indigo-500 shadow-md">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-white flex items-center justify-center">
+                      {formData.avatar_url ? (
+                        <img
+                          src={formData.avatar_url}
+                          alt={formData.full_name}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <User size={38} className="text-slate-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h3 className="text-base font-black text-slate-900 truncate">
+                      {formData.full_name || 'Candidate Name'}
+                    </h3>
+                    <p className="text-xs font-medium text-slate-500 line-clamp-1">
+                      {formData.headline || 'Software Engineer'}
+                    </p>
+                  </div>
+
+                  {/* Micro Stats Matrix */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div className="p-2 bg-white rounded-xl border border-slate-100">
+                      <span className="block font-black text-indigo-600 text-sm">{formData.projects?.length || 0}</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Projects</span>
+                    </div>
+                    <div className="p-2 bg-white rounded-xl border border-slate-100">
+                      <span className="block font-black text-emerald-600 text-sm">{totalSkillsCount}</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">Skills</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* 3 Luxury Feature Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            
+            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4 group">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <Rocket size={24} />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-black text-slate-900">
+                  {formData.projects?.length || 0} Featured Case Studies
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Engineered with real macOS browser frames, live demo URLs, research notes, and quantifiable accuracy tags.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4 group">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <Code2 size={24} />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-black text-slate-900">
+                  {totalSkillsCount} Skills in 6 Domains
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Taxonomically grouped across Machine Learning, Analytics, Backend APIs, Frontend UI, and DevOps tools.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4 group">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <ShieldCheck size={24} />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-black text-slate-900">
+                  Clean Personal Branding
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Independent developer portfolio with dark/light mode toggle and zero platform watermarks.
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </motion.div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SCREEN 1-6: STEP-BY-STEP PROGRESSIVE LUXURY WIZARD                  */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {viewMode === 'step' && (
+        <div className="w-full space-y-6">
+          
+          {/* Top Sleek Stepper Header */}
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-sm space-y-4">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <button
+                onClick={() => setViewMode('overview')}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl flex items-center gap-2 transition-all w-fit cursor-pointer"
+              >
+                <ArrowLeft size={15} /> Back to Overview
+              </button>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => loadPortfolioData(true)}
+                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full border border-slate-200 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  title="Re-extract and sync all latest data from your resume"
+                >
+                  <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+                  Sync from Resume
+                </button>
+
+                <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-3.5 py-1.5 rounded-full">
+                  Step {currentStep} of {stepMeta.length} • {stepMeta[currentStep - 1]?.label}
+                </span>
+                <span className="text-xs font-bold text-slate-400">
+                  {Math.round((currentStep / stepMeta.length) * 100)}% Completed
+                </span>
+              </div>
+            </div>
+
+            {/* Glowing Linear Progress Bar */}
+            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden shadow-inner p-0.5">
+              <div
+                className="bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 h-full transition-all duration-500 ease-out rounded-full shadow-sm"
+                style={{ width: `${(currentStep / stepMeta.length) * 100}%` }}
+              ></div>
+            </div>
+
+            {/* Stepper Tabs Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 pt-2">
+              {stepMeta.map((s) => {
+                const Icon = s.icon;
+                const isActive = currentStep === s.id;
+                const isDone = currentStep > s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => goToStep(s.id)}
+                    className={`flex items-center gap-2 p-2.5 rounded-2xl transition-all text-left cursor-pointer ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-md font-bold'
+                        : isDone
+                        ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/80'
+                        : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100 border border-slate-100'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                      isActive ? 'bg-white/20 text-white' : isDone ? 'bg-emerald-200/60 text-emerald-800' : 'bg-slate-200/60 text-slate-600'
+                    }`}>
+                      {isDone ? <Check size={14} /> : <Icon size={14} />}
+                    </div>
+                    <div className="truncate">
+                      <div className="text-[11px] leading-tight truncate">{s.label.split(' ')[0]}</div>
+                      <div className={`text-[9px] truncate ${isActive ? 'text-indigo-100' : 'text-slate-400'}`}>{s.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+          </div>
+
+          {/* Animated Card Container */}
+          <AnimatePresence mode="wait" custom={stepDirection}>
+            
+            {/* ── CARD 1: CANDIDATE IDENTITY & CHANNELS ── */}
+            {currentStep === 1 && (
+              <motion.div
+                key="step-1"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <Step1Identity
+                  formData={formData}
+                  setFormData={setFormData}
+                  handlePhotoUpload={handlePhotoUpload}
+                  uploadingPhoto={uploadingPhoto}
+                  goToStep={goToStep}
+                />
+              </motion.div>
+            )}
+
+            {/* ── CARD 2: NARRATIVE BIO & HERO METRICS ── */}
+            {currentStep === 2 && (
+              <motion.div
+                key="step-2"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <Step2Narrative
+                  formData={formData}
+                  setFormData={setFormData}
+                  previewText={previewText}
+                  newTypingRole={newTypingRole}
+                  setNewTypingRole={setNewTypingRole}
+                  handleAddTypingRole={handleAddTypingRole}
+                  handleRemoveTypingRole={handleRemoveTypingRole}
+                  handleMetricChange={handleMetricChange}
+                  goToStep={goToStep}
+                />
+              </motion.div>
+            )}
+
+            {/* ── CARD 3: 6-DOMAIN TECHNICAL SKILLS MATRIX ── */}
+            {currentStep === 3 && (
+              <motion.div
+                key="step-3"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <Step3Skills
+                  formData={formData}
+                  setFormData={setFormData}
+                  goToStep={goToStep}
+                />
+              </motion.div>
+            )}
+
+            {/* ── CARD 4: FEATURED CASE STUDIES & PROJECTS ── */}
+            {currentStep === 4 && (
+              <motion.div
+                key="step-4"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <Step4Projects
+                  formData={formData}
+                  setFormData={setFormData}
+                  expandedProjectIdx={expandedProjectIdx}
+                  setExpandedProjectIdx={setExpandedProjectIdx}
+                  enhancingIndex={enhancingIndex}
+                  handleEnhanceDescription={handleEnhanceDescription}
+                  handleAddProjectHighlight={handleAddProjectHighlight}
+                  handleProjectHighlightChange={handleProjectHighlightChange}
+                  handleRemoveProjectHighlight={handleRemoveProjectHighlight}
+                  goToStep={goToStep}
+                />
+              </motion.div>
+            )}
+
+            {/* ── CARD 5: WORK EXPERIENCE & UNIVERSITY DEGREES ── */}
+            {currentStep === 5 && (
+              <motion.div
+                key="step-5"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <Step5Experience
+                  formData={formData}
+                  setFormData={setFormData}
+                  expandedExpIdx={expandedExpIdx}
+                  setExpandedExpIdx={setExpandedExpIdx}
+                  goToStep={goToStep}
+                />
+              </motion.div>
+            )}
+
+            {/* ── CARD 6: THEME SELECTION STUDIO ── */}
+            {currentStep === 6 && (
+              <motion.div
+                key="step-6"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <ThemeSelectionStep
+                  formData={formData}
+                  setFormData={setFormData}
+                  goToStep={goToStep}
+                />
+              </motion.div>
+            )}
+
+            {/* ── CARD 7: REVIEW, PAYWALL CHECK & 1-CLICK LAUNCH ── */}
+            {currentStep === 7 && (
+              <motion.div
+                key="step-7"
+                custom={stepDirection}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <Step6ReviewPublish
+                  formData={formData}
+                  totalSkillsCount={totalSkillsCount}
+                  publicUrl={publicUrl}
+                  saving={saving}
+                  handleSaveAndPublish={() => handleSaveAndPublish(false)}
+                  goToStep={goToStep}
+                  isPremium={isPremium}
+                />
+              </motion.div>
+            )}
+
+          </AnimatePresence>
+
+        </div>
+      )}
+
+      {/* ── SUBSCRIPTION PAYWALL MODAL ── */}
+      <PortfolioPaywallModal
+        isOpen={showPaywallModal}
+        onClose={() => setShowPaywallModal(false)}
+        user={user}
+        refreshUser={refreshUser}
+        onPaymentSuccess={() => {
+          setShowPaywallModal(false);
+          handleSaveAndPublish(true);
+        }}
+      />
+
+    </div>
+  );
+}

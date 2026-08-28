@@ -116,6 +116,7 @@ const NAV_SECTIONS = [
     title: 'Resume Tools',
     items: [
       { to: '/results', label: 'ATS Matcher', icon: Icons.ats },
+      { to: '/portfolio-builder', label: 'Portfolio Generator', icon: Icons.ats },
     ],
   },
   {
@@ -168,6 +169,7 @@ const VIEW_MODES = [
 const ROUTE_PREFETCH = {
   '/dashboard': () => import('../pages/Dashboard'),
   '/profile': () => import('../pages/Profile'),
+  '/portfolio-builder': () => import('../pages/PortfolioBuilder'),
   '/results': () => import('../pages/Results'),
   '/interview': () => import('../pages/Interview'),
   '/live-interview': () => import('../pages/LiveInterview'),
