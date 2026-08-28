@@ -129,6 +129,17 @@ class ParserService:
         certs = self._extract_certifications(sections.get("certifications", ""))
         total_exp = extract_years_of_experience(raw_text)
 
+        print("\n" + "="*70)
+        print("📄 [PARSER_SERVICE] Raw Resume Structured:")
+        print(f"   👤 Name      : '{full_name}'")
+        print(f"   📍 Location  : '{contact.location}'")
+        print(f"   📧 Email     : '{contact.email}'")
+        print(f"   📱 Phone     : '{contact.phone}'")
+        print(f"   🛠️ TechSkills : {len(tech_skills)} skills")
+        print(f"   🚀 Projects  : {len(projects)} projects")
+        print(f"   💼 Exp       : {len(experience)} entries ({total_exp} yrs)")
+        print("="*70 + "\n")
+
         # Fallback: calculate experience from work entries
         if total_exp == 0.0 and experience:
             total_exp = self._calculate_experience_from_entries(experience)
@@ -178,14 +189,34 @@ class ParserService:
         return None
 
     def _extract_location(self, text: str) -> Optional[str]:
+        """Extracts location only from header lines, strictly avoiding technical skills."""
+        header_lines = text.split("\n")[:10]
+        header_text = "\n".join(header_lines)
+        
+        # Check for city/country or city/state patterns
         patterns = [
             r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?,\s*[A-Z]{2}(?:\s\d{5})?)\b",
-            r"\b([A-Z][a-z]+,\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\b",
+            r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?,\s*(?:India|USA|UK|Canada|Germany|Australia|Singapore|Remote|United States|United Kingdom))\b",
+            r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?,\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\b",
         ]
+        
+        KNOWN_SKILL_WORDS = {
+            "python", "java", "react", "fastapi", "flask", "django", "nodejs", "javascript",
+            "typescript", "docker", "kubernetes", "aws", "gcp", "azure", "mongodb", "postgresql",
+            "mysql", "sqlite", "redis", "pandas", "numpy", "pytorch", "tensorflow", "scikit",
+            "html", "css", "tailwind", "git", "linux", "c++", "c#", "machine", "learning", "data", "science"
+        }
+        
         for pattern in patterns:
-            match = re.search(pattern, text)
-            if match:
-                return match.group(1)
+            for match in re.finditer(pattern, header_text):
+                candidate = match.group(1).strip()
+                words = [w.lower().strip(",.") for w in candidate.split()]
+                # If any word in candidate is a known tech skill, skip it
+                if any(w in KNOWN_SKILL_WORDS for w in words):
+                    continue
+                # If candidate is plausible location
+                if len(candidate) >= 4 and len(candidate) <= 40:
+                    return candidate
         return None
 
     def _extract_experience(self, text: str) -> List[WorkExperience]:

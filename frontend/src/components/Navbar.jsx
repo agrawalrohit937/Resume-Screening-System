@@ -82,8 +82,9 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   const searchContainerRef = useRef(null)
   const searchInputRef = useRef(null)
 
+  const userId = user?.id || user?._id || null
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setStreak(0)
       return
     }
@@ -96,7 +97,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
       })
       .catch(() => {})
     return () => { isMounted = false }
-  }, [user])
+  }, [userId])
 
   // Dynamically get current page name for the breadcrumb
   const currentRouteName = SEARCH_ROUTES.find(r => r.path === location.pathname)?.name || 'Dashboard'

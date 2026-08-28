@@ -82,12 +82,18 @@ async def validate_and_save_profile_image(file: UploadFile, user_id: str) -> Tup
     compressed_bytes = buf.getvalue()
     file_size = len(compressed_bytes)
 
-    # Upload to Cloudinary — public_id is deterministic per user so uploading
-    # a new photo automatically overwrites the old one on Cloudinary side.
-    secure_url, public_id = await upload_profile_picture(compressed_bytes, user_id, ext)
-    logger.info("Profile image uploaded to Cloudinary", user_id=user_id, url=secure_url, size=file_size)
-
-    return secure_url, public_id, file_size
+    # Upload to Cloudinary with fallback to Base64 Data URI if network/DNS fails
+    try:
+        secure_url, public_id = await upload_profile_picture(compressed_bytes, user_id, ext)
+        logger.info("Profile image uploaded to Cloudinary", user_id=user_id, url=secure_url, size=file_size)
+        return secure_url, public_id, file_size
+    except Exception as err:
+        logger.warning("Cloudinary upload unavailable, using Base64 Data URI fallback", error=str(err))
+        import base64
+        b64_str = base64.b64encode(compressed_bytes).decode("utf-8")
+        mime = f"image/{ext if ext != 'jpg' else 'jpeg'}"
+        data_uri = f"data:{mime};base64,{b64_str}"
+        return data_uri, f"fallback_b64_{uuid.uuid4().hex[:8]}", file_size
 
 
 async def delete_profile_image(old_public_id: str) -> None:

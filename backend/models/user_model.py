@@ -105,6 +105,8 @@ class UserModel(BaseModel):
     bio: Optional[str] = None
     github_url: Optional[str] = None
     portfolio_url: Optional[str] = None
+    portfolio_slug: Optional[str] = None
+    is_portfolio_published: bool = False
     profile_resume_url: Optional[str] = None
     profile_resume_name: Optional[str] = None
 

@@ -54,6 +54,7 @@ async def _ensure_indexes() -> None:
             IndexModel([("email", ASCENDING)], unique=True, name="email_unique"),
             IndexModel([("role", ASCENDING)], name="role_idx"),
             IndexModel([("created_at", DESCENDING)], name="created_at_idx"),
+            IndexModel([("portfolio_slug", ASCENDING)], name="user_portfolio_slug_idx", sparse=True),
         ])
 
         # resumes
@@ -114,6 +115,15 @@ async def _ensure_indexes() -> None:
                  ("snapshot.assessment_slug", ASCENDING)],
                 name="cert_user_type_slug_idx",
             ),
+        ])
+
+        # ─── user_profiles & portfolio_analytics ──────────────────────────
+        await db.user_profiles.create_indexes([
+            IndexModel([("username", ASCENDING)], unique=True, name="portfolio_username_unique"),
+            IndexModel([("user_id", ASCENDING)], name="portfolio_user_idx"),
+        ])
+        await db.portfolio_analytics.create_indexes([
+            IndexModel([("username", ASCENDING)], unique=True, name="analytics_username_unique"),
         ])
 
         logger.info("✅ MongoDB indexes ensured")

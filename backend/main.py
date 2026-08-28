@@ -26,6 +26,11 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 from starlette.responses import Response
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.inmemory import InMemoryBackend
 # --- Existing imports ---
 from api.routes import (
     auth, resume, ats, explain, enhance,
@@ -46,6 +51,7 @@ from api.routes.gmail_oauth import router as gmail_oauth_router
 from api.routes.notifications import router as notifications_router
 from api.routes.careers import router as careers_router
 from api.routes.admin import router as admin_router
+from api.routes.portfolio import router as portfolio_router
 from config.db import connect_db, disconnect_db
 from core.config import settings
 from core.logging import setup_logging
@@ -59,12 +65,16 @@ print("SERVER IS ALIVE AND WORKING!")
 REQUEST_COUNT = Counter("http_requests_total", "Total requests", ["method", "endpoint", "status"])
 REQUEST_LATENCY = Histogram("http_request_duration_seconds", "Latency", ["method", "endpoint"])
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["300/minute"])
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Career Platform", version=settings.APP_VERSION)
     try:
         await asyncio.wait_for(connect_db(), timeout=15.0)
         logger.info("MongoDB connected")
+        FastAPICache.init(InMemoryBackend(), prefix="careershaala-cache")
+        logger.info("FastAPICache initialized")
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise
@@ -79,6 +89,8 @@ def create_application() -> FastAPI:
         docs_url="/docs",
         lifespan=lifespan,
     )
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     # Create profile upload directory if it doesn't exist
     os.makedirs("uploads/profile", exist_ok=True)
 
@@ -192,6 +204,8 @@ def create_application() -> FastAPI:
     app.include_router(careers_router, prefix=f"{p}/careers", tags=["Careers"])
     app.include_router(careers_router, prefix="/api", tags=["Careers Direct"])
     app.include_router(admin_router, prefix=f"{p}/admin", tags=["Admin"])
+    app.include_router(portfolio_router, prefix=f"{p}/portfolio", tags=["Portfolio Generator"])
+    app.include_router(portfolio_router, prefix="/api/portfolio", tags=["Portfolio Generator Direct"])
 
     return app
 app = create_application()

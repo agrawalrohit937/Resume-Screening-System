@@ -11,7 +11,13 @@ import threading
 import structlog
 from typing import List, Optional, Callable, Any, Awaitable
 from langchain_groq import ChatGroq
-from google import genai
+try:
+    from google import genai
+except ImportError:
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        genai = None
 from core.config import settings
 
 logger = structlog.get_logger(__name__)
