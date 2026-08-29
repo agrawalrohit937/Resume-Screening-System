@@ -196,6 +196,8 @@ def create_application() -> FastAPI:
     app.include_router(live_interview_router, prefix=f"{p}/live-interview", tags=["Live Interview"])
     app.include_router(interview_analytics_router, prefix=f"{p}/interview-analytics", tags=["Interview Analytics"])
     app.include_router(payment.router, prefix=f"{p}/payment", tags=["Payment"])
+    app.include_router(payment.router, prefix="/api/payment", tags=["Payment Direct"])
+    app.include_router(payment.router, prefix="/payment", tags=["Payment Root"])
     app.include_router(copilot_router, prefix=f"{p}/copilot", tags=["AI Copilot"])
     app.include_router(apply_assistant_router, prefix=f"{p}", tags=["Apply Assistant"])
     app.include_router(apply_assistant_router, prefix="/api", tags=["Apply Assistant Direct"])

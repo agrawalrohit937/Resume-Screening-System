@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
-import { createCheckout, verifyPayment } from '../services/api'
+import { createCheckout, verifyPayment, reportPaymentFailure } from '../services/api'
 
 // Elegant Minimalist Crown SVG
 function CrownIcon({ className, size = 20 }) {
@@ -207,6 +207,27 @@ export default function Premium() {
       }
 
       const rzpInstance = new window.Razorpay(options)
+
+      // Automatically report payment failure to AI recovery system & trigger Brevo recovery email
+      rzpInstance.on('payment.failed', async function (response) {
+        console.warn('[Razorpay] Payment failed:', response.error)
+        const errorDesc = response.error?.description || response.error?.reason || 'Payment failed during checkout.'
+        toast.error(errorDesc)
+        setProcessingPlan(null)
+
+        try {
+          await reportPaymentFailure({
+            plan: planName.toLowerCase(),
+            order_id: response.error?.metadata?.order_id || orderData.id,
+            failure_reason: errorDesc,
+            failure_code: response.error?.code || 'payment_failed',
+          })
+          console.log('[Razorpay] Payment failure successfully reported to AI recovery pipeline.')
+        } catch (reportErr) {
+          console.error('[Razorpay] Failed to report payment failure to server:', reportErr)
+        }
+      })
+
       rzpInstance.open()
 
     } catch (e) {

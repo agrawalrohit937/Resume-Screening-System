@@ -31,10 +31,10 @@ class RazorpayService:
                 self.client = None
         return bool(self.key_id and self.key_secret and self.client)
 
-    def create_order(self, plan: str) -> dict:
+    def create_order(self, plan: str, user_info: Optional[Dict[str, Any]] = None) -> dict:
         """
-        Creates a new order instance on the Razorpay gateway servers.
-        Note: Amounts must be calculated in Paisa (e.g., ₹299 = 29900 Paise).
+        Provisions a server-side order with Razorpay.
+        Attaches user_info in notes so subsequent webhooks can always link back to the user.
         """
         if not self.is_configured:
             raise HTTPException(
@@ -59,6 +59,14 @@ class RazorpayService:
                 "receipt": f"receipt_plan_{plan}_{int(hashlib.sha256(plan.encode()).hexdigest(), 16) % 10**8}",
                 "payment_capture": 1  # 1 indicates automatic capture upon authorization
             }
+
+            if user_info:
+                order_data["notes"] = {
+                    "user_id": str(user_info.get("user_id", "")),
+                    "email": str(user_info.get("email", "")),
+                    "full_name": str(user_info.get("full_name", "")),
+                    "plan": plan.lower(),
+                }
             
             razorpay_order = self.client.order.create(data=order_data)
             
@@ -78,25 +86,22 @@ class RazorpayService:
 
     def verify_signature(self, razorpay_order_id: str, razorpay_payment_id: str, razorpay_signature: str) -> bool:
         """
-        Mathematically verifies the authenticity of incoming payment tokens using HMAC SHA256.
+        Verifies checkout signatures using HMAC SHA256.
         """
         if not self.is_configured:
             return False
 
         try:
-            # Try Razorpay SDK verify utility first
-            params_dict = {
+            self.client.utility.verify_payment_signature({
                 'razorpay_order_id': razorpay_order_id,
                 'razorpay_payment_id': razorpay_payment_id,
                 'razorpay_signature': razorpay_signature
-            }
-            self.client.utility.verify_payment_signature(params_dict)
+            })
             return True
         except Exception:
-            # Fallback to direct HMAC SHA256 check
-            import hmac
-            import hashlib
             try:
+                import hmac
+                import hashlib
                 msg = f"{razorpay_order_id}|{razorpay_payment_id}"
                 generated_signature = hmac.new(
                     bytes(self.key_secret, 'utf-8'),
@@ -110,34 +115,44 @@ class RazorpayService:
     def verify_webhook_signature(self, webhook_body: str, webhook_signature: str, webhook_secret: Optional[str] = None) -> bool:
         """
         Verifies the authenticity of Razorpay Webhook payloads using HMAC SHA256.
-        Strictly uses the dedicated webhook secret (RAZORPAY_WEBHOOK_SECRET).
+        Tries RAZORPAY_WEBHOOK_SECRET, falling back to RAZORPAY_KEY_SECRET in case the developer
+        used the key secret as their webhook secret in Razorpay Dashboard.
         """
-        secret = webhook_secret or getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', None)
-        if not secret:
-            return False
-
         if not webhook_body or not webhook_signature:
             return False
 
-        try:
-            if self.client and hasattr(self.client.utility, 'verify_webhook_signature'):
-                self.client.utility.verify_webhook_signature(webhook_body, webhook_signature, secret)
-                return True
-        except Exception:
-            pass
+        secret = webhook_secret or getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', None)
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', None)
+        secrets_to_try = [s for s in [secret, key_secret] if s]
 
-        # Fallback direct HMAC computation
-        try:
-            import hmac
-            import hashlib
-            generated_signature = hmac.new(
-                bytes(secret, 'utf-8'),
-                bytes(webhook_body, 'utf-8') if isinstance(webhook_body, str) else webhook_body,
-                hashlib.sha256
-            ).hexdigest()
-            return hmac.compare_digest(generated_signature, webhook_signature)
-        except Exception:
+        if not secrets_to_try:
+            logger.warning("No webhook secret or key secret available to verify Razorpay webhook signature")
             return False
+
+        import hmac
+        import hashlib
+
+        for candidate in secrets_to_try:
+            try:
+                if self.client and hasattr(self.client.utility, 'verify_webhook_signature'):
+                    self.client.utility.verify_webhook_signature(webhook_body, webhook_signature, candidate)
+                    return True
+            except Exception:
+                pass
+
+            try:
+                generated_signature = hmac.new(
+                    bytes(candidate, 'utf-8'),
+                    bytes(webhook_body, 'utf-8') if isinstance(webhook_body, str) else webhook_body,
+                    hashlib.sha256
+                ).hexdigest()
+                if hmac.compare_digest(generated_signature, webhook_signature):
+                    return True
+            except Exception:
+                pass
+
+        logger.warning("Razorpay webhook signature verification failed with all candidate secrets")
+        return False
 
     def create_recovery_order(self, plan: str, discount_pct: int = 0, user_id: Optional[str] = None) -> dict:
         """
