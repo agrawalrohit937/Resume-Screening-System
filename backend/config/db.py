@@ -122,8 +122,14 @@ async def _ensure_indexes() -> None:
             IndexModel([("username", ASCENDING)], unique=True, name="portfolio_username_unique"),
             IndexModel([("user_id", ASCENDING)], name="portfolio_user_idx"),
         ])
-        await db.portfolio_analytics.create_indexes([
-            IndexModel([("username", ASCENDING)], unique=True, name="analytics_username_unique"),
+        # ─── recovery_cases ────────────────────────────────────────────────
+        await db.recovery_cases.create_indexes([
+            IndexModel([("case_id", ASCENDING)], unique=True, name="case_id_unique"),
+            IndexModel([("user_id", ASCENDING)], name="recovery_user_idx"),
+            IndexModel([("status", ASCENDING)], name="recovery_status_idx"),
+            IndexModel([("risk_level", ASCENDING)], name="recovery_risk_idx"),
+            IndexModel([("created_at", DESCENDING)], name="recovery_created_idx"),
+            IndexModel([("updated_at", DESCENDING)], name="recovery_updated_idx"),
         ])
 
         logger.info("✅ MongoDB indexes ensured")

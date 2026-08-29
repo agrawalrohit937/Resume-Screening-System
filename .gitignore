@@ -56,3 +56,7 @@ local.properties
 
 # Log files
 *.log
+
+# Temporary tunnel binaries and tools
+tools/
+scratch_synopsis.txt

@@ -9,10 +9,14 @@ import {
   Mail,
   Receipt,
   CheckCircle2,
-  Wallet
+  Wallet,
+  AlertTriangle,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import SupportButton from '../components/support/SupportButton'
+import { getMyRecoveryBanner } from '../services/revenueRecoveryApi'
 
 // --- Utility Functions ---
 function formatDate(d) {
@@ -76,10 +80,14 @@ function EmptyState({ title, desc }) {
 
 export default function Billing() {
   const { user, refreshUser } = useAuth()
+  const [recoveryBanner, setRecoveryBanner] = useState(null)
   
-  // Using a mount effect to silently refresh user data
+  // Using a mount effect to silently refresh user data & recovery status
   useEffect(() => {
     refreshUser?.().catch(() => null)
+    getMyRecoveryBanner().then(data => {
+      if (data?.has_active_recovery) setRecoveryBanner(data)
+    }).catch(() => null)
   }, [refreshUser])
 
   // Core State Logic
@@ -162,6 +170,48 @@ export default function Billing() {
           </div>
         </div>
       </motion.div>
+
+      {/* ── Active Recovery / Win-Back Notification Banner ────────────────── */}
+      {recoveryBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-5 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100 border border-amber-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300">
+                  Action Required
+                </span>
+                {recoveryBanner.offer?.discount_pct > 0 && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
+                    <Sparkles size={11} /> Special {recoveryBanner.offer.discount_pct}% Win-Back Offer
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-bold text-slate-900 mt-1">
+                {recoveryBanner.offer?.discount_pct > 0
+                  ? `Claim ${recoveryBanner.offer.discount_pct}% off your ${recoveryBanner.plan?.toUpperCase()} renewal with code ${recoveryBanner.offer.promo_code}`
+                  : `Your ${recoveryBanner.plan?.toUpperCase()} plan renewal needs attention`}
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {recoveryBanner.message || 'Update payment method to retain unlimited AI interviews & ATS resume checks.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => (window.location.href = `/premium?coupon=${recoveryBanner.offer?.promo_code || ''}`)}
+            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition flex items-center gap-2 shrink-0 active:scale-95"
+          >
+            {recoveryBanner.offer?.discount_pct > 0 ? 'Claim Offer & Renew' : 'Retry Payment'} <ArrowRight size={14} />
+          </button>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         

@@ -52,6 +52,7 @@ from api.routes.notifications import router as notifications_router
 from api.routes.careers import router as careers_router
 from api.routes.admin import router as admin_router
 from api.routes.portfolio import router as portfolio_router
+from api.routes.revenue_recovery import router as revenue_recovery_router
 from config.db import connect_db, disconnect_db
 from core.config import settings
 from core.logging import setup_logging
@@ -206,6 +207,8 @@ def create_application() -> FastAPI:
     app.include_router(admin_router, prefix=f"{p}/admin", tags=["Admin"])
     app.include_router(portfolio_router, prefix=f"{p}/portfolio", tags=["Portfolio Generator"])
     app.include_router(portfolio_router, prefix="/api/portfolio", tags=["Portfolio Generator Direct"])
+    app.include_router(revenue_recovery_router, prefix=f"{p}/revenue-recovery", tags=["Revenue Recovery"])
+    app.include_router(revenue_recovery_router, prefix=f"{p}", tags=["Revenue Recovery Root"])
 
     return app
 app = create_application()

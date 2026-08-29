@@ -119,6 +119,7 @@ class Settings(BaseSettings):
     # ── Razorpay Settings ───────────────────────────────────────────────────────
     RAZORPAY_KEY_ID: Optional[str] = Field(default=None)
     RAZORPAY_KEY_SECRET: Optional[str] = Field(default=None)
+    RAZORPAY_WEBHOOK_SECRET: Optional[str] = Field(default=None)
 
     # ── PDF Generation ──────────────────────────────────────────────────────────
     PDF_TIMEOUT_SECONDS: int = 60
