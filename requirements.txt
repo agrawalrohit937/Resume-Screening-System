@@ -50,6 +50,7 @@ requests==2.31.0
 celery==5.4.0
 redis==5.0.4
 aiocache==0.12.2
+fastapi-cache2==0.2.2
 
 # ─── Environment, Logging & Monitoring ────────────────────────
 python-dotenv==1.0.1
