@@ -20,6 +20,7 @@ import {
   Users,
   ChevronDown,
   Crown as LucideCrown,
+  Settings,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
@@ -84,6 +85,7 @@ const Icons = {
   gamification: <Trophy {...ICON_PROPS} />,
   recruiter: <UserSearch {...ICON_PROPS} />,
   admin: <Shield {...ICON_PROPS} />,
+  settings: <Settings {...ICON_PROPS} />,
   check: <Check className="w-3 h-3" strokeWidth={3} />,
   logout: <LogOut className="w-4 h-4" strokeWidth={2.2} />,
 }
@@ -135,6 +137,7 @@ const NAV_SECTIONS = [
   {
     title: 'Account',
     items: [
+      { to: '/settings', label: 'Settings', icon: Icons.settings },
       { to: '/billing', label: 'Billing', icon: Icons.dashboard },
       { to: '/premium', label: 'Premium', icon: Icons.dashboard },
       { to: '/support', label: 'Support', icon: Icons.dashboard },
@@ -169,6 +172,7 @@ const VIEW_MODES = [
 const ROUTE_PREFETCH = {
   '/dashboard': () => import('../pages/Dashboard'),
   '/profile': () => import('../pages/Profile'),
+  '/settings': () => import('../pages/Settings'),
   '/portfolio-builder': () => import('../pages/PortfolioBuilder'),
   '/results': () => import('../pages/Results'),
   '/interview': () => import('../pages/Interview'),
@@ -235,10 +239,27 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     return localStorage.getItem('admin_view_mode') || 'admin'
   })
   const [viewModeOpen, setViewModeOpen] = useState(false)
+  const viewModeRef = useRef(null)
 
   useEffect(() => {
     setViewModeOpen(false)
   }, [location.pathname, location.key])
+
+  // Close dropdown on outside click/touch anywhere on the screen (capture phase)
+  useEffect(() => {
+    if (!viewModeOpen) return
+    const handleOutsideClick = (e) => {
+      if (viewModeRef.current && !viewModeRef.current.contains(e.target)) {
+        setViewModeOpen(false)
+      }
+    }
+    window.addEventListener('click', handleOutsideClick, true)
+    window.addEventListener('touchstart', handleOutsideClick, true)
+    return () => {
+      window.removeEventListener('click', handleOutsideClick, true)
+      window.removeEventListener('touchstart', handleOutsideClick, true)
+    }
+  }, [viewModeOpen])
 
   const switchViewMode = (mode) => {
     setViewModeOpen(false)
@@ -246,7 +267,9 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     localStorage.setItem('admin_view_mode', mode)
     onNavigate?.()
     const vm = VIEW_MODES.find(v => v.key === mode)
-    if (vm) navigate(vm.defaultPath)
+    if (vm && vm.defaultPath && location.pathname !== vm.defaultPath) {
+      navigate(vm.defaultPath)
+    }
   }
 
   const isAdmin = user?.role === 'admin'
@@ -348,7 +371,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
       {/* ── Admin View Mode Switcher (Always upper side for Admin) ─────── */}
       {isAdmin && (
-        <div className={`shrink-0 border-b border-slate-100 ${isCompact ? 'px-2 py-2.5' : 'px-3 py-2.5'}`}>
+        <div className={`shrink-0 border-b border-slate-100 relative z-30 ${isCompact ? 'px-2 py-2.5' : 'px-3 py-2.5'}`}>
           {isCompact ? (
             /* Compact: cycle through modes on click */
             <button
@@ -369,10 +392,13 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             </button>
           ) : (
             /* Expanded: dropdown selector */
-            <div className="relative">
+            <div className="relative z-50" ref={viewModeRef}>
               <button
                 type="button"
-                onClick={() => setViewModeOpen(p => !p)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setViewModeOpen(p => !p)
+                }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm active:scale-[0.98] cursor-pointer touch-manipulation"
                 style={{
                   backgroundColor: currentViewMode.color + '08',
@@ -394,58 +420,53 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${viewModeOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              <AnimatePresence>
-                {viewModeOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setViewModeOpen(false)
-                      }}
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.96 }}
-                      transition={{ duration: 0.12 }}
-                      className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden"
-                    >
-                      <div className="p-1">
-                        {VIEW_MODES.map(v => {
-                          const active = adminViewMode === v.key
-                          return (
-                            <button
-                              key={v.key}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setViewModeOpen(false)
-                                switchViewMode(v.key)
-                              }}
-                              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all cursor-pointer touch-manipulation ${
-                                active
-                                  ? 'font-bold'
-                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                              }`}
-                              style={active ? { backgroundColor: v.color + '12', color: v.color } : {}}
-                            >
-                              <v.icon className="w-4 h-4" style={{ color: v.color }} />
-                              <span className="flex-1 text-left">{v.label}</span>
-                              {active && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: v.color }} />}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      <div className="px-3 py-2 bg-slate-50 border-t border-slate-100">
-                        <p className="text-[9.5px] text-slate-400 font-medium leading-snug">
-                          Switch view to test different user experiences
-                        </p>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
+              {viewModeOpen && (
+                <>
+                  {/* Invisible backdrop inside sidebar container */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setViewModeOpen(false)
+                    }}
+                  />
+                  <div
+                    className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden"
+                  >
+                    <div className="p-1">
+                      {VIEW_MODES.map(v => {
+                        const active = adminViewMode === v.key
+                        return (
+                          <button
+                            key={v.key}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setViewModeOpen(false)
+                              switchViewMode(v.key)
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] font-semibold transition-all cursor-pointer touch-manipulation ${
+                              active
+                                ? 'font-bold'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            }`}
+                            style={active ? { backgroundColor: v.color + '12', color: v.color } : {}}
+                          >
+                            <v.icon className="w-4 h-4" style={{ color: v.color }} />
+                            <span className="flex-1 text-left">{v.label}</span>
+                            {active && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: v.color }} />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="px-3 py-2 bg-slate-50 border-t border-slate-100">
+                      <p className="text-[9.5px] text-slate-400 font-medium leading-snug">
+                        Switch view to test different user experiences
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

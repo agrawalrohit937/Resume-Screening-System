@@ -25,8 +25,10 @@ export function resolveAvatarUrl(user, width = 100) {
   const getValidUrl = (url) => optimizeCloudinaryUrl(url, width)
 
   return (
+    getValidUrl(user.avatar_url) ||
     getValidUrl(user.display_picture) ||
     getValidUrl(user.profile_picture) ||
+    getValidUrl(user.picture) ||
     (user.linked_accounts && typeof user.linked_accounts === 'object' && (
       getValidUrl(user.linked_accounts.google?.picture) ||
       getValidUrl(user.linked_accounts.linkedin?.picture) ||

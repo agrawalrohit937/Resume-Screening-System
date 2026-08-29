@@ -113,6 +113,7 @@ class UserPublicResponse(BaseModel):
     # ── Primary profile resume fields ────────────────────────────────────
     profile_resume_url: Optional[str] = None
     profile_resume_name: Optional[str] = None
+    has_password: bool = False
 
 
 class SetPrimaryResumeRequest(BaseModel):

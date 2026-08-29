@@ -265,18 +265,24 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
           <ChevronRight size={14} className="opacity-70" />
         </button>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             onClick={() => handleNavigateAndClose('/billing')}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            <CreditCard size={13} className="text-slate-500" /> Billing
+            <CreditCard size={13} className="text-slate-500 shrink-0" /> Billing
           </button>
           <button
             onClick={() => handleNavigateAndClose('/profile')}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            <Settings size={13} className="text-slate-500" /> Settings
+            <User size={13} className="text-slate-500 shrink-0" /> Profile
+          </button>
+          <button
+            onClick={() => handleNavigateAndClose('/settings')}
+            className="flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Settings size={13} className="text-slate-500 shrink-0" /> Settings
           </button>
         </div>
       </div>

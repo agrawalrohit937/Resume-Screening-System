@@ -8,12 +8,15 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
+import structlog
 
 from core.config import settings
 from core.security import generate_otp, hash_otp, verify_otp_hash
 from models.otp_model import OTPModel, OTPPurpose
 from repositories.otp_repo import OTPRepository
 from services.email_service import EmailService
+
+logger = structlog.get_logger(__name__)
 
 
 class OTPService:
@@ -57,6 +60,15 @@ class OTPService:
         )
 
         # Purpose branching now lives in EmailService's dispatch table, not here.
+        if not getattr(settings, "BREVO_API_KEY", None):
+            logger.warning(
+                "🔑 [DEV MODE] Brevo API Key not configured. OTP generated for %s (purpose=%s): %s",
+                email,
+                purpose.value,
+                otp_plain,
+            )
+            print(f"\n======================================================\n🔑 [OTP CODE] For: {email} | Purpose: {purpose.value}\n👉 CODE: {otp_plain}\n======================================================\n")
+
         await self.email_service.send_otp(email, full_name, otp_plain, purpose)
 
     async def verify(self, email: str, purpose: OTPPurpose, otp_input: str) -> None:

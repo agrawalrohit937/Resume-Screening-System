@@ -46,6 +46,7 @@ const VerifyCertificate = lazy(() => import('./pages/VerifyCertificate'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const Profile = lazy(() => import('./pages/Profile'))
+const Settings = lazy(() => import('./pages/Settings'))
 const ApplyAssistant = lazy(() => import('./pages/ApplyAssistant'))
 const SupportTickets = lazy(() => import('./pages/SupportTickets'))
 const TicketDetail = lazy(() => import('./pages/TicketDetail'))
@@ -166,6 +167,7 @@ export default function App() {
                 {/* Core */}
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="settings" element={<Settings />} />
                 <Route path="portfolio-builder" element={<PortfolioBuilder />} />
 
                 <Route path="results" element={<Results />} />

@@ -60,6 +60,7 @@ def user_to_public(user: UserModel) -> UserPublicResponse:
         # ── Primary profile resume fields ──────────────────────────────────
         profile_resume_url=user.profile_resume_url,
         profile_resume_name=user.profile_resume_name,
+        has_password=bool(user.hashed_password),
     )
 
 

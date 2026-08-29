@@ -133,6 +133,14 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  const changePassword = async (currentPassword, newPassword) => {
+    const { data } = await api.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+    return data
+  }
+
   // 🔵 GOOGLE LOGIN ✅ FIXED
   const googleLogin = useCallback(async (token, role = 'candidate') => {
     try {
@@ -187,7 +195,7 @@ export function AuthProvider({ children }) {
       user, loading,
       login, signup, logout, googleLogin, linkedinLoginSuccess,
       verifyLoginOtp, verifyEmail, resendOtp,
-      forgotPassword, verifyResetOtp, resetPassword,
+      forgotPassword, verifyResetOtp, resetPassword, changePassword,
       updateProfile, uploadProfilePhoto, removeProfilePhoto, refreshUser,
     }}>
       {children}

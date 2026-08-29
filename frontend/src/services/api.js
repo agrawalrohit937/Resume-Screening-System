@@ -272,5 +272,10 @@ export const chatCopilotStream = async (message, history = [], quickAction = nul
 export const createCheckout = (plan) => api.post('/payment/checkout', { plan })
 export const verifyPayment = (payload) => api.post('/payment/verify', payload)
 export const choosePlan = (plan) => api.post('/payment/choose', { plan })
+export const cancelSubscription = (payload) => api.post('/payment/cancel', payload || {})
+
+// Auth Security APIs
+export const changePassword = (current_password, new_password) =>
+  api.post('/auth/change-password', { current_password, new_password })
 
 export default api

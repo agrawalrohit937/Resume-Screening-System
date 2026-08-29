@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 import {
   CreditCard,
   Shield,
@@ -13,10 +14,13 @@ import {
   AlertTriangle,
   Sparkles,
   ArrowRight,
+  X,
+  Loader2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import SupportButton from '../components/support/SupportButton'
 import { getMyRecoveryBanner } from '../services/revenueRecoveryApi'
+import { cancelSubscription } from '../services/api'
 
 // --- Utility Functions ---
 function formatDate(d) {
@@ -81,7 +85,11 @@ function EmptyState({ title, desc }) {
 export default function Billing() {
   const { user, refreshUser } = useAuth()
   const [recoveryBanner, setRecoveryBanner] = useState(null)
-  
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelReason, setCancelReason] = useState('Too expensive')
+  const [cancelFeedback, setCancelFeedback] = useState('')
+
   // Using a mount effect to silently refresh user data & recovery status
   useEffect(() => {
     refreshUser?.().catch(() => null)
@@ -89,6 +97,26 @@ export default function Billing() {
       if (data?.has_active_recovery) setRecoveryBanner(data)
     }).catch(() => null)
   }, [refreshUser])
+
+  const handleCancelSubscription = async () => {
+    setCancelling(true)
+    try {
+      const res = await cancelSubscription({
+        reason: cancelReason,
+        feedback: cancelFeedback,
+      })
+      toast.success(res.data?.message || 'Subscription cancelled successfully.')
+      setShowCancelModal(false)
+      if (refreshUser) {
+        await refreshUser()
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Failed to cancel subscription.'
+      toast.error(msg)
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   // Core State Logic
   const planId = (user?.plan || 'free').toLowerCase()
@@ -271,10 +299,19 @@ export default function Billing() {
               >
                 {isFree ? 'Upgrade to Premium ✨' : 'Change Plan'}
               </button>
-              {!isFree && (
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-rose-600 border border-slate-200 hover:bg-rose-50 hover:border-rose-200 transition-colors">
+              {!isFree && subscriptionActive && (
+                <button 
+                  onClick={() => setShowCancelModal(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-rose-600 border border-slate-200 hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm"
+                >
                   Cancel Subscription
                 </button>
+              )}
+              {!isFree && !subscriptionActive && (
+                <div className="text-center p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <p className="text-xs font-bold text-amber-800">Subscription Inactive</p>
+                  <p className="text-[11px] text-amber-600 font-medium">Your plan has been cancelled.</p>
+                </div>
               )}
             </div>
           </Card>
@@ -348,9 +385,15 @@ export default function Billing() {
                       <td className="py-4 px-6">{p.plan}</td>
                       <td className="py-4 px-6">₹{p.amount}</td>
                       <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                          <CheckCircle2 size={12} /> {p.status}
-                        </span>
+                        {p.status === 'cancelled' ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                            Cancelled
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                            <CheckCircle2 size={12} /> {p.status}
+                          </span>
+                        )}
                       </td>
                       <td className="py-4 px-6 text-right">
                         <button className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors">
@@ -381,6 +424,111 @@ export default function Billing() {
           <SupportButton variant="billing" label="Get Support" />
         </div>
       </motion.div>
+
+      {/* ── Cancel Subscription Modal ── */}
+      <AnimatePresence>
+        {showCancelModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !cancelling && setShowCancelModal(false)}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden p-6 z-10 space-y-4"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Cancel Subscription?</h3>
+                    <p className="text-xs text-slate-500 font-medium">Revert to Free Tier</p>
+                  </div>
+                </div>
+                <button
+                  disabled={cancelling}
+                  onClick={() => setShowCancelModal(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-3.5 text-xs text-rose-800 leading-relaxed">
+                <p className="font-bold mb-0.5">Are you sure you want to cancel {currentConfig.name}?</p>
+                <p className="text-rose-700/90 text-[11px]">
+                  Your subscription will be deactivated immediately and your account will revert to the standard Free Tier.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Reason for cancelling
+                </label>
+                <select
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
+                >
+                  <option value="Too expensive">Too expensive</option>
+                  <option value="Temporary need fulfilled">Found a job / Interview cleared</option>
+                  <option value="Missing features">Missing features I need</option>
+                  <option value="Switching to another platform">Switching to another service</option>
+                  <option value="Technical issues">Technical difficulties</option>
+                  <option value="Other">Other reason</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Additional feedback (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={cancelFeedback}
+                  onChange={(e) => setCancelFeedback(e.target.value)}
+                  placeholder="How could we make CareerShala better?"
+                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white resize-none transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={() => setShowCancelModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                >
+                  Keep Subscription
+                </button>
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={handleCancelSubscription}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {cancelling ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Cancelling...
+                    </>
+                  ) : (
+                    'Confirm Cancel'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   )

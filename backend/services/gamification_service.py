@@ -539,7 +539,21 @@ class GamificationService:
                                 }
                             }
                         },
-                        {"$project": {"full_name": 1, "email": 1, "username": 1, "name": 1, "role": 1}},
+                        {
+                            "$project": {
+                                "full_name": 1,
+                                "email": 1,
+                                "username": 1,
+                                "name": 1,
+                                "role": 1,
+                                "profile_picture": 1,
+                                "avatar_url": 1,
+                                "picture": 1,
+                                "display_picture": 1,
+                                "google_picture": 1,
+                                "linked_accounts": 1,
+                            }
+                        },
                     ],
                     "as": "user_info",
                 }
@@ -579,12 +593,28 @@ class GamificationService:
             if not full_name or full_name.lower() == "unknown":
                 full_name = "Anonymous Candidate"
 
+            # Resolve user's profile photo
+            linked_accounts = user_info.get("linked_accounts") or {}
+            avatar_url = (
+                user_info.get("profile_picture")
+                or user_info.get("avatar_url")
+                or user_info.get("display_picture")
+                or user_info.get("picture")
+                or (linked_accounts.get("google") or {}).get("picture")
+                or (linked_accounts.get("github") or {}).get("picture")
+                or (linked_accounts.get("linkedin") or {}).get("picture")
+                or user_info.get("google_picture")
+                or None
+            )
+
             streak_info = self._calculate_streak(doc.get("active_dates") or [])
             result.append({
                 "rank": rank,
                 "user_id": doc["user_id"],
                 "full_name": full_name,
                 "role": user_role,
+                "avatar_url": avatar_url,
+                "profile_picture": avatar_url,
                 "total_points": doc.get("total_points", 0),
                 "level_info": self._compute_level(doc.get("total_points", 0)),
                 "current_streak": streak_info["current_streak"],

@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { resolveAvatarUrl } from '../../utils/avatarUtils'
 
 // ── LeaderboardCard ─────────────────────────────────────────────────────────
 export function LeaderboardCard({ entry, currentUserId, index }) {
+  const [imgError, setImgError] = useState(false)
   const isMe = entry.user_id === currentUserId
   const RANK_STYLES = {
     1: { bg: 'bg-amber-50 border-amber-200', badge: 'bg-amber-400 text-white', icon: '🥇' },
@@ -12,6 +15,7 @@ export function LeaderboardCard({ entry, currentUserId, index }) {
 
   const displayName = isMe ? 'You' : entry.full_name ? entry.full_name : `Top Player #${entry.rank}`
   const initials = entry.full_name ? entry.full_name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase() : entry.level_info?.icon || '🌱'
+  const avatarUrl = resolveAvatarUrl(entry)
 
   return (
     <motion.div
@@ -22,8 +26,19 @@ export function LeaderboardCard({ entry, currentUserId, index }) {
         {entry.rank <= 3 ? rankStyle.icon : `#${entry.rank}`}
       </div>
 
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2E9BDA] to-[#1d6fa5] flex items-center justify-center text-white font-extrabold text-[13px] shrink-0">
-        {initials}
+      <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-[#2E9BDA] to-[#1d6fa5] flex items-center justify-center text-white font-extrabold text-[13px] shrink-0 shadow-sm">
+        {avatarUrl && !imgError ? (
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            className="w-full h-full object-cover"
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          initials
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
