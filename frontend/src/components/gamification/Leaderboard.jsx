@@ -1,6 +1,41 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Medal, Flame, Trophy, Crown, Sparkles } from 'lucide-react'
 import Card from './Card' 
+import { useAuth } from '../../context/AuthContext'
+import { resolveAvatarUrl, getInitials } from '../../utils/avatarUtils'
+
+// ─── Avatar Component with Real Photo & Initials Fallback ───────────────────
+function LeaderboardAvatar({ entry, isTop3, rankStyle, isMe, currentUser }) {
+  const [imgError, setImgError] = useState(false)
+  const avatarUrl = resolveAvatarUrl(entry) || (isMe ? resolveAvatarUrl(currentUser) : null)
+  const initials = getInitials(entry.full_name || 'Candidate')
+
+  if (avatarUrl && !imgError) {
+    return (
+      <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 relative z-10 border-2 ${
+        isTop3 ? 'border-amber-400 shadow-sm' : 'border-white shadow-sm ring-1 ring-slate-200'
+      }`}>
+        <img
+          src={avatarUrl}
+          alt={entry.full_name || 'Candidate'}
+          className="w-full h-full object-cover"
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-[13px] font-bold shrink-0 relative z-10 ${
+      isTop3 ? `${rankStyle.avatar} text-white` : 'bg-slate-100 text-slate-600 border border-slate-200 shadow-sm'
+    }`}>
+      {initials}
+    </div>
+  )
+}
 
 // ─── Professional Premium Rank Styles ────────────────────────────────────────
 const TOP_RANKS = {
@@ -34,6 +69,7 @@ const TOP_RANKS = {
 }
 
 export default function Leaderboard({ leaderboard = [], currentUserId }) {
+  const { user: currentUser } = useAuth()
   // Only display candidates on the leaderboard (exclude admin & recruiter)
   const candidateLeaderboard = leaderboard.filter(
     (e) => !e.role || e.role.toLowerCase() === 'candidate'
@@ -145,11 +181,13 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
                 </div>
 
                 {/* Avatar */}
-                <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-[13px] font-bold shrink-0 relative z-10
-                  ${isTop3 ? `${rankStyle.avatar} text-white` : 'bg-slate-100 text-slate-600 border border-slate-200 shadow-sm'}
-                `}>
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
+                <LeaderboardAvatar
+                  entry={entry}
+                  isTop3={isTop3}
+                  rankStyle={rankStyle}
+                  isMe={isMe}
+                  currentUser={currentUser}
+                />
 
                 {/* User Info */}
                 <div className="flex-1 min-w-0 relative z-10">

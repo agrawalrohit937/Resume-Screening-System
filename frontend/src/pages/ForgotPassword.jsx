@@ -18,6 +18,7 @@ export default function ForgotPassword() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
 
@@ -141,9 +142,18 @@ export default function ForgotPassword() {
           {step === 2 && (
             <motion.div key="step2" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               <h1 className="font-display text-[24px] font-bold text-[#111827]">Enter the code</h1>
-              <p className="mt-1.5 text-[14px] text-slate-500">
-                Sent to <span className="font-semibold text-slate-700">{email}</span>
-              </p>
+              <div className="flex items-center justify-between mt-1.5">
+                <p className="text-[14px] text-slate-500 truncate">
+                  Sent to <span className="font-semibold text-slate-700">{email}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setStep(1); setOtp(''); }}
+                  className="text-xs font-bold text-[#2E9BDA] hover:underline shrink-0 ml-2"
+                >
+                  Change email
+                </button>
+              </div>
 
               <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
                 <div className="relative">
@@ -185,7 +195,7 @@ export default function ForgotPassword() {
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               <h1 className="font-display text-[24px] font-bold text-[#111827]">Create new password</h1>
-              <p className="mt-1.5 text-[14px] text-slate-500">Make it at least 8 characters, with a number and symbol.</p>
+              <p className="mt-1.5 text-[14px] text-slate-500">Make it at least 8 characters with letters & numbers.</p>
 
               <form onSubmit={handleResetPassword} className="mt-6 space-y-4">
                 <div className="relative">
@@ -196,7 +206,7 @@ export default function ForgotPassword() {
                     minLength={8}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="New password"
+                    placeholder="New password (min 8 chars)"
                     disabled={loading}
                     className="h-[46px] w-full rounded-xl border border-slate-200/80 bg-white pl-12 pr-12 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10"
                   />
@@ -212,14 +222,22 @@ export default function ForgotPassword() {
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? 'text' : 'password'}
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
                     disabled={loading}
-                    className="h-[46px] w-full rounded-xl border border-slate-200/80 bg-white pl-12 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10"
+                    className="h-[46px] w-full rounded-xl border border-slate-200/80 bg-white pl-12 pr-12 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10"
                   />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#2E9BDA]"
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
                 <button
                   type="submit"

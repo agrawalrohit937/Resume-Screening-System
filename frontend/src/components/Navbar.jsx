@@ -15,7 +15,8 @@ import {
   Trophy,
   Settings,
   Flame,
-  Crown
+  Crown,
+  User
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getGamificationProfile } from '../services/interviewApi'
@@ -25,19 +26,16 @@ import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 
 const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
 
-// --- Search Routing Dictionary ---
 const SEARCH_ROUTES = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard, keywords: ['home', 'main'] },
-  { name: 'ATS Matcher', path: '/results', icon: FileText, keywords: ['ats', 'resume', 'scan'] },
-  { name: 'Upload Resume', path: '/upload', icon: FileText, keywords: ['upload', 'library'] },
-  { name: 'AI Apply Assistant', path: '/apply-assistant', icon: FileText, keywords: ['apply', 'cover letter'] },
-  { name: 'Quick Practice', path: '/interview', icon: Zap, keywords: ['practice', 'mock', 'test'] },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, keywords: ['home', 'analytics'] },
+  { name: 'Resume Upload', path: '/dashboard', icon: FileText, keywords: ['upload', 'cv', 'ats'] },
+  { name: 'Mock Interview', path: '/interview', icon: Video, keywords: ['practice', 'ai interview'] },
   { name: 'Live Interview', path: '/live-interview-v2', icon: Video, keywords: ['live', 'video'] },
   { name: 'Career Quest', path: '/gamification', icon: Trophy, keywords: ['quest', 'rewards', 'badges'] },
-  { name: 'AI Resume Enhancer', path: '/results', icon: Settings, keywords: ['enhance', 'improve'] },
-  { name: 'Fake Detect', path: '/fake-detect', icon: Settings, keywords: ['fake', 'authenticity'] },
-  { name: 'Billing & Premium', path: '/billing', icon: Settings, keywords: ['billing', 'upgrade', 'pro'] },
-  { name: 'Profile Settings', path: '/profile', icon: Settings, keywords: ['profile', 'account'] },
+  { name: 'AI Resume Enhancer', path: '/results', icon: Zap, keywords: ['enhance', 'improve'] },
+  { name: 'Billing & Premium', path: '/billing', icon: Crown, keywords: ['billing', 'upgrade', 'pro'] },
+  { name: 'My Profile & Resume', path: '/profile', icon: User, keywords: ['profile', 'resume', 'bio'] },
+  { name: 'Account Settings & Password', path: '/settings', icon: Settings, keywords: ['settings', 'password', 'change password', 'security'] },
 ]
 
 function UserAvatar({ user, size = 'sm' }) {

@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from core.config import settings
 from api.deps import get_current_user, get_user_repo
 from models.user_model import UserModel
 from schemas.user_schema import MessageResponse
@@ -14,6 +15,10 @@ router = APIRouter()
 
 class ChoosePlanRequest(BaseModel):
     plan: str = Field(..., description="Plan to activate: free | pro | premium")
+
+class CancelSubscriptionRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, description="Optional cancellation reason")
+    feedback: Optional[str] = Field(default=None, description="Optional feedback details")
 
 class CheckoutRequest(BaseModel):
     plan: str = Field(..., description="Plan to checkout: pro | premium")
@@ -41,6 +46,76 @@ def _normalize(plan: str) -> str:
 
 
 # --- Routes ---
+
+@router.post('/cancel', response_model=MessageResponse)
+async def cancel_subscription(
+    payload: Optional[CancelSubscriptionRequest] = None,
+    current_user: UserModel = Depends(get_current_user),
+    user_repo=Depends(get_user_repo),
+):
+    """
+    Cancels the user's active paid subscription, reverts their account to the Free tier,
+    and records the cancellation in their payment history.
+    """
+    if current_user.plan == 'free' and not current_user.subscription_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have an active paid subscription to cancel."
+        )
+
+    prev_plan = current_user.plan or 'pro'
+    reason = payload.reason if payload and payload.reason else "User initiated cancellation"
+    feedback = payload.feedback if payload else None
+
+    updates = {
+        'plan': 'free',
+        'subscription_active': False,
+        'plan_updated_at': datetime.now(timezone.utc),
+    }
+
+    updated = await user_repo.update(str(current_user.id), updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail='User not found')
+
+    # Append cancellation event into user's payment history
+    cancel_record = {
+        'order_id': 'sub_cancellation',
+        'payment_id': 'cancelled',
+        'plan': f"Cancelled {prev_plan.capitalize()}",
+        'amount': 0,
+        'status': 'cancelled',
+        'reason': reason,
+        'feedback': feedback,
+        'date': datetime.now(timezone.utc).isoformat(),
+    }
+    await user_repo.add_payment_history(str(current_user.id), cancel_record)
+
+    # If user had an active recovery case, close it as churned
+    try:
+        from config.db import get_database
+        from repositories.revenue_recovery_repo import RevenueRecoveryRepository
+        from models.revenue_recovery_model import RecoveryStatus, ActorType
+        db = get_database()
+        recovery_repo = RevenueRecoveryRepository(db)
+        active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
+        if active_case:
+            await recovery_repo.update_case(active_case.case_id, {
+                "status": RecoveryStatus.CHURNED.value,
+                "closed_at": datetime.now(timezone.utc),
+            })
+            await recovery_repo.add_audit_log(
+                case_id=active_case.case_id,
+                action="SUBSCRIPTION_CANCELLED_BY_USER",
+                actor=ActorType.USER,
+                actor_name=current_user.full_name,
+                details={"reason": reason, "prev_plan": prev_plan},
+                reasoning="User cancelled subscription directly from billing page."
+            )
+    except Exception:
+        pass
+
+    return MessageResponse(message="Subscription cancelled successfully. Your plan has been reverted to Free.")
+
 
 @router.post('/choose', response_model=MessageResponse)
 async def choose_plan(

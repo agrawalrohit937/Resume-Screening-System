@@ -82,13 +82,27 @@ async def change_password(
     user_repo: UserRepository = Depends(get_user_repo),
 ):
     """Change user password after verifying current password."""
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your account is connected via social login (Google/GitHub/LinkedIn) and does not use a direct password.",
+        )
+
     if not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect.",
         )
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from your current password.",
+        )
+
     new_hash = hash_password(payload.new_password)
     await user_repo.update(str(current_user.id), {"hashed_password": new_hash})
+    logger.info("Password changed successfully", user_id=str(current_user.id))
     return MessageResponse(message="Password changed successfully.")
 
 
