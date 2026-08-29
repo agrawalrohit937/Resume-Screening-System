@@ -1,6 +1,6 @@
+from typing import Optional, Dict, Any
 from fastapi import HTTPException
 import razorpay
-# Import the settings class instance directly from your core config module
 from core.config import settings
 
 class RazorpayService:
@@ -106,6 +106,93 @@ class RazorpayService:
                 return hmac.compare_digest(generated_signature, razorpay_signature)
             except Exception:
                 return False
+
+    def verify_webhook_signature(self, webhook_body: str, webhook_signature: str, webhook_secret: Optional[str] = None) -> bool:
+        """
+        Verifies the authenticity of Razorpay Webhook payloads using HMAC SHA256.
+        Strictly uses the dedicated webhook secret (RAZORPAY_WEBHOOK_SECRET).
+        """
+        secret = webhook_secret or getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', None)
+        if not secret:
+            return False
+
+        if not webhook_body or not webhook_signature:
+            return False
+
+        try:
+            if self.client and hasattr(self.client.utility, 'verify_webhook_signature'):
+                self.client.utility.verify_webhook_signature(webhook_body, webhook_signature, secret)
+                return True
+        except Exception:
+            pass
+
+        # Fallback direct HMAC computation
+        try:
+            import hmac
+            import hashlib
+            generated_signature = hmac.new(
+                bytes(secret, 'utf-8'),
+                bytes(webhook_body, 'utf-8') if isinstance(webhook_body, str) else webhook_body,
+                hashlib.sha256
+            ).hexdigest()
+            return hmac.compare_digest(generated_signature, webhook_signature)
+        except Exception:
+            return False
+
+    def create_recovery_order(self, plan: str, discount_pct: int = 0, user_id: Optional[str] = None) -> dict:
+        """
+        Creates a discounted or standard order for payment recovery retry.
+        Bounded discount is applied if valid.
+        """
+        pricing = {
+            "pro": 299,
+            "premium": 499
+        }
+        base_amount = pricing.get(plan.lower(), 299)
+        clamped_discount = max(0, min(20, discount_pct))  # Hard guardrail
+        discounted_amount = base_amount * (1.0 - (clamped_discount / 100.0))
+        amount_paisa = int(discounted_amount * 100)
+
+        if not self.is_configured:
+            # Safe mock fallback for test mode / local development
+            import hashlib
+            fake_id = f"order_rec_{plan}_{int(hashlib.sha256(f'{plan}_{user_id}_{amount_paisa}'.encode()).hexdigest(), 16) % 10**8}"
+            return {
+                "id": fake_id,
+                "amount": amount_paisa,
+                "currency": "INR",
+                "razorpay_key_id": self.key_id or "rzp_test_mockkey",
+                "discount_pct": clamped_discount,
+                "discounted_amount": discounted_amount,
+                "is_mock": True,
+            }
+
+        import hashlib
+        try:
+            order_data = {
+                "amount": amount_paisa,
+                "currency": "INR",
+                "receipt": f"rec_{plan}_{int(hashlib.sha256(f'{plan}_{user_id}'.encode()).hexdigest(), 16) % 10**8}",
+                "payment_capture": 1,
+                "notes": {
+                    "recovery_flow": "true",
+                    "plan": plan,
+                    "discount_pct": str(clamped_discount),
+                    "user_id": str(user_id or ""),
+                }
+            }
+            razorpay_order = self.client.order.create(data=order_data)
+            return {
+                "id": razorpay_order["id"],
+                "amount": razorpay_order["amount"],
+                "currency": razorpay_order["currency"],
+                "razorpay_key_id": self.key_id,
+                "discount_pct": clamped_discount,
+                "discounted_amount": discounted_amount,
+                "is_mock": False,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create recovery order: {str(e)}")
 
 # Singleton instance to prevent multiple client instantiations across routes
 razorpay_service = RazorpayService()

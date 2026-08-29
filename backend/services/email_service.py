@@ -509,6 +509,86 @@ class EmailService:
             attachments=attachments_payload if attachments_payload else None,
         )
 
+    async def send_payment_recovery_email(
+        self,
+        *,
+        to_email: str,
+        full_name: str,
+        plan_name: str,
+        amount: float,
+        failure_situation: str,
+        retry_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Sends AI-personalized subscription payment recovery email via Brevo."""
+        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+        if "localhost" in base_url or not base_url:
+            base_url = "https://careershala.tech"
+
+        final_retry_url = retry_url or f"{base_url}/billing"
+        support_url = f"{base_url}/support"
+
+        html = _render_template(
+            "payment_recovery.html",
+            full_name=full_name or "there",
+            plan_name=plan_name.capitalize(),
+            amount=f"{amount:.0f}" if amount == int(amount) else f"{amount:.2f}",
+            failure_situation=failure_situation or "Temporary payment processing issue",
+            retry_url=final_retry_url,
+            support_url=support_url,
+            logo_url=f"{base_url}/logo.png",
+        )
+
+        subject = f"⚠️ Action Required: Renew your CareerShala {plan_name.capitalize()} subscription"
+        return await self._send_brevo_email(
+            to_email=to_email,
+            to_name=full_name,
+            subject=subject,
+            html_body=html,
+        )
+
+    async def send_winback_offer_email(
+        self,
+        *,
+        to_email: str,
+        full_name: str,
+        plan_name: str,
+        discount_pct: int,
+        promo_code: str,
+        original_amount: float,
+        discounted_amount: float,
+        valid_until_str: str,
+        claim_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Sends bounded win-back discount offer email via Brevo."""
+        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+        if "localhost" in base_url or not base_url:
+            base_url = "https://careershala.tech"
+
+        final_claim_url = claim_url or f"{base_url}/premium?coupon={promo_code}"
+        support_url = f"{base_url}/support"
+
+        html = _render_template(
+            "winback_offer.html",
+            full_name=full_name or "there",
+            plan_name=plan_name.capitalize(),
+            discount_pct=discount_pct,
+            promo_code=promo_code,
+            original_amount=f"{original_amount:.0f}",
+            discounted_amount=f"{discounted_amount:.0f}",
+            valid_until_str=valid_until_str or "next 7 days",
+            claim_url=final_claim_url,
+            support_url=support_url,
+            logo_url=f"{base_url}/logo.png",
+        )
+
+        subject = f"🎁 Special Offer: {discount_pct}% Off CareerShala {plan_name.capitalize()}"
+        return await self._send_brevo_email(
+            to_email=to_email,
+            to_name=full_name,
+            subject=subject,
+            html_body=html,
+        )
+
 
 async def send_with_attachments(
     *,
