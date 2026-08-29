@@ -273,6 +273,7 @@ export const createCheckout = (plan) => api.post('/payment/checkout', { plan })
 export const verifyPayment = (payload) => api.post('/payment/verify', payload)
 export const choosePlan = (plan) => api.post('/payment/choose', { plan })
 export const cancelSubscription = (payload) => api.post('/payment/cancel', payload || {})
+export const reportPaymentFailure = (payload) => api.post('/payment/report-failure', payload)
 
 // Auth Security APIs
 export const changePassword = (current_password, new_password) =>

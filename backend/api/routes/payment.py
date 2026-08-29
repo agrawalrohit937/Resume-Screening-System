@@ -151,7 +151,14 @@ async def create_checkout(
     if plan == 'free':
         raise HTTPException(status_code=400, detail="Free plan does not require checkout.")
         
-    order_details = razorpay_service.create_order(plan)
+    order_details = razorpay_service.create_order(
+        plan,
+        user_info={
+            "user_id": str(current_user.id),
+            "email": current_user.email,
+            "full_name": current_user.full_name,
+        }
+    )
     return order_details
 
 
@@ -380,15 +387,34 @@ async def razorpay_webhook(
 
     # 1. Handle Payment Failure Events
     if event in ("payment.failed", "subscription.halted", "subscription.charge_failed"):
-        user_email = payment_entity.get("email") or ""
+        notes = payment_entity.get("notes") or {}
+        user_email = payment_entity.get("email") or notes.get("email") or ""
+        notes_user_id = notes.get("user_id")
+        notes_full_name = notes.get("full_name")
+
         amount = float(payment_entity.get("amount", 29900)) / 100.0
         error_desc = payment_entity.get("error_description") or "Gateway charge failed"
         error_code = payment_entity.get("error_code") or "payment_failed"
         order_id = payment_entity.get("order_id")
 
-        user_doc = await user_repo.get_by_email(user_email) if user_email else None
-        user_id = str(user_doc.id) if user_doc else "unlinked_customer"
-        user_name = user_doc.full_name if user_doc else "Valued Learner"
+        user_doc = None
+        if notes_user_id:
+            user_doc = await user_repo.get_by_id(notes_user_id)
+        if not user_doc and user_email:
+            user_doc = await user_repo.get_by_email(user_email)
+
+        user_id = str(user_doc.id) if user_doc else (notes_user_id or "unlinked_customer")
+        user_name = user_doc.full_name if user_doc else (notes_full_name or "Valued Learner")
+        if not user_email and user_doc:
+            user_email = user_doc.email
+
+        logger.info(
+            "Handling Razorpay payment failure event",
+            user_id=user_id,
+            user_email=user_email,
+            order_id=order_id,
+            error=error_desc,
+        )
 
         existing_case = await recovery_repo.get_active_case_for_user(user_id) if user_doc else None
         attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
