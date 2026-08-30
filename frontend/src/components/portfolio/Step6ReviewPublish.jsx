@@ -102,6 +102,21 @@ export default function Step6ReviewPublish({
         </div>
       </div>
 
+      {/* Profile System Settings Callout */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50/90 to-blue-50/90 border border-indigo-200/80 text-left max-w-xl mx-auto flex items-start gap-3.5 shadow-sm">
+        <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+          <Sparkles size={17} />
+        </div>
+        <div className="text-xs space-y-1">
+          <p className="font-black text-indigo-950 flex items-center gap-1.5">
+            Profile Settings Synchronization
+          </p>
+          <p className="text-slate-600 leading-relaxed">
+            Upon launch, your public URL will be ready. You'll be prompted to automatically sync this link to your <strong className="text-slate-800 font-bold">Profile & System Settings</strong> so recruiters can inspect your interactive projects during ATS evaluations.
+          </p>
+        </div>
+      </div>
+
       {/* Launch Actions */}
       <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
         <button

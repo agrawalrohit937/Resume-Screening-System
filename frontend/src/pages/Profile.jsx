@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useDropzone } from 'react-dropzone'
 import {
   Camera, Pencil, X, Mail, Loader2, Upload, MapPin,
-  Link as LinkIcon, Github, Linkedin, FileText, CheckCircle
+  Link as LinkIcon, Github, Linkedin, FileText, CheckCircle,
+  ExternalLink, Globe, Sparkles, Zap
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing, { getUserPlan } from '../components/AvatarRing'
@@ -51,14 +52,47 @@ function PlanBadge({ user }) {
 }
 
 function InfoItem({ label, value, icon: Icon }) {
+  const isUrl = value && (
+    value.startsWith('http://') || 
+    value.startsWith('https://') || 
+    value.startsWith('/portfolio') || 
+    label.toLowerCase().includes('portfolio') || 
+    label.toLowerCase().includes('linkedin') || 
+    label.toLowerCase().includes('github')
+  );
+  const href = value ? (value.startsWith('http') ? value : value.startsWith('/portfolio') ? value : `https://${value}`) : '';
+
   return (
-    <div className="flex flex-col gap-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-100/50">
-      <dt className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-        {Icon && <Icon size={14} className="text-indigo-400" />}
-        {label}
+    <div className="flex flex-col gap-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-100/50 hover:border-indigo-100 transition-colors">
+      <dt className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          {Icon && <Icon size={14} className="text-indigo-400" />}
+          {label}
+        </span>
+        {isUrl && value && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5"
+            title="Open link"
+          >
+            Visit <ExternalLink size={10} />
+          </a>
+        )}
       </dt>
       <dd className="text-sm font-semibold text-slate-800 truncate">
-        {value || <span className="text-slate-400 italic font-medium">Not provided</span>}
+        {value ? (
+          isUrl ? (
+            <a href={href} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline truncate block">
+              {value}
+            </a>
+          ) : (
+            value
+          )
+        ) : (
+          <span className="text-slate-400 italic font-medium">Not provided</span>
+        )}
       </dd>
     </div>
   )
@@ -473,7 +507,28 @@ export default function Profile() {
                     </div>
 
                     <div className="md:col-span-2 pt-4 border-t border-slate-100/50">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Social Links</h3>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Social Links</h3>
+                        {user.portfolio_slug && !user.portfolio_url && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const autoUrl = `${window.location.origin}/portfolio/${user.portfolio_slug}`;
+                              try {
+                                await updateProfile({ portfolio_url: autoUrl });
+                                if (refreshUser) await refreshUser();
+                                toast.success('🎉 Live portfolio link saved to your profile!');
+                              } catch (e) {
+                                toast.error('Failed to update portfolio link.');
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/90 px-3 py-1 rounded-full transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <Sparkles size={13} className="text-amber-600" />
+                            Link Your Live Portfolio (/portfolio/{user.portfolio_slug})
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <InfoItem label="LinkedIn" value={user.linkedin_url} icon={Linkedin} />
                         <InfoItem label="GitHub" value={user.github_url} icon={Github} />
@@ -506,7 +561,18 @@ export default function Profile() {
                     <div className="pt-6 border-t border-slate-100/50 grid grid-cols-1 md:grid-cols-3 gap-6">
                       <Input label="LinkedIn URL" icon={Linkedin} value={form.linkedin_url} onChange={(v) => setForm({ ...form, linkedin_url: v })} placeholder="linkedin.com/in/..." />
                       <Input label="GitHub URL" icon={Github} value={form.github_url} onChange={(v) => setForm({ ...form, github_url: v })} placeholder="github.com/..." />
-                      <Input label="Portfolio URL" icon={LinkIcon} value={form.portfolio_url} onChange={(v) => setForm({ ...form, portfolio_url: v })} placeholder="yourwebsite.com" />
+                      <div className="space-y-1.5">
+                        <Input label="Portfolio URL" icon={LinkIcon} value={form.portfolio_url} onChange={(v) => setForm({ ...form, portfolio_url: v })} placeholder="yourwebsite.com" />
+                        {user.portfolio_slug && (
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, portfolio_url: `${window.location.origin}/portfolio/${user.portfolio_slug}` })}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Sparkles size={11} /> Use my site portfolio: /portfolio/{user.portfolio_slug}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="pt-8 flex justify-end gap-3">
