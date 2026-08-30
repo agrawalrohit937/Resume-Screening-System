@@ -93,7 +93,7 @@
   ::-webkit-scrollbar-track { @apply bg-blue-100; }
   ::-webkit-scrollbar-thumb { @apply bg-blue-300 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
-  ::selection { background: rgba(59,130,246,0.15); color: var(--color-text); }
+  ::selection { background-color: #c7d2fe; color: #1e1b4b; }
 
   input, select, textarea, button { font-family: var(--font-body); }
 }

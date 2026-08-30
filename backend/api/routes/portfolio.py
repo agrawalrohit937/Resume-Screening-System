@@ -815,7 +815,7 @@ async def get_my_portfolio(
     print(f"   🔗 GitHub     : '{auto_data['social_links']['github']}'")
     print(f"   🔗 LinkedIn   : '{auto_data['social_links']['linkedin']}'")
     print("="*70 + "\n")
-    auto_data["is_published"] = True
+    auto_data["is_published"] = bool(doc.get("is_published", False)) if doc else False
 
     # Automatically save clean profile in MongoDB
     if not doc or has_corrupt_projects or sync_from_resume:

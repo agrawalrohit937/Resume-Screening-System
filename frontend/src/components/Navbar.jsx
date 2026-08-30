@@ -16,7 +16,9 @@ import {
   Settings,
   Flame,
   Crown,
-  User
+  User,
+  Globe,
+  X
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getGamificationProfile } from '../services/interviewApi'
@@ -28,6 +30,7 @@ const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
 
 const SEARCH_ROUTES = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, keywords: ['home', 'analytics'] },
+  { name: 'Portfolio Builder & Showcase', path: '/portfolio', icon: Globe, keywords: ['portfolio', 'website', 'developer site', 'showcase', 'projects'] },
   { name: 'Resume Upload', path: '/dashboard', icon: FileText, keywords: ['upload', 'cv', 'ats'] },
   { name: 'Mock Interview', path: '/interview', icon: Video, keywords: ['practice', 'ai interview'] },
   { name: 'Live Interview', path: '/live-interview-v2', icon: Video, keywords: ['live', 'video'] },
@@ -74,6 +77,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const [streak, setStreak] = useState(0)
   
   const menuRef = useRef(null)
@@ -103,6 +107,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([])
+      setSelectedIndex(-1)
       return
     }
     const timer = setTimeout(() => {
@@ -112,15 +117,49 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
         route.keywords.some(kw => kw.includes(query))
       )
       setSearchResults(results)
+      setSelectedIndex(results.length > 0 ? 0 : -1)
     }, 150)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
   const handleNavigate = (path) => {
-    navigate(path)
-    setSearchQuery('')
     setIsSearchFocused(false)
-    searchInputRef.current?.blur()
+    setSearchQuery('')
+    setSearchResults([])
+    setSelectedIndex(-1)
+    if (searchInputRef.current) {
+      searchInputRef.current.value = ''
+      searchInputRef.current.blur()
+    }
+    navigate(path)
+  }
+
+  const handleInputKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (searchResults.length > 0) {
+        setSelectedIndex(prev => (prev + 1) % searchResults.length)
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (searchResults.length > 0) {
+        setSelectedIndex(prev => (prev - 1 + searchResults.length) % searchResults.length)
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (searchResults.length > 0) {
+        const target = selectedIndex >= 0 && selectedIndex < searchResults.length 
+          ? searchResults[selectedIndex] 
+          : searchResults[0]
+        handleNavigate(target.path)
+      }
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
+      setIsSearchFocused(false)
+      setSearchQuery('')
+      setSearchResults([])
+      setSelectedIndex(-1)
+      searchInputRef.current?.blur()
+    }
   }
 
   useEffect(() => {
@@ -128,6 +167,9 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
       if (menuRef.current && !menuRef.current.contains(e.target)) setIsOpen(false)
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
         setIsSearchFocused(false)
+        setSearchQuery('')
+        setSearchResults([])
+        setSelectedIndex(-1)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -137,6 +179,9 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   useEffect(() => {
     setIsOpen(false)
     setIsSearchFocused(false)
+    setSearchQuery('')
+    setSearchResults([])
+    setSelectedIndex(-1)
   }, [location.pathname, location.key, location.search])
 
   useEffect(() => {
@@ -180,7 +225,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
         <motion.div 
           animate={{ width: isSearchFocused ? '100%' : '90%' }}
           transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
-          className="relative group mx-auto"
+          className="relative group mx-auto w-full"
         >
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-600 transition-colors z-10" strokeWidth={2.5} />
           
@@ -190,63 +235,102 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
+            onKeyDown={handleInputKeyDown}
             placeholder="Search ATS, Mock Interviews, or settings..."
             aria-label="Search ATS, Mock Interviews, or settings"
             className="w-full h-11 pl-11 pr-16 rounded-2xl bg-white border border-slate-200/80 focus:border-indigo-400 focus:ring-[4px] focus:ring-indigo-500/10 outline-none text-sm font-semibold text-slate-900 placeholder-slate-500 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] group-focus-within:shadow-[0_8px_30px_rgba(99,102,241,0.1)]"
           />
           
-          <AnimatePresence>
-            {!searchQuery && !isSearchFocused && (
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 shadow-sm pointer-events-none"
-              >
-                <Command size={10} className="text-slate-500" strokeWidth={3} />
-                <span className="text-[10px] font-extrabold text-slate-500">K</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {Boolean(searchQuery) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('')
+                setSearchResults([])
+                setSelectedIndex(-1)
+                setIsSearchFocused(false)
+                if (searchInputRef.current) {
+                  searchInputRef.current.value = ''
+                  searchInputRef.current.focus()
+                }
+              }}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer z-20"
+              aria-label="Clear search query"
+            >
+              <X size={15} strokeWidth={2.5} />
+            </button>
+          ) : (
+            <AnimatePresence>
+              {!isSearchFocused && (
+                <motion.div 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 shadow-sm pointer-events-none"
+                >
+                  <Command size={10} className="text-slate-500" strokeWidth={3} />
+                  <span className="text-[10px] font-extrabold text-slate-500">K</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </motion.div>
 
-        {/* Search Results Dropdown */}
-        <AnimatePresence>
-          {isSearchFocused && searchQuery && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', bounce: 0.3, staggerChildren: 0.05 } }}
-              exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.15 } }}
-              className="absolute top-[calc(100%+12px)] left-0 right-0 mx-auto w-full max-w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_10px_40px_rgba(30,58,138,0.1)] border border-slate-200/80 overflow-hidden"
-            >
-              {searchResults.length > 0 ? (
-                <div className="p-2">
-                  <p className="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Jump To</p>
-                  {searchResults.map((result, idx) => (
-                    <motion.button
-                      key={idx}
-                      initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+        {/* Search Results Dropdown (100% Solid Opaque Pure White - Instant Dismissal on Selection) */}
+        {Boolean(isSearchFocused && searchQuery.trim()) && (
+          <div
+            className="absolute top-[calc(100%+8px)] left-0 right-0 mx-auto w-full max-w-full bg-white rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.18)] border border-slate-200 overflow-hidden z-50"
+          >
+            {searchResults.length > 0 ? (
+              <div className="p-2 bg-white">
+                <div className="flex items-center justify-between px-3 pt-2 pb-1 bg-white">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Jump To</p>
+                  <span className="text-[10px] font-semibold text-slate-400">↑↓ to navigate • ↵ to select</span>
+                </div>
+                {searchResults.map((result, idx) => {
+                  const isSelected = selectedIndex === idx;
+                  return (
+                    <button
+                      key={result.path + idx}
+                      type="button"
                       onClick={() => handleNavigate(result.path)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left group"
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left cursor-pointer ${
+                        isSelected 
+                          ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-100' 
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
                     >
-                      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors border border-transparent group-hover:border-indigo-100">
-                        <result.icon size={16} strokeWidth={2.5} />
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors border ${
+                          isSelected 
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                            : 'bg-slate-100 text-slate-600 border-slate-200/60'
+                        }`}>
+                          <result.icon size={16} strokeWidth={2.5} />
+                        </div>
+                        <span className="text-sm font-bold">
+                          {result.name}
+                        </span>
                       </div>
-                      <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">
-                        {result.name}
+                      <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${
+                        isSelected ? 'opacity-100 bg-white text-indigo-700 border-indigo-200' : 'opacity-0 text-slate-400 border-transparent'
+                      }`}>
+                        Select ↵
                       </span>
-                    </motion.button>
-                  ))}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-white">
+                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-slate-100">
+                  <Search className="w-5 h-5 text-slate-400" strokeWidth={3} />
                 </div>
-              ) : (
-                <div className="p-8 text-center">
-                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
-                    <Search className="w-5 h-5 text-slate-400" strokeWidth={3} />
-                  </div>
-                  <p className="text-sm font-extrabold text-slate-900">No results found</p>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <p className="text-sm font-extrabold text-slate-900">No results found</p>
+                <p className="text-xs text-slate-500 mt-1">Try searching for "Portfolio", "ATS", or "Interview"</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 3. Right: Actions & Profile (Densely packed to avoid empty space) */}
@@ -255,8 +339,12 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
         {/* Mobile Search Icon */}
         <motion.button
           whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            setIsSearchFocused(true)
+            searchInputRef.current?.focus()
+          }}
           aria-label="Open search"
-          className="sm:hidden p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm"
+          className="sm:hidden p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm cursor-pointer"
         >
           <Search size={18} strokeWidth={2.5} />
         </motion.button>
