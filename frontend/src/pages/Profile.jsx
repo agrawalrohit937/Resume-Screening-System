@@ -52,15 +52,27 @@ function PlanBadge({ user }) {
 }
 
 function InfoItem({ label, value, icon: Icon }) {
-  const isUrl = value && (
-    value.startsWith('http://') || 
-    value.startsWith('https://') || 
-    value.startsWith('/portfolio') || 
-    label.toLowerCase().includes('portfolio') || 
-    label.toLowerCase().includes('linkedin') || 
-    label.toLowerCase().includes('github')
+  const strVal = typeof value === 'string' ? value.trim() : (value !== null && value !== undefined ? String(value).trim() : '');
+  const labelStr = typeof label === 'string' ? label.toLowerCase() : '';
+
+  const isUrl = Boolean(
+    strVal && (
+      strVal.startsWith('http://') || 
+      strVal.startsWith('https://') || 
+      strVal.startsWith('/portfolio') || 
+      labelStr.includes('portfolio') || 
+      labelStr.includes('linkedin') || 
+      labelStr.includes('github')
+    )
   );
-  const href = value ? (value.startsWith('http') ? value : value.startsWith('/portfolio') ? value : `https://${value}`) : '';
+
+  const href = strVal ? (
+    strVal.startsWith('http://') || strVal.startsWith('https://') 
+      ? strVal 
+      : strVal.startsWith('/portfolio') 
+        ? strVal 
+        : `https://${strVal}`
+  ) : '';
 
   return (
     <div className="flex flex-col gap-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-100/50 hover:border-indigo-100 transition-colors">
@@ -69,7 +81,7 @@ function InfoItem({ label, value, icon: Icon }) {
           {Icon && <Icon size={14} className="text-indigo-400" />}
           {label}
         </span>
-        {isUrl && value && (
+        {isUrl && strVal && (
           <a
             href={href}
             target="_blank"
@@ -82,13 +94,13 @@ function InfoItem({ label, value, icon: Icon }) {
         )}
       </dt>
       <dd className="text-sm font-semibold text-slate-800 truncate">
-        {value ? (
+        {strVal ? (
           isUrl ? (
             <a href={href} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline truncate block">
-              {value}
+              {strVal}
             </a>
           ) : (
-            value
+            strVal
           )
         ) : (
           <span className="text-slate-400 italic font-medium">Not provided</span>
@@ -145,9 +157,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({})
 
-  // Preview state
-  const [previewUrl, setPreviewUrl] = useState(null)
-  const [previewFile, setPreviewFile] = useState(null)
+  // Avatar error state
   const [imgError, setImgError] = useState(false)
 
   // Resume Upload State
@@ -158,7 +168,7 @@ export default function Profile() {
 
   const savedAvatarUrl = resolveAvatarUrl(user)
   useEffect(() => { setImgError(false) }, [savedAvatarUrl])
-  const displayedAvatarUrl = previewUrl || (imgError ? null : savedAvatarUrl)
+  const displayedAvatarUrl = imgError ? null : savedAvatarUrl
 
   useEffect(() => {
     if (user) {
@@ -185,11 +195,7 @@ export default function Profile() {
     }
   }, [user?.profile_resume_url, user?.profile_resume_name])
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-    }
-  }, [previewUrl])
+
 
   // --- Resume Drag & Drop Logic ---
   const onResumeDrop = useCallback(async (accepted) => {
@@ -256,11 +262,7 @@ export default function Profile() {
     }
   }
 
-  const handleCancelPreview = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(null)
-    setPreviewFile(null)
-  }
+
 
   const handleSave = async () => {
     setLoading(true)
@@ -340,35 +342,7 @@ export default function Profile() {
               />
             </div>
 
-            {/* Photo Actions (Visible only when previewing) */}
-            <AnimatePresence>
-              {previewFile && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, y: -10 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -10 }}
-                  className="flex flex-col gap-2 w-full"
-                >
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={handleUploadConfirm}
-                      disabled={loading}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 disabled:opacity-50 transition-all"
-                    >
-                      {loading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                      Save Photo
-                    </button>
-                    <button
-                      onClick={handleCancelPreview}
-                      disabled={loading}
-                      className="flex items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 shadow-sm disabled:opacity-50 transition-all"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
           </div>
 
           {/* User Details */}
