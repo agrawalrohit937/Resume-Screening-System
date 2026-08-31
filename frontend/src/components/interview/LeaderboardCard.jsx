@@ -32,7 +32,6 @@ export function LeaderboardCard({ entry, currentUserId, index }) {
             src={avatarUrl}
             alt={displayName}
             className="w-full h-full object-cover"
-            crossOrigin="anonymous"
             referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
           />

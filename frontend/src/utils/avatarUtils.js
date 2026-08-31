@@ -28,6 +28,8 @@ export function resolveAvatarUrl(user, width = 100) {
     getValidUrl(user.avatar_url) ||
     getValidUrl(user.display_picture) ||
     getValidUrl(user.profile_picture) ||
+    getValidUrl(user.profile_photo_url) ||
+    getValidUrl(user.photo_url) ||
     getValidUrl(user.picture) ||
     (user.linked_accounts && typeof user.linked_accounts === 'object' && (
       getValidUrl(user.linked_accounts.google?.picture) ||

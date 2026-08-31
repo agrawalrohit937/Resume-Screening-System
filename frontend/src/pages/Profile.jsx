@@ -306,7 +306,6 @@ export default function Profile() {
                     <img
                       src={displayedAvatarUrl}
                       alt="Profile"
-                      crossOrigin="anonymous"
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                       onError={() => setImgError(true)}
