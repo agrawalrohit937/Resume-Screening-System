@@ -19,13 +19,13 @@ export default function Step2Narrative({
   goToStep
 }) {
   return (
-    <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-md space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-slate-100 pb-8">
-        <div className="space-y-2 max-w-xl">
-          <span className="text-[11px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/60 inline-block">
+    <div className="bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-10 border border-slate-200/80 shadow-md space-y-6 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 border-b border-slate-100 pb-6 sm:pb-8">
+        <div className="space-y-1.5 sm:space-y-2 max-w-xl">
+          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/60 inline-block">
             Step 02 • Narrative Story & Counters
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Hero Subtitle, Rotating Roles, Bio & Metrics
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed">
@@ -146,11 +146,11 @@ export default function Step2Narrative({
       </div>
 
       {/* Navigation Footer */}
-      <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-6 border-t border-slate-100">
         <button
           type="button"
           onClick={() => goToStep(1)}
-          className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl flex items-center gap-2 cursor-pointer transition-all"
+          className="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
         >
           <ArrowLeft size={15} /> Back to Step 1
         </button>
@@ -158,7 +158,7 @@ export default function Step2Narrative({
         <button
           type="button"
           onClick={() => goToStep(3)}
-          className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-2xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer transition-transform hover:scale-105 active:scale-95"
         >
           Next: Technical Skills <ChevronRight size={15} />
         </button>

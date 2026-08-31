@@ -17,13 +17,13 @@ function LeaderboardAvatar({ entry, isTop3, rankStyle, isMe, currentUser }) {
 
   if (avatarUrl && !imgError) {
     return (
-      <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 relative z-10 border-2 ${
+      <div className={`w-9 h-9 sm:w-10 sm:h-10 min-w-[36px] sm:min-w-[40px] max-w-[36px] sm:max-w-[40px] min-h-[36px] sm:min-h-[40px] max-h-[36px] sm:max-h-[40px] aspect-square rounded-full overflow-hidden shrink-0 relative z-10 border-2 ${
         isTop3 ? 'border-amber-400 shadow-sm' : 'border-white shadow-sm ring-1 ring-slate-200'
       }`}>
         <img
           src={avatarUrl}
           alt={entry.full_name || 'Candidate'}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover object-center block rounded-full"
           referrerPolicy="no-referrer"
           onError={() => setImgError(true)}
         />
@@ -32,7 +32,7 @@ function LeaderboardAvatar({ entry, isTop3, rankStyle, isMe, currentUser }) {
   }
 
   return (
-    <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-[13px] font-bold shrink-0 relative z-10 ${
+    <div className={`w-9 h-9 sm:w-10 sm:h-10 min-w-[36px] sm:min-w-[40px] max-w-[36px] sm:max-w-[40px] min-h-[36px] sm:min-h-[40px] max-h-[36px] sm:max-h-[40px] aspect-square rounded-full flex items-center justify-center text-xs sm:text-[13px] font-bold shrink-0 relative z-10 ${
       isTop3 ? `${rankStyle.avatar} text-white` : 'bg-slate-100 text-slate-600 border border-slate-200 shadow-sm'
     }`}>
       {initials}
@@ -109,20 +109,20 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
   }
 
   return (
-    <Card className="p-0 overflow-hidden border border-slate-200/80 shadow-sm rounded-3xl bg-white relative">
+    <Card className="p-0 overflow-hidden border border-slate-200/80 shadow-sm rounded-2xl sm:rounded-3xl bg-white relative">
       {/* Header */}
-      <div className="p-4 sm:p-7 border-b border-slate-200/60 flex items-center justify-between bg-slate-50/70 relative overflow-hidden">
-        <div className="relative z-10 min-w-0">
-          <h3 className="font-extrabold text-xl sm:text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
+      <div className="p-3.5 sm:p-6 md:p-7 border-b border-slate-200/60 flex items-center justify-between bg-slate-50/70 relative overflow-hidden gap-2">
+        <div className="relative z-10 min-w-0 flex-1">
+          <h3 className="font-extrabold text-lg sm:text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
             Leaderboard
           </h3>
-          <p className="text-xs sm:text-[13px] font-medium text-slate-500 mt-0.5 sm:mt-1 truncate">{getDynamicSubtitle(candidateLeaderboard.length)}</p>
+          <p className="text-[11px] sm:text-[13px] font-medium text-slate-500 mt-0.5 truncate">{getDynamicSubtitle(candidateLeaderboard.length)}</p>
         </div>
 
         {myEntry && (
-          <div className="text-right relative z-10 bg-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl border border-slate-200 shadow-sm shrink-0 ml-2">
-            <p className="text-[9px] sm:text-[10px] font-extrabold text-[#1d6fa5] uppercase tracking-wider">Your Rank</p>
-            <p className="font-extrabold text-xl sm:text-2xl text-slate-900 leading-none mt-0.5 sm:mt-1">#{myEntry.rank}</p>
+          <div className="text-right relative z-10 bg-white px-2.5 py-1 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs shrink-0">
+            <p className="text-[8px] sm:text-[10px] font-extrabold text-[#1d6fa5] uppercase tracking-wider">Your Rank</p>
+            <p className="font-extrabold text-base sm:text-2xl text-slate-900 leading-none mt-0.5">#{myEntry.rank}</p>
           </div>
         )}
       </div>
@@ -130,22 +130,22 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
 
       {/* Empty State */}
       {candidateLeaderboard.length === 0 ? (
-        <div className="text-center py-16 px-4">
+        <div className="text-center py-12 sm:py-16 px-4">
           <motion.div 
             initial={{ scale: 0.8, opacity: 0 }} 
             animate={{ scale: 1, opacity: 1 }} 
             transition={{ type: "spring" }}
-            className="w-16 h-16 mx-auto bg-slate-50 rounded-2xl flex items-center justify-center mb-4 border border-slate-100 shadow-sm"
+            className="w-14 h-14 sm:w-16 sm:h-16 mx-auto bg-slate-50 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 border border-slate-100 shadow-sm"
           >
-            <Trophy className="w-8 h-8 text-slate-300" />
+            <Trophy className="w-7 h-7 sm:w-8 sm:h-8 text-slate-300" />
           </motion.div>
-          <p className="text-[15px] font-extrabold text-blue-950">No rankings yet</p>
-          <p className="text-[13px] font-medium text-blue-900/50 mt-1">Complete an interview to establish your rank.</p>
+          <p className="text-sm sm:text-[15px] font-extrabold text-blue-950">No rankings yet</p>
+          <p className="text-xs sm:text-[13px] font-medium text-blue-900/50 mt-1">Complete an interview to establish your rank.</p>
         </div>
       ) : (
         /* Leaderboard List */
         <motion.div 
-          className="p-2 sm:p-3 space-y-1.5"
+          className="p-1.5 sm:p-3 space-y-1 sm:space-y-1.5"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -165,59 +165,61 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
               <motion.div
                 key={entry.user_id || i}
                 variants={itemVariants}
-                whileHover={{ scale: 1.01, transition: { type: 'spring', stiffness: 400 } }}
-                className={`relative flex items-center gap-2.5 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl sm:rounded-[20px] transition-all duration-200 
+                whileHover={{ scale: 1.008, transition: { type: 'spring', stiffness: 400 } }}
+                className={`relative flex items-center gap-2 sm:gap-3.5 px-2.5 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-[20px] transition-all duration-200 
                   ${isTop3 ? `${rankStyle.bg} border ${rankStyle.border}` : 'bg-white border border-transparent hover:bg-slate-50 hover:border-slate-100'}
-                  ${isMe && !isTop3 ? 'ring-1 ring-[#2E9BDA]/40 shadow-sm bg-blue-50/30' : ''}
+                  ${isMe && !isTop3 ? 'ring-1 ring-[#2E9BDA]/40 shadow-xs bg-blue-50/30' : ''}
                 `}
               >
                 {/* Glowing ring for current user */}
-                {isMe && <div className="absolute inset-0 rounded-2xl sm:rounded-[20px] ring-2 ring-[#2E9BDA]/30 animate-pulse opacity-50 pointer-events-none" />}
+                {isMe && <div className="absolute inset-0 rounded-xl sm:rounded-[20px] ring-2 ring-[#2E9BDA]/30 animate-pulse opacity-50 pointer-events-none" />}
 
                 {/* Rank Number / Icon */}
-                <div className="w-6 sm:w-8 flex items-center justify-center shrink-0 relative z-10">
+                <div className="w-5 sm:w-7 flex items-center justify-center shrink-0 relative z-10 text-center">
                   {isTop3 ? (
-                    <RankIcon className={`w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 ${rankStyle.iconColor}`} />
+                    <RankIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${rankStyle.iconColor}`} />
                   ) : (
-                    <span className="text-xs sm:text-[14px] font-extrabold text-slate-400">#{actualRank}</span>
+                    <span className="text-[11px] sm:text-[13.5px] font-extrabold text-slate-400">#{actualRank}</span>
                   )}
                 </div>
 
                 {/* Avatar */}
-                <LeaderboardAvatar
-                  entry={entry}
-                  isTop3={isTop3}
-                  rankStyle={rankStyle}
-                  isMe={isMe}
-                  currentUser={currentUser}
-                />
+                <div className="shrink-0 relative z-10">
+                  <LeaderboardAvatar
+                    entry={entry}
+                    isTop3={isTop3}
+                    rankStyle={rankStyle}
+                    isMe={isMe}
+                    currentUser={currentUser}
+                  />
+                </div>
 
                 {/* User Info */}
                 <div className="flex-1 min-w-0 relative z-10">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <p className={`text-xs sm:text-[13.5px] font-bold truncate ${isTop3 ? rankStyle.text : isMe ? 'text-[#1d6fa5]' : 'text-blue-950'}`}>
                       {displayName}
                     </p>
                     {isMe && (
-                      <span className="bg-[#2E9BDA]/10 text-[#1d6fa5] text-[8.5px] sm:text-[9px] font-extrabold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full border border-[#2E9BDA]/20 shrink-0">
+                      <span className="bg-[#2E9BDA]/10 text-[#1d6fa5] text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded-full border border-[#2E9BDA]/20 shrink-0">
                         You
                       </span>
                     )}
                   </div>
                   
                   {/* Badges/Streaks */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1">
-                    <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-[11px] font-bold text-slate-500 bg-white/60 px-1.5 sm:px-2 py-0.5 rounded-md border border-slate-200/60 shadow-sm">
-                      <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500" /> {entry.current_streak || 0}
+                  <div className="flex items-center gap-1 sm:gap-1.5 mt-0.5">
+                    <span className="inline-flex items-center gap-0.5 text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-white/70 px-1.5 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                      <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500 shrink-0" /> {entry.current_streak || 0}
                     </span>
-                    <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-[11px] font-bold text-slate-500 bg-white/60 px-2 py-0.5 rounded-md border border-slate-200/60 shadow-sm">
-                      <Medal className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" /> {entry.badge_count || 0}
+                    <span className="inline-flex items-center gap-0.5 text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-white/70 px-1.5 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                      <Medal className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" /> {entry.badge_count || 0}
                     </span>
                   </div>
                 </div>
 
                 {/* XP / Points */}
-                <div className={`shrink-0 relative z-10 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl font-extrabold text-xs sm:text-[13px] border shadow-sm
+                <div className={`shrink-0 relative z-10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl font-extrabold text-[11px] sm:text-[13px] border shadow-2xs whitespace-nowrap tabular-nums
                   ${isTop3 ? rankStyle.points : 'bg-slate-50 text-blue-950 border-slate-200'}
                   ${isMe && !isTop3 ? 'bg-[#2E9BDA] text-white border-[#1d6fa5]' : ''}
                 `}>

@@ -18,9 +18,11 @@ import {
   Layers,
   Check,
   ExternalLink,
-  HelpCircle
+  HelpCircle,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
-import { Reorder, AnimatePresence, motion } from 'framer-motion';
+import { Reorder, AnimatePresence, motion, useDragControls } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 // Popular quick-tag suggestions for 1-tap addition
@@ -62,47 +64,78 @@ const ProjectCard = memo(function ProjectCard({
   onAddHighlight,
   onUpdateHighlight,
   onRemoveHighlight,
+  onMoveUp,
+  onMoveDown,
   totalProjects
 }) {
+  const dragControls = useDragControls();
   const currentImage = proj.image_url || `https://placehold.co/1200x800/1e293b/38bdf8?text=${encodeURIComponent(proj.title || 'Project Cover')}`;
 
   return (
     <Reorder.Item
       value={proj}
+      dragListener={false}
+      dragControls={dragControls}
       layout="position"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.18 }}
+      transition={{ 
+        layout: { type: "spring", stiffness: 350, damping: 28 }, 
+        duration: 0.2 
+      }}
       whileDrag={{ 
-        scale: 1.015, 
-        boxShadow: "0px 20px 40px -10px rgba(79, 70, 229, 0.22)", 
-        zIndex: 50,
+        scale: 1.025, 
+        boxShadow: "0 25px 50px -12px rgba(79, 70, 229, 0.25), 0 0 0 2px rgba(99, 102, 241, 0.6)", 
+        zIndex: 999,
         cursor: "grabbing"
       }}
-      className={`rounded-3xl border transition-all transform-gpu will-change-transform ${
+      className={`rounded-2xl sm:rounded-3xl border transition-all transform-gpu will-change-transform ${
         isExpanded 
-          ? 'bg-slate-50/95 border-indigo-300 shadow-lg p-5 sm:p-7' 
-          : 'bg-white hover:bg-slate-50/80 border-slate-200 p-4 sm:p-5 shadow-xs hover:border-slate-300'
+          ? 'bg-slate-50/95 border-indigo-300 shadow-md p-4 sm:p-7' 
+          : 'bg-white hover:bg-slate-50/80 border-slate-200 p-3.5 sm:p-5 shadow-xs hover:border-slate-300'
       }`}
     >
       {/* Collapsed Bar */}
-      <div className="flex items-center justify-between gap-3 sm:gap-4">
+      <div className="flex items-center justify-between gap-2.5 sm:gap-4">
+        {/* Quick Smooth Move Up / Down Buttons */}
+        <div className="flex flex-col gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            disabled={idx === 0}
+            onClick={() => onMoveUp(idx)}
+            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90"
+            title="Move project up"
+          >
+            <ChevronUp size={15} strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            disabled={idx === totalProjects - 1}
+            onClick={() => onMoveDown(idx)}
+            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90"
+            title="Move project down"
+          >
+            <ChevronDown size={15} strokeWidth={2.5} />
+          </button>
+        </div>
+
         <div 
-          className="flex items-center gap-3 sm:gap-4 truncate flex-1 cursor-pointer"
+          className="flex items-center gap-2.5 sm:gap-4 truncate flex-1 cursor-pointer"
           onClick={onToggleExpand}
         >
-          {/* Drag Handle */}
+          {/* Dedicated YouTube-style Drag Grip Handle */}
           <div 
-            className="text-slate-400 hover:text-indigo-600 transition-colors p-1.5 hover:bg-indigo-50 rounded-lg cursor-grab active:cursor-grabbing shrink-0 touch-none"
-            title="Drag to reorder projects"
+            onPointerDown={(e) => dragControls.start(e)}
+            className="text-slate-400 hover:text-indigo-600 active:text-indigo-700 transition-colors p-1.5 hover:bg-indigo-50 active:bg-indigo-100 rounded-xl cursor-grab active:cursor-grabbing shrink-0 touch-none select-none flex items-center justify-center group/grab"
+            title="Hold & drag up or down to reorder"
             onClick={(e) => e.stopPropagation()}
           >
-            <GripVertical size={18} />
+            <GripVertical size={18} className="group-hover/grab:scale-110 transition-transform" />
           </div>
 
           {/* Dynamic Serial Number */}
-          <span className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
+          <span className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
             isExpanded ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700'
           }`}>
             #{idx + 1}
@@ -589,6 +622,45 @@ export default function Step4Projects({
     toast.success('Project deleted');
   }, [setFormData, setExpandedProjectIdx]);
 
+  // Smooth Move Up / Down (Fluid splice reordering)
+  const handleMoveUp = useCallback((idx) => {
+    if (idx <= 0) return;
+    setFormData(prev => {
+      const updated = [...prev.projects];
+      const [item] = updated.splice(idx, 1);
+      updated.splice(idx - 1, 0, item);
+      return { ...prev, projects: updated };
+    });
+    setExpandedProjectIdx(prev => (prev === idx ? idx - 1 : prev === idx - 1 ? idx : prev));
+  }, [setFormData, setExpandedProjectIdx]);
+
+  const handleMoveDown = useCallback((idx) => {
+    setFormData(prev => {
+      if (idx >= prev.projects.length - 1) return prev;
+      const updated = [...prev.projects];
+      const [item] = updated.splice(idx, 1);
+      updated.splice(idx + 1, 0, item);
+      return { ...prev, projects: updated };
+    });
+    setExpandedProjectIdx(prev => (prev === idx ? idx + 1 : prev === idx + 1 ? idx : prev));
+  }, [setFormData, setExpandedProjectIdx]);
+
+  // Ensure every project has a permanent unique ID so React & Framer Motion track cards seamlessly
+  useEffect(() => {
+    if (!formData.projects || formData.projects.length === 0) return;
+    let hasMissingId = false;
+    const withIds = formData.projects.map((p, i) => {
+      if (!p.id && !p._dndId) {
+        hasMissingId = true;
+        return { ...p, id: `proj_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}` };
+      }
+      return p;
+    });
+    if (hasMissingId) {
+      setFormData(prev => ({ ...prev, projects: withIds }));
+    }
+  }, []);
+
   // Single vs Double Tap
   const handleImageInteraction = useCallback((idx, currentImage) => {
     const now = Date.now();
@@ -678,21 +750,21 @@ export default function Step4Projects({
   const liveCount = formData.projects?.filter(p => p.live_url)?.length || 0;
 
   return (
-    <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-md space-y-8 relative">
+    <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-10 border border-slate-200 shadow-md space-y-6 sm:space-y-8 relative">
       
       {/* ── HEADER & LIVE METRICS ── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-100 pb-8">
-        <div className="space-y-2 max-w-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 border-b border-slate-100 pb-6 sm:pb-8">
+        <div className="space-y-1.5 sm:space-y-2 max-w-xl">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/60 inline-block">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/60 inline-block">
               Step 04 • Portfolio Showcase
             </span>
-            <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
               {totalProjectsCount} {totalProjectsCount === 1 ? 'Project' : 'Projects'} • {liveCount} Live
             </span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Featured Case Studies
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed">
@@ -701,7 +773,7 @@ export default function Step4Projects({
         </div>
 
         {/* Add Project Button */}
-        <div className="shrink-0">
+        <div className="shrink-0 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => {
@@ -788,7 +860,7 @@ export default function Step4Projects({
         <AnimatePresence initial={false}>
           {formData.projects?.map((proj, idx) => (
             <ProjectCard
-              key={proj.id || proj._dndId || `proj_item_${idx}`}
+              key={proj.id || proj._dndId || `proj_stable_${idx}`}
               proj={proj}
               idx={idx}
               isExpanded={expandedProjectIdx === idx}
@@ -806,17 +878,19 @@ export default function Step4Projects({
               onAddHighlight={handleAddProjectHighlight}
               onUpdateHighlight={handleProjectHighlightChange}
               onRemoveHighlight={handleRemoveProjectHighlight}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
             />
           ))}
         </AnimatePresence>
       </Reorder.Group>
 
       {/* Navigation Footer */}
-      <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-6 border-t border-slate-100">
         <button
           type="button"
           onClick={() => goToStep(3)}
-          className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl flex items-center gap-2 cursor-pointer transition-all"
+          className="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
         >
           <ArrowLeft size={15} /> Back to Step 3
         </button>
@@ -824,7 +898,7 @@ export default function Step4Projects({
         <button
           type="button"
           onClick={() => goToStep(5)}
-          className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-2xl shadow-lg shadow-indigo-600/25 flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
+          className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer transition-transform active:scale-95"
         >
           Next: Experience & Timeline <ChevronRight size={15} />
         </button>

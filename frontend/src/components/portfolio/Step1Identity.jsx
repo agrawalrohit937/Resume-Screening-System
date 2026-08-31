@@ -117,14 +117,14 @@ export default function Step1Identity({
   );
 
   return (
-    <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-10 border border-slate-200/80 shadow-md space-y-8">
+    <div className="bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 md:p-10 border border-slate-200/80 shadow-md space-y-6 sm:space-y-8">
       {/* Header with Circular Avatar */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border-b border-slate-100 pb-8">
-        <div className="space-y-2 max-w-xl">
-          <span className="text-[11px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/60 inline-block">
+      <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 sm:gap-6 border-b border-slate-100 pb-6 sm:pb-8 text-center sm:text-left">
+        <div className="space-y-1.5 sm:space-y-2 max-w-xl">
+          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/60 inline-block">
             Step 01 • Candidate Profile & Channels
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Claim Handle, Identity & Socials
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed">
@@ -227,9 +227,10 @@ export default function Step1Identity({
                 : 'border-rose-300 focus-within:ring-4 focus-within:ring-rose-500/10 focus-within:border-rose-500 bg-rose-50/20'
             }`}>
               {/* Fixed Prefix Badge */}
-              <span className="px-3.5 py-3 bg-slate-100/90 border-r border-slate-200 text-xs font-semibold text-slate-500 select-none shrink-0 flex items-center gap-1">
+              <span className="px-2.5 sm:px-3.5 py-3 bg-slate-100/90 border-r border-slate-200 text-xs font-semibold text-slate-500 select-none shrink-0 flex items-center gap-1">
                 <Globe size={13} className="text-slate-400 hidden sm:inline" />
-                careershala.tech/portfolio/
+                <span className="hidden sm:inline">careershala.tech/portfolio/</span>
+                <span className="sm:hidden text-[11px]">/portfolio/</span>
               </span>
 
               {/* Slug Input */}
@@ -238,22 +239,22 @@ export default function Step1Identity({
                 value={formData.username || ''}
                 onChange={handleSlugChange}
                 placeholder="rohit-agrawal"
-                className="w-full px-3.5 py-3 bg-transparent text-xs outline-none font-mono font-bold text-slate-900 pr-10"
+                className="w-full px-2.5 sm:px-3.5 py-3 bg-transparent text-xs outline-none font-mono font-bold text-slate-900 pr-9"
               />
 
               {/* Status Icon Indicator Inside Right */}
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
                 {isCheckingSlug ? (
-                  <Loader2 size={16} className="text-indigo-500 animate-spin" />
+                  <Loader2 size={15} className="text-indigo-500 animate-spin" />
                 ) : slugAvailable === true ? (
-                  <CheckCircle2 size={17} className="text-emerald-500" />
+                  <CheckCircle2 size={16} className="text-emerald-500" />
                 ) : (
-                  <XCircle size={17} className="text-rose-500" />
+                  <XCircle size={16} className="text-rose-500" />
                 )}
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-400 break-all">
               Your live public link: <span className="font-mono text-indigo-600 font-bold">https://careershala.tech/portfolio/{formData.username || 'your-handle'}</span>
             </p>
           </div>
@@ -398,8 +399,8 @@ export default function Step1Identity({
       </div>
 
       {/* Navigation Footer with Strict Validation Blocking */}
-      <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-        <div className="text-xs text-slate-400 font-medium">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-6 border-t border-slate-100">
+        <div className="text-xs text-slate-400 font-medium text-center sm:text-left">
           {!isFormValid && (
             <span className="text-rose-500 font-semibold">
               * Please claim an available handle and enter your full name to proceed.
@@ -411,7 +412,7 @@ export default function Step1Identity({
           type="button"
           disabled={!isFormValid}
           onClick={() => goToStep(2)}
-          className={`px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg flex items-center gap-2 transition-all active:scale-95 ${
+          className={`w-full sm:w-auto px-8 py-3.5 rounded-xl sm:rounded-2xl text-xs font-black shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 ${
             isFormValid
               ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/25 cursor-pointer'
               : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed shadow-none'
