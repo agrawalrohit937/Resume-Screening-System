@@ -156,7 +156,7 @@ export default function PortfolioBuilder() {
       }
 
       if (res.status === 'success' && res.data) {
-        const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p) => {
+        const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p, i) => {
           const rawHighlights = (p.highlights || []).map((h) => {
             if (typeof h === 'string') return { value: '92%', label: 'Metric' };
             const v = (h.value || '').trim();
@@ -172,7 +172,11 @@ export default function PortfolioBuilder() {
             }
             return h;
           });
-          return { ...p, highlights: rawHighlights };
+          return { 
+            ...p, 
+            id: p.id || p._id || `proj_loaded_${i}_${(p.title || 'case').replace(/\s+/g, '_').toLowerCase()}`,
+            highlights: rawHighlights 
+          };
         });
 
         setFormData((prev) => ({
@@ -579,20 +583,20 @@ export default function PortfolioBuilder() {
           className="w-full space-y-8"
         >
           {/* Executive Glass Banner with Ambient Glow */}
-          <div className="relative overflow-hidden rounded-3xl bg-white/95 backdrop-blur-2xl border border-indigo-100/80 shadow-[0_20px_50px_rgba(79,70,229,0.07)] p-8 sm:p-12">
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-2xl border border-indigo-100/80 shadow-[0_20px_50px_rgba(79,70,229,0.07)] p-5 sm:p-8 md:p-12">
             
             {/* Ambient Background Mesh */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-indigo-400/15 via-purple-300/10 to-transparent rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-cyan-400/15 via-blue-300/10 to-transparent rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
 
-            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
               
               {/* Left Column: Copy & Actions */}
-              <div className="lg:col-span-8 space-y-6">
+              <div className="lg:col-span-8 space-y-4 sm:space-y-6">
                 
                 {/* Badges Bar */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-black rounded-full shadow-2xs ${
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[11px] sm:text-xs font-black rounded-full shadow-2xs ${
                     hasExistingPortfolio 
                       ? 'bg-emerald-50/90 border border-emerald-200/80 text-emerald-800' 
                       : 'bg-indigo-50/90 border border-indigo-200/80 text-indigo-700'
@@ -600,38 +604,38 @@ export default function PortfolioBuilder() {
                     <span className={`w-2 h-2 rounded-full ${hasExistingPortfolio ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`}></span>
                     {hasExistingPortfolio ? `Your Portfolio is Live (@${formData.username})` : 'Draft Mode • Ready to Build'}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50/90 border border-indigo-200/80 text-indigo-700 text-xs font-bold rounded-full shadow-2xs">
-                    <Sparkles size={13} /> Auto-Engineered from Resume
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50/90 border border-indigo-200/80 text-indigo-700 text-[11px] sm:text-xs font-bold rounded-full shadow-2xs">
+                    <Sparkles size={12} /> Auto-Engineered from Resume
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-full">
-                    <ShieldCheck size={13} className="text-indigo-600" /> Independent Domain
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-[11px] sm:text-xs font-bold rounded-full">
+                    <ShieldCheck size={12} className="text-indigo-600" /> Independent Domain
                   </span>
                 </div>
 
                 {/* Main Headline */}
-                <div className="space-y-3">
-                  <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
+                <div className="space-y-2 sm:space-y-3">
+                  <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
                     Smart Portfolio Studio
                   </h1>
-                  <p className="text-sm sm:text-base text-slate-600 max-w-2xl leading-relaxed">
+                  <p className="text-xs sm:text-base text-slate-600 max-w-2xl leading-relaxed">
                     Build a world-class personal developer website in minutes. Turn your raw resume into an interactive case-study showcase with real macOS browser frames, dynamic particle background, and adaptive theme switching.
                   </p>
                 </div>
 
                 {/* Live URL Pill Bar & Profile Sync Status (ONLY SHOWN FOR PUBLISHED PORTFOLIOS) */}
-                <div className="flex flex-wrap items-center gap-3 pt-1">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-1">
                   {hasExistingPortfolio ? (
                     <>
-                      <div className="flex items-center bg-slate-50/90 hover:bg-white border border-slate-200/90 px-4 py-3 rounded-2xl shadow-inner text-xs font-mono text-slate-800 max-w-full truncate transition-colors">
-                        <Globe size={16} className="text-indigo-600 mr-2.5 shrink-0" />
+                      <div className="flex items-center bg-slate-50/90 hover:bg-white border border-slate-200/90 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-inner text-[11px] sm:text-xs font-mono text-slate-800 max-w-full truncate transition-colors">
+                        <Globe size={15} className="text-indigo-600 mr-2 shrink-0" />
                         <span className="truncate select-all font-semibold">{publicUrl}</span>
                       </div>
 
                       <button
                         onClick={copyPublicLink}
-                        className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 shadow-sm transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                        className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
                       >
-                        {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
+                        {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                         {copied ? 'Copied' : 'Copy Link'}
                       </button>
 
@@ -639,7 +643,7 @@ export default function PortfolioBuilder() {
                         href={publicUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 shadow-sm transition-all flex items-center gap-1.5 hover:text-indigo-600 cursor-pointer"
+                        className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs transition-all flex items-center gap-1.5 hover:text-indigo-600 cursor-pointer"
                         title="View Public Page"
                       >
                         <ExternalLink size={15} />
@@ -647,42 +651,42 @@ export default function PortfolioBuilder() {
 
                       {/* Profile Settings Sync Action Pill */}
                       {isProfileSynced ? (
-                        <span className="inline-flex items-center gap-1.5 px-3.5 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl shadow-2xs">
-                          <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                        <span className="inline-flex items-center gap-1.5 px-3 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl sm:rounded-2xl shadow-2xs">
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                           Synced to Profile Settings
                         </span>
                       ) : (
                         <button
                           onClick={() => handleSyncToProfile(publicUrl)}
                           disabled={syncingProfile}
-                          className="px-3.5 py-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                          className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl sm:rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
                           title="Add this portfolio link into your Profile System Settings"
                         >
                           {syncingProfile ? (
-                            <RefreshCw size={14} className="animate-spin text-amber-600" />
+                            <RefreshCw size={13} className="animate-spin text-amber-600" />
                           ) : (
-                            <Zap size={14} className="text-amber-600" />
+                            <Zap size={13} className="text-amber-600" />
                           )}
                           <span>⚡ Sync to Profile Settings</span>
                         </button>
                       )}
                     </>
                   ) : (
-                    <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-50/90 border border-slate-200/90 rounded-2xl text-xs text-slate-600 font-medium max-w-xl">
-                      <Sparkles size={16} className="text-indigo-600 shrink-0" />
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/90 border border-slate-200/90 rounded-xl sm:rounded-2xl text-xs text-slate-600 font-medium max-w-xl">
+                      <Sparkles size={15} className="text-indigo-600 shrink-0" />
                       <span>No live portfolio published yet. Click <strong>Start Portfolio Wizard</strong> below to customize and publish your website.</span>
                     </div>
                   )}
                 </div>
 
                 {/* Big Action Buttons */}
-                <div className="flex flex-wrap items-center gap-4 pt-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                   <button
                     onClick={() => {
                       setViewMode('step');
                       goToStep(1);
                     }}
-                    className="px-8 py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 text-white text-sm font-black rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center gap-2.5 group active:scale-95 cursor-pointer"
+                    className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 text-white text-xs sm:text-sm font-black rounded-xl sm:rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center gap-2.5 group active:scale-95 cursor-pointer"
                   >
                     {hasExistingPortfolio ? 'Edit Portfolio Wizard' : 'Start Portfolio Wizard'}
                     <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform" />
@@ -693,7 +697,7 @@ export default function PortfolioBuilder() {
                       href={publicUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-6 py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black rounded-2xl border border-emerald-200/90 shadow-sm transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                      className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black rounded-xl sm:rounded-2xl border border-emerald-200/90 shadow-xs transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                     >
                       <Eye size={15} className="text-emerald-600" />
                       View Live Website
@@ -702,9 +706,9 @@ export default function PortfolioBuilder() {
 
                   <button
                     onClick={() => loadPortfolioData(true)}
-                    className="px-6 py-4 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200/90 shadow-sm transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                    className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-4 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-xs transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                   >
-                    <RefreshCw size={15} className="text-indigo-600" />
+                    <RefreshCw size={14} className="text-indigo-600" />
                     Re-Sync from Resume
                   </button>
                 </div>
@@ -713,10 +717,10 @@ export default function PortfolioBuilder() {
 
               {/* Right Column: Live Portfolio Avatar & Card Preview */}
               <div className="lg:col-span-4 flex flex-col items-center justify-center">
-                <div className="relative w-full max-w-[280px] p-6 bg-gradient-to-b from-white to-slate-50 rounded-3xl border border-slate-200/80 shadow-xl text-center space-y-4">
+                <div className="relative w-full max-w-[280px] p-5 sm:p-6 bg-gradient-to-b from-white to-slate-50 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xl text-center space-y-3.5">
                   
                   {/* Glowing Status Dot */}
-                  <div className="absolute top-4 right-4">
+                  <div className="absolute top-3.5 right-3.5">
                     {hasExistingPortfolio ? (
                       <span className="relative flex h-3 w-3" title="Live on Web">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -728,7 +732,7 @@ export default function PortfolioBuilder() {
                   </div>
 
                   {/* Circular Avatar */}
-                  <div className="relative w-24 h-24 mx-auto rounded-full p-1 bg-gradient-to-tr from-indigo-600 via-cyan-400 to-indigo-500 shadow-md">
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full p-1 bg-gradient-to-tr from-indigo-600 via-cyan-400 to-indigo-500 shadow-md">
                     <div className="w-full h-full rounded-full overflow-hidden bg-white flex items-center justify-center">
                       {formData.avatar_url ? (
                         <img
@@ -737,16 +741,16 @@ export default function PortfolioBuilder() {
                           className="w-full h-full object-cover rounded-full"
                         />
                       ) : (
-                        <User size={38} className="text-slate-400" />
+                        <User size={36} className="text-slate-400" />
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="text-base font-black text-slate-900 truncate">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">
                       {formData.full_name || 'Candidate Name'}
                     </h3>
-                    <p className="text-xs font-medium text-slate-500 line-clamp-1">
+                    <p className="text-[11px] sm:text-xs font-medium text-slate-500 line-clamp-1">
                       {formData.headline || 'Software Engineer'}
                     </p>
                   </div>
@@ -755,11 +759,11 @@ export default function PortfolioBuilder() {
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
                     <div className="p-2 bg-white rounded-xl border border-slate-100">
                       <span className="block font-black text-indigo-600 text-sm">{formData.projects?.length || 0}</span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Projects</span>
+                      <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">Projects</span>
                     </div>
                     <div className="p-2 bg-white rounded-xl border border-slate-100">
                       <span className="block font-black text-emerald-600 text-sm">{totalSkillsCount}</span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Skills</span>
+                      <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">Skills</span>
                     </div>
                   </div>
 
@@ -767,20 +771,20 @@ export default function PortfolioBuilder() {
                   <div className="pt-2 border-t border-slate-100">
                     {hasExistingPortfolio ? (
                       isProfileSynced ? (
-                        <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50/80 py-1.5 px-2.5 rounded-xl border border-emerald-100">
-                          <CheckCircle2 size={13} /> Linked to Profile Settings
+                        <div className="flex items-center justify-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50/80 py-1.5 px-2 rounded-xl border border-emerald-100 truncate">
+                          <CheckCircle2 size={12} className="shrink-0" /> Linked to Profile
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleSyncToProfile(publicUrl)}
-                          className="w-full flex items-center justify-center gap-1.5 text-[11px] font-extrabold text-amber-800 bg-amber-50 hover:bg-amber-100 py-1.5 px-2.5 rounded-xl border border-amber-200 transition-colors cursor-pointer"
+                          className="w-full flex items-center justify-center gap-1.5 text-[10.5px] font-extrabold text-amber-800 bg-amber-50 hover:bg-amber-100 py-1.5 px-2 rounded-xl border border-amber-200 transition-colors cursor-pointer"
                         >
-                          <Zap size={12} className="text-amber-600" /> Sync to Profile Settings
+                          <Zap size={11} className="text-amber-600 shrink-0" /> Sync to Profile
                         </button>
                       )
                     ) : (
-                      <div className="text-center text-[11px] font-semibold text-slate-400 py-1">
+                      <div className="text-center text-[10.5px] font-semibold text-slate-400 py-0.5">
                         Draft preview • Not published
                       </div>
                     )}
@@ -793,14 +797,14 @@ export default function PortfolioBuilder() {
           </div>
 
           {/* 3 Luxury Feature Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             
-            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-                <Rocket size={24} />
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-sm transition-all space-y-3 sm:space-y-4 group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <Rocket size={20} className="sm:w-6 sm:h-6" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-black text-slate-900">
+              <div className="space-y-1">
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
                   {formData.projects?.length || 0} Featured Case Studies
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
@@ -809,12 +813,12 @@ export default function PortfolioBuilder() {
               </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-                <Code2 size={24} />
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-sm transition-all space-y-3 sm:space-y-4 group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <Code2 size={20} className="sm:w-6 sm:h-6" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-black text-slate-900">
+              <div className="space-y-1">
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
                   {totalSkillsCount} Skills in 6 Domains
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
@@ -823,12 +827,12 @@ export default function PortfolioBuilder() {
               </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-md transition-all space-y-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-                <ShieldCheck size={24} />
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-sm transition-all space-y-3 sm:space-y-4 group">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <ShieldCheck size={20} className="sm:w-6 sm:h-6" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-black text-slate-900">
+              <div className="space-y-1">
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
                   Clean Personal Branding
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
@@ -845,49 +849,49 @@ export default function PortfolioBuilder() {
       {/* SCREEN 1-6: STEP-BY-STEP PROGRESSIVE LUXURY WIZARD                  */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {viewMode === 'step' && (
-        <div className="w-full space-y-6">
+        <div className="w-full space-y-4 sm:space-y-6">
           
           {/* Top Sleek Stepper Header */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-sm space-y-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-7 border border-slate-200/80 shadow-sm space-y-3 sm:space-y-4">
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
               <button
                 onClick={() => setViewMode('overview')}
-                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl flex items-center gap-2 transition-all w-fit cursor-pointer"
+                className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl flex items-center gap-1.5 transition-all w-fit cursor-pointer"
               >
-                <ArrowLeft size={15} /> Back to Overview
+                <ArrowLeft size={14} /> Back to Overview
               </button>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => loadPortfolioData(true)}
-                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full border border-slate-200 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] sm:text-xs font-bold rounded-full border border-slate-200 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                   title="Re-extract and sync all latest data from your resume"
                 >
-                  <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+                  <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
                   Sync from Resume
                 </button>
 
-                <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-3.5 py-1.5 rounded-full">
+                <span className="text-[11px] sm:text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-3 py-1 rounded-full">
                   Step {currentStep} of {stepMeta.length} • {stepMeta[currentStep - 1]?.label}
                 </span>
-                <span className="text-xs font-bold text-slate-400">
+                <span className="text-[11px] sm:text-xs font-bold text-slate-400">
                   {Math.round((currentStep / stepMeta.length) * 100)}% Completed
                 </span>
               </div>
             </div>
 
             {/* Glowing Linear Progress Bar */}
-            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden shadow-inner p-0.5">
+            <div className="w-full bg-slate-100 h-2 sm:h-2.5 rounded-full overflow-hidden shadow-inner p-0.5">
               <div
-                className="bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 h-full transition-all duration-500 ease-out rounded-full shadow-sm"
+                className="bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 h-full transition-all duration-500 ease-out rounded-full shadow-xs"
                 style={{ width: `${(currentStep / stepMeta.length) * 100}%` }}
               ></div>
             </div>
 
-            {/* Stepper Tabs Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 pt-2">
+            {/* Mobile Stepper Horizontal Chip Carousel (sm:hidden) */}
+            <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar touch-pan-x">
               {stepMeta.map((s) => {
                 const Icon = s.icon;
                 const isActive = currentStep === s.id;
@@ -896,7 +900,36 @@ export default function PortfolioBuilder() {
                   <button
                     key={s.id}
                     onClick={() => goToStep(s.id)}
-                    className={`flex items-center gap-2 p-2.5 rounded-2xl transition-all text-left cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : isDone
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80'
+                        : 'bg-slate-50 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <span className={`w-4.5 h-4.5 rounded-md flex items-center justify-center text-[10px] ${
+                      isActive ? 'bg-white/20 text-white' : isDone ? 'bg-emerald-200/60 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {isDone ? <Check size={10} /> : s.id}
+                    </span>
+                    <span>{s.label.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Desktop Stepper Tabs Bar (hidden on mobile, shown on sm+) */}
+            <div className="hidden sm:grid sm:grid-cols-7 gap-2 pt-1">
+              {stepMeta.map((s) => {
+                const Icon = s.icon;
+                const isActive = currentStep === s.id;
+                const isDone = currentStep > s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => goToStep(s.id)}
+                    className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl transition-all text-left cursor-pointer ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-md font-bold'
                         : isDone
