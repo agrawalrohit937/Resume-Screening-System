@@ -1023,20 +1023,139 @@ async def send_contact_message(
         try:
             # We can use the existing EmailService if available
             email_svc = EmailService()
-            subject = f"[CareerShal Recruiter Inquiry] {msg.subject}"
-            body_html = f"""
-            <h3>New Message Received from your CareerShal Portfolio!</h3>
-            <p><strong>Sender:</strong> {msg.sender_name} ({msg.sender_email})</p>
-            <p><strong>Subject:</strong> {msg.subject}</p>
-            <hr />
-            <p><strong>Message:</strong></p>
-            <p style="white-space: pre-wrap;">{msg.message}</p>
-            <hr />
-            <p style="color: #64748B; font-size: 12px;">This email was sent via CareerShal's secure contact router.</p>
-            """
-            # If email_svc has send_generic_email or similar
+            subject = f"💼 [Recruiter Inquiry] {msg.subject} — CareerShala Portfolio"
+            candidate_name = profile.get("full_name") or username
+
+            body_html = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recruiter message for {candidate_name}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
+    <tr>
+      <td align="center">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" width="520" align="center" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+        <![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td style="padding: 36px 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <a href="https://careershala.tech" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
+                      <img src="https://careershala.tech/logo_t.png" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
+                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
+                        Career<span style="color: #2E9BDA;">Shala</span> Portfolios
+                      </span>
+                    </a>
+                  </td>
+                  <td align="right">
+                    <span style="font-size: 12px; font-weight: 600; color: #0284c7; background-color: #f0f9ff; padding: 4px 10px; border-radius: 6px;">
+                      Recruiter Inquiry
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 32px 40px 24px 40px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
+                New message from your portfolio
+              </h1>
+              <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                Hi {candidate_name}, you received a new message from a recruiter or hiring manager via your public portfolio:
+              </p>
+
+              <!-- Sender Details Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 30%;">Sender</td>
+                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{msg.sender_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Email</td>
+                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                    <a href="mailto:{msg.sender_email}" style="color: #2E9BDA; text-decoration: none;">{msg.sender_email}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b;">Subject</td>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">{msg.subject}</td>
+                </tr>
+              </table>
+
+              <!-- Message Block -->
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
+                Message
+              </div>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: #1e293b; margin-bottom: 24px; white-space: pre-wrap;">
+                {msg.message}
+              </div>
+
+              <!-- Quick Reply Action -->
+              <div style="margin-bottom: 12px;">
+                <a href="mailto:{msg.sender_email}?subject=Re:%20{msg.subject}" 
+                   style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
+                  Reply to {msg.sender_name} →
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px 32px 40px;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                Sent via CareerShala Developer Portfolios (careershala.tech/portfolio/{username})
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
+            </td>
+          </tr>
+        </table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
             if hasattr(email_svc, 'send_email'):
-                await email_svc.send_email(to_email=target_email, subject=subject, html_content=body_html)
+                await email_svc.send_email(
+                    to_email=target_email,
+                    subject=subject,
+                    html_content=body_html,
+                    reply_to_email=msg.sender_email,
+                    reply_to_name=msg.sender_name,
+                )
         except Exception as e:
             logger.error("Failed to forward contact email", error=str(e))
 

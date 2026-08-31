@@ -148,7 +148,7 @@ export default function Careers() {
               </div>
               <h3 className="text-2xl font-black text-slate-900">Application Submitted!</h3>
               <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-md mx-auto leading-relaxed">
-                Your application and resume PDF have been dispatched via Brevo to our hiring team. We'll review your profile and reach out shortly!
+                Your application and resume PDF have been dispatched to our talent acquisition team at <strong className="text-slate-800">careers@careershala.tech</strong>. We'll review your profile and reach out shortly!
               </p>
               <button
                 onClick={() => setSubmittedSuccess(false)}
@@ -313,6 +313,16 @@ export default function Careers() {
               </button>
             </form>
           )}
+        </div>
+
+        {/* Talent Acquisition Direct Contact Note */}
+        <div className="rounded-2xl bg-white border border-slate-200/80 p-5 text-center shadow-sm">
+          <p className="text-xs text-slate-500 font-medium">
+            Have questions about an open position or exploring future roles? Reach our hiring team directly at{' '}
+            <a href="mailto:careers@careershala.tech" className="text-[#2E9BDA] hover:underline font-bold">
+              careers@careershala.tech
+            </a>
+          </p>
         </div>
 
       </main>

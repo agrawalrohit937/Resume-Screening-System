@@ -100,11 +100,14 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
-    # ── Brevo HTTP API & Transactional Email Settings ───────────────────────
+    # ── Brevo HTTP API & Multi-Inbox Email Settings ─────────────────────────
     BREVO_API_KEY: Optional[str] = None
     MAIL_FROM_EMAIL: Optional[str] = "admin@careershala.tech"
     MAIL_FROM_NAME: str = "CareerShala"
-    SUPPORT_EMAIL: Optional[str] = "admin@careershala.tech"
+    ADMIN_EMAIL: Optional[str] = "admin@careershala.tech"
+    SUPPORT_EMAIL: Optional[str] = "support@careershala.tech"
+    CAREERS_EMAIL: Optional[str] = "careers@careershala.tech"
+    INFO_EMAIL: Optional[str] = "info@careershala.tech"
 
     # Legacy SMTP Settings (kept for fallback compatibility)
     SMTP_HOST: Optional[str] = None
@@ -284,6 +287,18 @@ class Settings(BaseSettings):
         email = self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "admin@careershala.tech"
         name = self.MAIL_FROM_NAME or self.SMTP_FROM_NAME or "CareerShala"
         return {"name": name, "email": email}
+
+    @property
+    def careers_recipient(self) -> dict:
+        return {"name": "CareerShala Hiring Team", "email": self.CAREERS_EMAIL or "careers@careershala.tech"}
+
+    @property
+    def support_recipient(self) -> dict:
+        return {"name": "CareerShala Support Team", "email": self.SUPPORT_EMAIL or "support@careershala.tech"}
+
+    @property
+    def info_recipient(self) -> dict:
+        return {"name": "CareerShala Inquiries", "email": self.INFO_EMAIL or "info@careershala.tech"}
 
     @property
     def cert_verify_base_url(self) -> str:

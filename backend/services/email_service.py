@@ -6,7 +6,7 @@ Replaces legacy SMTP (aiosmtplib) with an async, non-blocking HTTP mailer servic
 """
 
 import base64
-from datetime import timezone
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -37,11 +37,19 @@ def _render_template(filename: str, **context) -> str:
         return f"<p>Your OTP code is {context.get('otp', '')}</p>"
     html = path.read_text(encoding="utf-8")
 
-    if "logo_url" not in context:
-        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-        if "localhost" in base_url or not base_url:
-            base_url = "https://careershala.tech"
-        context["logo_url"] = f"{base_url}/logo.png"
+    from datetime import datetime
+
+    base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+    if "localhost" in base_url or not base_url:
+        base_url = "https://careershala.tech"
+
+    context.setdefault("base_url", base_url)
+    context.setdefault("logo_url", f"{base_url}/logo_t.png")
+    context.setdefault("support_url", f"{base_url}/support")
+    context.setdefault("support_email", getattr(settings, "SUPPORT_EMAIL", "support@careershala.tech") or "support@careershala.tech")
+    context.setdefault("careers_email", getattr(settings, "CAREERS_EMAIL", "careers@careershala.tech") or "careers@careershala.tech")
+    context.setdefault("info_email", getattr(settings, "INFO_EMAIL", "info@careershala.tech") or "info@careershala.tech")
+    context.setdefault("year", str(datetime.now().year))
 
     for key, value in context.items():
         html = html.replace("{{" + key + "}}", str(value))
@@ -72,6 +80,8 @@ class EmailService:
         reply_to_email: Optional[str] = None,
         reply_to_name: Optional[str] = None,
         attachments: Optional[List[Dict[str, str]]] = None,
+        sender_email: Optional[str] = None,
+        sender_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Core async method for dispatching emails via Brevo HTTP API (v3/smtp/email).
 
@@ -82,7 +92,11 @@ class EmailService:
             logger.error("Brevo API Key Missing", to=to_email, subject=subject)
             return {"sent": False, "error": "BREVO_API_KEY is not configured"}
 
-        sender_info = settings.mail_sender
+        default_sender = settings.mail_sender
+        sender_info = {
+            "name": sender_name or default_sender["name"],
+            "email": sender_email or default_sender["email"],
+        }
         payload: Dict[str, Any] = {
             "sender": sender_info,
             "to": [{"email": to_email, "name": to_name or to_email.split("@")[0]}],
@@ -148,6 +162,34 @@ class EmailService:
         result = await self._send_brevo_email(to_email=to_email, subject=subject, html_body=html_body)
         return bool(result.get("sent"))
 
+    async def send_email(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None,
+        to_name: Optional[str] = None,
+        reply_to_email: Optional[str] = None,
+        reply_to_name: Optional[str] = None,
+        sender_email: Optional[str] = None,
+        sender_name: Optional[str] = None,
+        attachments: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
+        """Generic email dispatch helper via Brevo HTTP API."""
+        return await self._send_brevo_email(
+            to_email=to_email,
+            to_name=to_name,
+            subject=subject,
+            html_body=html_content,
+            text_body=text_content,
+            reply_to_email=reply_to_email,
+            reply_to_name=reply_to_name,
+            sender_email=sender_email,
+            sender_name=sender_name,
+            attachments=attachments,
+        )
+
     async def send_otp(self, to_email: str, full_name: str, otp: str, purpose: OTPPurpose) -> bool:
         """1. User Sign-up / Auth OTP Verification"""
         try:
@@ -202,32 +244,136 @@ class EmailService:
             f"&certUrl={encoded_cert_url}"
         )
 
-        html_body = f"""
-<html>
-  <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:24px; color:#1e293b;">
-    <div style="max-width:560px;margin:auto;background:white;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
-      <h2 style="color:#1e293b;">🎉 Congratulations, {escape(recipient_name)}!</h2>
-      <p>You've successfully completed the <b>{escape(topic)}</b> assessment at <b>{escape(difficulty)}</b> level.</p>
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-        <tr><td style="padding:8px 0;color:#64748b;">Score</td><td style="padding:8px 0;font-weight:bold;">{score}%</td></tr>
-        <tr><td style="padding:8px 0;color:#64748b;">Grade</td><td style="padding:8px 0;font-weight:bold;color:#6366f1;">{escape(grade_label)}</td></tr>
-        <tr><td style="padding:8px 0;color:#64748b;">Issued on</td><td style="padding:8px 0;">{issued_str}</td></tr>
-        <tr><td style="padding:8px 0;color:#64748b;">Certificate ID</td><td style="padding:8px 0;font-family:monospace;font-size:12px;">{escape(cert_id)}</td></tr>
-      </table>
-      <div style="text-align:center;margin:28px 0;">
-        <a href="{escape(public_url)}" style="background:#6366f1;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;margin-right:8px;margin-bottom:8px;">Download Certificate</a>
-        <a href="{escape(linkedin_url)}" target="_blank" rel="noopener noreferrer" style="background:#0A66C2;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;margin-bottom:8px;">Add to LinkedIn</a>
-      </div>
-      <p style="font-size:13px;color:#94a3b8;">
-        Also attached to this email as a PDF. Anyone can verify its authenticity at
-        <a href="{escape(verification_url)}">{escape(verification_url)}</a>.
-      </p>
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
-      <p style="font-size:12px;color:#94a3b8;">Team CareerShala</p>
-    </div>
-  </body>
-</html>
-"""
+        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+        if "localhost" in base_url or not base_url:
+            base_url = "https://careershala.tech"
+        logo_url = f"{base_url}/logo_t.png"
+        support_email = settings.SUPPORT_EMAIL or "support@careershala.tech"
+        year = str(datetime.now().year)
+
+        html_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your certificate for {escape(topic)} is ready</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
+    <tr>
+      <td align="center">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" width="520" align="center" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+        <![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td style="padding: 36px 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <a href="{base_url}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
+                      <img src="{logo_url}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
+                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
+                        Career<span style="color: #2E9BDA;">Shala</span>
+                      </span>
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 32px 40px 24px 40px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
+                Your certificate is ready
+              </h1>
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                Hi {escape(recipient_name)},
+              </p>
+              <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6;">
+                Congratulations! You have successfully passed the assessment for <strong>{escape(topic)}</strong> ({escape(difficulty)} level) on CareerShala.
+              </p>
+
+              <!-- Certificate Details Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 28px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 40%;">Topic</td>
+                  <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{escape(topic)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Score</td>
+                  <td style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{score}% ({escape(grade_label)})</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Issued on</td>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{issued_str}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b;">Certificate ID</td>
+                  <td style="padding: 12px 16px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace; color: #334155; text-align: right;">{escape(cert_id)}</td>
+                </tr>
+              </table>
+
+              <!-- Primary Action Buttons -->
+              <div style="margin: 0 0 24px 0;">
+                <a href="{escape(public_url)}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; margin-right: 8px; margin-bottom: 8px;">
+                  View & Download PDF →
+                </a>
+                <a href="{escape(linkedin_url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0A66C2; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; margin-bottom: 8px;">
+                  Add to LinkedIn
+                </a>
+              </div>
+
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+                The official PDF certificate is also attached to this email. Anyone can verify its authenticity at{' '}
+                <a href="{escape(verification_url)}" target="_blank" style="color: #2E9BDA; text-decoration: underline;">{escape(verification_url)}</a>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px 32px 40px;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                Sent by CareerShala Technologies Pvt. Ltd. · Credentials Authority
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                Questions? <a href="mailto:{support_email}" style="color: #64748b; text-decoration: underline;">{support_email}</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
+            </td>
+          </tr>
+        </table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
 
         pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
         filename = f"CareerShala_Certificate_{topic.replace(' ', '_')}.pdf"
@@ -304,7 +450,7 @@ class EmailService:
         return created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     def _build_support_ticket_payload(self, *, ticket: Any, user: Any, metadata: dict | None, attachments: list[dict] | None) -> tuple[str, str, str, str]:
-        support_email = settings.SUPPORT_EMAIL
+        support_email = settings.SUPPORT_EMAIL or "support@careershala.tech"
         if not support_email:
             raise ValueError("SUPPORT_EMAIL is not configured")
 
@@ -357,21 +503,177 @@ class EmailService:
 
         html_attachments = "<p style='margin:0;color:#64748b;'>No attachments</p>" if not attachment_html_items else f"<ul style='margin:0;padding-left:18px;color:#334155;'>{''.join(attachment_html_items)}</ul>"
 
-        html_body = f"""
-        <html>
-          <body style="font-family:Inter,Arial,sans-serif;background:#f8fafc;padding:24px;">
-            <div style="max-width:720px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;border:1px solid #e2e8f0;">
-              <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">New Support Ticket Received</h2>
-              <p style="margin:0 0 20px;color:#64748b;">A new support ticket was created and saved successfully.</p>
-              <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">{html_rows}</table>
-              <div style="margin-top:20px;">
-                <h3 style="margin:0 0 10px;font-size:14px;color:#0f172a;">Attachment Links (if any)</h3>
-                {html_attachments}
+        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+        if "localhost" in base_url or not base_url:
+            base_url = "https://careershala.tech"
+        logo_url = f"{base_url}/logo_t.png"
+
+        ticket_id = escape(str(getattr(ticket, "ticket_id", "N/A")))
+        ticket_subject = escape(str(getattr(ticket, "subject", "Support Inquiry")))
+        ticket_priority = escape(str(getattr(ticket, "priority", "medium"))).upper()
+        ticket_category = escape(str(getattr(ticket, "category", "general"))).title()
+        user_name = escape(str(getattr(user, "full_name", None) or "Candidate"))
+        user_email = escape(str(getattr(user, "email", None) or "N/A"))
+        user_plan = escape(str(getattr(user, "plan", "free"))).upper()
+        description = escape(str(getattr(ticket, "description", "No details provided."))).replace("\n", "<br/>")
+        created_time = self._format_support_created_at(getattr(ticket, "created_at", None))
+        browser_info = escape(str(meta.get("browser") or getattr(ticket, "browser", None) or "N/A"))
+        os_info = escape(str(meta.get("os") or getattr(ticket, "os", None) or "N/A"))
+        page_url = escape(str(meta.get("current_url") or getattr(ticket, "current_url", None) or "N/A"))
+
+        priority_bg = "#fee2e2" if "HIGH" in ticket_priority or "URGENT" in ticket_priority else "#f1f5f9"
+        priority_color = "#b91c1c" if "HIGH" in ticket_priority or "URGENT" in ticket_priority else "#475569"
+
+        attachment_html_items: list[str] = []
+        for attachment in attachment_rows:
+            filename = attachment.get("filename") or attachment.get("public_id") or "Attachment"
+            url = attachment.get("url") or ""
+            if url:
+                attachment_html_items.append(
+                    f"<a href='{escape(url)}' target='_blank' rel='noopener noreferrer' style='display:inline-block;margin:4px;padding:6px 14px;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;color:#0284c7;text-decoration:none;font-weight:600;'>📎 {escape(filename)}</a>"
+                )
+            else:
+                attachment_html_items.append(f"<span style='display:inline-block;margin:4px;padding:6px 14px;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;color:#64748b;'>📎 {escape(filename)}</span>")
+
+        attachments_block = "<p style='margin:0;font-size:13px;color:#94a3b8;font-style:italic;'>No attachments uploaded with this ticket.</p>" if not attachment_html_items else f"<div>{''.join(attachment_html_items)}</div>"
+
+        html_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support ticket #{ticket_id}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
+    <tr>
+      <td align="center">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" width="560" align="center" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+        <![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td style="padding: 36px 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <a href="{base_url}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
+                      <img src="{logo_url}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
+                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
+                        Career<span style="color: #2E9BDA;">Shala</span> Support
+                      </span>
+                    </a>
+                  </td>
+                  <td align="right">
+                    <span style="font-size: 12px; font-weight: 600; color: #64748b; background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px;">
+                      #{ticket_id}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 32px 40px 24px 40px;">
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px;">
+                {ticket_category} · {ticket_priority} priority
               </div>
-            </div>
-          </body>
-        </html>
-        """
+              <h1 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.35;">
+                {ticket_subject}
+              </h1>
+
+              <!-- Reporter Meta Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 35%;">Reporter</td>
+                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{user_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Email</td>
+                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                    <a href="mailto:{user_email}" style="color: #2E9BDA; text-decoration: none;">{user_email}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Plan</td>
+                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{user_plan}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Submitted</td>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: right;">{created_time}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b;">Client Info</td>
+                  <td style="padding: 10px 14px; font-size: 12px; color: #64748b; text-align: right;">{browser_info} · {os_info}</td>
+                </tr>
+              </table>
+
+              <!-- Description Body -->
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
+                Description
+              </div>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: #1e293b; margin-bottom: 24px;">
+                {description}
+              </div>
+
+              <!-- Attachments -->
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
+                Attachments
+              </div>
+              <div style="margin-bottom: 28px;">
+                {attachments_block}
+              </div>
+
+              <!-- Action Reply Button -->
+              <div style="margin-bottom: 12px;">
+                <a href="mailto:{user_email}?subject=Re:%20[Support%20Ticket%20{ticket_id}]%20{quote(ticket_subject)}" 
+                   style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
+                  Reply to reporter →
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px 32px 40px;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                Internal Support Dispatch · CareerShala Technologies Pvt. Ltd.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
+            </td>
+          </tr>
+        </table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
 
         return support_email, subject, "\n".join(text_lines), html_body
 
@@ -389,11 +691,16 @@ class EmailService:
             logger.error("Support Email Configuration Missing", ticket_id=getattr(ticket, "ticket_id", None), error=str(exc))
             return {"sent": False, "error": str(exc)}
 
+        user_email = getattr(user, "email", None)
+        user_name = getattr(user, "full_name", None)
         return await self._send_brevo_email(
             to_email=support_email,
+            to_name="CareerShala Support Team",
             subject=subject,
             html_body=html_body,
             text_body=text_body,
+            reply_to_email=user_email,
+            reply_to_name=user_name,
         )
 
     async def send_career_application(
@@ -407,8 +714,8 @@ class EmailService:
         resume_bytes: Optional[bytes] = None,
         resume_filename: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Send job application notification email to admin via Brevo HTTP API with attached resume PDF."""
-        admin_email = settings.SUPPORT_EMAIL or settings.MAIL_FROM_EMAIL or "admin@careershala.tech"
+        """Send job application notification email to hiring team via Brevo HTTP API with attached resume PDF."""
+        careers_email = getattr(settings, "CAREERS_EMAIL", None) or "careers@careershala.tech"
         subject = f"💼 New Job Application: {applicant_name} — {role_title}"
 
         portfolio_html = (
@@ -425,71 +732,137 @@ class EmailService:
             else '<span style="color:#94a3b8; font-style:italic;">No file attached</span>'
         )
 
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"/></head>
-        <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 32px 16px; color: #0f172a;">
-          <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.06);">
-            
-            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; tracking-tight: -0.02em;">
-                Career<span style="color: #2E9BDA;">Shala</span> Careers
-              </h1>
-              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 13px; font-weight: 600;">
-                New Candidate Application Submission
-              </p>
-            </div>
+        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
+        if "localhost" in base_url or not base_url:
+            base_url = "https://careershala.tech"
+        logo_url = f"{base_url}/logo_t.png"
+        careers_email = getattr(settings, "CAREERS_EMAIL", None) or "careers@careershala.tech"
+        year = str(datetime.now().year)
 
-            <div style="padding: 32px;">
-              <div style="background: #f1f5f9; border-left: 4px solid #2E9BDA; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
-                <p style="margin: 0; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #2E9BDA;">Position Applied For</p>
-                <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 800; color: #0f172a;">{escape(role_title)}</p>
-              </div>
-
-              <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+        html_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Application: {escape(applicant_name)} — {escape(role_title)}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
+    <tr>
+      <td align="center">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" width="560" align="center" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+        <![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td style="padding: 36px 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b; width: 140px;">Applicant Name</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; font-weight: 700; color: #0f172a;">{escape(applicant_name)}</td>
+                  <td>
+                    <a href="{base_url}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
+                      <img src="{logo_url}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
+                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
+                        Career<span style="color: #2E9BDA;">Shala</span> Careers
+                      </span>
+                    </a>
+                  </td>
+                  <td align="right">
+                    <span style="font-size: 12px; font-weight: 600; color: #0284c7; background-color: #f0f9ff; padding: 4px 10px; border-radius: 6px;">
+                      New Applicant
+                    </span>
+                  </td>
                 </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 32px 40px 24px 40px;">
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px;">
+                Application Received
+              </div>
+              <h1 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
+                {escape(applicant_name)}
+              </h1>
+              <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.5;">
+                Applied for <strong>{escape(role_title)}</strong>
+              </p>
+
+              <!-- Applicant Details Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b;">Email Address</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; font-weight: 700; color: #2E9BDA;">
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 35%;">Candidate Email</td>
+                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">
                     <a href="mailto:{escape(applicant_email)}" style="color: #2E9BDA; text-decoration: none;">{escape(applicant_email)}</a>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b;">Portfolio Link</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px;">{portfolio_html}</td>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Portfolio / Profile</td>
+                  <td style="padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f1f5f9; text-align: right;">{portfolio_html}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; font-weight: 700; color: #64748b;">Resume Attachment</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px;">{resume_status_html}</td>
+                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b;">Resume</td>
+                  <td style="padding: 10px 14px; font-size: 13px; text-align: right;">{resume_status_html}</td>
                 </tr>
               </table>
 
-              <div style="margin-top: 24px;">
-                <p style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569;">Cover Letter / Note</p>
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; font-size: 14px; line-height: 1.6; color: #334155;">
-                  {formatted_cover}
-                </div>
+              <!-- Cover Letter / Pitch -->
+              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
+                Note / Cover Letter
+              </div>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: #1e293b; margin-bottom: 24px;">
+                {formatted_cover}
               </div>
 
-              <div style="margin-top: 32px; text-align: center;">
-                <a href="mailto:{escape(applicant_email)}?subject=Re:%20Application%20for%20{quote(role_title)}" 
-                   style="display: inline-block; background: #2E9BDA; color: #ffffff; font-weight: 800; font-size: 13px; text-decoration: none; padding: 14px 28px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.05em;">
-                  Reply Directly to Applicant
+              <!-- Quick Reply Action -->
+              <div style="margin-bottom: 12px;">
+                <a href="mailto:{escape(applicant_email)}?subject=Re:%20Application%20for%20{quote(role_title)}%20at%20CareerShala" 
+                   style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
+                  Reply to candidate →
                 </a>
               </div>
-            </div>
+            </td>
+          </tr>
 
-            <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
-              Sent via CareerShala Brevo Mailer Engine · {settings.APP_NAME}
-            </div>
-          </div>
-        </body>
-        </html>
-        """
+          <!-- Divider -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px 32px 40px;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                CareerShala Talent Acquisition · Confidential hiring dispatch to <a href="mailto:{careers_email}" style="color: #64748b; text-decoration: underline;">{careers_email}</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
+            </td>
+          </tr>
+        </table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
 
         attachments_payload = []
         if resume_bytes and resume_filename:
@@ -500,7 +873,7 @@ class EmailService:
             })
 
         return await self._send_brevo_email(
-            to_email=admin_email,
+            to_email=careers_email,
             to_name="CareerShala Hiring Team",
             subject=subject,
             html_body=html_body,

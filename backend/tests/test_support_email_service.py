@@ -140,4 +140,77 @@ def test_email_settings_are_loaded_from_env_file():
     assert settings.SMTP_HOST == "smtp.gmail.com"
     assert settings.SMTP_USER
     assert settings.SMTP_PASSWORD
-    assert settings.SUPPORT_EMAIL
+    assert settings.SUPPORT_EMAIL == "support@careershala.tech"
+    assert settings.ADMIN_EMAIL == "admin@careershala.tech"
+    assert settings.CAREERS_EMAIL == "careers@careershala.tech"
+    assert settings.INFO_EMAIL == "info@careershala.tech"
+    assert settings.careers_recipient["email"] == "careers@careershala.tech"
+    assert settings.support_recipient["email"] == "support@careershala.tech"
+    assert settings.info_recipient["email"] == "info@careershala.tech"
+
+
+@pytest.mark.asyncio
+async def test_career_application_routes_to_careers_inbox(monkeypatch):
+    from services.email_service import EmailService
+
+    captured_call = {}
+
+    async def fake_send_brevo(self, **kwargs):
+        captured_call.update(kwargs)
+        return {"sent": True, "message_id": "test-msg-id"}
+
+    monkeypatch.setattr(EmailService, "_send_brevo_email", fake_send_brevo)
+
+    service = EmailService()
+    res = await service.send_career_application(
+        applicant_name="Alice Smith",
+        applicant_email="alice@example.com",
+        role_title="Lead AI Engineer",
+        portfolio_url="https://github.com/alice",
+        cover_letter="Passionate about AI",
+    )
+
+    assert res["sent"] is True
+    assert captured_call["to_email"] == "careers@careershala.tech"
+    assert captured_call["to_name"] == "CareerShala Hiring Team"
+    assert captured_call["reply_to_email"] == "alice@example.com"
+    assert captured_call["reply_to_name"] == "Alice Smith"
+
+
+@pytest.mark.asyncio
+async def test_support_ticket_routes_to_support_inbox_with_user_reply_to(monkeypatch):
+    from services.email_service import EmailService
+
+    captured_call = {}
+
+    async def fake_send_brevo(self, **kwargs):
+        captured_call.update(kwargs)
+        return {"sent": True, "message_id": "test-support-id"}
+
+    monkeypatch.setattr(EmailService, "_send_brevo_email", fake_send_brevo)
+
+    service = EmailService()
+    ticket = SimpleNamespace(
+        ticket_id="CS-999999",
+        subject="Payment inquiry",
+        category="billing",
+        description="Invoice needed",
+        priority="high",
+        created_at=datetime(2026, 8, 31, 12, 0, 0, tzinfo=timezone.utc),
+    )
+    user = SimpleNamespace(
+        email="candidate@example.com",
+        full_name="Bob Builder",
+        plan="premium",
+    )
+
+    res = await service.send_support_ticket_notification(
+        ticket=ticket,
+        user=user,
+    )
+
+    assert res["sent"] is True
+    assert captured_call["to_email"] == "support@careershala.tech"
+    assert captured_call["to_name"] == "CareerShala Support Team"
+    assert captured_call["reply_to_email"] == "candidate@example.com"
+    assert captured_call["reply_to_name"] == "Bob Builder"
