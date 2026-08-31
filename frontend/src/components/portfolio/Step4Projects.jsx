@@ -72,14 +72,14 @@ const ProjectCard = memo(function ProjectCard({
       value={proj}
       dragListener={false}
       dragControls={dragControls}
-      layout
+      layout="position"
       transition={{ 
-        layout: { type: "spring", stiffness: 500, damping: 35 }, 
-        duration: 0.15 
+        layout: { type: "spring", stiffness: 1400, damping: 70, mass: 0.5 }, 
+        duration: 0.08 
       }}
       whileDrag={{ 
-        scale: 1.02, 
-        boxShadow: "0 20px 40px -15px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(99, 102, 241, 0.7)", 
+        scale: 1.015, 
+        boxShadow: "0 15px 30px -10px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(99, 102, 241, 0.7)", 
         zIndex: 100,
         cursor: "grabbing"
       }}
@@ -183,7 +183,7 @@ const ProjectCard = memo(function ProjectCard({
           <button
             type="button"
             onClick={onToggleExpand}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
               isExpanded 
                 ? 'bg-indigo-600 text-white shadow-xs' 
                 : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60'
