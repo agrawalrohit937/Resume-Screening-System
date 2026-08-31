@@ -47,12 +47,15 @@ function UserAvatar({ user, size = 'sm' }) {
   const initials = getInitials(user?.full_name)
   const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm'
 
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
+
   if (avatarUrl && !imgError) {
     return (
       <img
         src={avatarUrl}
         alt={user?.full_name || 'avatar'}
-        crossOrigin="anonymous"
         referrerPolicy="no-referrer"
         className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-sm`}
         onError={() => setImgError(true)}

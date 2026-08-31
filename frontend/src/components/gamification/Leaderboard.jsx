@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Medal, Flame, Trophy, Crown, Sparkles } from 'lucide-react'
 import Card from './Card' 
@@ -11,6 +11,10 @@ function LeaderboardAvatar({ entry, isTop3, rankStyle, isMe, currentUser }) {
   const avatarUrl = resolveAvatarUrl(entry) || (isMe ? resolveAvatarUrl(currentUser) : null)
   const initials = getInitials(entry.full_name || 'Candidate')
 
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
+
   if (avatarUrl && !imgError) {
     return (
       <div className={`w-8.5 h-8.5 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 relative z-10 border-2 ${
@@ -20,7 +24,6 @@ function LeaderboardAvatar({ entry, isTop3, rankStyle, isMe, currentUser }) {
           src={avatarUrl}
           alt={entry.full_name || 'Candidate'}
           className="w-full h-full object-cover"
-          crossOrigin="anonymous"
           referrerPolicy="no-referrer"
           onError={() => setImgError(true)}
         />
