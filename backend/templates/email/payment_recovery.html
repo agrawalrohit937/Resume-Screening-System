@@ -1,82 +1,113 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Action Required: CareerShala Subscription Renewal</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment update needed for your CareerShala subscription</title>
 </head>
-<body style="margin:0;padding:0;background-color:#F1F5F9;font-family:'Segoe UI',Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F1F5F9;padding:32px 12px;">
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" width="520" align="center" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="background:linear-gradient(135deg,#0F172A,#1E293B);padding:24px 32px;border-bottom:3px solid #F43F5E;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <td>
+        <![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td style="padding: 36px 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="vertical-align:middle;">
-                    <img src="{{logo_url}}" alt="CareerShala Logo" width="38" height="38" style="display:inline-block;width:38px;height:38px;vertical-align:middle;border:0;outline:none;text-decoration:none;object-fit:contain;background:#ffffff;border-radius:10px;padding:4px;box-sizing:border-box;" />
-                    <span style="color:#ffffff;font-size:20px;font-weight:700;margin-left:12px;vertical-align:middle;font-family:'Segoe UI',Arial,sans-serif;">CareerShala</span>
-                  </td>
-                  <td align="right" style="vertical-align:middle;">
-                    <span style="background:rgba(244,63,94,0.15);color:#FDA4AF;font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid rgba(244,63,94,0.3);text-transform:uppercase;">Payment Notice</span>
+                  <td>
+                    <a href="{{base_url}}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
+                      <img src="{{logo_url}}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
+                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
+                        Career<span style="color: #2E9BDA;">Shala</span>
+                      </span>
+                    </a>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+
+          <!-- Divider -->
           <tr>
-            <td style="padding:32px 32px 12px 32px;">
-              <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#0F172A;">Payment update needed for your {{plan_name}} Plan</h1>
-              <p style="margin:0;font-size:14px;color:#475569;line-height:1.6;">
-                Hi {{full_name}}, we were unable to process your recent renewal of <strong>₹{{amount}}</strong> for your CareerShala <strong>{{plan_name}}</strong> subscription.
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 32px 40px 24px 40px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
+                Payment update needed
+              </h1>
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                Hi {{full_name}},
               </p>
-              <div style="margin-top:16px;background:#FFF1F2;border-left:4px solid #F43F5E;padding:12px 16px;border-radius:0 8px 8px 0;">
-                <p style="margin:0;font-size:13px;color:#9F1239;font-weight:600;">
-                  Reason: {{failure_situation}}
-                </p>
+              <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6;">
+                We were unable to process your renewal payment of <strong>₹{{amount}}</strong> for your CareerShala <strong>{{plan_name}}</strong> plan.
+              </p>
+
+              <!-- Payment Summary Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 28px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 40%;">Plan</td>
+                  <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{{plan_name}}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Amount due</td>
+                  <td style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">₹{{amount}}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b;">Notice</td>
+                  <td style="padding: 12px 16px; font-size: 13px; color: #e11d48; font-weight: 500; text-align: right;">{{failure_situation}}</td>
+                </tr>
+              </table>
+
+              <!-- Primary Action Button -->
+              <div style="margin: 0 0 28px 0;">
+                <a href="{{retry_url}}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
+                  Update payment method →
+                </a>
               </div>
-            </td>
-          </tr>
 
-          <tr>
-            <td style="padding:16px 32px;">
-              <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:18px;">
-                <p style="margin:0 0 10px 0;font-size:13px;font-weight:700;color:#0F172A;text-transform:uppercase;letter-spacing:0.5px;">Keep access to your premium career toolkit:</p>
-                <ul style="margin:0;padding-left:20px;font-size:13px;color:#475569;line-height:1.8;">
-                  <li>Unlimited AI-Powered ATS Resume Audits & Scoring</li>
-                  <li>Real-time Speech & Video AI Mock Interviews</li>
-                  <li>Autonomous Job Application Copilot & Cover Letters</li>
-                  <li>Global Verified Skills Certifications</li>
-                </ul>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:12px 32px 24px 32px;text-align:center;">
-              <a href="{{retry_url}}" style="display:inline-block;background:linear-gradient(135deg,#2E9BDA,#1d6fa5);color:#ffffff;font-size:15px;font-weight:700;padding:14px 36px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(46,155,218,0.35);">
-                Retry Secure Payment →
-              </a>
-              <p style="margin:12px 0 0 0;font-size:12px;color:#94A3B8;">
-                Safe and encrypted payment via Razorpay.
+              <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+                Your benefits (unlimited ATS audits, video mock interviews, and recruiter copilot) will remain active during the grace period. If you need any help, contact our support team at <a href="mailto:{{support_email}}" style="color: #2E9BDA; text-decoration: underline;">{{support_email}}</a>.
               </p>
             </td>
           </tr>
 
+          <!-- Divider -->
           <tr>
-            <td style="padding:0 32px 28px 32px;">
-              <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.5;text-align:center;">
-                If you have questions or need assistance, simply reply to this email or visit our <a href="{{support_url}}" style="color:#2E9BDA;text-decoration:none;font-weight:600;">Support Desk</a>.
+            <td style="padding: 0 40px;">
+              <div style="border-top: 1px solid #f1f5f9;"></div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px 32px 40px;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                Sent by CareerShala Technologies Pvt. Ltd. · Subscription Billing
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                Questions? <a href="mailto:{{support_email}}" style="color: #64748b; text-decoration: underline;">{{support_email}}</a> · <a href="{{base_url}}/privacy" target="_blank" style="color: #94a3b8; text-decoration: underline;">Privacy</a> · <a href="{{base_url}}/terms" target="_blank" style="color: #94a3b8; text-decoration: underline;">Terms</a>
               </p>
             </td>
           </tr>
-          <tr>
-            <td style="background:#F8FAFC;padding:16px 32px;border-top:1px solid #F1F5F9;text-align:center;">
-              <p style="margin:0;font-size:12px;color:#94A3B8;">© CareerShala Inc. · Empowering Your Career Journey</p>
+
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
             </td>
           </tr>
         </table>
+        <![endif]-->
       </td>
     </tr>
   </table>

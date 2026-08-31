@@ -17,7 +17,7 @@ const LINKS = [
   { label: 'Documentation', icon: BookOpen, href: '/docs' },
   { label: 'Privacy Policy', icon: Shield, href: '/privacy' },
   { label: 'Terms of Service', icon: FileText, href: '/terms' },
-  { label: 'Contact Email', icon: Mail, href: 'mailto:admin@careershala.tech' },
+  { label: 'Contact Email', icon: Mail, href: 'mailto:support@careershala.tech' },
   { label: 'Status Page', icon: Activity, href: 'https://status.careershala.tech' },
 ]
 

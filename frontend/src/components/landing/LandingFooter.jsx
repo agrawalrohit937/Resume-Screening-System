@@ -157,7 +157,10 @@ export default function LandingFooter({
               </button>
             </form>
             <p className="text-[11px] text-slate-500 font-medium pt-1">
-              For press & partnerships: admin@careershala.tech
+              For press & partnerships:{' '}
+              <a href="mailto:info@careershala.tech" className="text-slate-400 hover:text-white transition-colors underline decoration-slate-700 underline-offset-2">
+                info@careershala.tech
+              </a>
             </p>
           </div>
         </div>
