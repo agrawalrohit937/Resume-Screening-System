@@ -18,9 +18,7 @@ import {
   Layers,
   Check,
   ExternalLink,
-  HelpCircle,
-  ChevronUp,
-  ChevronDown
+  HelpCircle
 } from 'lucide-react';
 import { Reorder, AnimatePresence, motion, useDragControls } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -64,8 +62,6 @@ const ProjectCard = memo(function ProjectCard({
   onAddHighlight,
   onUpdateHighlight,
   onRemoveHighlight,
-  onMoveUp,
-  onMoveDown,
   totalProjects
 }) {
   const dragControls = useDragControls();
@@ -98,28 +94,6 @@ const ProjectCard = memo(function ProjectCard({
     >
       {/* Collapsed Bar */}
       <div className="flex items-center justify-between gap-2.5 sm:gap-4">
-        {/* Quick Smooth Move Up / Down Buttons */}
-        <div className="flex flex-col gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            disabled={idx === 0}
-            onClick={() => onMoveUp(idx)}
-            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90"
-            title="Move project up"
-          >
-            <ChevronUp size={15} strokeWidth={2.5} />
-          </button>
-          <button
-            type="button"
-            disabled={idx === totalProjects - 1}
-            onClick={() => onMoveDown(idx)}
-            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed active:scale-90"
-            title="Move project down"
-          >
-            <ChevronDown size={15} strokeWidth={2.5} />
-          </button>
-        </div>
-
         <div 
           className="flex items-center gap-2.5 sm:gap-4 truncate flex-1 cursor-pointer"
           onClick={onToggleExpand}
@@ -622,28 +596,6 @@ export default function Step4Projects({
     toast.success('Project deleted');
   }, [setFormData, setExpandedProjectIdx]);
 
-  // Smooth Move Up / Down (Fluid splice reordering)
-  const handleMoveUp = useCallback((idx) => {
-    if (idx <= 0) return;
-    setFormData(prev => {
-      const updated = [...prev.projects];
-      const [item] = updated.splice(idx, 1);
-      updated.splice(idx - 1, 0, item);
-      return { ...prev, projects: updated };
-    });
-    setExpandedProjectIdx(prev => (prev === idx ? idx - 1 : prev === idx - 1 ? idx : prev));
-  }, [setFormData, setExpandedProjectIdx]);
-
-  const handleMoveDown = useCallback((idx) => {
-    setFormData(prev => {
-      if (idx >= prev.projects.length - 1) return prev;
-      const updated = [...prev.projects];
-      const [item] = updated.splice(idx, 1);
-      updated.splice(idx + 1, 0, item);
-      return { ...prev, projects: updated };
-    });
-    setExpandedProjectIdx(prev => (prev === idx ? idx + 1 : prev === idx + 1 ? idx : prev));
-  }, [setFormData, setExpandedProjectIdx]);
 
   // Ensure every project has a permanent unique ID so React & Framer Motion track cards seamlessly
   useEffect(() => {
@@ -878,8 +830,6 @@ export default function Step4Projects({
               onAddHighlight={handleAddProjectHighlight}
               onUpdateHighlight={handleProjectHighlightChange}
               onRemoveHighlight={handleRemoveProjectHighlight}
-              onMoveUp={handleMoveUp}
-              onMoveDown={handleMoveDown}
             />
           ))}
         </AnimatePresence>
