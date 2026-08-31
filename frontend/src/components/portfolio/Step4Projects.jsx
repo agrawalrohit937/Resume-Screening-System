@@ -72,21 +72,18 @@ const ProjectCard = memo(function ProjectCard({
       value={proj}
       dragListener={false}
       dragControls={dragControls}
-      layout="position"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      layout
       transition={{ 
-        layout: { type: "spring", stiffness: 350, damping: 28 }, 
-        duration: 0.2 
+        layout: { type: "spring", stiffness: 500, damping: 35 }, 
+        duration: 0.15 
       }}
       whileDrag={{ 
-        scale: 1.025, 
-        boxShadow: "0 25px 50px -12px rgba(79, 70, 229, 0.25), 0 0 0 2px rgba(99, 102, 241, 0.6)", 
-        zIndex: 999,
+        scale: 1.02, 
+        boxShadow: "0 20px 40px -15px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(99, 102, 241, 0.7)", 
+        zIndex: 100,
         cursor: "grabbing"
       }}
-      className={`rounded-2xl sm:rounded-3xl border transition-all transform-gpu will-change-transform ${
+      className={`rounded-2xl sm:rounded-3xl border select-none ${
         isExpanded 
           ? 'bg-slate-50/95 border-indigo-300 shadow-md p-4 sm:p-7' 
           : 'bg-white hover:bg-slate-50/80 border-slate-200 p-3.5 sm:p-5 shadow-xs hover:border-slate-300'
@@ -600,18 +597,15 @@ export default function Step4Projects({
   // Ensure every project has a permanent unique ID so React & Framer Motion track cards seamlessly
   useEffect(() => {
     if (!formData.projects || formData.projects.length === 0) return;
-    let hasMissingId = false;
-    const withIds = formData.projects.map((p, i) => {
-      if (!p.id && !p._dndId) {
-        hasMissingId = true;
-        return { ...p, id: `proj_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}` };
-      }
-      return p;
-    });
+    const hasMissingId = formData.projects.some(p => !p.id && !p._dndId);
     if (hasMissingId) {
+      const withIds = formData.projects.map((p, i) => ({
+        ...p,
+        id: p.id || p._dndId || `proj_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`
+      }));
       setFormData(prev => ({ ...prev, projects: withIds }));
     }
-  }, []);
+  }, [formData.projects, setFormData]);
 
   // Single vs Double Tap
   const handleImageInteraction = useCallback((idx, currentImage) => {
@@ -809,30 +803,28 @@ export default function Step4Projects({
         onReorder={handleReorder}
         className="space-y-4"
       >
-        <AnimatePresence initial={false}>
-          {formData.projects?.map((proj, idx) => (
-            <ProjectCard
-              key={proj.id || proj._dndId || `proj_stable_${idx}`}
-              proj={proj}
-              idx={idx}
-              isExpanded={expandedProjectIdx === idx}
-              isFetching={fetchingScreenshotIdx === idx}
-              totalProjects={formData.projects.length}
-              onToggleExpand={() => setExpandedProjectIdx(prev => (prev === idx ? null : idx))}
-              onUpdateProject={handleUpdateProject}
-              onDeleteProject={handleDeleteProject}
-              onAutoFetchScreenshot={handleFetchScreenshot}
-              onFileUpload={handleImageFileUpload}
-              onGeneratePlaceholder={handleGeneratePlaceholder}
-              onRemoveCover={handleRemoveCover}
-              onImageInteraction={handleImageInteraction}
-              onEnhanceDescription={handleEnhanceDescription}
-              onAddHighlight={handleAddProjectHighlight}
-              onUpdateHighlight={handleProjectHighlightChange}
-              onRemoveHighlight={handleRemoveProjectHighlight}
-            />
-          ))}
-        </AnimatePresence>
+        {formData.projects?.map((proj, idx) => (
+          <ProjectCard
+            key={proj.id || proj._dndId || `proj_stable_${idx}`}
+            proj={proj}
+            idx={idx}
+            isExpanded={expandedProjectIdx === idx}
+            isFetching={fetchingScreenshotIdx === idx}
+            totalProjects={formData.projects.length}
+            onToggleExpand={() => setExpandedProjectIdx(prev => (prev === idx ? null : idx))}
+            onUpdateProject={handleUpdateProject}
+            onDeleteProject={handleDeleteProject}
+            onAutoFetchScreenshot={handleFetchScreenshot}
+            onFileUpload={handleImageFileUpload}
+            onGeneratePlaceholder={handleGeneratePlaceholder}
+            onRemoveCover={handleRemoveCover}
+            onImageInteraction={handleImageInteraction}
+            onEnhanceDescription={handleEnhanceDescription}
+            onAddHighlight={handleAddProjectHighlight}
+            onUpdateHighlight={handleProjectHighlightChange}
+            onRemoveHighlight={handleRemoveProjectHighlight}
+          />
+        ))}
       </Reorder.Group>
 
       {/* Navigation Footer */}

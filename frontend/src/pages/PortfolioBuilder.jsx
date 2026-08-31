@@ -156,7 +156,7 @@ export default function PortfolioBuilder() {
       }
 
       if (res.status === 'success' && res.data) {
-        const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p) => {
+        const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p, i) => {
           const rawHighlights = (p.highlights || []).map((h) => {
             if (typeof h === 'string') return { value: '92%', label: 'Metric' };
             const v = (h.value || '').trim();
@@ -172,7 +172,11 @@ export default function PortfolioBuilder() {
             }
             return h;
           });
-          return { ...p, highlights: rawHighlights };
+          return { 
+            ...p, 
+            id: p.id || p._id || `proj_loaded_${i}_${(p.title || 'case').replace(/\s+/g, '_').toLowerCase()}`,
+            highlights: rawHighlights 
+          };
         });
 
         setFormData((prev) => ({
