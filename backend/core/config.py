@@ -253,7 +253,7 @@ class Settings(BaseSettings):
     # ── Trusted Device / Login OTP (NEW) ───────────────────────────────────────
     TRUSTED_DEVICE_COOKIE_NAME: str = "device_id"
     TRUSTED_DEVICE_EXPIRE_DAYS: int = 30
-    REQUIRE_OTP_FOR_NEW_DEVICE: bool = True
+    REQUIRE_OTP_FOR_NEW_DEVICE: bool = False
     LOGIN_CHALLENGE_EXPIRE_MINUTES: int = 10
 
     # ── Profile Photo Upload ────────────────────────────────────────────────────
