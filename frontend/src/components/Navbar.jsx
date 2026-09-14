@@ -31,9 +31,7 @@ const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
 const SEARCH_ROUTES = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, keywords: ['home', 'analytics'] },
   { name: 'Portfolio Builder & Showcase', path: '/portfolio', icon: Globe, keywords: ['portfolio', 'website', 'developer site', 'showcase', 'projects'] },
-  { name: 'Resume Upload', path: '/dashboard', icon: FileText, keywords: ['upload', 'cv', 'ats'] },
-  { name: 'Mock Interview', path: '/interview', icon: Video, keywords: ['practice', 'ai interview'] },
-  { name: 'Live Interview', path: '/live-interview-v2', icon: Video, keywords: ['live', 'video'] },
+  { name: 'Quick Practice (MCQ)', path: '/interview', icon: Zap, keywords: ['practice', 'mcq', 'quiz', 'quick practice'] },
   { name: 'Career Quest', path: '/gamification', icon: Trophy, keywords: ['quest', 'rewards', 'badges'] },
   { name: 'AI Resume Enhancer', path: '/results', icon: Zap, keywords: ['enhance', 'improve'] },
   { name: 'Billing & Premium', path: '/billing', icon: Crown, keywords: ['billing', 'upgrade', 'pro'] },

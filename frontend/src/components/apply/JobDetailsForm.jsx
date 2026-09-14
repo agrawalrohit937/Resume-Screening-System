@@ -111,16 +111,16 @@ export default function JobDetailsForm({ values, setValues, extracting, onSubmit
           <button
             type="submit"
             disabled={isSubmitting || extracting}
-            className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-[#2E9BDA] hover:from-indigo-700 hover:to-[#2380b8] px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-[#2E9BDA] hover:from-indigo-700 hover:to-[#2380b8] px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
             {isSubmitting ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                <span>Generating AI Application Draft...</span>
+                <span>Checking ATS Compatibility...</span>
               </>
             ) : (
               <>
-                <span>Generate AI Draft</span>
+                <span>Analyze Job & Check ATS Match</span>
                 <Sparkles size={16} />
               </>
             )}

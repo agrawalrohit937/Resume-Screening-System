@@ -13,10 +13,6 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=ai_career_platform
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - ENVIRONMENT=production
       - DEBUG=false
     env_file:
       - ../.env
@@ -72,28 +68,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ── Celery Worker (optional async tasks) ──────────────────────────────────────
-  celery_worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: ai_career_celery
-    restart: unless-stopped
-    command: celery -A celery_app worker --loglevel=info --concurrency=2
-    env_file:
-      - ../.env
-    environment:
-      - MONGO_URI=mongodb://mongo:27017
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-    volumes:
-      - uploads_data:/app/uploads
-    depends_on:
-      - mongo
-      - redis
-    networks:
-      - ai_career_net
 
   # ── Nginx Reverse Proxy ───────────────────────────────────────────────────────
   nginx:

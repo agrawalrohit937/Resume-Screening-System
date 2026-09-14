@@ -16,7 +16,6 @@ from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
 from schemas.resume_schema import EnhanceResumeRequest, EnhanceResumeResponse
 from services.pdf_generator_service import PDFGeneratorService
-from services.hitl_questionnaire_service import generate_hitl_questions
 from workflows.enhancer_graph import enhance_resume_content
 
 router = APIRouter()
@@ -126,58 +125,6 @@ async def enhance_resume(
         ],
     )
 
-
-# ── /enhance/wizard-questions ─────────────────────────────────────────────────
-class WizardQuestionsRequest(BaseModel):
-    resume_id: str
-    job_description: Optional[str] = None
-    strict_missing_keywords: Optional[List[str]] = None
-
-
-@router.post("/wizard-questions")
-async def get_wizard_questions(
-    payload: WizardQuestionsRequest,
-    current_user: UserModel = Depends(get_current_user),
-    resume_repo: ResumeRepository = Depends(get_resume_repo),
-):
-    """
-    Data Gap Analyzer — generates ≤3 high-value conversational questions
-    to show the candidate BEFORE the enhancer graph runs (the HITL wizard).
-
-    Call this endpoint AFTER /ats/match so you have `strict_missing_keywords`
-    to pass in.  The returned `questions` list is ordered by priority and may
-    be empty if no meaningful gaps are found.
-
-    Flow:
-        POST /ats/match           → get strict_missing_keywords
-        POST /enhance/wizard-questions  ← HERE
-        (user answers in the UI)
-        POST /enhance/enhance-and-download with user_verified bundle
-    """
-    resume = await resume_repo.get_by_id_and_user(payload.resume_id, str(current_user.id))
-    if not resume:
-        raise HTTPException(status_code=404, detail="Resume not found.")
-
-    parsed_data = (
-        resume.parsed_data.model_dump()
-        if hasattr(resume.parsed_data, "model_dump")
-        else (resume.parsed_data or {})
-    )
-
-    # Run sync LLM call in thread pool — keeps the event loop free
-    questions = await asyncio.get_event_loop().run_in_executor(
-        _executor,
-        generate_hitl_questions,
-        parsed_data,
-        payload.job_description or "",
-        payload.strict_missing_keywords or [],
-    )
-
-    return {
-        "resume_id": payload.resume_id,
-        "questions": questions,         # list of {question_id, question_text, category, context_hint}
-        "total": len(questions),
-    }
 
 
 # ── /enhance/enhance-and-download ─────────────────────────────────────────────

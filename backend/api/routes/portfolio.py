@@ -16,6 +16,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from api.deps import get_db, security
+from core.config import settings
 from core.security import decode_token
 from core.llm_client import groq_key_pool
 from models.portfolio_model import (
@@ -1025,6 +1026,7 @@ async def send_contact_message(
             email_svc = EmailService()
             subject = f"💼 [Recruiter Inquiry] {msg.subject} — CareerShala Portfolio"
             candidate_name = profile.get("full_name") or username
+            frontend_base = settings.FRONTEND_URL.rstrip('/')
 
             body_html = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
@@ -1050,8 +1052,8 @@ async def send_contact_message(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td>
-                    <a href="https://careershala.tech" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
-                      <img src="https://careershala.tech/logo_t.png" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
+                    <a href="{frontend_base}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
+                      <img src="{frontend_base}/logo_t.png" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
                       <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
                         Career<span style="color: #2E9BDA;">Shala</span> Portfolios
                       </span>
@@ -1074,49 +1076,54 @@ async def send_contact_message(
             </td>
           </tr>
 
-          <!-- Content Body -->
+          <!-- Hero Message -->
           <tr>
             <td style="padding: 32px 40px 24px 40px;">
-              <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
-                New message from your portfolio
+              <h1 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #0f172a; line-height: 1.3;">
+                New Opportunity Message
               </h1>
-              <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
-                Hi {candidate_name}, you received a new message from a recruiter or hiring manager via your public portfolio:
+              <p style="margin: 0; font-size: 14px; color: #475569; line-height: 1.6;">
+                Hi <strong>{candidate_name}</strong>, a recruiter or collaborator viewed your developer portfolio and sent you a message directly through CareerShala.
               </p>
+            </td>
+          </tr>
 
-              <!-- Sender Details Table -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+          <!-- Sender Details Card -->
+          <tr>
+            <td style="padding: 0 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
                 <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 30%;">Sender</td>
-                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{msg.sender_name}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Email</td>
-                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">
-                    <a href="mailto:{msg.sender_email}" style="color: #2E9BDA; text-decoration: none;">{msg.sender_email}</a>
+                  <td style="padding-bottom: 8px; font-size: 13px; color: #64748b;">
+                    <strong>From:</strong> {msg.sender_name} &lt;<a href="mailto:{msg.sender_email}" style="color: #0284c7; text-decoration: none;">{msg.sender_email}</a>&gt;
                   </td>
                 </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b;">Subject</td>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">{msg.subject}</td>
-                </tr>
+                {f'<tr><td style="padding-bottom: 8px; font-size: 13px; color: #64748b;"><strong>Company:</strong> {msg.company}</td></tr>' if msg.company else ''}
+                {f'<tr><td style="padding-bottom: 8px; font-size: 13px; color: #64748b;"><strong>Subject:</strong> {msg.subject}</td></tr>' if msg.subject else ''}
               </table>
+            </td>
+          </tr>
 
-              <!-- Message Block -->
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
-                Message
-              </div>
-              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: #1e293b; margin-bottom: 24px; white-space: pre-wrap;">
+          <!-- Message Content Box -->
+          <tr>
+            <td style="padding: 0 40px 32px 40px;">
+              <div style="background-color: #ffffff; border-left: 3px solid #0284c7; padding: 16px 20px; margin: 0; font-size: 14px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">
                 {msg.message}
               </div>
+            </td>
+          </tr>
 
-              <!-- Quick Reply Action -->
-              <div style="margin-bottom: 12px;">
-                <a href="mailto:{msg.sender_email}?subject=Re:%20{msg.subject}" 
-                   style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
-                  Reply to {msg.sender_name} →
-                </a>
-              </div>
+          <!-- CTA Button -->
+          <tr>
+            <td style="padding: 0 40px 36px 40px;" align="center">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="background-color: #0f172a; border-radius: 8px;">
+                    <a href="mailto:{msg.sender_email}?subject=Re:%20{msg.subject}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
+                      Reply directly to {msg.sender_name} &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 

@@ -19,11 +19,8 @@ from repositories.otp_repo import OTPRepository
 from services.parser_service import ParserService
 from services.skill_service import SkillService
 
-from services.enhancer_service import EnhancerService
 from services.ai_interview_service import AIInterviewService
 from services.github_service import GitHubService
-
-from services.fake_detection_service import FakeDetectionService
 from services.pdf_generator_service import PDFGeneratorService
 from services.email_service import EmailService
 from services.otp_service import OTPService
@@ -64,24 +61,12 @@ def get_parser_service() -> ParserService:
 
 def get_skill_service() -> SkillService:
     return SkillService()
-
-
-
-def get_enhancer_service() -> EnhancerService:
-    return EnhancerService()
-
-
 def get_interview_service() -> AIInterviewService:
     return AIInterviewService()
 
 
-
 def get_github_service() -> GitHubService:
     return GitHubService()
-
-
-def get_fake_detection_service() -> FakeDetectionService:
-    return FakeDetectionService()
 
 
 def get_pdf_service() -> PDFGeneratorService:
@@ -114,13 +99,12 @@ async def get_current_user(
 
     token = None
 
-    # 1. Try cookie first (NEW SYSTEM)
-    if request.cookies.get("access_token"):
-        token = request.cookies.get("access_token")
-
-    # 2. Fallback to header (OLD SYSTEM / Swagger)
-    elif credentials:
+    # 1. Header takes precedence if explicitly provided (API clients / Mobile / Swagger)
+    if credentials:
         token = credentials.credentials
+    # 2. Fallback to cookie (Web frontend)
+    elif request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
 
     if not token:
         raise credentials_exception
@@ -174,6 +158,8 @@ def get_recruiter_or_admin(current_user: UserModel = Depends(get_current_user)) 
     if current_user.role not in (UserRole.RECRUITER, UserRole.ADMIN):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter access required")
     return current_user
+
+
 
 
 # ─── Pagination ───────────────────────────────────────────────────────────────

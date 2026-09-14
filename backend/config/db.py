@@ -30,7 +30,6 @@ async def connect_db() -> None:
     logger.info("MongoDB connected", db=settings.MONGO_DB_NAME)
 
 
-
 async def disconnect_db() -> None:
     global _client
     if _client:

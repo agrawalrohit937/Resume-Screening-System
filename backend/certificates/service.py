@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 import structlog
-from sympy import pprint
 
 from certificates.ftp_storage import FTPCertificateStorage
 from certificates.id_generator import generate_certificate_id, resolve_grade

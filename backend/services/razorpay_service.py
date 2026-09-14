@@ -1,7 +1,10 @@
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 import razorpay
+import structlog
 from core.config import settings
+
+logger = structlog.get_logger(__name__)
 
 class RazorpayService:
     def __init__(self):

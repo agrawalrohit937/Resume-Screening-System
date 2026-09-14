@@ -18,9 +18,7 @@ const PAGE_TITLES = {
   '/analytics': { title: 'Analytics', sub: 'Performance trends & insights' },
   '/interview': { title: 'Quick Practice', sub: 'Fast mock interview sessions' },
   '/live-interview': { title: 'Live AI Interview', sub: 'Full session with camera & AI feedback' },
-  '/interview-analytics': { title: 'Interview Analytics', sub: 'Performance breakdown & weak areas' },
   '/github': { title: 'GitHub Analysis', sub: 'Profile & contribution insights' },
-  '/fake-detect': { title: 'Authenticity Check', sub: '7-factor experience verification' },
   '/gamification': { title: 'Rewards Hub', sub: 'Points, badges & leaderboard' },
   '/recruiter': { title: 'Shortlist Candidates', sub: 'JD → Top matching resumes' },
 }

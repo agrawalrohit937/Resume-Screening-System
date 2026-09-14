@@ -79,7 +79,7 @@ export default function Dashboard() {
   }
 
   const s = analytics?.summary || { total_ats_checks: 0, best_score: 0, average_score: 0 }
-  const firstName = user?.full_name?.split(' ')[0] || 'Rohit'
+  const firstName = user?.full_name?.split(' ')[0] || user?.username || 'Candidate'
   
   const atsStrength = normalizeScore(s.best_score);
   const atsAverage = normalizeScore(s.average_score);
@@ -101,21 +101,14 @@ export default function Dashboard() {
   const totalPoints = gami?.total_points || 0
   const totalBadges = gami?.badges?.length || 0
 
-  // Dynamic Missing Skills
+  // Real Missing Skills from actual ATS checks (No dummy or fake data)
   const rawMissing = analytics?.top_missing_skills || [];
-  const displayMissing = rawMissing.length > 0 ? rawMissing : [
-    { skill: 'Advanced React Patterns', frequency: 0 },
-    { skill: 'FastAPI Microservices', frequency: 0 },
-    { skill: 'System Design', frequency: 0 }
-  ];
-
-  // Build dynamic skill bars from top_missing_skills (inverse: missing = low proficiency)
-  const dynamicSkills = displayMissing.slice(0, 3).map((item, i) => {
-    const name = item.skill
-    const basePct = Math.max(40 - (i * 12), 15)
-    const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-purple-500']
-    return { label: name, pct: basePct, color: colors[i] }
-  })
+  const maxFreq = Math.max(...rawMissing.map(m => m.frequency || 1), 1);
+  const dynamicSkills = rawMissing.slice(0, 4).map((item, i) => {
+    const pct = Math.min(Math.round(((item.frequency || 1) / maxFreq) * 100), 100);
+    const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-amber-500'];
+    return { label: item.skill, pct, frequency: item.frequency, color: colors[i % colors.length] };
+  });
 
   // Score Trend: last 3 scores for mini preview
   const recentScores = scoreTrend.slice(-3).map(t => normalizeScore(t.score))
@@ -151,9 +144,18 @@ export default function Dashboard() {
               {headline}
             </p>
             <div className="mt-5 sm:mt-8 flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4">
-              <button onClick={openCopilot} className="w-full sm:w-auto justify-center px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs sm:text-sm font-extrabold shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 transition-all flex items-center gap-2">
+              <button onClick={openCopilot} className="w-full sm:w-auto justify-center px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs sm:text-sm font-extrabold shadow-[0_8px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer">
                 <Sparkles size={18} /> Ask AI Copilot
               </button>
+              {s.total_ats_checks === 0 ? (
+                <button onClick={() => navigate('/results')} className="w-full sm:w-auto justify-center px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-800 text-xs sm:text-sm font-extrabold shadow-sm hover:border-blue-300 hover:text-blue-600 transition-all flex items-center gap-2 cursor-pointer">
+                  <FileText size={18} className="text-blue-600" /> Run ATS Check
+                </button>
+              ) : (
+                <button onClick={() => navigate('/live-interview')} className="w-full sm:w-auto justify-center px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-800 text-xs sm:text-sm font-extrabold shadow-sm hover:border-blue-300 hover:text-blue-600 transition-all flex items-center gap-2 cursor-pointer">
+                  <Video size={18} className="text-indigo-600" /> Mock Interview
+                </button>
+              )}
             </div>
           </div>
 
@@ -250,7 +252,7 @@ export default function Dashboard() {
                         <p className="text-sm font-medium text-amber-900/70 mb-5 leading-relaxed">
                           Outstanding! You scored a perfect 100/100. Your verified certificate is ready to be added to your professional profile.
                         </p>
-                        <button className="px-6 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md hover:-translate-y-0.5 transition-all">
+                        <button onClick={() => navigate('/interview')} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md hover:-translate-y-0.5 transition-all cursor-pointer">
                           View & Download Certificate
                         </button>
                       </>
@@ -259,7 +261,7 @@ export default function Dashboard() {
                         <p className="text-sm font-medium text-slate-500 mb-5 leading-relaxed">
                           Score a perfect 100/100 in the Quick Practice module to unlock this verified certificate. Currently, your best score is <strong className="text-slate-800">{interviewBest}%</strong>.
                         </p>
-                        <button onClick={() => navigate('/live-interview')} className="px-6 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:border-blue-300 hover:text-blue-600 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
+                        <button onClick={() => navigate('/live-interview')} className="px-6 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl text-sm font-bold shadow-sm hover:border-blue-300 hover:text-blue-600 transition-all flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto cursor-pointer">
                           <Timer size={18} /> Start Quick Practice
                         </button>
                       </>
@@ -272,7 +274,7 @@ export default function Dashboard() {
 
           {/* Priority Actions */}
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <SectionHeader title="Priority Actions" subtitle="AI-curated tasks to increase your hireability" />
+            <SectionHeader title="Priority Actions" subtitle="Curated tasks to increase your hireability" />
             <div className="space-y-4">
               <Card hover className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5 cursor-pointer group" onClick={() => navigate('/live-interview')}>
                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 border border-indigo-100 shadow-inner">
@@ -289,26 +291,63 @@ export default function Dashboard() {
                 </div>
               </Card>
 
-              {/* Dynamic Missing Skill Actions */}
-              {displayMissing.slice(0, 2).map((item, i) => (
-                <Card key={i} hover className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5 cursor-pointer group" onClick={() => navigate('/results')}>
-
-                  <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 border border-rose-100 shadow-inner">
-                    <AlertCircle size={28} strokeWidth={2} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h3 className="text-base font-black text-slate-900 tracking-tight">Missing Skill: {item.skill}</h3>
+              {/* Real Missing Skill Actions if available, or Real Platform Recommendations if none */}
+              {rawMissing.length > 0 ? (
+                rawMissing.slice(0, 2).map((item, i) => (
+                  <Card key={i} hover className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5 cursor-pointer group" onClick={() => navigate('/results')}>
+                    <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 border border-rose-100 shadow-inner">
+                      <AlertCircle size={28} strokeWidth={2} />
                     </div>
-                    <p className="text-sm font-medium text-slate-500">
-                      This skill is frequently required in target roles. Update your resume to bypass filters.
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white text-slate-400 transition-colors shrink-0 mt-2 sm:mt-0">
-                     <ArrowRight size={18} strokeWidth={2.5} />
-                  </div>
-                </Card>
-              ))}
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="text-base font-black text-slate-900 tracking-tight">Missing Keyword: {item.skill}</h3>
+                      </div>
+                      <p className="text-sm font-medium text-slate-500">
+                        This skill was missing in your target role evaluations. Update your resume to bypass keyword filters.
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white text-slate-400 transition-colors shrink-0 mt-2 sm:mt-0">
+                       <ArrowRight size={18} strokeWidth={2.5} />
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <>
+                  <Card hover className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5 cursor-pointer group" onClick={() => navigate('/results')}>
+                    <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 border border-blue-100 shadow-inner">
+                      <Target size={28} strokeWidth={2} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="text-base font-black text-slate-900 tracking-tight">Run ATS Resume & Job Match</h3>
+                      </div>
+                      <p className="text-sm font-medium text-slate-500">
+                        Scan your resume against any job description to discover exact keyword matches, gaps, and recommendations.
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white text-slate-400 transition-colors shrink-0 mt-2 sm:mt-0">
+                       <ArrowRight size={18} strokeWidth={2.5} />
+                    </div>
+                  </Card>
+
+                  <Card hover className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5 cursor-pointer group" onClick={() => navigate('/portfolio')}>
+                    <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 border border-purple-100 shadow-inner">
+                      <Sparkles size={28} strokeWidth={2} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="text-base font-black text-slate-900 tracking-tight">Build Personal Developer Portfolio</h3>
+                      </div>
+                      <p className="text-sm font-medium text-slate-500">
+                        Auto-engineer your interactive portfolio website from your resume to share with recruiters.
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white text-slate-400 transition-colors shrink-0 mt-2 sm:mt-0">
+                       <ArrowRight size={18} strokeWidth={2.5} />
+                    </div>
+                  </Card>
+                </>
+              )}
             </div>
           </motion.div>
         </div>
@@ -414,15 +453,33 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* Dynamic Skill Bars */}
+          {/* Real Skill Bars or Honest Empty State */}
           <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
             <SectionHeader title="Areas to Improve" subtitle="Based on ATS analysis" />
             <Card className="p-6">
-              <div className="space-y-5">
-                {dynamicSkills.map((skill, i) => (
-                  <SkillBar key={i} label={skill.label} pct={skill.pct} color={skill.color} />
-                ))}
-              </div>
+              {dynamicSkills.length > 0 ? (
+                <div className="space-y-5">
+                  {dynamicSkills.map((skill, i) => (
+                    <SkillBar key={i} label={skill.label} pct={skill.pct} color={skill.color} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-3 border border-emerald-100">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <p className="text-sm font-black text-slate-900">No Keyword Gaps Detected</p>
+                  <p className="text-xs font-medium text-slate-500 max-w-xs mt-1 leading-relaxed">
+                    Scan your resume against job postings to automatically detect missing skills and keywords.
+                  </p>
+                  <button
+                    onClick={() => navigate('/results')}
+                    className="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    Run ATS Scan <ArrowRight size={12} />
+                  </button>
+                </div>
+              )}
             </Card>
           </motion.div>
         </div>

@@ -8,6 +8,17 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
   const [extracting, setExtracting] = useState(false);
   const [previews, setPreviews] = useState([]);
   const [extractedSuccess, setExtractedSuccess] = useState(false);
+  const [canPasteClipboard, setCanPasteClipboard] = useState(false);
+
+  useEffect(() => {
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.read === 'function'
+    ) {
+      setCanPasteClipboard(true);
+    }
+  }, []);
 
   const processFiles = useCallback(
     async (files) => {
@@ -71,7 +82,7 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
   );
 
   // ── 1. Drag & Drop Listener ──────────────────────────────────────────────
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop: processFiles,
     accept: {
       'image/png': ['.png'],
@@ -82,7 +93,7 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
     multiple: true,
   });
 
-  // ── 2. Ctrl+V / Cmd+V Clipboard Paste Listener ──────────────────────────
+  // ── 2. Ctrl+V / Cmd+V Clipboard Paste Listener (Desktop) ─────────────────
   useEffect(() => {
     const handlePaste = (e) => {
       // Don't intercept if user is typing inside an input/textarea
@@ -117,6 +128,47 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
     return () => window.removeEventListener('paste', handlePaste);
   }, [processFiles]);
 
+  // ── 3. Paste from Clipboard Action (Mobile & Supported Browsers) ────────
+  const handlePasteFromClipboard = async (e) => {
+    e?.stopPropagation?.();
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      toast.error('Clipboard image access is not supported by your browser.');
+      return;
+    }
+
+    try {
+      const items = await navigator.clipboard.read();
+      const imageFiles = [];
+
+      for (const item of items) {
+        const imageType = item.types.find((t) => t.startsWith('image/'));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const ext = imageType.split('/')[1] || 'png';
+          const file = new File(
+            [blob],
+            `clipboard_screenshot_${Date.now()}.${ext}`,
+            { type: imageType }
+          );
+          imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        processFiles(imageFiles);
+      } else {
+        toast.error('No image found in clipboard. Copy a screenshot first.');
+      }
+    } catch (err) {
+      console.error('[ScreenshotUploadZone] Clipboard read error:', err);
+      if (err.name === 'NotAllowedError') {
+        toast.error('Clipboard permission denied. Please allow access.');
+      } else {
+        toast.error('Could not read image from clipboard.');
+      }
+    }
+  };
+
   const handleClear = (e) => {
     e.stopPropagation();
     previews.forEach((p) => URL.revokeObjectURL(p.url));
@@ -128,10 +180,11 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-indigo-600" />
+          <Sparkles size={16} className="text-indigo-600 shrink-0" />
           <h3 className="text-sm font-extrabold text-slate-900">Job Posting Screenshot</h3>
         </div>
-        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+        {/* Desktop-only: "Ctrl + V to Paste" badge */}
+        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
           <Clipboard size={10} /> Ctrl + V to Paste
         </span>
       </div>
@@ -145,7 +198,7 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
             ? 'border-indigo-300 bg-slate-50'
             : previews.length > 0
             ? 'border-emerald-300 bg-emerald-50/20 hover:border-emerald-400'
-            : 'border-slate-200 hover:border-indigo-300 bg-slate-50/60 hover:bg-slate-50'
+            : 'border-indigo-300 sm:border-slate-200 hover:border-indigo-400 bg-indigo-50/25 sm:bg-slate-50/60 hover:bg-indigo-50/40 sm:hover:bg-slate-50 shadow-sm sm:shadow-none ring-2 ring-indigo-500/10 sm:ring-0'
         }`}
       >
         <input {...getInputProps()} />
@@ -165,15 +218,27 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
               ))}
             </div>
 
-            {/* Clear Button */}
+            {/* Actions for Previews */}
             {!extracting && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-rose-600 bg-white/90 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors shadow-sm"
-              >
-                <X size={12} /> Clear Screenshot
-              </button>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-rose-600 bg-white/90 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors shadow-sm"
+                >
+                  <X size={12} /> Clear Screenshot
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    open();
+                  }}
+                  className="sm:hidden inline-flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors shadow-sm"
+                >
+                  <UploadCloud size={12} /> Change
+                </button>
+              </div>
             )}
 
             {/* Scanning Laser Line Overlay when Extracting */}
@@ -207,15 +272,49 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
           </div>
         ) : (
           /* ── Empty Dropzone Prompt Mode ── */
-          <div className="p-7 text-center flex flex-col items-center justify-center min-h-[180px]">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 shadow-inner">
-              <UploadCloud size={24} />
+          <div className="p-5 sm:p-7 text-center flex flex-col items-center justify-center min-h-[190px] sm:min-h-[180px]">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-indigo-100/70 text-indigo-600 flex items-center justify-center mb-3 shadow-inner">
+              <UploadCloud size={22} className="sm:w-6 sm:h-6" />
             </div>
+
+            {/* Desktop prompt */}
             <p className="text-xs font-extrabold text-slate-800 mb-1">
-              {isDragActive ? 'Drop job screenshot here...' : 'Drag & drop screenshot or click to browse'}
+              {isDragActive
+                ? 'Drop job screenshot here...'
+                : 'Drag & drop screenshot or click to browse'}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium max-w-[240px]">
+            <p className="hidden sm:block text-[11px] text-slate-500 font-medium max-w-[240px]">
               Or copy a screenshot to clipboard and press <kbd className="px-1.5 py-0.5 bg-slate-200/80 rounded text-[10px] font-mono text-slate-700">Ctrl+V</kbd> anywhere
+            </p>
+
+            {/* Mobile primary action buttons */}
+            <div
+              className="sm:hidden flex flex-col w-full max-w-[260px] gap-2 mt-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => open()}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-[#2E9BDA] active:opacity-90 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all"
+              >
+                <UploadCloud size={16} />
+                <span>Upload Screenshot</span>
+              </button>
+
+              {canPasteClipboard && (
+                <button
+                  type="button"
+                  onClick={handlePasteFromClipboard}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-white active:bg-slate-100 text-slate-700 border border-slate-200 active:border-indigo-300 text-xs font-bold rounded-xl shadow-sm transition-all"
+                >
+                  <Clipboard size={14} className="text-indigo-600" />
+                  <span>Paste from Clipboard</span>
+                </button>
+              )}
+            </div>
+
+            <p className="sm:hidden text-[10px] text-slate-400 font-medium mt-2.5">
+              Select an image from gallery, files, or paste
             </p>
           </div>
         )}

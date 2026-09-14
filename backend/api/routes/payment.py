@@ -357,13 +357,12 @@ async def razorpay_webhook(
     body_str = body_bytes.decode("utf-8")
 
     # Cryptographically verify webhook signature strictly using RAZORPAY_WEBHOOK_SECRET
-    webhook_secret = getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', None)
-    if webhook_secret or razorpay_service.is_configured:
-        if not signature:
-            raise HTTPException(status_code=400, detail="Missing X-Razorpay-Signature header")
-        valid = razorpay_service.verify_webhook_signature(body_str, signature)
-        if not valid:
-            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    if not signature:
+        raise HTTPException(status_code=400, detail="Missing X-Razorpay-Signature header")
+
+    valid = razorpay_service.verify_webhook_signature(body_str, signature)
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
     import json
     try:

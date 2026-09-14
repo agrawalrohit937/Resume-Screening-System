@@ -131,7 +131,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 | http://localhost:8000/docs | Swagger UI (interactive) |
 | http://localhost:8000/redoc | ReDoc (clean reference) |
 | http://localhost:8000/health | Health check |
-| http://localhost:8000/metrics | Prometheus metrics |
 
 ---
 

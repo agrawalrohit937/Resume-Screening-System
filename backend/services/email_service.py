@@ -39,9 +39,7 @@ def _render_template(filename: str, **context) -> str:
 
     from datetime import datetime
 
-    base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-    if "localhost" in base_url or not base_url:
-        base_url = "https://careershala.tech"
+    base_url = settings.FRONTEND_URL.rstrip("/")
 
     context.setdefault("base_url", base_url)
     context.setdefault("logo_url", f"{base_url}/logo_t.png")
@@ -244,9 +242,7 @@ class EmailService:
             f"&certUrl={encoded_cert_url}"
         )
 
-        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-        if "localhost" in base_url or not base_url:
-            base_url = "https://careershala.tech"
+        base_url = settings.FRONTEND_URL.rstrip("/")
         logo_url = f"{base_url}/logo_t.png"
         support_email = settings.SUPPORT_EMAIL or "support@careershala.tech"
         year = str(datetime.now().year)
@@ -503,9 +499,7 @@ class EmailService:
 
         html_attachments = "<p style='margin:0;color:#64748b;'>No attachments</p>" if not attachment_html_items else f"<ul style='margin:0;padding-left:18px;color:#334155;'>{''.join(attachment_html_items)}</ul>"
 
-        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-        if "localhost" in base_url or not base_url:
-            base_url = "https://careershala.tech"
+        base_url = settings.FRONTEND_URL.rstrip("/")
         logo_url = f"{base_url}/logo_t.png"
 
         ticket_id = escape(str(getattr(ticket, "ticket_id", "N/A")))
@@ -732,9 +726,7 @@ class EmailService:
             else '<span style="color:#94a3b8; font-style:italic;">No file attached</span>'
         )
 
-        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-        if "localhost" in base_url or not base_url:
-            base_url = "https://careershala.tech"
+        base_url = settings.FRONTEND_URL.rstrip("/")
         logo_url = f"{base_url}/logo_t.png"
         careers_email = getattr(settings, "CAREERS_EMAIL", None) or "careers@careershala.tech"
         year = str(datetime.now().year)
@@ -893,9 +885,7 @@ class EmailService:
         retry_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Sends AI-personalized subscription payment recovery email via Brevo."""
-        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-        if "localhost" in base_url or not base_url:
-            base_url = "https://careershala.tech"
+        base_url = settings.FRONTEND_URL.rstrip("/")
 
         final_retry_url = retry_url or f"{base_url}/billing"
         support_url = f"{base_url}/support"
@@ -933,9 +923,7 @@ class EmailService:
         claim_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Sends bounded win-back discount offer email via Brevo."""
-        base_url = (getattr(settings, "FRONTEND_URL", "") or getattr(settings, "APP_BASE_URL", "") or "https://careershala.tech").rstrip("/")
-        if "localhost" in base_url or not base_url:
-            base_url = "https://careershala.tech"
+        base_url = settings.FRONTEND_URL.rstrip("/")
 
         final_claim_url = claim_url or f"{base_url}/premium?coupon={promo_code}"
         support_url = f"{base_url}/support"
