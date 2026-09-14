@@ -65,8 +65,6 @@ async def parse_resume_for_portfolio(file: UploadFile = File(...)):
         )
     try:
         content = await file.read()
-        print("\n" + "="*70)
-        print(f"📥 [PORTFOLIO_UPLOAD] Received resume file: '{file.filename}' ({len(content)} bytes)")
         
         # 1. Extract raw text
         raw_text = ""
@@ -79,19 +77,17 @@ async def parse_resume_for_portfolio(file: UploadFile = File(...)):
                     if t:
                         raw_text += t + "\n"
         except Exception as e_pdf:
-            print(f"⚠️ [PORTFOLIO_UPLOAD] PDFPlumber error: {e_pdf}")
+            logger.warning("PDFPlumber error during portfolio parse", error=str(e_pdf))
 
         # 2. Try Gemini AI Extraction First
         ai_data = {}
         if raw_text and len(raw_text.strip()) >= 50:
-            print("🚀 [PORTFOLIO_UPLOAD] Attempting Gemini AI Extraction...")
             try:
                 ai_data = await ai_extract_portfolio_from_resume(raw_text)
             except Exception as e_ai:
-                print(f"❌ [PORTFOLIO_UPLOAD] Gemini AI extraction failed: {e_ai}")
+                logger.warning("Gemini AI extraction failed", error=str(e_ai))
 
         if ai_data and ai_data.get("projects") and len(ai_data.get("projects", [])) > 0:
-            print(f"✅ [PORTFOLIO_UPLOAD] Successfully used [AI_SYSTEM] for '{file.filename}'!")
             return {
                 "status": "success",
                 "source": "ai_system",
@@ -99,17 +95,13 @@ async def parse_resume_for_portfolio(file: UploadFile = File(...)):
             }
 
         # 3. Fallback to Local Rule-Based / NLP Parser
-        print(f"⚙️ [PORTFOLIO_UPLOAD] Using [FALLBACK_PARSER] for '{file.filename}'...")
         parsed_data = parse_resume_to_portfolio_data(content, file.filename)
-        print(f"✅ [PORTFOLIO_UPLOAD] Fallback parser completed. Projects: {len(parsed_data.get('projects', []))}")
-        print("="*70 + "\n")
         return {
             "status": "success",
             "source": "fallback_parser",
             "data": parsed_data
         }
     except Exception as exc:
-        print(f"❌ [PORTFOLIO_UPLOAD] Resume parsing failed: {str(exc)}")
         logger.error("Failed to parse resume for portfolio", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -565,19 +557,11 @@ async def get_my_portfolio(
     ai_data = {}
     ai_used = False
     if raw_text:
-        print("\n" + "="*70)
-        print("🔍 [PORTFOLIO_TELEMETRY] Starting resume extraction pipeline...")
-        print(f"📄 [PORTFOLIO_TELEMETRY] Input text source length: {len(raw_text)} chars")
-        print("="*70)
         try:
             ai_data = await ai_extract_portfolio_from_resume(raw_text, original_parsed=parsed if isinstance(parsed, dict) else None)
             if ai_data and ai_data.get("projects") and len(ai_data.get("projects", [])) > 0:
                 ai_used = True
-                print("🌟 [PORTFOLIO_TELEMETRY] AI extraction pipeline: [SUCCESS - GEMINI AI USED]")
-            else:
-                print("⚠️ [PORTFOLIO_TELEMETRY] AI extraction pipeline: [EMPTY - USING FALLBACK PARSER]")
         except Exception as e:
-            print(f"❌ [PORTFOLIO_TELEMETRY] AI extraction pipeline: [FAILED with error: {e}] -> [USING FALLBACK PARSER]")
             logger.warning("AI resume extraction fallback", error=str(e))
 
     # Extract all skills
@@ -803,19 +787,6 @@ async def get_my_portfolio(
         "theme_id": (doc.get("theme_id") if doc else "") or "glassmorphic_pro"
     }
 
-    print("\n" + "="*70)
-    print("📊 [PORTFOLIO_TELEMETRY] FIELD PROVENANCE & EXTRACTION AUDIT:")
-    print(f"   👤 Name       : '{auto_data['full_name']}' [Source: {name_source}]")
-    print(f"   🎯 Headline   : '{auto_data['headline']}' [Source: {headline_source}]")
-    print(f"   📍 Location   : '{auto_data['location']}' [Source: {loc_source}]")
-    print(f"   📝 Bio        : len={len(auto_data['bio'])} chars [Source: {bio_source}]")
-    print(f"   🛠️ Skills     : {len(all_skills)} skills [Source: {skills_source}]")
-    print(f"   🚀 Projects   : {len(auto_data['projects'])} items [Source: {projects_source}]")
-    print(f"   💼 Experience : {len(auto_data['experience'])} items [Source: {exp_source}]")
-    print(f"   🎓 Education  : {len(auto_data['education'])} items [Source: {edu_source}]")
-    print(f"   🔗 GitHub     : '{auto_data['social_links']['github']}'")
-    print(f"   🔗 LinkedIn   : '{auto_data['social_links']['linkedin']}'")
-    print("="*70 + "\n")
     auto_data["is_published"] = bool(doc.get("is_published", False)) if doc else False
 
     # Automatically save clean profile in MongoDB

@@ -7,10 +7,14 @@ split into their own modules and mounted below, so this file stays a thin
 router rather than a monolith covering every auth concern.
 """
 
+import structlog
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from api.deps import get_current_user, get_user_repo
+
+logger = structlog.get_logger(__name__)
 from core.security import decode_token, verify_password, verify_token_type, hash_password
 from models.user_model import UserModel, UserStatus
 from repositories.user_repo import UserRepository

@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 import razorpay
@@ -45,7 +47,6 @@ class RazorpayService:
                 detail="Razorpay payment gateway is not configured on the server. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."
             )
 
-        import hashlib
         pricing = {
             "pro": 29900,
             "premium": 49900
@@ -103,8 +104,6 @@ class RazorpayService:
             return True
         except Exception:
             try:
-                import hmac
-                import hashlib
                 msg = f"{razorpay_order_id}|{razorpay_payment_id}"
                 generated_signature = hmac.new(
                     bytes(self.key_secret, 'utf-8'),
@@ -132,8 +131,6 @@ class RazorpayService:
             logger.warning("No webhook secret or key secret available to verify Razorpay webhook signature")
             return False
 
-        import hmac
-        import hashlib
 
         for candidate in secrets_to_try:
             try:
@@ -173,7 +170,6 @@ class RazorpayService:
 
         if not self.is_configured:
             # Safe mock fallback for test mode / local development
-            import hashlib
             fake_id = f"order_rec_{plan}_{int(hashlib.sha256(f'{plan}_{user_id}_{amount_paisa}'.encode()).hexdigest(), 16) % 10**8}"
             return {
                 "id": fake_id,
@@ -185,7 +181,6 @@ class RazorpayService:
                 "is_mock": True,
             }
 
-        import hashlib
         try:
             order_data = {
                 "amount": amount_paisa,

@@ -67,7 +67,6 @@ class OTPService:
                 purpose.value,
                 otp_plain,
             )
-            print(f"\n======================================================\n🔑 [OTP CODE] For: {email} | Purpose: {purpose.value}\n👉 CODE: {otp_plain}\n======================================================\n")
 
         await self.email_service.send_otp(email, full_name, otp_plain, purpose)
 

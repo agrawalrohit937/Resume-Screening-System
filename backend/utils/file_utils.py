@@ -3,7 +3,6 @@ File Utilities — upload handling, validation, cleanup
 """
 
 import hashlib
-import mimetypes
 import os
 import uuid
 from pathlib import Path

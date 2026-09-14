@@ -13,7 +13,7 @@ from fastapi.encoders import jsonable_encoder
 
 from core.config import settings
 from core.security import create_access_token, create_refresh_token
-from models.user_model import UserModel, UserStatus
+from models.user_model import UserModel, UserStatus, AuthProvider
 from models.otp_model import OTPPurpose
 from repositories.user_repo import UserRepository
 from repositories.otp_repo import OTPRepository
@@ -176,8 +176,6 @@ def build_new_user_data(
     """
     now = datetime.now(timezone.utc)
 
-    # Map provider string to AuthProvider enum
-    from models.user_model import AuthProvider
     provider_enum_map = {
         "google": AuthProvider.GOOGLE,
         "github": AuthProvider.GITHUB,
@@ -278,13 +276,6 @@ async def link_or_create_user(
         "last_login": now_iso,
     }
 
-    provider_enum_map = {
-        "google": "google",
-        "github": "github",
-        "linkedin": "linkedin",
-        "password": "email",
-    }
-    from models.user_model import AuthProvider
     provider_enum_rev = {
         "google": AuthProvider.GOOGLE,
         "github": AuthProvider.GITHUB,

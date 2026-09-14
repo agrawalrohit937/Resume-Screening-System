@@ -28,7 +28,6 @@ from workflows.ats_graph import ats_engine
 from services.strict_ats_service import run_strict_ats_check
 from utils.validators import validate_object_id
 import time
-import traceback
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -176,25 +175,6 @@ async def match_resume(
             detail="Resume contains no parsed text.",
         )
 
-    # ── [DEBUG] Verify raw_text content for gap-analysis bug ──────────────
-    debug_needles = ["express.js", "node.js", "vector database", "pinecone",
-                     "express", "node", "vector", "pinecone"]
-    print("\n" + "=" * 80)
-    print("[ATS_ROUTE DEBUG] match_resume — raw_text verification:")
-    print(f"  raw_text length: {len(raw_text)} chars, {len(raw_text.split())} words")
-    print(f"  raw_text preview (first 300 chars):")
-    print(f"    '''{raw_text[:300]}'''")
-    print(f"  raw_text preview (last 200 chars):")
-    print(f"    '''{raw_text[-200:]}'''")
-    print(f"  Targeted skill presence in raw_text:")
-    for needle in debug_needles:
-        found = needle.lower() in raw_text.lower()
-        print(f"    {'✅' if found else '❌'} '{needle}': {'FOUND' if found else 'NOT FOUND'}")
-    # Check all extracted skills from the parsed data
-    extracted_skills = (resume.parsed_data.skills if resume.parsed_data else []) or []
-    print(f"  Extracted skills from parser: {extracted_skills}")
-    print("=" * 80 + "\n")
-
     # Save Job Description (Fail-safe)
     jd = None
     try:
@@ -216,8 +196,6 @@ async def match_resume(
         })
     except Exception as e:
         logger.exception("ATS graph execution failed", error=str(e))
-        print(f"[ATS ROUTE ERROR] ats_engine.ainvoke failed: {e}")
-        traceback.print_exc()
         err_detail = str(e).strip() or repr(e)
         raise HTTPException(
             status_code=500,

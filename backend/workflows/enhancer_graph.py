@@ -18,10 +18,13 @@ import json
 import re
 from typing import TypedDict, List, Optional, Dict, Any
 
+import structlog
 from google import genai
 from langgraph.graph import StateGraph, END
 from core.llm_client import gemini_key_pool
 from schemas.enhancement_schema import EnhancedResumeSection
+
+logger = structlog.get_logger(__name__)
 
 # ── State ─────────────────────────────────────────────────────────────────────
 class EnhancementState(TypedDict):
@@ -196,7 +199,7 @@ Output ONLY valid JSON matching this schema structure:
     try:
         enhanced_dict = await gemini_key_pool.execute_async_with_fallback(_enhance_with_gemini)
     except Exception as e:
-        print(f"[EnhancerGraph] Gemini LLM Enhancement Error after retries: {e}")
+        logger.error("Gemini LLM enhancement failed after retries", error=str(e))
         raise RuntimeError("Unable to enhance the resume using the Gemini AI model.") from e
 
     # ── Python Bullet Restore ─────────────────────────────────────────────────
