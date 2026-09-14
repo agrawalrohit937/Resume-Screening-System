@@ -3,9 +3,8 @@ Certificate Storage — Cloudinary (replaces FTP).
 """
 
 import asyncio
-from functools import partial
 
-from services.cloudinary_service import upload_certificate, delete_file as cloudinary_delete
+from services.cloudinary_service import upload_certificate
 
 
 class CloudinaryCertificateStorage:

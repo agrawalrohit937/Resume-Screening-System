@@ -6,7 +6,6 @@ Provides thread-safe round-robin key rotation and fallback logic for:
 2. Google Gemini API Key Pool (Gemini tasks: Email Generator, Cover Letter Generator)
 """
 
-import os
 import threading
 import structlog
 from typing import List, Optional, Callable, Any, Awaitable
@@ -141,7 +140,6 @@ class GeminiKeyPool:
                     self._index = (current_index + 1) % len(keys)
                 return result
             except Exception as e:
-                track_ai_request("gemini", "gemini-llm", "error", time.perf_counter() - t0)
                 err_str = str(e).lower()
                 is_rate_limit = any(
                     term in err_str

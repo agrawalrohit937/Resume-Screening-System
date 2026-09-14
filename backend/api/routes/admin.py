@@ -10,9 +10,9 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
-from api.deps import get_admin_user, get_db
+from api.deps import get_admin_user
 from config.db import get_database
-from models.user_model import UserModel, UserRole
+from models.user_model import UserModel
 from repositories.career_application_repo import CareerApplicationRepository
 from repositories.support_ticket_repo import SupportTicketRepository
 

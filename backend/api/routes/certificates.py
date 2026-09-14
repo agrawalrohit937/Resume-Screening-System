@@ -10,8 +10,6 @@ Endpoints:
   GET  /my             – authenticated: list the current user's certificates
 """
 
-import traceback
-
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -88,22 +86,9 @@ async def _do_issue(
         # should not be treated as an internal server error.
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as e:
-
-        # AGGRESSIVE DEBUG CATCH
-        import sys
-        import traceback
-        exc_info = traceback.format_exc()
-        
-        # Force print to terminal
-        print("\n" + "="*50)
-        print("CRITICAL BACKEND CRASH IN _do_issue:")
-        print(exc_info)
-        print("="*50 + "\n")
-        
-        # Force send to browser
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"CRASH REPORT: {str(e)} | TRACEBACK: {exc_info}"
+            detail=f"Certificate issuance failed: {str(e)}"
         )
 
     # Fire-and-forget: email PDF to user (non-blocking)
@@ -136,9 +121,6 @@ async def issue_certificate(
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
 ):
-    print("\n" + "!"*50)
-    print(f"REQUEST RECEIVED AT /ISSUE FOR USER: {current_user.email}")
-    print("!"*50 + "\n")
     """Issue a new certificate. Requires authentication and score ≥ 80."""
     if payload.certificate_type != "assessment":
         raise HTTPException(

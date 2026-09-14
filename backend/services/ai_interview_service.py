@@ -372,7 +372,6 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
         """Try LLM providers in order."""
         # Try Groq first (fastest)
         if settings.groq_api_keys:
-            print("-------------🚀 TRYING GROQ KEY POOL...")
             result = await self._call_groq(prompt, max_tokens)
             if result:
                 self._last_model_used = f"groq/{GROQ_MODEL}"
@@ -432,7 +431,7 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
         try:
             return await groq_key_pool.execute_async_with_fallback(_make_request)
         except Exception as e:
-            print("❌ GROQ EXCEPTION:", str(e))
+            logger.warning("Groq call failed", error=str(e))
             return None
 
     async def _call_mistral(self, prompt: str, max_tokens: int) -> Optional[str]:

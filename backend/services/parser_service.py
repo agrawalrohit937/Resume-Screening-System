@@ -129,16 +129,9 @@ class ParserService:
         certs = self._extract_certifications(sections.get("certifications", ""))
         total_exp = extract_years_of_experience(raw_text)
 
-        print("\n" + "="*70)
-        print("📄 [PARSER_SERVICE] Raw Resume Structured:")
-        print(f"   👤 Name      : '{full_name}'")
-        print(f"   📍 Location  : '{contact.location}'")
-        print(f"   📧 Email     : '{contact.email}'")
-        print(f"   📱 Phone     : '{contact.phone}'")
-        print(f"   🛠️ TechSkills : {len(tech_skills)} skills")
-        print(f"   🚀 Projects  : {len(projects)} projects")
-        print(f"   💼 Exp       : {len(experience)} entries ({total_exp} yrs)")
-        print("="*70 + "\n")
+        logger.debug("Resume parsed",
+            name=full_name, tech_skills=len(tech_skills),
+            projects=len(projects), experience_years=total_exp)
 
         # Fallback: calculate experience from work entries
         if total_exp == 0.0 and experience:

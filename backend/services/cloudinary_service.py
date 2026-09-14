@@ -208,11 +208,6 @@ async def upload_ats_resume(file_bytes: bytes, filename: str) -> Tuple[str, str]
                 unique_filename=False,
             )
 
-            print("========== ATS CLOUDINARY RESULT ==========")
-            for k, v in result.items():
-                print(k, ":", v)
-            print("===========================================")
-
             return result
 
         finally:

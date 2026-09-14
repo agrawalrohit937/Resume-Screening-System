@@ -8,12 +8,14 @@ Pipeline:
 
 from typing import TypedDict, List, Dict, Any
 from langgraph.graph import StateGraph, END
+import structlog
 from services.nlp_extractor import extract_resume_data_deterministic
 from services.strict_ats_service import (
     evaluate_knockout_math,
     compute_vector_similarity
 )
 
+logger = structlog.get_logger(__name__)
 
 # 1. Define the Global State
 class ATSState(TypedDict, total=False):
@@ -54,9 +56,9 @@ async def extract_resume_data(state: ATSState):
 
     skills_found = len(extracted_dict.get("skills", []) or [])
     if skills_found < 3:
-        print(
-            f"[ATSGraph] WARNING: Deterministic extractor found {skills_found} skills. "
-            "Check resume raw text quality."
+        logger.warning(
+            "Deterministic extractor found few skills — check resume raw text quality",
+            skills_found=skills_found,
         )
 
     return {"extracted_data": extracted_dict}

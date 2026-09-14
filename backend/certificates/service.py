@@ -8,7 +8,6 @@ from certificates.qr import build_verification_url, generate_qr_image
 from certificates.registry import get_registry_entry
 from certificates.renderer import render_certificate_pdf
 from certificates.skill_icons import resolve_skill_icon_path
-from core.config import settings
 from models.certificate_model import CertificateRecord
 
 
@@ -105,17 +104,14 @@ class CertificateService:
         try:
             pdf_bytes = render_certificate_pdf(template_dir, render_context)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.error("Certificate PDF rendering failed", error=str(e))
             raise
 
         filename = f"{cert_id}.pdf"
         try:
-            print(f"PDF Size = {len(pdf_bytes)/1024:.2f} KB")
             public_url, _public_id = await FTPCertificateStorage.async_upload(filename, pdf_bytes)
-        except Exception:
-            import traceback
-            traceback.print_exc()
+        except Exception as e:
+            logger.error("Certificate upload failed", error=str(e))
             raise
 
         record = CertificateRecord(
@@ -132,9 +128,8 @@ class CertificateService:
         )
         try:
             await record.persist()
-        except Exception:
-            import traceback
-            traceback.print_exc()
+        except Exception as e:
+            logger.error("Certificate DB persist failed", error=str(e))
             raise
 
         return record, pdf_bytes

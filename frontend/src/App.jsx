@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import React, { Suspense, lazy, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 

@@ -632,10 +632,6 @@ async def ai_extract_portfolio_from_resume(raw_text: str, original_parsed: Optio
         return {}
 
     try:
-        print("\n" + "="*70)
-        print("🤖 [PORTFOLIO_AI] Starting Gemini AI Extraction via workflows.enhancer_graph...")
-        print(f"📄 [PORTFOLIO_AI] Resume text snippet: {raw_text[:120]}... (Total len: {len(raw_text)})")
-        print("="*70)
 
         state = {
             "resume_text": raw_text,
@@ -725,15 +721,8 @@ async def ai_extract_portfolio_from_resume(raw_text: str, original_parsed: Optio
         bio = enhanced_data.get("summary") or ""
         location = contact.get("location") or ""
 
-        print(f"✅ [PORTFOLIO_AI] Gemini AI Extraction Successful!")
-        print(f"   👤 Name    : {full_name}")
-        print(f"   🎯 Headline: {headline}")
-        print(f"   📍 Location: {location}")
-        print(f"   📝 Bio     : {bio[:70]}...")
-        print(f"   🚀 Projects: {len(clean_projects)} parsed")
-        print(f"   💼 Exp     : {len(clean_experience)} entries")
-        print(f"   🎓 Edu     : {len(clean_education)} entries")
-        print("="*70 + "\n")
+        logger.debug("AI portfolio extraction complete",
+            name=full_name, headline=headline, projects=len(clean_projects))
 
         return {
             "full_name": full_name,
@@ -751,6 +740,5 @@ async def ai_extract_portfolio_from_resume(raw_text: str, original_parsed: Optio
             "education": clean_education
         }
     except Exception as e:
-        print(f"❌ [PORTFOLIO_AI] Gemini AI Extraction Failed: {e}")
         logger.warning("Enhancer graph integration fallback", error=str(e))
         return {}

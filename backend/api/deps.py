@@ -5,7 +5,7 @@ Dependency Injection — Auth guards, DB access, service instances
 from typing import Annotated, Optional
 
 import structlog
-from fastapi import Depends, HTTPException, Header, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from config.db import get_database
@@ -18,15 +18,11 @@ from repositories.result_repo import ResultRepository
 from repositories.otp_repo import OTPRepository
 from services.parser_service import ParserService
 from services.skill_service import SkillService
-
 from services.ai_interview_service import AIInterviewService
 from services.github_service import GitHubService
 from services.pdf_generator_service import PDFGeneratorService
 from services.email_service import EmailService
 from services.otp_service import OTPService
-from fastapi import Request, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from typing import Optional, Annotated
 
 logger = structlog.get_logger(__name__)
 security = HTTPBearer(auto_error=False)
@@ -61,6 +57,8 @@ def get_parser_service() -> ParserService:
 
 def get_skill_service() -> SkillService:
     return SkillService()
+
+
 def get_interview_service() -> AIInterviewService:
     return AIInterviewService()
 

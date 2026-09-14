@@ -3,7 +3,6 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from core.config import settings
 from api.deps import get_current_user, get_user_repo
 from models.user_model import UserModel
 from schemas.user_schema import MessageResponse

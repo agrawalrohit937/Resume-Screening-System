@@ -199,9 +199,6 @@ async def enhance_and_download(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        traceback_str = traceback.format_exc()
-        print(f"[Enhance] CRITICAL ERROR: {str(e)}\n{traceback_str}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Enhancement failed: {str(e)}"
