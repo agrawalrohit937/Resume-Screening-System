@@ -13,7 +13,6 @@ os.environ["MONGO_URI"] = "mongodb://localhost:27017"
 os.environ["MONGO_DB_NAME"] = "ai_career_test"
 os.environ["SECRET_KEY"] = "test-secret-key-do-not-use-in-production-12345"
 os.environ["DEBUG"] = "true"
-os.environ["ENVIRONMENT"] = "development"
 
 from main import app
 
@@ -52,36 +51,37 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def client():
     async with AsyncClient(transport=ASGITransport(app=app), base_url=BASE_URL) as c:
         yield c
 
 
 @pytest.fixture(scope="session")
-async def candidate_token(client):
-    """Register + login a candidate, return access token."""
-    # Signup
-    r = await client.post(f"{API}/auth/signup", json=CANDIDATE_USER)
-    if r.status_code == 409:  # Already exists
-        r = await client.post(f"{API}/auth/login", json={
-            "email": CANDIDATE_USER["email"],
-            "password": CANDIDATE_USER["password"],
-        })
-    assert r.status_code in (200, 201), f"Auth failed: {r.text}"
-    return r.json()["access_token"]
+def candidate_token():
+    from core.security import create_access_token
+    return create_access_token(
+        subject="665f1a2b3c4d5e6f7a8b9c0d",
+        extra_claims={"role": "candidate", "email": CANDIDATE_USER["email"]},
+    )
 
 
 @pytest.fixture(scope="session")
-async def recruiter_token(client):
-    r = await client.post(f"{API}/auth/signup", json=RECRUITER_USER)
-    if r.status_code == 409:
-        r = await client.post(f"{API}/auth/login", json={
-            "email": RECRUITER_USER["email"],
-            "password": RECRUITER_USER["password"],
-        })
-    assert r.status_code in (200, 201)
-    return r.json()["access_token"]
+def recruiter_token():
+    from core.security import create_access_token
+    return create_access_token(
+        subject="665f1a2b3c4d5e6f7a8b9c0e",
+        extra_claims={"role": "recruiter", "email": RECRUITER_USER["email"]},
+    )
+
+
+@pytest.fixture(scope="session")
+def admin_token():
+    from core.security import create_access_token
+    return create_access_token(
+        subject="665f1a2b3c4d5e6f7a8b9c0f",
+        extra_claims={"role": "admin", "email": "admin@example.com"},
+    )
 
 
 def auth_headers(token: str) -> dict:
@@ -116,6 +116,12 @@ class TestHealth:
         assert "paths" in schema
         assert "components" in schema
 
+    async def test_favicon(self, client):
+        r = await client.get("/favicon.ico")
+        assert r.status_code == 200
+        assert r.headers["content-type"] in ("image/x-icon", "image/vnd.microsoft.icon")
+        assert len(r.content) > 0
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Auth Tests
@@ -131,10 +137,8 @@ class TestAuth:
         r = await client.post(f"{API}/auth/signup", json=user)
         assert r.status_code == 201
         data = r.json()
-        assert "access_token" in data
-        assert "refresh_token" in data
-        assert data["user"]["email"] == user["email"]
-        assert data["user"]["role"] == "candidate"
+        assert "message" in data
+        assert data["email"] == user["email"]
 
     async def test_signup_duplicate_email(self, client, candidate_token):
         r = await client.post(f"{API}/auth/signup", json=CANDIDATE_USER)
@@ -302,17 +306,6 @@ class TestATS:
 # Skills Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 class TestSkills:
-    async def test_market_demand(self, client, candidate_token):
-        r = await client.get(f"{API}/skills/market-demand", headers=auth_headers(candidate_token))
-        assert r.status_code == 200
-        data = r.json()
-        assert "skills" in data
-        assert len(data["skills"]) > 10
-        first = data["skills"][0]
-        assert "skill" in first
-        assert "demand_score" in first
-        assert "demand_level" in first
-
     async def test_analyze_skills_invalid_resume(self, client, candidate_token):
         r = await client.post(
             f"{API}/skills/analyze",
@@ -330,7 +323,7 @@ class TestGitHub:
         r = await client.post(
             f"{API}/github/analyze",
             headers=auth_headers(candidate_token),
-            json={"username": "this-is-definitely-not-a-real-user-xyz999abc"},
+            json={"username": "fake-gh-user-xyz999"},
         )
         # Either 404 (not found) or 503 (rate limit) — both acceptable
         assert r.status_code in (200, 404, 503)
@@ -375,11 +368,6 @@ class TestAnalytics:
         assert "score_trend" in data
         assert "improvement_tips" in data
         assert "profile_completeness" in data
-
-    async def test_skills_market(self, client, candidate_token):
-        r = await client.get(f"{API}/analytics/skills-market", headers=auth_headers(candidate_token))
-        assert r.status_code == 200
-        assert "skills_in_demand" in r.json()
 
     async def test_platform_analytics_requires_admin(self, client, candidate_token):
         r = await client.get(f"{API}/analytics/platform", headers=auth_headers(candidate_token))

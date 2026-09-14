@@ -59,8 +59,8 @@ class GitHubService:
         resp = await client.get(f"{self.base_url}/users/{username}", headers=self.headers)
         if resp.status_code == 404:
             raise ValueError(f"GitHub user '{username}' not found.")
-        if resp.status_code == 403:
-            raise RuntimeError("GitHub API rate limit exceeded. Set GITHUB_TOKEN in config.")
+        if resp.status_code in (401, 403):
+            raise RuntimeError("GitHub API rate limit exceeded or credentials invalid.")
         resp.raise_for_status()
         return resp.json()
 

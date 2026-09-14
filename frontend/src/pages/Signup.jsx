@@ -9,12 +9,7 @@ import { Mail, Lock, User, Eye, EyeOff, Briefcase, ArrowRight, CheckCircle2 } fr
 
 const illustration = '/illustration.webp';
 
-const getOAuthRedirectUri = (envVal, path) => {
-  if (envVal && typeof envVal === 'string' && !envVal.includes('localhost')) {
-    return envVal;
-  }
-  return `${window.location.origin}${path}`;
-};
+const getOAuthRedirectUri = (envVal, path) => envVal || `${window.location.origin}${path}`;
 
 const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || '860awpba0h82no';
 const LINKEDIN_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_LINKEDIN_REDIRECT_URI, '/linkedin-callback');

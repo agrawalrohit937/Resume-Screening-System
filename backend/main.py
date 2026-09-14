@@ -1,216 +1,255 @@
 """
 AI Career Co-Pilot & Smart ATS + Interview Platform
-Entry Point — FastAPI Application Bootstrap
+FastAPI Application Entry Point & Production Bootstrap
 """
-import os
+import asyncio
 import sys
 import time
-import asyncio
-import traceback # Added for debugging
-import structlog
-
-# ── Windows asyncio subprocess fix ───────────────────────────────────────────
-# On Windows, uvicorn defaults to SelectorEventLoop which cannot spawn
-# subprocesses.  Playwright needs subprocess transport to launch Chromium.
-# ProactorEventLoop supports subprocesses and must be set BEFORE the loop
-# is created by uvicorn.
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-# ─────────────────────────────────────────────────────────────────────────────
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status, HTTPException
+from pathlib import Path
+
+import structlog
+from fastapi import Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from starlette.responses import Response
-from dotenv import load_dotenv
-from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+from fastapi.openapi.docs import get_redoc_html
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
-# --- Existing imports ---
-from api.routes import (
-    auth, resume, ats, explain, enhance,
-    interview, pdf_gen, recruiter, recruiter_v2, analytics, health,
-    github, payment
-)
-from api.routes.users import router as users_routes
-from api.routes.recruiter_v2 import router as recruiter_v2_router
-from api.routes.fake_detect import router as fake_detect_router
-from api.routes.interview_ai import router as interview_ai_router
-from api.routes.interview_analytics import router as interview_analytics_router
-from api.routes.live_interview import router as live_interview_router
-from api.routes.certificates import router as certificates_router
-from api.routes.copilot import router as copilot_router
-from api.routes.apply_assistant import router as apply_assistant_router
-from api.routes.support import router as support_router
-from api.routes.gmail_oauth import router as gmail_oauth_router
-from api.routes.notifications import router as notifications_router
-from api.routes.careers import router as careers_router
-from api.routes.admin import router as admin_router
-from api.routes.portfolio import router as portfolio_router
-from api.routes.revenue_recovery import router as revenue_recovery_router
+from pydantic import ValidationError
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
+# Windows asyncio subprocess fix: ProactorEventLoop required for Playwright subprocesses
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from config.db import connect_db, disconnect_db
 from core.config import settings
 from core.logging import setup_logging
 
-# Load and Setup
-load_dotenv()
+from api.routes import (
+    admin,
+    analytics,
+    apply_assistant,
+    ats,
+    auth,
+    careers,
+    certificates,
+    copilot,
+    enhance,
+    github,
+    gmail_oauth,
+    health,
+    interview,
+    interview_ai,
+    live_interview,
+    notifications,
+    payment,
+    pdf_gen,
+    portfolio,
+    recruiter,
+    recruiter_v2,
+    resume,
+    revenue_recovery,
+    support,
+    users,
+)
+
 setup_logging()
 logger = structlog.get_logger(__name__)
-print("SERVER IS ALIVE AND WORKING!")
-# Prometheus Metrics
-REQUEST_COUNT = Counter("http_requests_total", "Total requests", ["method", "endpoint", "status"])
-REQUEST_LATENCY = Histogram("http_request_duration_seconds", "Latency", ["method", "endpoint"])
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["300/minute"])
+
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.redoc.ly https://storage.googleapis.com https://www.googletagmanager.com https://accounts.google.com; "
+        "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com; "
+        "worker-src 'self' blob:; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob: https: https://fastapi.tiangolo.com https://cdn.redoc.ly; "
+        "connect-src 'self' https: ws: wss: https://api.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://raw.githubusercontent.com blob: data:; "
+        "object-src 'none'; "
+        "base-uri 'self';"
+    ),
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+FAVICON_PATH = Path(__file__).resolve().parent.parent / "frontend" / "public" / "favicon.ico"
+if not FAVICON_PATH.is_file():
+    _alt_favicon = Path(__file__).resolve().parent.parent / "frontend" / "dist" / "favicon.ico"
+    if _alt_favicon.is_file():
+        FAVICON_PATH = _alt_favicon
+    else:
+        _backend_logo = Path(__file__).resolve().parent / "certificates" / "assets" / "skill_icons" / "qr_logo.png"
+        if _backend_logo.is_file():
+            FAVICON_PATH = _backend_logo
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Career Platform", version=settings.APP_VERSION)
     try:
         await asyncio.wait_for(connect_db(), timeout=15.0)
-        logger.info("MongoDB connected")
         FastAPICache.init(InMemoryBackend(), prefix="careershaala-cache")
         logger.info("FastAPICache initialized")
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise
     yield
-    await disconnect_db()
+    try:
+        await disconnect_db()
+    except Exception as exc:
+        logger.error("Shutdown error disconnecting database", error=str(exc))
     logger.info("Shutdown complete")
+
 
 def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         docs_url="/docs",
+        redoc_url=None,
+        openapi_url="/openapi.json",
         lifespan=lifespan,
     )
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    # Create profile upload directory if it doesn't exist
-    os.makedirs("uploads/profile", exist_ok=True)
 
-    # CORS Middleware — must be added BEFORE static mount so images get CORS headers
-    raw_origins = settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [str(settings.ALLOWED_ORIGINS)]
-    cors_origins = list(set(raw_origins) | {
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "https://resume-screening-system-lyart.vercel.app",
-        "https://careershala.tech",
-        "https://www.careershala.tech",
-    })
+    @app.exception_handler(RateLimitExceeded)
+    async def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+        return _rate_limit_exceeded_handler(request, exc)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_origin_regex=r"https://.*",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
+    @app.exception_handler(ValueError)
+    async def value_error_handler(request: Request, exc: ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(ValidationError)
+    async def validation_error_handler(request: Request, exc: ValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": jsonable_encoder(exc.errors())},
+        )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logger.exception(
+            "Unhandled server exception",
+            path=request.url.path,
+            method=request.method,
+            error=str(exc),
+        )
+        error_detail = {"detail": "Internal Server Error"}
+        if settings.DEBUG:
+            error_detail["error"] = str(exc)
+        return JSONResponse(status_code=500, content=error_detail)
+
+    # CORS & GZip Middlewares
+    cors_kwargs = {
+        "allow_origins": settings.ALLOWED_ORIGINS,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+        "expose_headers": ["*"],
+    }
+    if settings.CORS_ORIGIN_REGEX:
+        cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
-    # Serve uploaded profile photos — mounted AFTER CORS middleware so images
-    # served from /static/uploads carry Access-Control-Allow-Origin headers.
-    app.mount(
-        "/static/uploads",
-        StaticFiles(directory="uploads"),
-        name="uploads"
-    )
-
-    # Security Headers Middleware — strict headers for Lighthouse / OWASP security standards
+    # Security Headers Middleware
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         response = await call_next(request)
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://www.googletagmanager.com https://accounts.google.com; "
-            "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com; "
-            "worker-src 'self' blob:; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com data:; "
-            "img-src 'self' data: blob: https:; "
-            "connect-src 'self' https: ws: wss: https://api.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://cdn.jsdelivr.net https://unpkg.com https://storage.googleapis.com https://raw.githubusercontent.com blob: data:; "
-            "object-src 'none'; "
-            "base-uri 'self';"
-        )
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
-        response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers.update(SECURITY_HEADERS)
         return response
 
-    # Debugging Middleware: Prints every request to the terminal
+    # Request Timing Middleware
     @app.middleware("http")
-    async def request_debug_middleware(request: Request, call_next):
-        print(f"DEBUG: Received {request.method} request to {request.url.path}")
-        t = time.perf_counter()
+    async def add_process_time_header(request: Request, call_next):
+        if settings.DEBUG:
+            logger.debug("http_request", method=request.method, path=request.url.path)
+        start_time = time.perf_counter()
         response = await call_next(request)
-        duration = time.perf_counter() - t
-        REQUEST_COUNT.labels(request.method, request.url.path, response.status_code).inc()
-        REQUEST_LATENCY.labels(request.method, request.url.path).observe(duration)
+        duration = time.perf_counter() - start_time
         response.headers["X-Process-Time"] = f"{duration:.4f}s"
         return response
 
-    # GLOBAL EXCEPTION HANDLER: This will catch the 500 errors and print the trace
-    @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
-        print("!"*60)
-        print(f"CRITICAL ERROR DETECTED at {request.url.path}")
-        traceback.print_exc() # Prints full error to your terminal
-        print("!"*60, flush=True)
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal Server Error", "error": str(exc)}
+    # Favicon Endpoint
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        if FAVICON_PATH.is_file():
+            media_type = "image/png" if FAVICON_PATH.suffix == ".png" else "image/x-icon"
+            return FileResponse(FAVICON_PATH, media_type=media_type)
+        return Response(status_code=204)
+
+    # ReDoc Documentation Endpoint (Uses stable pinned CDN to prevent blank page issues)
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc_html():
+        return get_redoc_html(
+            openapi_url=app.openapi_url or "/openapi.json",
+            title=f"{app.title} - ReDoc",
+            redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.1.5/bundles/redoc.standalone.js",
+            with_google_fonts=True,
         )
 
+    # API Route Registrations
     p = settings.API_V1_PREFIX
 
-    # Routes
+    # Health & System
     app.include_router(health.router, tags=["Health"])
-    app.include_router(certificates_router, prefix=f"{p}/certificates", tags=["Certificates"])
+
+    # Authentication & User Management
     app.include_router(auth.router, prefix=f"{p}/auth", tags=["Auth"])
-    app.include_router(users_routes, prefix=f"{p}/users", tags=["Users"])
+    app.include_router(gmail_oauth.router, prefix=f"{p}/auth", tags=["Gmail OAuth"])
+    app.include_router(users.router, prefix=f"{p}/users", tags=["Users"])
+
+    # Resume & ATS Screening
     app.include_router(resume.router, prefix=f"{p}/resume", tags=["Resume"])
     app.include_router(ats.router, prefix=f"{p}/ats", tags=["ATS"])
-    app.include_router(explain.router, prefix=f"{p}/explain", tags=["Explain"])
     app.include_router(enhance.router, prefix=f"{p}/enhance", tags=["Enhance"])
     app.include_router(pdf_gen.router, prefix=f"{p}/pdf", tags=["PDF"])
+
+    # Recruiter Portal
     app.include_router(recruiter.router, prefix=f"{p}/recruiter", tags=["Recruiter"])
-    app.include_router(recruiter_v2_router, prefix=f"{p}/recruiter/v2", tags=["Recruiter V2"])
-    app.include_router(analytics.router, prefix=f"{p}/analytics", tags=["Analytics"])
-    app.include_router(fake_detect_router, prefix=f"{p}/fake-detect", tags=["Fake Detect"])
-    app.include_router(github.router, prefix=f"{p}/github", tags=["GitHub"])
+    app.include_router(recruiter_v2.router, prefix=f"{p}/recruiter/v2", tags=["Recruiter V2"])
+
+    # Interview Simulation & Analytics
     app.include_router(interview.router, prefix=f"{p}/interview", tags=["Interview"])
-    app.include_router(interview_ai_router, prefix=f"{p}/interview", tags=["AI Interview"])
-    app.include_router(live_interview_router, prefix=f"{p}/live-interview", tags=["Live Interview"])
-    app.include_router(interview_analytics_router, prefix=f"{p}/interview-analytics", tags=["Interview Analytics"])
+    app.include_router(interview_ai.router, prefix=f"{p}/interview", tags=["AI Interview"])
+    app.include_router(live_interview.router, prefix=f"{p}/live-interview", tags=["Live Interview"])
+
+    # AI Assistants & Integrations
+    app.include_router(copilot.router, prefix=f"{p}/copilot", tags=["AI Copilot"])
+    app.include_router(apply_assistant.router, prefix=f"{p}", tags=["Apply Assistant"])
+    app.include_router(github.router, prefix=f"{p}/github", tags=["GitHub"])
+    app.include_router(portfolio.router, prefix=f"{p}/portfolio", tags=["Portfolio Generator"])
+    app.include_router(certificates.router, prefix=f"{p}/certificates", tags=["Certificates"])
+
+    # Commerce, Billing & Growth
     app.include_router(payment.router, prefix=f"{p}/payment", tags=["Payment"])
-    app.include_router(payment.router, prefix="/api/payment", tags=["Payment Direct"])
-    app.include_router(payment.router, prefix="/payment", tags=["Payment Root"])
-    app.include_router(copilot_router, prefix=f"{p}/copilot", tags=["AI Copilot"])
-    app.include_router(apply_assistant_router, prefix=f"{p}", tags=["Apply Assistant"])
-    app.include_router(apply_assistant_router, prefix="/api", tags=["Apply Assistant Direct"])
-    app.include_router(support_router, prefix=f"{p}", tags=["Support"])
-    app.include_router(gmail_oauth_router, prefix=f"{p}/auth", tags=["Gmail OAuth"])
-    app.include_router(notifications_router, prefix=f"{p}/notifications", tags=["Notifications"])
-    app.include_router(careers_router, prefix=f"{p}/careers", tags=["Careers"])
-    app.include_router(careers_router, prefix="/api", tags=["Careers Direct"])
-    app.include_router(admin_router, prefix=f"{p}/admin", tags=["Admin"])
-    app.include_router(portfolio_router, prefix=f"{p}/portfolio", tags=["Portfolio Generator"])
-    app.include_router(portfolio_router, prefix="/api/portfolio", tags=["Portfolio Generator Direct"])
-    app.include_router(revenue_recovery_router, prefix=f"{p}/revenue-recovery", tags=["Revenue Recovery"])
-    app.include_router(revenue_recovery_router, prefix=f"{p}", tags=["Revenue Recovery Root"])
+    app.include_router(revenue_recovery.router, prefix=f"{p}/revenue-recovery", tags=["Revenue Recovery"])
+    app.include_router(revenue_recovery.router, prefix=f"{p}/admin/revenue-recovery", tags=["Revenue Recovery Admin"])
+
+    # Operations & Administration
+    app.include_router(analytics.router, prefix=f"{p}/analytics", tags=["Analytics"])
+    app.include_router(notifications.router, prefix=f"{p}/notifications", tags=["Notifications"])
+    app.include_router(careers.router, prefix=f"{p}/careers", tags=["Careers"])
+    app.include_router(support.router, prefix=f"{p}", tags=["Support"])
+    app.include_router(admin.router, prefix=f"{p}/admin", tags=["Admin"])
 
     return app
+
+
 app = create_application()

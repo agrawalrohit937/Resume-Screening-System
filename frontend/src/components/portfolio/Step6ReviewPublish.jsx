@@ -47,7 +47,7 @@ export default function Step6ReviewPublish({
             </span>
           ) : (
             <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200/80 inline-flex items-center gap-1">
-              <Lock size={12} className="text-indigo-600" /> Paywall Protected
+              <Sparkles size={12} className="text-indigo-600" /> Ready to Launch
             </span>
           )}
         </div>

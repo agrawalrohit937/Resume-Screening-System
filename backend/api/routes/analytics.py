@@ -97,23 +97,6 @@ async def get_platform_analytics(
     }
 
 
-@router.get("/skills-market")
-async def skills_market_analytics(
-    current_user: UserModel = Depends(get_current_user),
-    db=Depends(get_database),
-):
-    pipeline = [
-        {"$unwind": "$missing_skills"},
-        {"$group": {"_id": "$missing_skills", "demand_count": {"$sum": 1}}},
-        {"$sort": {"demand_count": -1}},
-        {"$limit": 20},
-    ]
-    cursor = db.results.aggregate(pipeline)
-    skills_data = [doc async for doc in cursor]
-    from services.skill_service import MARKET_DEMAND
-    enriched = [{"skill": item["_id"], "demand_count": item["demand_count"], "market_demand_score": MARKET_DEMAND.get(item["_id"], 0.5)} for item in skills_data]
-    enriched.sort(key=lambda x: x["market_demand_score"], reverse=True)
-    return {"skills_in_demand": enriched, "analysis_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}
 
 
 def _compute_profile_completeness(user: UserModel) -> dict:

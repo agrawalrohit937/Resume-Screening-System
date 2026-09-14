@@ -4,272 +4,149 @@ Application Configuration — Environment-driven settings via Pydantic v2
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
-from pydantic import Field, field_validator
+from dotenv import load_dotenv
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ENV_FILE_PATH = Path(__file__).resolve().parent.parent / ".env"
+if ENV_FILE_PATH.exists():
+    load_dotenv(str(ENV_FILE_PATH))
+
+
+def get_api_keys(prefix: str | List[str], count: int = 5, fallback: Optional[str] = None) -> List[str]:
+    """Collect unique, non-empty, stripped API keys from numbered env vars and optional fallback."""
+    prefixes = [prefix] if isinstance(prefix, str) else prefix
+    keys: List[str] = []
+
+    if fallback and (cleaned_fb := fallback.strip()) and cleaned_fb not in keys:
+        keys.append(cleaned_fb)
+
+    for p in prefixes:
+        for i in range(1, count + 1):
+            val = os.getenv(f"{p}_{i}")
+            if val and (cleaned := val.strip()) and cleaned not in keys:
+                keys.append(cleaned)
+
+    return keys
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(Path(__file__).resolve().parent.parent / ".env"),
+        env_file=str(ENV_FILE_PATH),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
 
-    # ── App ───────────────────────────────────────────────────────────────────
+    # ── 1. Application & URLs ──────────────────────────────────────────────────
     APP_NAME: str = "AI Career Co-Pilot & Smart ATS Platform"
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
-    ENVIRONMENT: str = Field(default="development", pattern="^(development|staging|production)$")
-    ENV: str = "development"
-    # ── MongoDB ───────────────────────────────────────────────────────────────
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # ── 2. Database (MongoDB) ──────────────────────────────────────────────────
     MONGO_URI: str = "mongodb://localhost:27017"
     MONGO_DB_NAME: str = "ai_career_platform"
     MONGO_MAX_CONNECTIONS: int = 100
     MONGO_MIN_CONNECTIONS: int = 10
 
-    # ── JWT ───────────────────────────────────────────────────────────────────
-    # [SEC-001] No default value — must be set via environment variable.
-    # Generate a secure key with: python -c "import secrets; print(secrets.token_hex(32))"
+    # ── 3. Security & JWT ─────────────────────────────────────────────────────
     SECRET_KEY: str = Field(..., min_length=32)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # ── CORS ──────────────────────────────────────────────────────────────────
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "https://resume-screening-system-lyart.vercel.app",
-        "https://careershala.tech",
-        "https://www.careershala.tech",
-    ]
+    # ── 4. CORS ───────────────────────────────────────────────────────────────
+    ALLOWED_ORIGINS: List[str] = Field(default_factory=list)
+    CORS_ORIGIN_REGEX: Optional[str] = None
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: Any) -> List[str]:
-        if isinstance(v, str):
-            if v.startswith("[") and v.endswith("]"):
-                import json
-                try:
-                    return json.loads(v)
-                except Exception:
-                    pass
-            return [i.strip() for i in v.split(",") if i.strip()]
-        elif isinstance(v, list):
-            return v
-        return [
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "https://resume-screening-system-lyart.vercel.app",
-            "https://careershala.tech",
-            "https://www.careershala.tech",
-        ]
-
-    # ── File Upload ───────────────────────────────────────────────────────────
+    # ── 5. File & Upload Constraints ──────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 10
-    ALLOWED_FILE_TYPES: List[str] = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+    ALLOWED_FILE_TYPES: List[str] = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
     UPLOAD_DIR: str = "./uploads"
 
-    # ── Application Base URLs (Environment-aware) ──────────────────────────────
-    APP_BASE_URL: str = Field(
-        default_factory=lambda: os.getenv(
-            "APP_BASE_URL",
-            os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://careershala.tech" if (os.getenv("RENDER") or os.getenv("VERCEL") or os.getenv("ENVIRONMENT") == "production") else "http://localhost:5173"))
-        )
-    )
-    FRONTEND_URL: str = Field(
-        default_factory=lambda: os.getenv(
-            "FRONTEND_URL",
-            os.getenv("APP_BASE_URL", "https://careershala.tech" if (os.getenv("RENDER") or os.getenv("VERCEL") or os.getenv("ENVIRONMENT") == "production") else "http://localhost:5173")
-        )
-    )
-    BASE_URL: str = Field(
-        default_factory=lambda: os.getenv(
-            "BASE_URL",
-            os.getenv("APP_BASE_URL", "https://careershala.tech" if (os.getenv("RENDER") or os.getenv("VERCEL") or os.getenv("ENVIRONMENT") == "production") else "http://localhost:5173")
-        )
-    )
+    PROFILE_MAX_SIZE_MB: int = 5
+    PROFILE_ALLOWED_CONTENT_TYPES: List[str] = [
+        "image/jpeg", "image/jpg", "image/png", "image/webp"
+    ]
+    PROFILE_IMAGE_MAX_DIMENSION: int = 1024
 
+    # ── 6. Cloudinary Storage ─────────────────────────────────────────────────
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
 
-# ── Cloudinary ───────────────────────────────────────────────────────────────
-    CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
-
-    # ── Brevo HTTP API & Multi-Inbox Email Settings ─────────────────────────
+    # ── 7. Email Communications (Brevo API + Inboxes) ─────────────────────────
     BREVO_API_KEY: Optional[str] = None
-    MAIL_FROM_EMAIL: Optional[str] = "admin@careershala.tech"
+    MAIL_FROM_EMAIL: Optional[str] = None
     MAIL_FROM_NAME: str = "CareerShala"
-    ADMIN_EMAIL: Optional[str] = "admin@careershala.tech"
-    SUPPORT_EMAIL: Optional[str] = "support@careershala.tech"
-    CAREERS_EMAIL: Optional[str] = "careers@careershala.tech"
-    INFO_EMAIL: Optional[str] = "info@careershala.tech"
+    ADMIN_EMAIL: Optional[str] = None
+    SUPPORT_EMAIL: Optional[str] = None
+    CAREERS_EMAIL: Optional[str] = None
+    INFO_EMAIL: Optional[str] = None
 
-    # Legacy SMTP Settings (kept for fallback compatibility)
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = Field(default_factory=lambda: int(os.getenv("SMTP_PORT", 587)))
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM_EMAIL: Optional[str] = "admin@careershala.tech"
-    SMTP_FROM_NAME: str = "CareerShala"
-    SMTP_USE_SSL: bool = Field(default_factory=lambda: os.getenv("SMTP_USE_SSL", "false").lower() == "true")
+    # ── 8. Payment Gateway (Razorpay) ─────────────────────────────────────────
+    RAZORPAY_KEY_ID: Optional[str] = None
+    RAZORPAY_KEY_SECRET: Optional[str] = None
+    RAZORPAY_WEBHOOK_SECRET: Optional[str] = None
 
+    # ── 9. AI / LLM Providers ─────────────────────────────────────────────────
+    GROQ_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None
 
-    # ── Razorpay Settings ───────────────────────────────────────────────────────
-    RAZORPAY_KEY_ID: Optional[str] = Field(default=None)
-    RAZORPAY_KEY_SECRET: Optional[str] = Field(default=None)
-    RAZORPAY_WEBHOOK_SECRET: Optional[str] = Field(default=None)
+    MISTRAL_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+    HF_TOKEN: Optional[str] = None
 
-    # ── PDF Generation ──────────────────────────────────────────────────────────
-    PDF_TIMEOUT_SECONDS: int = 60
-    PUBLIC_PDF_URL_BASE: str = Field(
-        default_factory=lambda: os.getenv(
-            "PUBLIC_PDF_URL_BASE",
-            "https://careershala-hghwgae4ebesdsb3.centralindia-01.azurewebsites.net/generated/"
-            if (os.getenv("ENVIRONMENT") == "production" or os.getenv("WEBSITE_SITE_NAME") or os.getenv("AZURE_HTTP_USER_AGENT"))
-            else "http://localhost:8000/generated/"
-        )
-    )
+    # ── 10. OAuth Integrations ────────────────────────────────────────────────
+    GOOGLE_CLIENT_ID: str = Field(...)
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_GMAIL_REDIRECT_URI: Optional[str] = None
 
-    # ── NLP / ML ──────────────────────────────────────────────────────────────
-    BERT_MODEL_NAME: str = "all-MiniLM-L6-v2"
-    BERT_SCORE_WEIGHT: float = 0.6
-    TFIDF_SCORE_WEIGHT: float = 0.4
-    MAX_SEQUENCE_LENGTH: int = 512
+    LINKEDIN_CLIENT_ID: Optional[str] = None
+    LINKEDIN_CLIENT_SECRET: Optional[str] = None
+    LINKEDIN_REDIRECT_URI: Optional[str] = None
 
-    # ── GitHub ────────────────────────────────────────────────────────────────
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+    GITHUB_REDIRECT_URI: Optional[str] = None
     GITHUB_TOKEN: Optional[str] = None
     GITHUB_API_BASE: str = "https://api.github.com"
 
-    # ── AI/LLM ────────────────────────────────────────────────────────────────
-    OPENAI_API_KEY: Optional[str] = None
-    ANTHROPIC_API_KEY: Optional[str] = None
-    LLM_PROVIDER: str = Field(default="anthropic", pattern="^(openai|anthropic|local)$")
-    LLM_MAX_TOKENS: int = 2048
-    LLM_TEMPERATURE: float = 0.7
-
-    # LinkedIn OAuth Settings
-    LINKEDIN_CLIENT_ID: Optional[str] = None
-    LINKEDIN_CLIENT_SECRET: Optional[str] = None
-
-    LINKEDIN_REDIRECT_URI: str = Field(
-        default_factory=lambda: os.getenv(
-            "LINKEDIN_REDIRECT_URI",
-            f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/linkedin-callback"
-        )
-    )
-
-    # GitHub OAuth Settings
-    GITHUB_CLIENT_ID: Optional[str] = None
-    GITHUB_CLIENT_SECRET: Optional[str] = None
-
-    GITHUB_REDIRECT_URI: str = Field(
-        default_factory=lambda: os.getenv(
-            "GITHUB_REDIRECT_URI",
-            f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/github-callback"
-        )
-    )
-
-    # ── Certificates ──────────────────────────────────────────────────────────
-    CERT_VERIFY_BASE_URL: Optional[str] = None
-    CERT_ISSUER_NAME: str = "CareerShala"
-
-    # ── Redis / Celery ────────────────────────────────────────────────────────
-    REDIS_URL: str = "redis://localhost:6379/0"
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
-
-    # ── Sentry ────────────────────────────────────────────────────────────────
-    SENTRY_DSN: Optional[str] = None
-
-    # ── Rate Limiting ─────────────────────────────────────────────────────────
-    RATE_LIMIT_REQUESTS: int = 100
-    RATE_LIMIT_WINDOW_SECONDS: int = 60
-
-    # ── Pagination ────────────────────────────────────────────────────────────
-    DEFAULT_PAGE_SIZE: int = 20
-    MAX_PAGE_SIZE: int = 100
-
-    GROQ_API_KEY: str | None = None
-    GROQ_API_KEY_1: Optional[str] = None
-    GROQ_API_KEY_2: Optional[str] = None
-    GROQ_API_KEY_3: Optional[str] = None
-    GROQ_API_KEY_4: Optional[str] = None
-    GROQ_API_KEY_5: Optional[str] = None
-    GROQ_API_KEY_6: Optional[str] = None
-    GROQ_API_KEY_7: Optional[str] = None
-    GROQ_API_KEY_8: Optional[str] = None
-    GROQ_API_KEY_9: Optional[str] = None
-    GROQ_API_KEY_10: Optional[str] = None
-    GROQ_API_KEYS: Optional[str] = None
-
-    GEMINI_API_KEY: Optional[str] = None
-    GEMINI_API_KEY_1: Optional[str] = None
-    GEMINI_API_KEY_2: Optional[str] = None
-    GEMINI_API_KEY_3: Optional[str] = None
-    GEMINI_API_KEY_4: Optional[str] = None
-    GEMINI_API_KEY_5: Optional[str] = None
-    GEMINI_API_KEYS: Optional[str] = None
-
-    GOOGLE_API_KEY: Optional[str] = None
-    GOOGLE_API_KEY_1: Optional[str] = None
-    GOOGLE_API_KEY_2: Optional[str] = None
-    GOOGLE_API_KEY_3: Optional[str] = None
-    GOOGLE_API_KEY_4: Optional[str] = None
-    GOOGLE_API_KEY_5: Optional[str] = None
-    GOOGLE_API_KEYS: Optional[str] = None
-
-    MISTRAL_API_KEY: str | None = None
-    GAMIFICATION_ENABLED: bool = True
-    LEADERBOARD_SIZE: int = 50
-    # [SEC-003] No default value — must be set via environment variable.
-    # The Client ID from Google Cloud Console → Credentials → OAuth 2.0 Client ID.
-    GOOGLE_CLIENT_ID: str = Field(...)
-
-    # ── Google OAuth — Authorization Code Flow (Gmail offline access) ─────────
-    # Required to exchange auth codes for refresh tokens. Get this from
-    # Google Cloud Console → Credentials → OAuth 2.0 Client ID → Download JSON.
-    GOOGLE_CLIENT_SECRET: Optional[str] = None
-    # The redirect URI registered in Google Cloud Console for the Gmail OAuth flow.
-    # Must match EXACTLY (including http/https) with what's in Google Console.
-    GOOGLE_GMAIL_REDIRECT_URI: str = Field(
-        default_factory=lambda: os.getenv(
-            "GOOGLE_GMAIL_REDIRECT_URI",
-            f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/gmail-callback"
-        )
-    )
-
-    # ── OTP / Email Verification (NEW) ────────────────────────────────────────
+    # ── 11. Security Verification & OTP ───────────────────────────────────────
     OTP_LENGTH: int = 6
     OTP_EXPIRE_MINUTES: int = 5
     OTP_MAX_ATTEMPTS: int = 3
     OTP_RESEND_COOLDOWN_SECONDS: int = 60
     OTP_MAX_PER_HOUR: int = 100
 
-    # ── Trusted Device / Login OTP (NEW) ───────────────────────────────────────
     TRUSTED_DEVICE_COOKIE_NAME: str = "device_id"
     TRUSTED_DEVICE_EXPIRE_DAYS: int = 30
     REQUIRE_OTP_FOR_NEW_DEVICE: bool = False
     LOGIN_CHALLENGE_EXPIRE_MINUTES: int = 10
 
-    # ── Profile Photo Upload ────────────────────────────────────────────────────
-    PROFILE_UPLOAD_DIR: str = "uploads/profile"
-    PROFILE_MAX_SIZE_MB: int = 5
-    PROFILE_ALLOWED_CONTENT_TYPES: List[str] = [
-        "image/jpeg", "image/jpg", "image/png", "image/webp"
-    ]
-    PROFILE_IMAGE_MAX_DIMENSION: int = 1024  # px, longest side after compression
-    STATIC_UPLOADS_URL_PREFIX: str = "/static/uploads"
+    # ── 12. Certificates & Pagination ─────────────────────────────────────────
+    CERT_VERIFY_BASE_URL: Optional[str] = None
+    CERT_ISSUER_NAME: str = "CareerShala"
+    DEFAULT_PAGE_SIZE: int = 20
+    MAX_PAGE_SIZE: int = 100
 
-    @field_validator("BERT_SCORE_WEIGHT", "TFIDF_SCORE_WEIGHT")
-    @classmethod
-    def weights_must_sum_to_one(cls, v, info):
-        return v  # Checked at app startup
+    # ── URL Normalization ─────────────────────────────────────────────────────
+    @model_validator(mode="after")
+    def _finalize_settings(self) -> "Settings":
+        if self.FRONTEND_URL:
+            self.FRONTEND_URL = self.FRONTEND_URL.strip().rstrip("/")
+        return self
 
+    # ── Helper Properties ─────────────────────────────────────────────────────
     @property
     def max_file_bytes(self) -> int:
         return self.MAX_FILE_SIZE_MB * 1024 * 1024
@@ -279,112 +156,28 @@ class Settings(BaseSettings):
         return self.PROFILE_MAX_SIZE_MB * 1024 * 1024
 
     @property
-    def smtp_from(self) -> str:
-        return self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "admin@careershala.tech"
-
-    @property
     def mail_sender(self) -> dict:
-        email = self.MAIL_FROM_EMAIL or self.SMTP_FROM_EMAIL or self.SMTP_USER or "admin@careershala.tech"
-        name = self.MAIL_FROM_NAME or self.SMTP_FROM_NAME or "CareerShala"
+        email = self.MAIL_FROM_EMAIL or self.ADMIN_EMAIL or "notifications@localhost"
+        name = self.MAIL_FROM_NAME or "Career Platform"
         return {"name": name, "email": email}
 
     @property
-    def careers_recipient(self) -> dict:
-        return {"name": "CareerShala Hiring Team", "email": self.CAREERS_EMAIL or "careers@careershala.tech"}
-
-    @property
-    def support_recipient(self) -> dict:
-        return {"name": "CareerShala Support Team", "email": self.SUPPORT_EMAIL or "support@careershala.tech"}
-
-    @property
-    def info_recipient(self) -> dict:
-        return {"name": "CareerShala Inquiries", "email": self.INFO_EMAIL or "info@careershala.tech"}
-
-    @property
     def cert_verify_base_url(self) -> str:
-        if self.CERT_VERIFY_BASE_URL and "careershala.com" not in self.CERT_VERIFY_BASE_URL and "localhost" not in self.CERT_VERIFY_BASE_URL:
+        if self.CERT_VERIFY_BASE_URL:
             return self.CERT_VERIFY_BASE_URL.rstrip("/")
-        
-        url_candidates = [self.CERT_VERIFY_BASE_URL, self.FRONTEND_URL, self.APP_BASE_URL, self.BASE_URL]
-        base = None
-        for candidate in url_candidates:
-            if candidate and "localhost" not in candidate and "careershala.com" not in candidate:
-                base = candidate.rstrip("/")
-                break
-        
-        if not base:
-            if self.ENVIRONMENT == "production" or os.getenv("RENDER") or os.getenv("VERCEL"):
-                base = "https://careershala.tech"
-            else:
-                base = (self.APP_BASE_URL or self.FRONTEND_URL or "http://localhost:5173").rstrip("/")
-                
-        return f"{base}/verify"
+        return f"{self.FRONTEND_URL.rstrip('/')}/verify"
 
     @property
     def groq_api_keys(self) -> List[str]:
-        """Discovers all available Groq API keys from settings and environment variables.
-        Checks GROQ_API_KEY_1..10, GROQ_API_KEYS (comma-separated), and GROQ_API_KEY as fallback."""
-        keys: List[str] = []
-        i = 1
-        while True:
-            val = getattr(self, f"GROQ_API_KEY_{i}", None) or os.getenv(f"GROQ_API_KEY_{i}")
-            if val and str(val).strip():
-                k = str(val).strip()
-                if k not in keys:
-                    keys.append(k)
-                i += 1
-            else:
-                break
-
-        groq_keys_str = self.GROQ_API_KEYS or os.getenv("GROQ_API_KEYS")
-        if groq_keys_str:
-            for k in str(groq_keys_str).split(","):
-                if k.strip() and k.strip() not in keys:
-                    keys.append(k.strip())
-
-        if self.GROQ_API_KEY and self.GROQ_API_KEY.strip() and self.GROQ_API_KEY.strip() not in keys:
-            keys.append(self.GROQ_API_KEY.strip())
-
-        single_env = os.getenv("GROQ_API_KEY")
-        if single_env and single_env.strip() and single_env.strip() not in keys:
-            keys.append(single_env.strip())
-
-        return keys
+        return get_api_keys("GROQ_API_KEY", count=5, fallback=self.GROQ_API_KEY)
 
     @property
     def gemini_api_keys(self) -> List[str]:
-        """Discovers all available Gemini/Google API keys from settings and environment variables.
-        Checks GEMINI_API_KEY_1..5, GOOGLE_API_KEY_1..5, GEMINI_API_KEYS / GOOGLE_API_KEYS, and single fallbacks."""
-        keys: List[str] = []
-        i = 1
-        while True:
-            val = (
-                getattr(self, f"GEMINI_API_KEY_{i}", None)
-                or os.getenv(f"GEMINI_API_KEY_{i}")
-                or getattr(self, f"GOOGLE_API_KEY_{i}", None)
-                or os.getenv(f"GOOGLE_API_KEY_{i}")
-            )
-            if val and str(val).strip():
-                k = str(val).strip()
-                if k not in keys:
-                    keys.append(k)
-                i += 1
-            else:
-                break
-
-        for env_name in ["GEMINI_API_KEYS", "GOOGLE_API_KEYS"]:
-            env_str = getattr(self, env_name, None) or os.getenv(env_name)
-            if env_str:
-                for k in str(env_str).split(","):
-                    if k.strip() and k.strip() not in keys:
-                        keys.append(k.strip())
-
-        for key_attr in ["GEMINI_API_KEY", "GOOGLE_API_KEY"]:
-            single_k = getattr(self, key_attr, None) or os.getenv(key_attr)
-            if single_k and str(single_k).strip() and str(single_k).strip() not in keys:
-                keys.append(str(single_k).strip())
-
-        return keys
+        return get_api_keys(
+            ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+            count=5,
+            fallback=self.GEMINI_API_KEY or self.GOOGLE_API_KEY,
+        )
 
 
 @lru_cache()

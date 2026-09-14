@@ -16,7 +16,6 @@ async def health_check(db=Depends(get_database)):
     return {
         "status": "ok" if db_status == "ok" else "degraded",
         "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "services": {"mongodb": db_status, "api": "ok"},
     }

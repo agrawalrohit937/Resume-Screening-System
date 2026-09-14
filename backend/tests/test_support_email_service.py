@@ -137,16 +137,12 @@ def test_support_ticket_repo_normalizes_naive_datetimes_to_utc():
 
 
 def test_email_settings_are_loaded_from_env_file():
-    assert settings.SMTP_HOST == "smtp.gmail.com"
-    assert settings.SMTP_USER
-    assert settings.SMTP_PASSWORD
+    assert settings.BREVO_API_KEY
+    assert settings.MAIL_FROM_NAME == "CareerShala"
     assert settings.SUPPORT_EMAIL == "support@careershala.tech"
     assert settings.ADMIN_EMAIL == "admin@careershala.tech"
     assert settings.CAREERS_EMAIL == "careers@careershala.tech"
     assert settings.INFO_EMAIL == "info@careershala.tech"
-    assert settings.careers_recipient["email"] == "careers@careershala.tech"
-    assert settings.support_recipient["email"] == "support@careershala.tech"
-    assert settings.info_recipient["email"] == "info@careershala.tech"
 
 
 @pytest.mark.asyncio

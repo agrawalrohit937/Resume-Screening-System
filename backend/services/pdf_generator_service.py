@@ -247,7 +247,7 @@ class PDFGeneratorService:
         context = self._normalize_resume_context(resume_data)
 
         template_dir = self._template_dir()
-        env = Environment(loader=FileSystemLoader(template_dir))
+        env = Environment(loader=FileSystemLoader(template_dir), autoescape=True)
         template_obj = env.get_template(self._resolve_template_name(template))
         render_context = {k: v for k, v in context.items() if k != "recommended_skills"}
         html_content = template_obj.render(**render_context)

@@ -76,8 +76,7 @@ class CertificateService:
         CertificateService._register_fonts()
 
         cert_id = str(uuid.uuid4())
-        verify_base = getattr(settings, "CERT_VERIFY_BASE_URL", "https://careershala.com/verify/cert")
-        verification_url = f"{verify_base.rstrip('/')}/{cert_id}"
+        verification_url = f"{settings.cert_verify_base_url}/{cert_id}"
         grade_label, grade_color = _grade_for_score(score)
         issued_at = datetime.now(timezone.utc)
 

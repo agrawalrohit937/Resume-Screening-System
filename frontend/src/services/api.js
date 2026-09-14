@@ -191,7 +191,7 @@ export const getATSResult = (id) => api.get(`/ats/result/${id}`)
 
 export const enhanceResume = (p) => api.post('enhance/enhance-and-download', p)
 
-export const generateInterview = (p) => api.post('/interview/generate', p)
+export const generateQuickPractice = (p) => api.post('/interview/quick-practice', p)
 
 export const analyzeGitHub = (p) => api.post('/github/analyze', p)
 
@@ -200,9 +200,6 @@ export const generatePDF = (p) => api.post('/pdf/generate', p)
 export const getMyAnalytics = (p, config) =>
   api.get('/analytics/me', { params: p, ...config })
 
-
-export const getSkillsMarket = () =>
-  api.get('/analytics/skills-market')
 
 // Recruiter APIs (NEW)
 export const searchCandidates = (payload) => api.post('/recruiter/search', payload)
