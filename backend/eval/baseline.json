@@ -1,0 +1,9 @@
+{
+  "num_pairs": 50,
+  "ndcg_at_10": 0.5489,
+  "ndcg_at_50": 0.8148,
+  "precision_at_10": 0.7,
+  "mrr": 0.25,
+  "kendall_tau": -0.0148,
+  "ece": 0.2629
+}

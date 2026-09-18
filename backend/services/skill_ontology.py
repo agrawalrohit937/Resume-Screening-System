@@ -4,9 +4,11 @@ Provides hierarchical skill relationships, alias normalization, taxonomy expansi
 and semantic domain equivalence matching.
 """
 
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional, Any
 import re
 import structlog
+
+from services.scoring.constants import SkillMatch, get_skill_credit_table
 
 logger = structlog.get_logger(__name__)
 
@@ -87,6 +89,15 @@ SKILL_ALIASES: Dict[str, str] = {
     # Databases
     "postgres": "PostgreSQL",
     "postgresql": "PostgreSQL",
+    "postgressql": "PostgreSQL",
+    "postgre sql": "PostgreSQL",
+    "postgres sql": "PostgreSQL",
+    "postgre": "PostgreSQL",
+    "postgre-sql": "PostgreSQL",
+    "postgres-sql": "PostgreSQL",
+    "psql": "PostgreSQL",
+    "pgsql": "PostgreSQL",
+    "pg": "PostgreSQL",
     "mongo": "MongoDB",
     "mongodb": "MongoDB",
     "elastic search": "Elasticsearch",
@@ -95,8 +106,11 @@ SKILL_ALIASES: Dict[str, str] = {
     "mssql": "SQL Server",
     
     # Programming Languages
+    "python": "Python",
     "py": "Python",
     "python3": "Python",
+    "python 3": "Python",
+    "python-3": "Python",
     "golang": "Go",
     "cpp": "C++",
     "c sharp": "C#",
@@ -152,25 +166,46 @@ SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
     },
     "Programming Languages": {
         "parents": ["Software Engineering"],
-        "children": ["Python", "JavaScript", "TypeScript", "Java", "C++", "C#", "Go", "Rust", "Kotlin", "Swift", "PHP", "Ruby", "Scala"]
+        "children": ["Python", "JavaScript", "TypeScript", "Go", "Java", "C++", "C#", "SQL"]
     }
 }
 
-# Inverse index mapping each child skill to its direct category and top-level domains.
+# Inverted mapping: Canonical Skill -> Set of Parent Concept Names
 CHILD_TO_PARENTS: Dict[str, Set[str]] = {}
+PARENT_TO_CHILDREN: Dict[str, Set[str]] = {}
+EXCLUDED_BRIDGING_PARENTS: Set[str] = {"Software Engineering"}
+
+_VERSION_SUFFIX_PATTERN = re.compile(r"(\s+v?\d+(\.\d+)*|\s*\b\d+(\.\d+)*\b)$", re.IGNORECASE)
+
+def _strip_version(skill_name: str) -> str:
+    """Strips trailing version identifiers, e.g., 'React 17' -> 'React', 'Python 3.10' -> 'Python'."""
+    return _VERSION_SUFFIX_PATTERN.sub("", skill_name).strip()
 
 def _build_inverse_index():
-    for cat_name, details in SKILL_TAXONOMY.items():
-        if cat_name not in CHILD_TO_PARENTS:
-            CHILD_TO_PARENTS[cat_name] = set()
-        CHILD_TO_PARENTS[cat_name].update(details.get("parents", []))
-        
-        for child in details.get("children", []):
+    for category, meta in SKILL_TAXONOMY.items():
+        if category not in CHILD_TO_PARENTS:
+            CHILD_TO_PARENTS[category] = set()
+        parents = meta.get("parents", [])
+        CHILD_TO_PARENTS[category].update(parents)
+        children = meta.get("children", [])
+        for child in children:
             if child not in CHILD_TO_PARENTS:
                 CHILD_TO_PARENTS[child] = set()
-            CHILD_TO_PARENTS[child].add(cat_name)
-            for p in details.get("parents", []):
+            CHILD_TO_PARENTS[child].add(category)
+            for p in parents:
                 CHILD_TO_PARENTS[child].add(p)
+
+    # Invert mapping to count descendants per parent concept
+    for child, parents in CHILD_TO_PARENTS.items():
+        for p in parents:
+            if p not in PARENT_TO_CHILDREN:
+                PARENT_TO_CHILDREN[p] = set()
+            PARENT_TO_CHILDREN[p].add(child)
+
+    # Automatically exclude ultra-generic parents with > 40 children from bridging
+    for p, ch in PARENT_TO_CHILDREN.items():
+        if len(ch) > 40:
+            EXCLUDED_BRIDGING_PARENTS.add(p)
 
 _build_inverse_index()
 
@@ -178,13 +213,13 @@ _build_inverse_index()
 
 def normalize_skill(raw_skill: str) -> str:
     """
-    Normalizes raw skill string (e.g. 'nodejs', 'react.js', 'aws cloud')
+    Normalizes raw skill string (e.g. 'nodejs', 'react.js', 'aws cloud', 'python', 'postgressql')
     to canonical skill representation.
     """
     if not raw_skill or not isinstance(raw_skill, str):
         return ""
     
-    cleaned = raw_skill.strip().lower()
+    cleaned = re.sub(r"\s+", " ", raw_skill.strip().lower())
     
     # 1. Check direct alias lookup
     if cleaned in SKILL_ALIASES:
@@ -201,6 +236,27 @@ def normalize_skill(raw_skill: str) -> str:
             
     # 3. Capitalize words if unknown
     return raw_skill.strip().title()
+
+
+def canonicalize_skills(skills: Optional[List[str]]) -> List[str]:
+    """
+    Normalizes and deduplicates a list of skill strings preserving order.
+    Case-insensitive deduplication using canonical names.
+    e.g. ['python', 'Python', 'PYTHON'] -> ['Python']
+         ['python', 'postgresql', 'PostgreSQL'] -> ['Python', 'PostgreSQL']
+    """
+    if not skills:
+        return []
+    seen = set()
+    canonical_list = []
+    for s in skills:
+        if not s or not isinstance(s, str):
+            continue
+        canon = normalize_skill(s.strip())
+        if canon and canon.lower() not in seen:
+            seen.add(canon.lower())
+            canonical_list.append(canon)
+    return canonical_list
 
 
 def expand_skills(raw_skills: List[str]) -> Dict[str, Set[str]]:
@@ -253,33 +309,115 @@ def get_all_known_skills() -> Set[str]:
     return known
 
 
-def evaluate_skill_fulfillment(required_skill: str, candidate_skills: List[str]) -> Tuple[bool, str]:
+def evaluate_skill_fulfillment(required_skill: str, candidate_skills: List[str]) -> SkillMatch:
     """
-    Determines if a candidate satisfies a required skill either:
-    1. Directly / via Alias (Full Match)
-    2. Via Subcategory / Domain equivalence (e.g. Pinecone satisfies Vector Databases requirement)
-    
-    Returns: (is_fulfilled, match_type: 'EXACT', 'ALIAS', 'TAXONOMY_PARENT', 'TAXONOMY_EQUIVALENT', 'NONE')
+    Determines if a candidate satisfies a required skill using graded credit:
+    1. EXACT / ALIAS / VERSION_VARIANT (credit: 1.00, bucket: matched)
+    2. TAXONOMY_PARENT (credit: 0.90, bucket: matched)
+    3. TAXONOMY_SIBLING (credit: 0.40, bucket: transferable)
+    4. NONE (credit: 0.00, bucket: missing)
+
+    Returns a SkillMatch instance that also supports tuple unpacking (is_fulfilled, match_type)
+    for backward compatibility with legacy consumers.
+
+    Complexity:
+      Time: O(N_skills) where N_skills is number of candidate skills.
+      Space: O(N_skills) for concept expansion.
     """
+    credit_table = get_skill_credit_table()
+    if not required_skill or not isinstance(required_skill, str):
+        none_info = credit_table.get("NONE", {"credit": 0.0, "bucket": "missing"})
+        return SkillMatch(
+            required="",
+            credit=none_info["credit"],
+            match_type="NONE",
+            evidence=[],
+            bucket=none_info["bucket"],
+        )
+
     req_canonical = normalize_skill(required_skill)
     cand_expansion = expand_skills(candidate_skills)
-    
-    # 1. Exact canonical match
+
+    # 1. Exact canonical or alias match
     if req_canonical in cand_expansion["explicit_skills"]:
-        return True, "EXACT"
-        
-    # 2. Check if req_canonical is a Category and candidate has a child belonging to that Category
+        req_clean = re.sub(r"\s+", " ", required_skill.strip().lower())
+        is_alias = req_clean in SKILL_ALIASES or any(
+            re.sub(r"\s+", " ", (c or "").strip().lower()) in SKILL_ALIASES for c in candidate_skills
+        )
+        match_type = "ALIAS" if is_alias and req_clean != req_canonical.lower() else "EXACT"
+        info = credit_table.get(match_type, credit_table.get("EXACT", {"credit": 1.00, "bucket": "matched"}))
+        evidence = [c for c in candidate_skills if normalize_skill(c) == req_canonical]
+        return SkillMatch(
+            required=req_canonical,
+            credit=info["credit"],
+            match_type=match_type,
+            evidence=evidence or [req_canonical],
+            bucket=info["bucket"],
+        )
+
+    # 2. Version Variant match (e.g. React 17 vs React, Python 3.10 vs Python)
+    req_stripped = _strip_version(required_skill).lower()
+    for c in candidate_skills:
+        if not c or not isinstance(c, str):
+            continue
+        c_clean = c.strip()
+        c_stripped = _strip_version(c_clean).lower()
+        c_canonical = normalize_skill(c_clean)
+        c_canonical_stripped = _strip_version(c_canonical).lower()
+        if (
+            (req_stripped and req_stripped == c_stripped)
+            or (req_stripped and req_stripped == c_canonical.lower())
+            or (c_canonical_stripped and req_canonical.lower() == c_canonical_stripped)
+            or (_strip_version(req_canonical).lower() == c_canonical_stripped)
+        ):
+            info = credit_table.get("VERSION_VARIANT", {"credit": 1.00, "bucket": "matched"})
+            return SkillMatch(
+                required=req_canonical,
+                credit=info["credit"],
+                match_type="VERSION_VARIANT",
+                evidence=[c_clean],
+                bucket=info["bucket"],
+            )
+
+    # 3. Check if req_canonical is a Category and candidate has a child belonging to that Category (TAXONOMY_PARENT)
     # e.g., Req: "Vector Databases", Candidate has "Pinecone"
     if req_canonical in SKILL_TAXONOMY:
         category_children = set(SKILL_TAXONOMY[req_canonical].get("children", []))
-        if any(normalize_skill(c) in cand_expansion["explicit_skills"] for c in category_children):
-            return True, "TAXONOMY_PARENT"
-            
-    # 3. Check if Candidate skills share the exact category as Required Skill
+        matching_children = [c for c in candidate_skills if normalize_skill(c) in category_children]
+        if matching_children:
+            info = credit_table.get("TAXONOMY_PARENT", {"credit": 0.90, "bucket": "matched"})
+            return SkillMatch(
+                required=req_canonical,
+                credit=info["credit"],
+                match_type="TAXONOMY_PARENT",
+                evidence=matching_children,
+                bucket=info["bucket"],
+            )
+
+    # 4. Check if Candidate skills share the exact category as Required Skill (TAXONOMY_SIBLING)
     # e.g., Req: "Pinecone", Candidate has "ChromaDB" (both belong to "Vector Databases")
     req_parents = CHILD_TO_PARENTS.get(req_canonical, set())
-    cand_implicit = cand_expansion["implicit_concepts"]
-    if req_parents and any(p in cand_implicit for p in req_parents if p not in ["Software Engineering"]):
-        return True, "TAXONOMY_EQUIVALENT"
+    eligible_parents = req_parents - EXCLUDED_BRIDGING_PARENTS
+    if eligible_parents:
+        matching_siblings = [
+            c for c in candidate_skills
+            if any(p in CHILD_TO_PARENTS.get(normalize_skill(c), set()) for p in eligible_parents)
+        ]
+        if matching_siblings:
+            info = credit_table.get("TAXONOMY_SIBLING", {"credit": 0.40, "bucket": "transferable"})
+            return SkillMatch(
+                required=req_canonical,
+                credit=info["credit"],
+                match_type="TAXONOMY_SIBLING",
+                evidence=matching_siblings,
+                bucket=info["bucket"],
+            )
 
-    return False, "NONE"
+    info = credit_table.get("NONE", {"credit": 0.0, "bucket": "missing"})
+    return SkillMatch(
+        required=req_canonical,
+        credit=info["credit"],
+        match_type="NONE",
+        evidence=[],
+        bucket=info["bucket"],
+    )
