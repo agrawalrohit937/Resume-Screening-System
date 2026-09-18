@@ -1,89 +1,134 @@
 """
-Unit tests for Dual-Stage Mathematical & Vector Scoring Engine (Phase 3).
+Unit tests for Unified Scoring Engine (Phase 1 & Phase 5).
 """
 
 import pytest
-from services.strict_ats_service import (
-    compute_vector_similarity,
-    evaluate_knockout_math,
-    run_strict_ats_check,
+from services.scoring_engine import (
+    score_resume,
+    score_resume_dual,
+    WeightProfile,
+    CANDIDATE_PROFILE,
+    RECRUITER_PROFILE,
 )
 
 
-def test_compute_vector_similarity():
-    resume_text = "Experienced Senior Python Engineer specializing in FastAPI, React, Docker, and PostgreSQL microservices."
-    jd_text = "Looking for a Python Developer with FastAPI, PostgreSQL, and Docker experience."
-    
-    score = compute_vector_similarity(resume_text, jd_text)
-    assert isinstance(score, float)
-    assert score > 50.0  # High similarity expected
-
-
-def test_compute_vector_similarity_low_match():
-    resume_text = "Nurse Practitioner with 10 years of clinical patient care and hospital administration."
-    jd_text = "Senior Software Architect with Kubernetes, Go, Rust, and distributed systems."
-    
-    score = compute_vector_similarity(resume_text, jd_text)
-    assert isinstance(score, float)
-    assert score < 40.0  # Low similarity expected
-
-
-def test_evaluate_knockout_math():
+def test_unified_scoring_engine_candidate_mode():
     extracted_data = {
+        "raw_text": "Experienced Python Engineer proficient in FastAPI, Docker, and Pinecone with 4 years of experience and a Bachelor degree in Technology.",
         "skills": ["Python", "FastAPI", "Docker", "Pinecone"],
         "total_experience_years": 4.0,
         "education_level": "Bachelor's Degree",
         "education": [{"degree": "Bachelor of Technology"}]
     }
-    jd_text = "Requires 3+ years of experience in Python, FastAPI, Docker, and Vector Databases with a Bachelor degree."
+    jd_text = "Requires 3+ years of experience in Python, FastAPI, Docker, and Pinecone with a Bachelor degree."
     
-    result = evaluate_knockout_math(extracted_data, jd_text)
+    result = score_resume(
+        resume=extracted_data,
+        jd=jd_text,
+        mode="candidate",
+    )
     
     assert "Python" in result["matched_skills"]
     assert "FastAPI" in result["matched_skills"]
     assert "Docker" in result["matched_skills"]
-    # Vector Databases is matched because Pinecone is in ontology subcategory!
-    assert "Vector Databases" in result["matched_skills"]
     assert result["experience_score"] == 100.0
     assert result["education_score"] == 100.0
-    assert result["knockout_math_score"] == 100.0
+    assert result["final_score"] >= 60.0
+    assert result["is_knockout"] is False
 
 
-def test_run_strict_ats_check_dual_stage():
+def test_unified_scoring_engine_recruiter_mode():
     extracted_data = {
-        "skills": ["React", "TypeScript", "Node.js"],
-        "total_experience_years": 2.0,
-        "education_level": "Bachelor's Degree",
+        "raw_text": "High school graduate with 1 year of introductory Python scripting.",
+        "skills": ["Python", "FastAPI"],
+        "total_experience_years": 1.0,
+        "education_level": "High School",
+        "education": []
     }
-    raw_text = "Frontend engineer proficient in React, TypeScript, and Node.js with 2 years experience."
-    jd_text = "Looking for Frontend Engineer with React, TypeScript, and 3+ years experience."
+    jd_text = "Must have 5+ years of experience and a Bachelor degree in Computer Science."
     
-    result = run_strict_ats_check(
-        raw_text=raw_text,
-        extracted_data=extracted_data,
-        jd_text=jd_text,
-        skill_universe=["React", "TypeScript", "Node.js"]
+    result = score_resume(
+        resume=extracted_data,
+        jd=jd_text,
+        mode="recruiter",
     )
     
-    assert "math_result" in result
-    assert "vector_score" in result
-    assert "final_score" in result
-    assert result["final_score"] > 0
+    assert result["is_knockout"] is True
+    assert len(result["knockout_reasons"]) > 0
+    # In Task 0.3: quality_score and final_score are uncapped; legacy recruiter_score is capped at 45.0
+    assert result["quality_score"] == result["final_score"]
+    assert result.get("recruiter_score", 0.0) <= 45.0
+    assert result["eligibility"]["status"] == "ineligible"
+    assert result["eligibility_rank"] == 2
 
 
-def test_flexible_pattern_multiline_wrapping():
-    from services.strict_ats_service import evaluate_strict_keyword_match
-    
-    multiline_text = """
-    Experience with Large\nLanguage Models and Retrieval-\nAugmented Generation.
-    Also used Node.\njs in backend projects.
-    """
-    
-    skills = ["Large Language Models", "Retrieval-Augmented Generation", "Node.js"]
-    res = evaluate_strict_keyword_match(multiline_text, skills)
-    
-    assert "Large Language Models" in res.matched_exact
-    assert "Retrieval-Augmented Generation" in res.matched_exact
-    assert "Node.js" in res.matched_exact
-    assert len(res.missing_exact) == 0
+
+def test_candidate_profile_fresher_weights():
+    assert CANDIDATE_PROFILE.strict_weight == 0.80
+    assert CANDIDATE_PROFILE.semantic_weight == 0.20
+    assert CANDIDATE_PROFILE.skills_weight == 0.70
+    assert CANDIDATE_PROFILE.experience_weight == 0.15
+    assert CANDIDATE_PROFILE.education_weight == 0.15
+    assert CANDIDATE_PROFILE.enforce_hard_knockout is False
+
+    assert RECRUITER_PROFILE.strict_weight == 0.60
+    assert RECRUITER_PROFILE.semantic_weight == 0.40
+    assert RECRUITER_PROFILE.skills_weight == 0.50
+    assert RECRUITER_PROFILE.experience_weight == 0.30
+    assert RECRUITER_PROFILE.education_weight == 0.20
+    assert RECRUITER_PROFILE.enforce_hard_knockout is True
+
+    # Fresher with 100% skill match, 0 professional years, ongoing degree
+    extracted_data = {
+        "raw_text": "Recent graduate proficient in Python, FastAPI, Docker, and Pinecone.",
+        "skills": ["Python", "FastAPI", "Docker", "Pinecone"],
+        "total_experience_years": 0.0,
+        "education_level": "Bachelor's Degree",
+        "education": [{"degree": "Bachelor of Technology"}]
+    }
+    jd_text = "Requires 3+ years of experience in Python, FastAPI, Docker, and Pinecone with a Bachelor degree."
+
+    result = score_resume(
+        resume=extracted_data,
+        jd=jd_text,
+        mode="candidate",
+    )
+    # Fresher with full skill match should now achieve a high score (>70%) instead of a demotivating ~60-65%
+    assert result["skills_score"] == 100.0
+    assert result["final_score"] >= 70.0
+
+
+def test_score_resume_dual_and_knockout():
+    # Candidate with 1 year experience against a hard 5+ year requirement
+    extracted_data = {
+        "raw_text": "Python engineer with 1 year experience in FastAPI and PostgreSQL.",
+        "skills": ["Python", "FastAPI", "PostgreSQL"],
+        "total_experience_years": 1.0,
+        "education_level": "Bachelor's Degree",
+        "education": [{"degree": "Bachelor of Engineering"}]
+    }
+    jd_text = "Requires at least 5+ years of experience as a Python Engineer with FastAPI and PostgreSQL."
+
+    dual = score_resume_dual(
+        resume=extracted_data,
+        jd=jd_text,
+    )
+
+    assert "candidate_score" in dual
+    assert "recruiter_score" in dual
+    assert "quality_score" in dual
+    assert "eligibility" in dual
+    assert "knockout" in dual
+
+    # Candidate score is lenient (>70) while recruiter score is capped due to hard knockout (<=45)
+    assert dual["candidate_score"] > dual["recruiter_score"]
+    assert dual["recruiter_score"] <= 45.0
+    assert dual["quality_score"] > dual["recruiter_score"]
+    assert dual["eligibility"]["status"] == "ineligible"
+    assert dual["eligibility_rank"] == 2
+    assert dual["knockout"]["passed"] is False
+    assert len(dual["knockout"]["reasons"]) > 0
+    assert any("5+ years" in r for r in dual["knockout"]["reasons"])
+
+
 

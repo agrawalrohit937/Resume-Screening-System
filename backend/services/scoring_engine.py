@@ -23,6 +23,8 @@ import requests
 import structlog
 
 from services.scoring.constants import SkillMatch
+from services.scoring.criticality import JDCriticalityIndex, infer_criticality
+from core.feature_flags import FEATURE_CRITICALITY_WEIGHTING, FEATURE_SPLIT_ELIGIBILITY
 
 logger = structlog.get_logger(__name__)
 
@@ -220,16 +222,21 @@ def _candidate_max_degree_rank(extracted_data: dict) -> Tuple[int, bool]:
 def _skills_score(
     cand_skills: List[str],
     jd_skills: List[str],
+    jd_source: Union[str, JDCriticalityIndex] = "",
+    explicit_required: Optional[Set[str]] = None,
 ) -> Tuple[float, List[str], List[str], List[str]]:
     """
-    Computes graded skill credit and partitions required skills into:
+    Computes criticality-weighted graded skill credit and partitions required skills into:
       - matched_skills (credit >= 0.9)
       - transferable_skills (credit in [0.3, 0.9))
       - missing_skills (credit < 0.3)
 
+    Weighting:
+      skills_score = Σ(credit_i × weight_i) / Σ(weight_i)
+
     Complexity:
-      Time: O(N_jd * N_cand)
-      Space: O(N_jd + N_cand)
+      Time: O(N_jd * N_cand + N_jd * L_jd)
+      Space: O(N_jd + N_cand + L_jd)
     """
     matched, transferable, missing = [], [], []
     canonical_jd = canonicalize_skills(jd_skills) if canonicalize_skills else list(dict.fromkeys(jd_skills or []))
@@ -237,7 +244,17 @@ def _skills_score(
         return 1.0, cand_skills, [], []
 
     canonical_cand = canonicalize_skills(cand_skills) if canonicalize_skills else cand_skills
-    total_credit = 0.0
+
+    # Precomputed JD criticality index
+    jd_index = None
+    if FEATURE_CRITICALITY_WEIGHTING and jd_source:
+        if isinstance(jd_source, JDCriticalityIndex):
+            jd_index = jd_source
+        elif isinstance(jd_source, str) and jd_source.strip():
+            jd_index = JDCriticalityIndex(jd_source)
+
+    total_weighted_credit = 0.0
+    total_weights = 0.0
 
     for req in canonical_jd:
         match_obj: Optional[SkillMatch] = None
@@ -263,7 +280,15 @@ def _skills_score(
 
         credit = match_obj.credit if match_obj is not None else 0.0
         bucket = match_obj.bucket if match_obj is not None else "missing"
-        total_credit += credit
+
+        # Calculate requirement weight in {3.0 must, 2.0 important, 1.0 nice_to_have}
+        if jd_index is not None:
+            weight = infer_criticality(req, jd_index, explicit_required)
+        else:
+            weight = 2.0
+
+        total_weighted_credit += credit * weight
+        total_weights += weight
 
         # Partition strictly into one of the three disjoint buckets
         if bucket == "matched" or credit >= 0.9:
@@ -279,7 +304,7 @@ def _skills_score(
     transferable_set = {t.lower() for t in transferable}
     missing = [s for s in missing if s.lower() not in matched_set and s.lower() not in transferable_set]
 
-    score = total_credit / len(canonical_jd) if canonical_jd else 1.0
+    score = (total_weighted_credit / total_weights) if total_weights > 0 else 1.0
     return score, matched, transferable, missing
 
 
@@ -401,36 +426,56 @@ def _parsing_health(raw_text: str) -> Dict[str, Any]:
     }
 
 
-def _knockout_check(
+def _evaluate_eligibility(
     extracted_data: dict,
     jd_text: str,
     min_years: Optional[float] = None,
     profile: Optional[WeightProfile] = None,
+    parsing_health: Optional[dict] = None,
 ) -> Dict[str, Any]:
+    """
+    Evaluates candidate eligibility independently from quality score.
+    Produces structured checks with severity, observed values, and evidence.
+    status is 'ineligible' iff any hard check fails; 'unverified' if parse fails/data missing; else 'eligible'.
+    """
     reasons: List[str] = []
     advisories: List[str] = []
+    checks: List[Dict[str, Any]] = []
     prof = profile or CANDIDATE_PROFILE
 
     if not jd_text or not jd_text.strip():
-        return {"is_knockout": False, "reasons": [], "advisories": []}
+        return {
+            "status": "eligible",
+            "eligibility_rank": 0,
+            "checks": [],
+            "is_knockout": False,
+            "reasons": [],
+            "advisories": [],
+        }
 
     candidate_years = float(extracted_data.get("total_experience_years") or 0)
 
-    # Fix 5: Reconcile min_years (structured field) vs regex extraction from JD text.
-    # 1. Authoritative: if min_years is present and > 0, use it.
-    # 2. Tone/severity: regex classification from JD text determines hard vs. soft framing.
+    # Reconcile min_years (structured field) vs regex extraction from JD text
     regex_years_req = _extract_years_requirement(jd_text)
     if min_years is not None and float(min_years) > 0:
         required_years = float(min_years)
         is_hard = regex_years_req[1] if regex_years_req is not None else True
+        exp_source = "structured_min_years"
     elif regex_years_req is not None:
         required_years, is_hard = regex_years_req
+        exp_source = "jd_regex"
     else:
         required_years, is_hard = None, False
+        exp_source = "jd_regex"
 
     if required_years is not None and required_years > 0:
         threshold_ratio = getattr(prof, "knockout_years_threshold_ratio", 0.5)
+        exp_list = extracted_data.get("experience", []) or extracted_data.get("work_experience", []) or []
+        exp_evidence = [f"experience[{i}]" for i in range(min(len(exp_list), 3))] or ["total_experience_years"]
+
+        years_passed = True
         if candidate_years <= 0 and required_years > 0:
+            years_passed = False
             msg = f"Requires {required_years:.0f}+ years of professional experience — none detected."
             if is_hard:
                 reasons.append(msg)
@@ -439,34 +484,102 @@ def _knockout_check(
         elif candidate_years < required_years:
             msg = f"Requires {required_years:.0f}+ years of experience; resume shows ~{candidate_years:.1f} year(s)."
             if is_hard and candidate_years < required_years * threshold_ratio:
+                years_passed = False
                 reasons.append(msg)
             else:
                 advisories.append(msg)
+
+        checks.append({
+            "rule_id": "min_years",
+            "label": f"{required_years:.0f}+ years required",
+            "passed": years_passed,
+            "severity": "hard" if is_hard else "soft",
+            "observed": f"~{candidate_years:.1f} years" if candidate_years > 0 else "none detected",
+            "evidence": exp_evidence,
+            "source": exp_source,
+        })
 
     degree_req = _extract_degree_requirement(jd_text)
     if degree_req is not None:
         required_rank, required_label, is_hard = degree_req
         candidate_rank, in_progress = _candidate_max_degree_rank(extracted_data)
+        edu_list = extracted_data.get("education", []) or []
+        edu_evidence = [f"education[{i}]" for i in range(min(len(edu_list), 2))] or ["education_level"]
+
+        degree_passed = True
         if candidate_rank == 0:
+            degree_passed = False
             msg = f"Requires a {required_label.title()}-level degree — none found on resume."
             if is_hard:
                 reasons.append(msg)
             else:
                 advisories.append(msg + " (preferred)")
         elif candidate_rank < required_rank:
-            msg = f"Requires a {required_label.title()}-level degree; highest education ranks below."
-            if is_hard:
-                reasons.append(msg)
+            if not in_progress:
+                degree_passed = False
+                msg = f"Requires a {required_label.title()}-level degree; highest education ranks below."
+                if is_hard:
+                    reasons.append(msg)
+                else:
+                    advisories.append(msg)
             else:
-                advisories.append(msg)
+                advisories.append(f"Meets the {required_label.title()}-level requirement with a degree currently in progress.")
         elif in_progress:
             advisories.append(f"Meets the {required_label.title()}-level requirement with a degree currently in progress.")
 
+        checks.append({
+            "rule_id": "degree_level",
+            "label": f"{required_label.title()}-level degree required",
+            "passed": degree_passed,
+            "severity": "hard" if is_hard else "soft",
+            "observed": str(extracted_data.get("education_level") or ("In progress" if in_progress else "none found")),
+            "evidence": edu_evidence,
+            "source": "jd_regex",
+        })
+
+    # Overall status resolution
+    has_hard_failure = any(c["severity"] == "hard" and not c["passed"] for c in checks)
+    is_unverified = (
+        parsing_health is not None
+        and not parsing_health.get("is_healthy", True)
+        and float(parsing_health.get("confidence", 1.0)) < 0.3
+    )
+
+    if has_hard_failure:
+        status = "ineligible"
+        eligibility_rank = 2
+    elif is_unverified:
+        status = "unverified"
+        eligibility_rank = 1
+    else:
+        status = "eligible"
+        eligibility_rank = 0
+
     return {
-        "is_knockout": len(reasons) > 0,
+        "status": status,
+        "eligibility_rank": eligibility_rank,
+        "checks": checks,
+        "is_knockout": status == "ineligible",
         "reasons": reasons,
         "advisories": advisories,
     }
+
+
+def _knockout_check(
+    extracted_data: dict,
+    jd_text: str,
+    min_years: Optional[float] = None,
+    profile: Optional[WeightProfile] = None,
+    parsing_health: Optional[dict] = None,
+) -> Dict[str, Any]:
+    """Compatibility wrapper for legacy callers delegating to _evaluate_eligibility."""
+    return _evaluate_eligibility(
+        extracted_data=extracted_data,
+        jd_text=jd_text,
+        min_years=min_years,
+        profile=profile,
+        parsing_health=parsing_health,
+    )
 
 
 def _exact_keyword_match(raw_text: str, skill_universe: List[str]) -> Dict[str, Any]:
@@ -602,6 +715,7 @@ class SharedScoringComponents:
     education_score: float
     vector_score: float
     transferable_skills: List[str] = field(default_factory=list)
+    eligibility: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def knockout_result(self) -> Dict[str, Any]:
@@ -738,11 +852,25 @@ def _compute_shared_components(
 
     # 3. Execute Modular Shared Components (Embedding & NLP called ONCE)
     parsing_health = _parsing_health(raw_text)
-    knockout = _knockout_check(extracted_data, jd_text, min_years=resolved_min_years, profile=profile)
+    eligibility = _evaluate_eligibility(
+        extracted_data,
+        jd_text,
+        min_years=resolved_min_years,
+        profile=profile,
+        parsing_health=parsing_health,
+    )
+    knockout = eligibility
     keyword_match = _exact_keyword_match(raw_text, skill_universe)
 
+    # Precomputed JD Criticality Index for O(L_jd) weighting
+    jd_index = JDCriticalityIndex(jd_text) if (FEATURE_CRITICALITY_WEIGHTING and jd_text) else ""
     cand_skills = extracted_data.get("skills", []) or extracted_data.get("technical_skills", []) or []
-    s_score, matched_skills, transferable_skills, missing_skills = _skills_score(cand_skills, skill_universe)
+    s_score, matched_skills, transferable_skills, missing_skills = _skills_score(
+        cand_skills,
+        skill_universe,
+        jd_source=jd_index,
+        explicit_required=set(explicit_reqs),
+    )
     exp_score = _experience_score(extracted_data, jd_text, min_years=resolved_min_years)
     edu_score = _education_score(extracted_data, jd_text)
 
@@ -765,6 +893,7 @@ def _compute_shared_components(
         experience_score=exp_score,
         education_score=edu_score,
         vector_score=vector_score,
+        eligibility=eligibility,
     )
 
 
@@ -786,16 +915,25 @@ def _apply_profile(
         1
     )
 
-    # In recruiter mode with hard knockout enforcement:
-    if profile.enforce_hard_knockout and components.knockout.get("is_knockout", False):
-        final_score = min(final_score, 45.0)
+    # Task 0.3: Split eligibility from quality — remove 45.0 cap!
+    # quality_score is NEVER capped and is comparable across candidates.
+    quality_score = final_score
+
+    elig_data = getattr(components, "eligibility", {}) or components.knockout
+    is_ineligible = elig_data.get("status") == "ineligible" or components.knockout.get("is_knockout", False)
+
+    # Derived legacy recruiter_score for backward compatibility for 1 release (@deprecated)
+    if profile.enforce_hard_knockout and is_ineligible:
+        legacy_recruiter_score = min(final_score, 45.0)
+    else:
+        legacy_recruiter_score = final_score
 
     # Recommendation
-    if final_score >= 80.0:
+    if quality_score >= 80.0:
         rec_label = "Strong Match" if mode == "candidate" else "strong_match"
-    elif final_score >= 60.0:
+    elif quality_score >= 60.0:
         rec_label = "Good Match" if mode == "candidate" else "good_match"
-    elif final_score >= 40.0:
+    elif quality_score >= 40.0:
         rec_label = "Partial Match" if mode == "candidate" else "partial_match"
     else:
         rec_label = "Low Match" if mode == "candidate" else "poor_match"
@@ -813,11 +951,22 @@ def _apply_profile(
         suggestions.append(
             "Education requirement differs from target degree. Emphasize relevant coursework, certifications, and technical capstone projects."
         )
-    if final_score >= 80:
+    if quality_score >= 80:
         suggestions.append("Strong technical alignment and high skill relevance for this role.")
 
     return {
+        "quality_score": quality_score,
         "final_score": final_score,
+        "eligibility": {
+            "status": elig_data.get("status", "eligible"),
+            "checks": elig_data.get("checks", []),
+        },
+        "eligibility_rank": elig_data.get("eligibility_rank", 0),
+        "recruiter_score": legacy_recruiter_score,
+        "knockout_status": {
+            "passed": not is_ineligible,
+            "reasons": components.knockout.get("reasons", []),
+        },
         "mode": mode,
         "scoring_version": SCORING_ENGINE_VERSION,
         "recommendation": rec_label,
@@ -833,7 +982,7 @@ def _apply_profile(
         "keyword_score": components.keyword_match["strict_ats_score"],
         "parsing_health": components.parsing_health,
         "knockout": components.knockout,
-        "is_knockout": components.knockout["is_knockout"],
+        "is_knockout": is_ineligible,
         "knockout_reasons": components.knockout["reasons"],
         "knockout_advisories": components.knockout["advisories"],
         "strict_ats_score": components.keyword_match["strict_ats_score"],
@@ -914,9 +1063,13 @@ def score_resume_dual(
     gc.collect()
     return {
         "candidate_score": cand_res["final_score"],
-        "recruiter_score": rec_res["final_score"],
+        "recruiter_score": rec_res.get("recruiter_score", rec_res["final_score"]),
+        "quality_score": rec_res["quality_score"],
+        "eligibility": rec_res["eligibility"],
+        "eligibility_rank": rec_res["eligibility_rank"],
         "candidate_result": cand_res,
         "recruiter_result": rec_res,
         "knockout": components.knockout_result,
         "scoring_version": SCORING_ENGINE_VERSION,
     }
+

@@ -237,13 +237,14 @@ def test_7_apply_time_score_resume_dual_produces_both_scores():
     assert dual["candidate_score"] >= dual["recruiter_score"]
 
 
-def test_8_hard_knockout_behavior_remains_unchanged_for_recruiter():
+def test_8_split_eligibility_from_quality_score():
     """
-    TEST 8:
-    Hard knockout behavior remains unchanged for recruiter profile.
-    Candidate with hard knockout fails knockout check in recruiter mode,
-    and recruiter_score is capped at 45.0.
-    In candidate mode, knockout is advisory only and not enforced.
+    TEST 8 (Task 0.3):
+    Eligibility is split from Quality Score:
+    - quality_score is NEVER capped at 45.0 (reflects true quality).
+    - final_score equals quality_score.
+    - eligibility.status is 'ineligible' with failing checks and eligibility_rank == 2.
+    - Deprecated recruiter_score retains legacy 45.0 cap for backward compatibility.
     """
     resume_data = {
         "raw_text": "High school graduate with 6 months Python practice.",
@@ -260,10 +261,18 @@ def test_8_hard_knockout_behavior_remains_unchanged_for_recruiter():
         mode="recruiter",
         required_skills=["Python"],
     )
-    assert recruiter_res["is_knockout"] is True
-    assert len(recruiter_res["knockout_reasons"]) > 0
-    # Hard knockout caps score in recruiter mode
-    assert recruiter_res["final_score"] <= 45.0
+    # Quality score is NOT artificially capped at 45.0
+    assert "quality_score" in recruiter_res
+    assert recruiter_res["final_score"] == recruiter_res["quality_score"]
+
+    # Structured eligibility
+    assert "eligibility" in recruiter_res
+    assert recruiter_res["eligibility"]["status"] == "ineligible"
+    assert len(recruiter_res["eligibility"]["checks"]) > 0
+    assert recruiter_res["eligibility_rank"] == 2
+
+    # Deprecated recruiter_score retains legacy 45.0 cap
+    assert recruiter_res.get("recruiter_score", 0.0) <= 45.0
 
     candidate_res = score_resume(
         resume=resume_data,
@@ -271,8 +280,9 @@ def test_8_hard_knockout_behavior_remains_unchanged_for_recruiter():
         mode="candidate",
         required_skills=["Python"],
     )
-    # Candidate profile does not enforce hard knockout cap
-    assert candidate_res["is_knockout"] is False or len(candidate_res["knockout_advisories"]) >= 0
+    assert "quality_score" in candidate_res
+    assert candidate_res["final_score"] == candidate_res["quality_score"]
+
 
 
 def test_9_resume_snapshot_immutability_logic():
