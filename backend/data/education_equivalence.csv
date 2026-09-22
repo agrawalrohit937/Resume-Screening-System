@@ -1,0 +1,50 @@
+country_iso2,credential_name,synonyms,isced_level,degree_rank,level_label,notes
+IN,ITI,iti|industrial training institute|national trade certificate|ntc,3,1,Vocational / ITI,Mapped to Level 1 rank per Indian context override
+IN,Polytechnic Diploma,polytechnic|diploma in engineering|state board of technical education,4,1,Polytechnic Diploma,Mapped to Level 1 rank per Indian context override
+IN,Diploma,diploma|polytechnic diploma|post graduate diploma (pgd),4,1,Diploma,Mapped to Level 1 rank per Indian context override
+IN,B.Tech,b.tech|btech|bachelor of technology|b.e.|be|bachelor of engineering,6,3,Bachelor of Technology / Engineering,Mapped to Level 3 rank per Indian context override
+IN,B.E.,b.e.|be|bachelor of engineering,6,3,Bachelor of Engineering,Mapped to Level 3 rank per Indian context override
+IN,BCA,bca|bachelor of computer applications,6,3,Bachelor of Computer Applications,Mapped to Level 3 rank per Indian context override
+IN,B.Sc,b.sc|bsc|bachelor of science,6,3,Bachelor of Science,Mapped to Level 3 rank per Indian context override
+IN,B.Com,b.com|bcom|bachelor of commerce,6,3,Bachelor of Commerce,Mapped to Level 3 rank per Indian context override
+IN,B.A.,b.a.|ba|bachelor of arts,6,3,Bachelor of Arts,Mapped to Level 3 rank per Indian context override
+IN,MBBS,mbbs|bachelor of medicine and bachelor of surgery,6,3,Medical Graduate (MBBS),Mapped to Level 3 rank
+IN,Integrated Master,integrated m.tech|integrated msc|dual degree 5 year,7,4,Integrated Master,Mapped to Level 4 rank
+IN,B.Ed,b.ed|bed|bachelor of education,6,4,Bachelor of Education (B.Ed),Mapped to Level 4 rank per Indian context override
+IN,M.Sc,m.sc|msc|master of science,7,4,Master of Science,Mapped to Level 4 rank per Indian context override
+IN,M.Tech,m.tech|mtech|master of technology|m.e.|master of engineering,7,4,Master of Technology,Mapped to Level 4 rank
+IN,MCA,mca|master of computer applications,7,4,Master of Computer Applications,Mapped to Level 4 rank
+IN,MBA,mba|master of business administration|pgdm,7,4,Master of Business Administration,Mapped to Level 4 rank
+IN,M.A.,m.a.|ma|master of arts,7,4,Master of Arts,Mapped to Level 4 rank
+IN,M.Com,m.com|mcom|master of commerce,7,4,Master of Commerce,Mapped to Level 4 rank
+IN,Ph.D,ph.d|phd|doctor of philosophy|doctorate,8,5,Doctorate / Ph.D,Level 5 rank
+US,High School Diploma,high school|ged,3,1,High School Diploma,US K-12
+US,Associate Degree,associate|associate of science|associate of arts|aa|as,5,2,Associate Degree,US Community College
+US,Bachelor's Degree,bachelor|bs|ba|b.s.|b.a.|bachelor of science|bachelor of arts,6,3,Bachelor's Degree,US Undergraduate
+US,Master's Degree,master|ms|ma|m.s.|m.a.|mba|master of science,7,4,Master's Degree,US Graduate
+US,Doctorate,phd|ph.d.|doctorate|md|jd,8,5,Doctorate,US Terminal Degree
+UK,GCSE / A-Levels,gcse|a levels|a-level|btec,3,1,Secondary / A-Levels,UK Secondary
+UK,Foundation Degree,hnd|hnc|foundation degree,5,2,Higher National Diploma,UK Level 4/5
+UK,Bachelor's Honours Degree,bachelor|bsc|ba|beng|bachelor with honours,6,3,Bachelor's Honours,UK FHEQ Level 6
+UK,Master's Degree,master|msc|ma|meng|mres,7,4,Master's Degree,UK FHEQ Level 7
+UK,Doctorate,phd|dphil|doctorate,8,5,Doctorate / DPhil,UK FHEQ Level 8
+EU,Abitur / Baccalauréat,abitur|baccalaureat|matura,3,1,Upper Secondary,European High School Equivalent
+EU,Licence / Bachelor,licence|laurea|bachelor|diplom (fh),6,3,Bachelor / Licence,Bologna 1st Cycle
+EU,Master,master|magister|diplom|laurea magistrale,7,4,Master,Bologna 2nd Cycle
+EU,Doctorate,doctorate|promotion|phd,8,5,Doctorate,Bologna 3rd Cycle
+CA,College Diploma,college diploma|vocational certificate,4,1,College Diploma,Canadian College
+CA,Bachelor's Degree,bachelor|b.sc.|b.a.|b.eng.,6,3,Bachelor's Degree,Canadian University
+CA,Master's Degree,master|m.sc.|m.a.|mba,7,4,Master's Degree,Canadian Graduate
+CA,Ph.D,ph.d|phd|doctorate,8,5,Doctorate,Canadian Doctorate
+AU,Certificate / Diploma,cert iv|diploma|advanced diploma,5,2,Vocational Diploma,TAFE / AQF Level 5/6
+AU,Bachelor Degree,bachelor|bachelor with honours,6,3,Bachelor Degree,AQF Level 7/8
+AU,Master Degree,master|master of science|mba,7,4,Master Degree,AQF Level 9
+AU,Doctoral Degree,phd|doctorate,8,5,Doctoral Degree,AQF Level 10
+SG,Polytechnic Diploma,polytechnic diploma|diploma,4,1,Polytechnic Diploma,Singapore Polytechnic
+SG,Bachelor's Degree,bachelor|bachelor of computing|b.eng,6,3,Bachelor's Degree,Singapore Universities (NUS/NTU/SMU)
+SG,Master's Degree,master|msc|mba,7,4,Master's Degree,Singapore Graduate
+SG,Ph.D,phd|doctorate,8,5,Doctorate,Singapore Doctorate
+AE,Secondary Certificate,thanaweya amma|high school,3,1,Secondary School Certificate,UAE High School
+AE,Bachelor Degree,bachelor|b.sc|b.a,6,3,Bachelor Degree,UAE CAA Accredited Bachelor
+AE,Master Degree,master|m.sc|mba,7,4,Master Degree,UAE CAA Accredited Master
+AE,Doctorate,phd|doctorate,8,5,Doctorate,UAE Terminal Degree

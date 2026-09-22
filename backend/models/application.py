@@ -18,6 +18,7 @@ class ApplicationStage(str, Enum):
     UNDER_REVIEW = "Under Review"
     SHORTLISTED = "Shortlisted"
     INTERVIEW = "Interview"
+    HIRED = "Hired"
     REJECTED = "Rejected"
 
 
@@ -27,6 +28,7 @@ class ApplicationModel(BaseModel):
     job_id: str
     candidate_id: str
     resume_id: str
+    tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
     match_score: Optional[float] = Field(
         default=None,
         description="Candidate-facing lenient ATS match score (0-100)",
@@ -64,11 +66,20 @@ class ApplicationModel(BaseModel):
         description="Application lifecycle stage: Applied, Under Review, Shortlisted, Interview, Rejected",
     )
     scoring_version: Optional[str] = Field(
-        default="1.0.0",
+        default="2.0.0",
         description="Version of scoring engine used to compute match_score",
+    )
+    features: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Standardized feature vector snapshot at application time (schema version 1.0.0)",
     )
     candidate_name: Optional[str] = None
     candidate_email: Optional[str] = None
+    hire_outcome: Optional[str] = Field(
+        default=None,
+        description="Hire outcome status for ML calibration: hired | rejected | offer_declined | probation_passed | interview_failed",
+    )
+    hire_outcome_recorded_at: Optional[datetime] = None
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -97,11 +108,15 @@ class ApplicationResponse(BaseModel):
     recruiter_score: Optional[float] = None
     knockout_status: Optional[Dict[str, Any]] = None
     resume_snapshot: Optional[Dict[str, Any]] = None
+    features: Optional[Dict[str, Any]] = None
     stage: str
     scoring_version: Optional[str] = None
     candidate_name: Optional[str] = None
     candidate_email: Optional[str] = None
+    hire_outcome: Optional[str] = None
+    hire_outcome_recorded_at: Optional[datetime] = None
     notes: Optional[str] = None
+    tenant_id: Optional[str] = "default"
     created_at: datetime
 
     class Config:

@@ -341,19 +341,18 @@ class TestGitHub:
 # Recruiter Tests
 # ═══════════════════════════════════════════════════════════════════════════════
 class TestRecruiter:
-    async def test_recruiter_rank_requires_role(self, client, candidate_token):
-        """Candidate should NOT be able to access recruiter endpoints."""
+    async def test_recruiter_job_create_requires_role(self, client, candidate_token):
+        """Candidate should NOT be able to access recruiter job creation."""
         r = await client.post(
-            f"{API}/recruiter/rank",
+            f"{API}/jobs",
             headers=auth_headers(candidate_token),
-            json={"job_description_id": "000000000000000000000000"},
+            json={
+                "title": "Backend Engineer",
+                "company_name": "Acme Inc",
+                "jd_text_raw": "We are seeking a senior backend software engineer with Python.",
+            },
         )
         assert r.status_code == 403
-
-    async def test_recruiter_stats_with_role(self, client, recruiter_token):
-        r = await client.get(f"{API}/recruiter/stats", headers=auth_headers(recruiter_token))
-        assert r.status_code == 200
-        assert "total_ats_checks" in r.json()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

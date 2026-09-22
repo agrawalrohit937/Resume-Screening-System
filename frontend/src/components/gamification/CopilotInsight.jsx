@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Bot, ArrowRight, Sparkles } from 'lucide-react'
 import { nextBadgeHint } from './activityUtils'
-import Card from './Card'
+import Card from '../Card'
 
 function pickMessage(profile, catalog) {
   const hint = nextBadgeHint(profile, catalog)

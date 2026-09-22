@@ -2,6 +2,7 @@
 Resume Routes — Upload, Parse, List, Delete
 """
 
+import hashlib
 import os
 import uuid
 from datetime import datetime, timezone
@@ -10,6 +11,10 @@ import structlog
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import RedirectResponse
+
+from services.tasks import task_manager, execute_resume_parse
+from services.tasks.workers import execute_resume_upload_pipeline
+from models.task_job_model import JobType
 
 from api.deps import (
     get_current_user, get_resume_repo, get_parser_service, get_user_repo,
@@ -54,14 +59,34 @@ async def _parse_resume_background(
     """Background task: parse uploaded resume and save structured data."""
     try:
         await resume_repo.update_status(resume_id, ResumeStatus.PROCESSING)
-        parsed = await parser.parse_resume(file_path, file_type)
-        await resume_repo.update_parsed_data(resume_id, parsed.model_dump())
+        parsed_dict = parsed.model_dump()
+        await resume_repo.update_parsed_data(resume_id, parsed_dict)
         await user_repo.increment_counter(user_id, "total_resumes")
         logger.info("Resume parsed", resume_id=resume_id)
 
+        # Trigger Copilot RAG chunk ingestion
+        try:
+            from services.copilot.rag.ingestion import ingest_resume_chunks
+            resume_doc = await resume_repo.get_by_id(resume_id)
+            tenant_id = resume_doc.get("tenant_id", "default") if resume_doc else "default"
+            await ingest_resume_chunks(
+                db=resume_repo.db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                parsed_resume=parsed_dict,
+                resume_id=resume_id,
+            )
+        except Exception as chunk_err:
+            logger.warning("Copilot RAG chunk ingestion warning", error=str(chunk_err))
+
     except Exception as e:
-        logger.error("Resume parse failed", resume_id=resume_id, error=str(e))
-        await resume_repo.update_status(resume_id, ResumeStatus.FAILED, error=str(e))
+        logger.exception("Resume parse background task failed", resume_id=resume_id, error=str(e))
+        err_msg = f"Resume parse failed: {str(e)}"
+        await resume_repo.update_status(resume_id, ResumeStatus.FAILED, error=err_msg)
+        await resume_repo.collection.update_one(
+            {"_id": ObjectId(resume_id)},
+            {"$set": {"error_message": err_msg, "parse_error": err_msg}},
+        )
 
     finally:
         if os.path.exists(file_path):
@@ -103,22 +128,11 @@ async def upload_resume_endpoint(
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
     original_filename = sanitize_filename(file.filename or "resume")
+    user_id_str = str(current_user.id)
 
-    # Delete old resumes for this user from Cloudinary and MongoDB
-    old_resumes = await resume_repo.collection.find(
-        {"user_id": str(current_user.id)}
-    ).to_list(length=None)
-
-    for old_resume in old_resumes:
-        old_pid = old_resume.get("cloudinary_public_id")
-        if old_pid:
-            await cloudinary_delete(old_pid, resource_type="raw")
-
-    await resume_repo.collection.delete_many({"user_id": str(current_user.id)})
-
-    # Save in DB
+    # Prepare document data
     resume_data = {
-        "user_id": str(current_user.id),
+        "user_id": user_id_str,
         "filename": filename,
         "original_filename": original_filename,
         "file_type": file_type,
@@ -131,37 +145,96 @@ async def upload_resume_endpoint(
         "is_primary": True,
     }
 
-    # ── Save as primary profile resume on the User document ───────────────
-    await user_repo.collection.update_one(
-        {"_id": ObjectId(str(current_user.id))},
-        {"$set": {
-            "profile_resume_url": file_url,
-            "profile_resume_name": original_filename,
-            "updated_at": datetime.now(timezone.utc),
-        }}
-    )
+    # Perform atomic primary swap using MongoDB session transaction if supported,
+    # with automatic compensating fallback.
+    resume = None
+    client = resume_repo.collection.database.client
+    try:
+        async with await client.start_session() as session:
+            async with session.start_transaction():
+                await resume_repo.collection.update_many(
+                    {"user_id": user_id_str},
+                    {"$set": {"is_primary": False}},
+                    session=session,
+                )
+                res = await resume_repo.collection.insert_one(resume_data, session=session)
+                resume_data["_id"] = str(res.inserted_id)
+                resume = ResumeModel(**resume_data)
 
-    resume = await resume_repo.create(resume_data)
+                await user_repo.collection.update_one(
+                    {"_id": ObjectId(user_id_str)},
+                    {"$set": {
+                        "profile_resume_url": file_url,
+                        "profile_resume_name": original_filename,
+                        "updated_at": datetime.now(timezone.utc),
+                    }},
+                    session=session,
+                )
+    except Exception as tx_err:
+        logger.info("Session transaction unavailable or failed, applying compensating fallback", error=str(tx_err))
+        await resume_repo.collection.update_many(
+            {"user_id": user_id_str},
+            {"$set": {"is_primary": False}},
+        )
+        resume = await resume_repo.create(resume_data)
+        await user_repo.collection.update_one(
+            {"_id": ObjectId(user_id_str)},
+            {"$set": {
+                "profile_resume_url": file_url,
+                "profile_resume_name": original_filename,
+                "updated_at": datetime.now(timezone.utc),
+            }},
+        )
+
+    # Compensating post-check: ensure user has exactly 1 primary resume
+    primary_count = await resume_repo.collection.count_documents({"user_id": user_id_str, "is_primary": True})
+    if primary_count == 0 and resume:
+        await resume_repo.collection.update_one(
+            {"_id": ObjectId(str(resume.id))},
+            {"$set": {"is_primary": True}},
+        )
+    elif primary_count > 1 and resume:
+        await resume_repo.collection.update_many(
+            {"user_id": user_id_str, "_id": {"$ne": ObjectId(str(resume.id))}},
+            {"$set": {"is_primary": False}},
+        )
 
     # Gamification
     await gamification.mark_daily_activity(str(current_user.id))
 
-    # Background parsing
-    background_tasks.add_task(
-        _parse_resume_background,
-        str(resume.id), storage_path, file_type,
-        resume_repo, user_repo, str(current_user.id), parser,
+    # Task 4.1: Compute idempotency key on (resume_id, file_hash)
+    file_hash = hashlib.sha256(resume_bytes).hexdigest()
+    idempotency_key = task_manager.compute_idempotency_key("parse", str(resume.id), file_hash)
+
+    # Dispatched via TaskManager (Persistent Job Queue with live status tracking)
+    tenant_id = getattr(current_user, "tenant_id", None) or "default"
+    job_record = await task_manager.enqueue_job(
+        job_type=JobType.RESUME_PARSE_EMBED,
+        payload={
+            "resume_id": str(resume.id),
+            "file_path": storage_path,
+            "file_type": file_type,
+            "user_id": str(current_user.id),
+            "file_hash": file_hash,
+            "tenant_id": tenant_id,
+        },
+        task_coro_func=execute_resume_upload_pipeline,
+        tenant_id=tenant_id,
+        user_id=str(current_user.id),
+        idempotency_key=idempotency_key,
     )
 
     return ResumeUploadResponse(
         resume_id=str(resume.id),
         filename=filename,
         status=ResumeStatus.PENDING,
-        message="Resume uploaded. Parsing in progress — check status in a few seconds.",
+        message="Resume uploaded. Parsing and embedding pipeline queued.",
+        job_id=job_record.job_id if hasattr(job_record, "job_id") else getattr(job_record, "get", lambda k: None)("job_id"),
     )
 
 
 # ─── GET /resume/ ─────────────────────────────────────────────────────────────
+@router.get("", response_model=ResumeListResponse)
 @router.get("/", response_model=ResumeListResponse)
 async def list_resumes(
     pagination: PaginationParams = Depends(),
@@ -211,6 +284,11 @@ async def update_resume(
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
     update_data = payload.model_dump(exclude_none=True)
+    if update_data.get("is_primary") is True:
+        await resume_repo.collection.update_many(
+            {"user_id": str(current_user.id), "_id": {"$ne": ObjectId(resume_id)}},
+            {"$set": {"is_primary": False}},
+        )
     updated = await resume_repo.update(resume_id, update_data)
     return _resume_to_response(updated)
 
@@ -231,10 +309,20 @@ async def reparse_resume(
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
 
-    background_tasks.add_task(
-        _parse_resume_background,
-        resume_id, resume.storage_path, resume.file_type,
-        resume_repo, user_repo, str(current_user.id), parser,
+    idempotency_key = task_manager.compute_idempotency_key("reparse", resume_id)
+    await task_manager.enqueue_task(
+        task_name="parse_resume",
+        payload={
+            "resume_id": resume_id,
+            "file_path": resume.storage_path,
+            "file_type": resume.file_type,
+            "user_id": str(current_user.id),
+            "resume_repo": resume_repo,
+            "user_repo": user_repo,
+            "parser": parser,
+        },
+        task_coro_func=execute_resume_parse,
+        idempotency_key=idempotency_key,
     )
     return ResumeUploadResponse(
         resume_id=resume_id,
@@ -272,6 +360,7 @@ async def delete_resume(
 
 
 def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
+    err = getattr(resume, "error_message", None) or getattr(resume, "parse_error", None)
     return ResumeDetailResponse(
         id=str(resume.id),
         user_id=resume.user_id,
@@ -282,6 +371,8 @@ def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
         file_size_bytes=resume.file_size_bytes,
         status=resume.status,
         parsed_data=resume.parsed_data,
+        parse_error=err,
+        error_message=err,
         tags=resume.tags,
         is_primary=resume.is_primary,
         version=resume.version,

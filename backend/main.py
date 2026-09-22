@@ -28,34 +28,54 @@ if sys.platform == "win32":
 
 from config.db import connect_db, disconnect_db
 from core.config import settings
-from core.logging import setup_logging
+from core.logging import setup_logging, trace_context
+from core.metrics import (
+    generate_prometheus_metrics,
+    get_metrics_content_type,
+    record_http_request_metrics,
+)
+from core.telemetry import init_telemetry
+from scheduler.job_alerts import start_job_alert_scheduler, stop_job_alert_scheduler
+from services.multi_tenancy.tenant_context import TenantAccessDeniedError
+from services.multi_tenancy.tenant_middleware import TenantMiddleware
 
 from api.routes import (
     admin,
+    admin_ontology,
     analytics,
     apply_assistant,
     ats,
+    audit,
     auth,
     careers,
     certificates,
+    compliance,
+    company,
     copilot,
+    eeo,
     enhance,
+    enterprise_auth,
     github,
     gmail_oauth,
     health,
+    integrations,
     interview,
     interview_ai,
+    interview_kits,
+    jobs,
     live_interview,
     notifications,
     payment,
     pdf_gen,
     portfolio,
-    recruiter,
-    recruiter_v2,
+    requisitions,
     resume,
     revenue_recovery,
     support,
+    talent_pools,
+    team,
     users,
+    webhooks,
 )
 
 setup_logging()
@@ -98,13 +118,18 @@ if not FAVICON_PATH.is_file():
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Career Platform", version=settings.APP_VERSION)
     try:
-        await asyncio.wait_for(connect_db(), timeout=15.0)
+        init_telemetry()
+        await asyncio.wait_for(connect_db(), timeout=45.0)
         FastAPICache.init(InMemoryBackend(), prefix="careershaala-cache")
         logger.info("FastAPICache initialized")
+
+        # Nightly AI Job Alerts Scheduler (Phase D Retention Loops)
+        start_job_alert_scheduler()
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise
     yield
+    stop_job_alert_scheduler()
     try:
         await disconnect_db()
     except Exception as exc:
@@ -149,10 +174,17 @@ def create_application() -> FastAPI:
             method=request.method,
             error=str(exc),
         )
-        error_detail = {"detail": "Internal Server Error"}
-        if settings.DEBUG:
-            error_detail["error"] = str(exc)
-        return JSONResponse(status_code=500, content=error_detail)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error"},
+        )
+
+    @app.exception_handler(TenantAccessDeniedError)
+    async def tenant_access_denied_handler(request: Request, exc: TenantAccessDeniedError):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": str(exc)},
+        )
 
     # CORS & GZip Middlewares
     cors_kwargs = {
@@ -166,6 +198,7 @@ def create_application() -> FastAPI:
         cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
 
     app.add_middleware(CORSMiddleware, **cors_kwargs)
+    app.add_middleware(TenantMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # Security Headers Middleware
@@ -174,6 +207,15 @@ def create_application() -> FastAPI:
         response = await call_next(request)
         response.headers.update(SECURITY_HEADERS)
         return response
+
+    # Distributed Trace ID Middleware
+    @app.middleware("http")
+    async def add_trace_id_middleware(request: Request, call_next):
+        header_trace = request.headers.get("X-Trace-ID") or request.headers.get("X-Request-ID")
+        with trace_context(header_trace) as tid:
+            response = await call_next(request)
+            response.headers["X-Trace-ID"] = tid
+            return response
 
     # Request Timing Middleware
     @app.middleware("http")
@@ -184,7 +226,22 @@ def create_application() -> FastAPI:
         response = await call_next(request)
         duration = time.perf_counter() - start_time
         response.headers["X-Process-Time"] = f"{duration:.4f}s"
+        # Record Prometheus HTTP metric
+        record_http_request_metrics(
+            method=request.method,
+            endpoint=request.url.path,
+            status_code=response.status_code,
+            duration_sec=duration,
+        )
         return response
+
+    # Prometheus Metrics Endpoint
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint():
+        return Response(
+            content=generate_prometheus_metrics(),
+            media_type=get_metrics_content_type(),
+        )
 
     # Favicon Endpoint
     @app.get("/favicon.ico", include_in_schema=False)
@@ -221,9 +278,8 @@ def create_application() -> FastAPI:
     app.include_router(enhance.router, prefix=f"{p}/enhance", tags=["Enhance"])
     app.include_router(pdf_gen.router, prefix=f"{p}/pdf", tags=["PDF"])
 
-    # Recruiter Portal
-    app.include_router(recruiter.router, prefix=f"{p}/recruiter", tags=["Recruiter"])
-    app.include_router(recruiter_v2.router, prefix=f"{p}/recruiter/v2", tags=["Recruiter V2"])
+    # Recruiter Portal & AI Job Marketplace
+    app.include_router(jobs.router, prefix=f"{p}/jobs", tags=["Jobs Marketplace"])
 
     # Interview Simulation & Analytics
     app.include_router(interview.router, prefix=f"{p}/interview", tags=["Interview"])
@@ -240,14 +296,27 @@ def create_application() -> FastAPI:
     # Commerce, Billing & Growth
     app.include_router(payment.router, prefix=f"{p}/payment", tags=["Payment"])
     app.include_router(revenue_recovery.router, prefix=f"{p}/revenue-recovery", tags=["Revenue Recovery"])
-    app.include_router(revenue_recovery.router, prefix=f"{p}/admin/revenue-recovery", tags=["Revenue Recovery Admin"])
 
     # Operations & Administration
     app.include_router(analytics.router, prefix=f"{p}/analytics", tags=["Analytics"])
+    app.include_router(audit.router, prefix=f"{p}/audit", tags=["Enterprise ATS - Audit Log"])
     app.include_router(notifications.router, prefix=f"{p}/notifications", tags=["Notifications"])
     app.include_router(careers.router, prefix=f"{p}/careers", tags=["Careers"])
     app.include_router(support.router, prefix=f"{p}", tags=["Support"])
     app.include_router(admin.router, prefix=f"{p}/admin", tags=["Admin"])
+    app.include_router(admin_ontology.router)
+    app.include_router(compliance.router)
+
+    # Phase 5 Enterprise Surface (B2B SaaS)
+    app.include_router(requisitions.router, prefix=f"{p}/requisitions", tags=["Enterprise ATS - Requisitions"])
+    app.include_router(interview_kits.router, prefix=f"{p}/interview-kits", tags=["Enterprise ATS - Interview Kits & Scorecards"])
+    app.include_router(talent_pools.router, prefix=f"{p}/talent-pool", tags=["Enterprise ATS - Consented Talent Pools"])
+    app.include_router(eeo.router, prefix=f"{p}/eeo", tags=["Enterprise ATS - EEO Vault"])
+    app.include_router(webhooks.router, prefix=f"{p}/webhooks", tags=["Enterprise ATS - Outbound Webhooks"])
+    app.include_router(integrations.router, prefix=f"{p}/integrations", tags=["Enterprise ATS - Ecosystem Integrations"])
+    app.include_router(enterprise_auth.router, prefix=f"{p}/enterprise-auth", tags=["Enterprise ATS - SSO & SCIM"])
+    app.include_router(team.router, prefix=f"{p}/team", tags=["Enterprise ATS - Team Management"])
+    app.include_router(company.router, prefix=f"{p}/company", tags=["Company Profile"])
 
     return app
 

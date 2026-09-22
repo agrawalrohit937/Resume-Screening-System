@@ -10,7 +10,7 @@ from config.db import get_database
 from repositories.application_repo import ApplicationRepository
 from models.application_model import ApplicationStatus
 from workflows.apply_assistant_graph import apply_assistant_graph
-from workflows.ats_graph import ats_engine
+from services.scoring_engine import score_resume
 from repositories.resume_repo import ResumeRepository
 from services.pdf_generator_service import render_html_to_pdf
 from services.email_service import send_with_attachments, send_application_via_gmail_api
@@ -181,31 +181,20 @@ class ApplyAssistantService:
 
     async def _run_ats_match(self, resume_text: str, job_description: str) -> dict:
         """
-        Runs the semantic ATS graph workflow instead of the strict regex matcher.
+        Runs the unified scoring engine to match candidate resume with JD.
         """
-        initial_state = {
-            "resume_text": resume_text,
-            "jd_text": job_description,
-            "extracted_data": {},
-            "matched_skills": [],
-            "missing_skills": [],
-            "experience_score": 0.0,
-            "education_score": 0.0,
-            "final_score": 0.0,
-            "recommendation": "",
-            "feedback_suggestions": []
-        }
-        
-        # Invoke the LangGraph ATS pipeline
-        result_state = await ats_engine.ainvoke(initial_state)
-        
+        scored = score_resume(
+            resume={"raw_text": resume_text},
+            jd=job_description,
+            mode="candidate",
+        )
         return {
-            "result_id": "semantic_ats_graph",
-            "score": int(result_state.get("final_score", 0)),
-            "matched_keywords": result_state.get("matched_skills", []),
-            "missing_keywords": result_state.get("missing_keywords", []),
-            "recommendation": result_state.get("recommendation", ""),
-            "feedback": result_state.get("feedback_suggestions", [])
+            "result_id": "unified_scoring_engine",
+            "score": int(scored.get("final_score", 0)),
+            "matched_keywords": scored.get("matched_skills", []),
+            "missing_keywords": scored.get("missing_skills", []),
+            "recommendation": scored.get("recommendation", ""),
+            "feedback": scored.get("feedback_suggestions", []),
         }
 
     async def _render_cover_letter_pdf(self, application_id: str, cover_letter_text: str, company_name: str, full_name: str = "Candidate") -> str:

@@ -14,15 +14,13 @@ from models.result_model import ATSResultModel, JobDescriptionModel
 logger = structlog.get_logger(__name__)
 
 
-class ResultRepository:
+from repositories.base_repo import BaseRepository
+
+
+class ResultRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.results = db.results
         self.job_descriptions = db.job_descriptions
-
-    def _serialize(self, doc: dict) -> dict:
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-        return doc
 
     # ─── Job Description ──────────────────────────────────────────────────────
     async def create_job_description(self, jd_data: dict) -> JobDescriptionModel:

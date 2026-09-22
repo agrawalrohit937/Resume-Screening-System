@@ -92,7 +92,7 @@ const TESTIMONIALS = [
     initials: 'PM',
     name: 'Priya Mehta',
     role: 'Frontend Engineer',
-    quote: 'Scored 100% in the mock interview and unlocked my verified badge. A recruiter found my profile through talent search and invited me directly to a final round.',
+    quote: 'Scored 100% in the mock interview and unlocked my verified badge. A recruiter reviewed my application and invited me directly to a final round.',
     company: 'SaaS Enterprise',
   },
   {

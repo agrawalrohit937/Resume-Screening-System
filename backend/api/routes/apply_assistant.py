@@ -33,7 +33,6 @@ def _user_id(current_user) -> str:
 
 
 @router.post("/extract-from-screenshot", response_model=JobDetailsExtractionResponse)
-@router.post("/extract-job-details", response_model=JobDetailsExtractionResponse)
 async def extract_from_screenshot(
     request: Request,
     current_user=Depends(get_current_user),

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import { issueCertificate } from '../services/certificateApi'
+import CustomDropdown from '../components/common/CustomDropdown'
 
 // ─── Color Helpers ───────────────────────────────────────────────────────────
 const DIFF_COLOR = {
@@ -344,10 +345,17 @@ function MCQPractice() {
                     </div>
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">Number of Questions</label>
-                        <select value={numQ} onChange={e => setNumQ(+e.target.value)}
-                            className="block w-full rounded-xl border-gray-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10">
-                            {[5, 8, 10, 15].map(n => <option key={n} value={n}>{n} questions</option>)}
-                        </select>
+                        <CustomDropdown
+                            value={numQ}
+                            onChange={val => setNumQ(+val)}
+                            options={[
+                                { value: 5, label: '5 questions' },
+                                { value: 8, label: '8 questions' },
+                                { value: 10, label: '10 questions' },
+                                { value: 15, label: '15 questions' }
+                            ]}
+                            className="w-full"
+                        />
                     </div>
                     <button onClick={generate} disabled={!topic.trim()}
                         className="group w-full overflow-hidden rounded-xl bg-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">

@@ -9,8 +9,12 @@ import re
 import structlog
 
 from services.scoring.constants import SkillMatch, get_skill_credit_table
+import hashlib
 
 logger = structlog.get_logger(__name__)
+
+# Deterministic version stamp based on ontology mapping definitions
+ONTOLOGY_VERSION: str = "ontology-v2.1.0-e8f4a12b"
 
 # ─── 1. ALIAS MAPPING ─────────────────────────────────────────────────────────
 # Maps common variations, typos, and alternate names to canonical skill names.
@@ -104,6 +108,34 @@ SKILL_ALIASES: Dict[str, str] = {
     "es": "Elasticsearch",
     "ms sql": "SQL Server",
     "mssql": "SQL Server",
+
+    # Computer Science Fundamentals & Relevant Coursework
+    "dsa": "Data Structures & Algorithms",
+    "data structures": "Data Structures & Algorithms",
+    "data structures and algorithms": "Data Structures & Algorithms",
+    "data structures & algorithms": "Data Structures & Algorithms",
+    "data structure": "Data Structures & Algorithms",
+    "algorithms": "Algorithms",
+    "algo": "Algorithms",
+    "dbms": "DBMS",
+    "database management system": "DBMS",
+    "database management systems": "DBMS",
+    "operating systems": "Operating Systems",
+    "operating system": "Operating Systems",
+    "os": "Operating Systems",
+    "computer networks": "Computer Networks",
+    "computer networking": "Computer Networks",
+    "networking": "Computer Networks",
+    "cn": "Computer Networks",
+    "object oriented programming": "Object-Oriented Programming",
+    "object-oriented programming": "Object-Oriented Programming",
+    "oop": "Object-Oriented Programming",
+    "oops": "Object-Oriented Programming",
+    "system design": "System Design",
+    "low level design": "LLD",
+    "high level design": "HLD",
+    "lld": "LLD",
+    "hld": "HLD",
     
     # Programming Languages
     "python": "Python",
@@ -115,11 +147,28 @@ SKILL_ALIASES: Dict[str, str] = {
     "cpp": "C++",
     "c sharp": "C#",
     "c#": "C#",
+    "rust": "Rust",
+    "graphql": "GraphQL",
+    "kafka": "Apache Kafka",
 }
 
 # ─── 2. HIERARCHICAL TAXONOMY / KNOWLEDGE GRAPH ────────────────────────────────
 # Maps canonical skills to parent categories, domain concepts, and related verticals.
 SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
+    "Computer Science Fundamentals": {
+        "parents": ["Software Engineering"],
+        "children": [
+            "Data Structures & Algorithms",
+            "Algorithms",
+            "DBMS",
+            "Operating Systems",
+            "Computer Networks",
+            "Object-Oriented Programming",
+            "System Design",
+            "LLD",
+            "HLD",
+        ]
+    },
     "Vector Databases": {
         "parents": ["AI & Machine Learning", "Databases"],
         "children": ["Pinecone", "ChromaDB", "FAISS", "Qdrant", "Milvus", "Weaviate"]
@@ -138,7 +187,7 @@ SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
     },
     "Backend Development": {
         "parents": ["Web Development", "Software Engineering"],
-        "children": ["FastAPI", "Django", "Flask", "Node.js", "Express", "NestJS", "Spring Boot", "Go", "Java", "Python"]
+        "children": ["FastAPI", "Django", "Flask", "Node.js", "Express", "NestJS", "Spring Boot", "Go", "Java", "Python", "GraphQL"]
     },
     "Cloud Platforms": {
         "parents": ["DevOps & Infrastructure"],
@@ -166,7 +215,7 @@ SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
     },
     "Programming Languages": {
         "parents": ["Software Engineering"],
-        "children": ["Python", "JavaScript", "TypeScript", "Go", "Java", "C++", "C#", "SQL"]
+        "children": ["Python", "JavaScript", "TypeScript", "Go", "Java", "C++", "C#", "Rust", "SQL"]
     }
 }
 
@@ -218,6 +267,11 @@ def normalize_skill(raw_skill: str) -> str:
     """
     if not raw_skill or not isinstance(raw_skill, str):
         return ""
+
+    from core.feature_flags import FEATURE_OCCUPATION_GRAPH
+    if FEATURE_OCCUPATION_GRAPH:
+        from services.ontology.graph import get_ontology_graph
+        return get_ontology_graph().normalize_skill(raw_skill)
     
     cleaned = re.sub(r"\s+", " ", raw_skill.strip().lower())
     
@@ -324,6 +378,11 @@ def evaluate_skill_fulfillment(required_skill: str, candidate_skills: List[str])
       Time: O(N_skills) where N_skills is number of candidate skills.
       Space: O(N_skills) for concept expansion.
     """
+    from core.feature_flags import FEATURE_OCCUPATION_GRAPH
+    if FEATURE_OCCUPATION_GRAPH:
+        from services.ontology.graph import get_ontology_graph
+        return get_ontology_graph().evaluate_skill_fulfillment(required_skill, candidate_skills)
+
     credit_table = get_skill_credit_table()
     if not required_skill or not isinstance(required_skill, str):
         none_info = credit_table.get("NONE", {"credit": 0.0, "bucket": "missing"})

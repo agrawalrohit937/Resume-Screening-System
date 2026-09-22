@@ -59,4 +59,5 @@ local.properties
 
 # Temporary tunnel binaries and tools
 tools/
+*.exe
 scratch_synopsis.txt

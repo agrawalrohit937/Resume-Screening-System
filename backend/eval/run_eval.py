@@ -1,228 +1,284 @@
 """
-CareerPilot Evaluation Harness
-Computes NDCG@10, NDCG@50, Precision@10, MRR, Kendall Tau, and Expected Calibration Error (ECE)
-using the golden evaluation dataset at backend/eval/resumeJD2_pairs.csv.
+Evaluation Runner and Ablation Engine (Phase 2).
+Runs evaluation harness, computes ranking metrics with bootstrap 95% CIs, executes ablation suite,
+generates Markdown report, and performs CI baseline regression check.
 """
 
+from __future__ import annotations
+
 import argparse
-import csv
+from datetime import datetime, timezone
 import json
-import math
 import os
-import sys
 from pathlib import Path
-from typing import Dict, List, Any, Tuple
+import sys
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from scipy.stats import kendalltau
+import structlog
 
 # Ensure backend root is on sys.path
 backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from services.scoring_engine import score_resume
+from eval.dataset_schema import EvaluationDataset, LabeledPair
+from eval.build_dataset import load_from_csv, generate_synthetic_smoke_dataset
+from eval.metrics import (
+    evaluate_cohort,
+    bootstrap_ci,
+    compute_ndcg,
+    compute_precision_at_k,
+    compute_average_precision,
+    compute_rank_correlations,
+)
+from services.scoring_engine import score_resume, WeightProfile, CANDIDATE_PROFILE, RECRUITER_PROFILE
+import core.feature_flags as ff
+
+logger = structlog.get_logger(__name__)
 
 
-def compute_dcg(relevances: List[float], k: int) -> float:
-    """Computes Discounted Cumulative Gain at rank k."""
-    k = min(k, len(relevances))
-    if k == 0:
-        return 0.0
-    return sum(rel / math.log2(idx + 2) for idx, rel in enumerate(relevances[:k]))
-
-
-def compute_ndcg(actual_relevances: List[float], k: int) -> float:
-    """Computes Normalized Discounted Cumulative Gain at rank k."""
-    dcg = compute_dcg(actual_relevances, k)
-    ideal_relevances = sorted(actual_relevances, reverse=True)
-    idcg = compute_dcg(ideal_relevances, k)
-    if idcg <= 0.0:
-        return 0.0
-    return dcg / idcg
-
-
-def compute_precision_at_k(labels: List[str], k: int) -> float:
-    """Computes Precision@K where relevant items have match_label in ('match', 'partial match')."""
-    k = min(k, len(labels))
-    if k == 0:
-        return 0.0
-    relevant_count = sum(1 for label in labels[:k] if label in ("match", "partial match"))
-    return relevant_count / k
-
-
-def compute_mrr(labels: List[str]) -> float:
-    """Computes Mean Reciprocal Rank: reciprocal rank of the first relevant item ('match')."""
-    for idx, label in enumerate(labels):
-        if label == "match":
-            return 1.0 / (idx + 1)
-    return 0.0
-
-
-def compute_ece(predicted_scores: List[float], true_scores: List[float], n_bins: int = 10) -> float:
-    """
-    Computes Expected Calibration Error across n_bins.
-    Both predicted_scores and true_scores are expected in [0.0, 1.0].
-    """
-    bin_boundaries = np.linspace(0.0, 1.0, n_bins + 1)
-    ece = 0.0
-    total_samples = len(predicted_scores)
-    if total_samples == 0:
-        return 0.0
-
-    preds = np.array(predicted_scores)
-    trues = np.array(true_scores)
-
-    for i in range(n_bins):
-        low, high = bin_boundaries[i], bin_boundaries[i + 1]
-        mask = (preds >= low) & (preds < high) if i < n_bins - 1 else (preds >= low) & (preds <= high)
-        bin_count = np.sum(mask)
-        if bin_count > 0:
-            bin_acc = np.mean(trues[mask])
-            bin_conf = np.mean(preds[mask])
-            ece += (bin_count / total_samples) * abs(bin_acc - bin_conf)
-
-    return float(ece)
-
-
-def run_evaluation(
-    data_path: Path,
-    limit: int = 0,
-    update_baseline: bool = False,
+def evaluate_dataset_with_engine(
+    dataset: EvaluationDataset,
+    profile: WeightProfile,
+    mode: str = "recruiter",
 ) -> Dict[str, Any]:
-    """Runs evaluation on dataset and returns metric results."""
-    print(f"Loading evaluation pairs from {data_path}...")
-    pairs = []
-    with open(data_path, mode="r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            pairs.append({
-                "resume_text": row["resume_text"],
-                "job_description": row["job_description"],
-                "match_score": float(row["match_score"]),
-                "match_label": row["match_label"].strip().lower(),
-            })
+    """
+    Evaluates an entire dataset using the scoring engine with specified WeightProfile.
+    Groups by job description to compute mean ranking metrics and bootstrap 95% CIs.
+    """
+    grouped_pairs = dataset.group_by_jd()
+    cohort_metric_list: List[Dict[str, float]] = []
 
-    if limit > 0:
-        pairs = pairs[:limit]
-        print(f"Subsampled to {len(pairs)} evaluation pairs.")
-    else:
-        print(f"Evaluating all {len(pairs)} pairs.")
+    all_true_labels: List[float] = []
+    all_pred_scores: List[float] = []
 
-    scored_items = []
-    for idx, item in enumerate(pairs):
-        try:
-            result = score_resume(
-                resume=item["resume_text"],
-                jd=item["job_description"],
-                mode="candidate",
-            )
-            pred_score = float(result.get("final_score", 0.0)) / 100.0
-        except Exception as err:
-            print(f"Warning: scoring failed on pair {idx}: {err}")
-            pred_score = 0.0
+    for jd_id, pairs in grouped_pairs.items():
+        cohort_tuples: List[Tuple[float, float, bool, bool]] = []
+        for p in pairs:
+            r_input = p.resume_data if p.resume_data else {"raw_text": ""}
+            j_input = p.jd_data if p.jd_data else {"text": ""}
+            
+            try:
+                result = score_resume(r_input, j_input, profile=profile, mode=mode)
+                pred_score = float(result.get("quality_score", result.get("final_score", 0.0)))
+                is_ko_pred = bool(result.get("is_knockout", False))
+            except Exception as e:
+                logger.debug("Error scoring pair in evaluation", pair_id=p.pair_id, error=str(e))
+                pred_score = 0.0
+                is_ko_pred = False
 
-        scored_items.append({
-            "pred_score": pred_score,
-            "true_score": item["match_score"],
-            "label": item["match_label"],
-        })
+            is_ko_true = bool(p.is_knockout_expected) if p.is_knockout_expected is not None else False
+            cohort_tuples.append((float(p.recruiter_label), pred_score, is_ko_true, is_ko_pred))
+            all_true_labels.append(float(p.recruiter_label))
+            all_pred_scores.append(pred_score)
 
-    # Sort items by predicted score descending
-    scored_items.sort(key=lambda x: x["pred_score"], reverse=True)
+        if cohort_tuples:
+            metrics_dict = evaluate_cohort(cohort_tuples)
+            cohort_metric_list.append(metrics_dict)
 
-    ranked_true_scores = [item["true_score"] for item in scored_items]
-    ranked_labels = [item["label"] for item in scored_items]
-    all_pred_scores = [item["pred_score"] for item in scored_items]
+    if not cohort_metric_list:
+        return {}
 
-    ndcg_10 = compute_ndcg(ranked_true_scores, k=10)
-    ndcg_50 = compute_ndcg(ranked_true_scores, k=50)
-    precision_10 = compute_precision_at_k(ranked_labels, k=10)
-    mrr = compute_mrr(ranked_labels)
+    # Compute mean across cohorts
+    agg_metrics: Dict[str, float] = {}
+    for metric_name in ("ndcg@5", "ndcg@10", "precision@5", "precision@10", "map", "spearman", "kendall_tau", "knockout_accuracy"):
+        vals = [c[metric_name] for c in cohort_metric_list]
+        agg_metrics[metric_name] = round(float(np.mean(vals)), 4)
 
-    # Kendall Tau correlation
-    tau, p_val = kendalltau(all_pred_scores, ranked_true_scores)
-    if math.isnan(tau):
-        tau = 0.0
+    # Compute Bootstrap 95% CIs for primary metrics
+    ci_results: Dict[str, Dict[str, float]] = {}
+    for m in ("ndcg@5", "ndcg@10", "map"):
+        point, low, high = bootstrap_ci(cohort_metric_list, lambda s: float(np.mean([x[m] for x in s])))
+        ci_results[m] = {"mean": point, "ci_95_lower": low, "ci_95_upper": high}
 
-    # ECE
-    ece = compute_ece(all_pred_scores, ranked_true_scores, n_bins=10)
+    # Global Rank Correlations
+    global_spearman, global_tau = compute_rank_correlations(all_true_labels, all_pred_scores)
+    agg_metrics["global_spearman"] = round(global_spearman, 4)
+    agg_metrics["global_kendall_tau"] = round(global_tau, 4)
 
-    metrics = {
-        "num_pairs": len(pairs),
-        "ndcg_at_10": round(float(ndcg_10), 4),
-        "ndcg_at_50": round(float(ndcg_50), 4),
-        "precision_at_10": round(float(precision_10), 4),
-        "mrr": round(float(mrr), 4),
-        "kendall_tau": round(float(tau), 4),
-        "ece": round(float(ece), 4),
+    return {
+        "num_pairs": dataset.total_count(),
+        "num_jobs": len(grouped_pairs),
+        "metrics": agg_metrics,
+        "confidence_intervals": ci_results,
     }
 
-    print("\n" + "=" * 55)
-    print("           CAREERPILOT EVALUATION RESULTS")
-    print("=" * 55)
-    print(f" Samples Evaluated : {metrics['num_pairs']}")
-    print(f" NDCG@10           : {metrics['ndcg_at_10']:.4f}")
-    print(f" NDCG@50           : {metrics['ndcg_at_50']:.4f}")
-    print(f" Precision@10      : {metrics['precision_at_10']:.4f}")
-    print(f" MRR               : {metrics['mrr']:.4f}")
-    print(f" Kendall Tau       : {metrics['kendall_tau']:.4f}")
-    print(f" Calibration ECE   : {metrics['ece']:.4f}")
-    print("=" * 55)
 
-    # Save to baseline.json if requested or if missing
-    baseline_path = backend_dir / "eval" / "baseline.json"
-    if update_baseline or not baseline_path.exists():
-        with open(baseline_path, "w", encoding="utf-8") as f:
-            json.dump(metrics, f, indent=2)
-        print(f"Saved baseline metrics to {baseline_path}")
+def run_ablation_suite(dataset: EvaluationDataset) -> Dict[str, Dict[str, Any]]:
+    """
+    Runs systematic ablation experiments over standard model components:
+    1. skills_only
+    2. +experience
+    3. +education
+    4. +vector
+    5. +projects
+    6. +reranker
+    """
+    ablations: Dict[str, WeightProfile] = {
+        "skills_only": WeightProfile(
+            strict_weight=1.0, semantic_weight=0.0,
+            skills_weight=1.0, experience_weight=0.0, education_weight=0.0,
+        ),
+        "+experience": WeightProfile(
+            strict_weight=1.0, semantic_weight=0.0,
+            skills_weight=0.70, experience_weight=0.30, education_weight=0.0,
+        ),
+        "+education": WeightProfile(
+            strict_weight=1.0, semantic_weight=0.0,
+            skills_weight=0.50, experience_weight=0.30, education_weight=0.20,
+        ),
+        "+vector": WeightProfile(
+            strict_weight=0.60, semantic_weight=0.40,
+            skills_weight=0.50, experience_weight=0.30, education_weight=0.20,
+        ),
+        "+projects": WeightProfile(
+            strict_weight=0.60, semantic_weight=0.40,
+            skills_weight=0.50, experience_weight=0.30, education_weight=0.20,
+            fresher_skills_share=0.60, fresher_projects_share=0.25, fresher_education_share=0.15,
+        ),
+    }
 
-    # Generate or update docs/EVAL.md
-    docs_dir = backend_dir.parent / "docs"
-    docs_dir.mkdir(parents=True, exist_ok=True)
-    eval_md_path = docs_dir / "EVAL.md"
+    results: Dict[str, Dict[str, Any]] = {}
+    for name, prof in ablations.items():
+        eval_res = evaluate_dataset_with_engine(dataset, profile=prof, mode="recruiter")
+        results[name] = eval_res
 
-    md_content = f"""# CareerPilot Evaluation Report
+    return results
 
-Golden dataset: `backend/eval/resumeJD2_pairs.csv` (500 labeled pairs across multi-domain occupations).
 
-| Metric | Score | Target / Direction |
-|---|---|---|
-| **NDCG@10** | **{metrics['ndcg_at_10']:.4f}** | Higher is better (CI gate: no drop > 0.02) |
-| **NDCG@50** | **{metrics['ndcg_at_50']:.4f}** | Higher is better |
-| **Precision@10** | **{metrics['precision_at_10']:.4f}** | Higher is better |
-| **MRR** | **{metrics['mrr']:.4f}** | Higher is better |
-| **Kendall Tau** | **{metrics['kendall_tau']:.4f}** | Higher is better |
-| **Expected Calibration Error (ECE)** | **{metrics['ece']:.4f}** | Lower is better |
+def generate_markdown_report(
+    eval_results: Dict[str, Any],
+    ablation_results: Optional[Dict[str, Dict[str, Any]]] = None,
+    baseline: Optional[Dict[str, Any]] = None,
+    report_path: Optional[str] = None,
+) -> str:
+    """Generates a Markdown evaluation summary report formatted for engineering PRs."""
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    date_filename = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    m = eval_results.get("metrics", {})
+    cis = eval_results.get("confidence_intervals", {})
 
-*Evaluated on {metrics['num_pairs']} candidate-job pairs.*
-"""
-    with open(eval_md_path, "w", encoding="utf-8") as f:
+    lines = [
+        f"# ATS Matching Engine Evaluation Report",
+        f"**Generated:** {now_str} | **Dataset Size:** {eval_results.get('num_pairs', 0)} pairs across {eval_results.get('num_jobs', 0)} jobs",
+        "",
+        "## 1. Core Ranking & Quality Metrics (95% CI)",
+        "",
+        "| Metric | Point Estimate | 95% Confidence Interval | Baseline | Delta |",
+        "| :--- | :--- | :--- | :--- | :--- |",
+    ]
+
+    base_ndcg10 = baseline.get("ndcg_at_10", 0.0) if baseline else None
+    base_ndcg5 = baseline.get("ndcg_at_5", 0.0) if baseline else None
+    base_p10 = baseline.get("precision_at_10", 0.0) if baseline else None
+
+    for name, key, b_val in [
+        ("NDCG@10", "ndcg@10", base_ndcg10),
+        ("NDCG@5", "ndcg@5", base_ndcg5),
+        ("Precision@10", "precision@10", base_p10),
+        ("MAP", "map", None),
+        ("Global Spearman", "global_spearman", None),
+        ("Global Kendall Tau", "global_kendall_tau", None),
+        ("Knockout Accuracy", "knockout_accuracy", None),
+    ]:
+        val = m.get(key, 0.0)
+        ci_str = f"[{cis[key]['ci_95_lower']:.4f}, {cis[key]['ci_95_upper']:.4f}]" if key in cis else "N/A"
+        b_str = f"{b_val:.4f}" if b_val is not None else "N/A"
+        delta_str = f"{(val - b_val):+.4f}" if b_val is not None else "N/A"
+        lines.append(f"| {name} | **{val:.4f}** | {ci_str} | {b_str} | {delta_str} |")
+
+    if ablation_results:
+        lines.extend([
+            "",
+            "## 2. Component Ablation Breakdown",
+            "",
+            "| Stage / Variant | NDCG@10 | NDCG@5 | MAP | Precision@10 |",
+            "| :--- | :--- | :--- | :--- | :--- |",
+        ])
+        for stage, res in ablation_results.items():
+            sm = res.get("metrics", {})
+            lines.append(f"| `{stage}` | {sm.get('ndcg@10', 0.0):.4f} | {sm.get('ndcg@5', 0.0):.4f} | {sm.get('map', 0.0):.4f} | {sm.get('precision@10', 0.0):.4f} |")
+
+    md_content = "\n".join(lines) + "\n"
+
+    target_path = report_path or f"eval/reports/{date_filename}.md"
+    p = Path(backend_dir) / target_path
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
         f.write(md_content)
-    print(f"Updated {eval_md_path}")
 
-    # Check CI gate against baseline
-    if baseline_path.exists() and not update_baseline:
+    return md_content
+
+
+def run_eval_cli():
+    parser = argparse.ArgumentParser(description="Run CareerShala ATS Engine Evaluation Harness")
+    parser.add_argument("--csv", type=str, default="eval/resumeJD2_pairs.csv", help="CSV path")
+    parser.add_argument("--limit", type=int, default=50, help="Max pairs to evaluate")
+    parser.add_argument("--synthetic", action="store_true", help="Use synthetic dataset for fast smoke testing")
+    parser.add_argument("--ablation", action="store_true", help="Run full component ablation suite")
+    parser.add_argument("--check-ci", action="store_true", help="Assert NDCG@10 does not regress > 2% vs baseline")
+    parser.add_argument("--update-baseline", action="store_true", help="Overwrite baseline.json with current results")
+    args = parser.parse_args()
+
+    # Load dataset
+    if args.synthetic:
+        dataset = generate_synthetic_smoke_dataset()
+    else:
+        csv_file = Path(backend_dir) / args.csv
+        if csv_file.exists():
+            dataset = load_from_csv(csv_file, limit=args.limit)
+        else:
+            print(f"CSV {args.csv} not found, falling back to synthetic dataset.")
+            dataset = generate_synthetic_smoke_dataset()
+
+    print(f"Evaluating ATS Engine over {dataset.total_count()} pairs...")
+    results = evaluate_dataset_with_engine(dataset, profile=RECRUITER_PROFILE, mode="recruiter")
+
+    ablation_res = None
+    if args.ablation:
+        print("Running ablation suite across model components...")
+        ablation_res = run_ablation_suite(dataset)
+
+    # Load baseline
+    baseline_path = Path(backend_dir) / "eval/baseline.json"
+    baseline = {}
+    if baseline_path.exists():
         try:
             with open(baseline_path, "r", encoding="utf-8") as f:
-                baseline_data = json.load(f)
-            baseline_ndcg = baseline_data.get("ndcg_at_10", 0.0)
-            diff = metrics["ndcg_at_10"] - baseline_ndcg
-            print(f"\nBaseline NDCG@10: {baseline_ndcg:.4f} | Current: {metrics['ndcg_at_10']:.4f} | Delta: {diff:+.4f}")
-            if diff < -0.02:
-                print(f"ERROR: NDCG@10 dropped by {abs(diff):.4f} (threshold is 0.02)!")
-                sys.exit(1)
-        except Exception as e:
-            print(f"Note: Could not check baseline regression: {e}")
+                baseline = json.load(f)
+        except Exception:
+            baseline = {}
 
-    return metrics
+    report_md = generate_markdown_report(results, ablation_results=ablation_res, baseline=baseline)
+    print("\n" + report_md)
+
+    if args.update_baseline:
+        new_base = {
+            "num_pairs": results.get("num_pairs", 0),
+            "ndcg_at_10": results["metrics"].get("ndcg@10", 0.0),
+            "ndcg_at_5": results["metrics"].get("ndcg@5", 0.0),
+            "precision_at_10": results["metrics"].get("precision@10", 0.0),
+            "map": results["metrics"].get("map", 0.0),
+            "spearman": results["metrics"].get("global_spearman", 0.0),
+            "kendall_tau": results["metrics"].get("global_kendall_tau", 0.0),
+            "knockout_accuracy": results["metrics"].get("knockout_accuracy", 1.0),
+        }
+        with open(baseline_path, "w", encoding="utf-8") as f:
+            json.dump(new_base, f, indent=2)
+        print(f"Baseline successfully updated at: {baseline_path}")
+
+    if args.check_ci and baseline and "ndcg_at_10" in baseline:
+        curr_ndcg = results["metrics"].get("ndcg@10", 0.0)
+        base_ndcg = baseline["ndcg_at_10"]
+        allowed_floor = base_ndcg * 0.98
+        if curr_ndcg < allowed_floor:
+            print(f"CI ERROR: NDCG@10 ({curr_ndcg:.4f}) dropped > 2% vs stored baseline ({base_ndcg:.4f}). Allowed floor: {allowed_floor:.4f}")
+            sys.exit(1)
+        else:
+            print(f"CI PASS: NDCG@10 ({curr_ndcg:.4f}) meets baseline standard ({base_ndcg:.4f}).")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run CareerPilot ATS evaluation harness.")
-    parser.add_argument("--limit", type=int, default=50, help="Number of pairs to evaluate (0 for full 500).")
-    parser.add_argument("--update-baseline", action="store_true", help="Overwrite baseline.json with current results.")
-    args = parser.parse_args()
-
-    default_csv = backend_dir / "eval" / "resumeJD2_pairs.csv"
-    run_evaluation(default_csv, limit=args.limit, update_baseline=args.update_baseline)
+    run_eval_cli()

@@ -8,7 +8,7 @@ import asyncio
 import gc
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import pdfplumber
 import structlog
@@ -18,6 +18,7 @@ from models.resume_model import (
     ParsedResumeData, ContactInfo, WorkExperience,
     Education, Project, Certification
 )
+from services.document_parser_service import document_parser
 from utils.nlp_utils import (
     clean_text, detect_skills_in_text, extract_email,
     extract_phone, extract_urls, count_words,
@@ -34,8 +35,11 @@ class ParserService:
     async def parse_resume(self, file_path: str, file_type: str) -> ParsedResumeData:
         logger.info("Parsing resume", file_path=file_path, file_type=file_type)
         try:
-            raw_text = await self._extract_raw_text(file_path, file_type)
+            raw_text, page_count, parsing_source = await self._extract_raw_text_with_meta(file_path, file_type)
             result = await self._structure_resume(raw_text)
+            result.page_count = page_count
+            result.parsing_source = parsing_source
+            logger.info("Resume structured successfully", source=parsing_source, page_count=page_count, word_count=result.word_count)
             return result
         except Exception as e:
             logger.error("Resume parse failed", error=str(e))
@@ -45,11 +49,36 @@ class ParserService:
 
     # ── Text Extraction ────────────────────────────────────────────────────────
     async def _extract_raw_text(self, file_path: str, file_type: str) -> str:
+        """Backward-compatible extraction helper returning raw_text string."""
+        raw_text, _, _ = await self._extract_raw_text_with_meta(file_path, file_type)
+        return raw_text
+
+    async def _extract_raw_text_with_meta(self, file_path: str, file_type: str) -> Tuple[str, int, str]:
+        """
+        Primary extractor using DocumentParserService (Azure Document Intelligence for <=2 pages
+        with 2-page guardrail and automatic pdfplumber / docx fallback).
+        """
         ft = (file_type or "").lower().lstrip(".")
+        try:
+            parsed_doc = await document_parser.parse_document(file_path, ft)
+            raw_text = parsed_doc.get("raw_text", "")
+            page_count = parsed_doc.get("page_count", 1)
+            source = parsed_doc.get("source", "pdfplumber")
+            if raw_text and len(raw_text.strip()) > 30:
+                return raw_text, page_count, source
+        except Exception as e:
+            logger.warning("DocumentParserService extraction failed, trying legacy fallback", error=str(e))
+
+        # Secondary fallback if DocumentParserService threw an exception
         if ft == "pdf":
-            return self._extract_pdf(file_path)
+            raw_text = self._extract_pdf(file_path)
+            return raw_text, 1, "pdfplumber"
         elif ft in ("docx", "doc"):
-            return self._extract_docx(file_path)
+            raw_text = self._extract_docx(file_path)
+            return raw_text, 1, "docx"
+        elif ft == "txt":
+            raw_text = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+            return raw_text, 1, "txt"
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 

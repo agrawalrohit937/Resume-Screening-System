@@ -21,18 +21,8 @@ import { useAuth } from '../context/AuthContext'
 import SupportButton from '../components/support/SupportButton'
 import { getMyRecoveryBanner } from '../services/revenueRecoveryApi'
 import { cancelSubscription } from '../services/api'
-
-// --- Utility Functions ---
-function formatDate(d) {
-  if (!d) return '—'
-  try {
-    const date = new Date(d)
-    if (Number.isNaN(date.getTime())) return '—'
-    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
-  } catch {
-    return '—'
-  }
-}
+import CustomDropdown from '../components/common/CustomDropdown'
+import { formatDate } from '../utils/formatters'
 
 // --- Components ---
 function Card({ className = '', children, noPadding = false, accentTop = '' }) {
@@ -473,18 +463,19 @@ export default function Billing() {
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Reason for cancelling
                 </label>
-                <select
+                <CustomDropdown
                   value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-                >
-                  <option value="Too expensive">Too expensive</option>
-                  <option value="Temporary need fulfilled">Found a job / Interview cleared</option>
-                  <option value="Missing features">Missing features I need</option>
-                  <option value="Switching to another platform">Switching to another service</option>
-                  <option value="Technical issues">Technical difficulties</option>
-                  <option value="Other">Other reason</option>
-                </select>
+                  onChange={(val) => setCancelReason(val)}
+                  options={[
+                    { value: 'Too expensive', label: 'Too expensive' },
+                    { value: 'Temporary need fulfilled', label: 'Found a job / Interview cleared' },
+                    { value: 'Missing features', label: 'Missing features I need' },
+                    { value: 'Switching to another platform', label: 'Switching to another service' },
+                    { value: 'Technical issues', label: 'Technical difficulties' },
+                    { value: 'Other', label: 'Other reason' }
+                  ]}
+                  className="w-full"
+                />
               </div>
 
               <div>

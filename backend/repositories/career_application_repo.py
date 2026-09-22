@@ -14,18 +14,14 @@ from models.career_application_model import (
     CAREER_APPLICATION_COLLECTION,
 )
 
+from repositories.base_repo import BaseRepository
+
 logger = structlog.get_logger(__name__)
 
 
-class CareerApplicationRepository:
+class CareerApplicationRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db[CAREER_APPLICATION_COLLECTION]
-
-    def _serialize(self, doc: dict) -> dict:
-        """Normalize ObjectId and datetime fields for Pydantic."""
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-        return doc
 
     async def create(self, data: dict) -> CareerApplicationModel:
         data["created_at"] = datetime.now(timezone.utc)

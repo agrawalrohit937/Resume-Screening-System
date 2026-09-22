@@ -142,6 +142,20 @@ async def mock_col_find_one(query=None, *args, **kwargs):
     q_str = str(query).lower()
     if "000000000000000000000000" in q_str or "notfound" in q_str or "nonexistent" in q_str:
         return None
+    if "jti" in q_str or "revoked" in q_str:
+        return None
+    if "token_hash" in q_str:
+        from datetime import datetime, timezone, timedelta
+        return {
+            "_id": "665f1a2b3c4d5e6f7a8b9c0d",
+            "token_hash": query.get("token_hash", "mock_hash"),
+            "family_id": "fam_123",
+            "user_id": "665f1a2b3c4d5e6f7a8b9c0d",
+            "tenant_id": "default",
+            "revoked": False,
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
+            "created_at": datetime.now(timezone.utc),
+        }
     return sample_resume_doc
 
 mock_col = MagicMock()
@@ -191,6 +205,11 @@ mock_db.job_applications = mock_app_col
 mock_db.analytics = mock_col
 mock_db.interviews = mock_col
 mock_db.certificates = mock_col
+mock_db.copilot_sessions = mock_col
+mock_db.copilot_messages = mock_col
+mock_db.copilot_memory = mock_col
+mock_db.task_jobs = mock_col
+mock_db.task_dlq = mock_col
 
 config.db._db = mock_db
 app.dependency_overrides[get_db] = lambda: mock_db

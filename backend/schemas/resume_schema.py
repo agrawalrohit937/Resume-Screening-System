@@ -68,6 +68,7 @@ class ResumeUploadResponse(BaseModel):
     filename: str
     status: ResumeStatus
     message: str
+    job_id: Optional[str] = None
 
 
 class ResumeDetailResponse(BaseModel):
@@ -80,6 +81,8 @@ class ResumeDetailResponse(BaseModel):
     file_size_bytes: int
     status: ResumeStatus
     parsed_data: Optional[ParsedResumeData]
+    parse_error: Optional[str] = None
+    error_message: Optional[str] = None
     tags: List[str]
     is_primary: bool
     version: int

@@ -24,8 +24,9 @@ from typing import Any, Dict, List, Optional
 import structlog
 from bson import ObjectId
 
-from core.feature_flags import FEATURE_ATLAS_VECTOR_SEARCH
+from core.feature_flags import FEATURE_ATLAS_VECTOR_SEARCH, FEATURE_HYBRID_RETRIEVAL
 from services.embedding_service import embedding_model, EMBEDDING_DIMENSIONS
+from utils.pagination import stream_cursor
 
 logger = structlog.get_logger(__name__)
 
@@ -137,6 +138,9 @@ async def find_jobs_for_candidate(
     skills_text = ", ".join(skills[:25])
     raw_text = parsed_dict.get("raw_text") or getattr(target_resume, "raw_text", "") or ""
 
+    candidate_summary = summary_text or (raw_text[:300] if raw_text else "")
+    candidate_skills = skills or []
+
     # Synthesize candidate profile representation for embedding
     candidate_profile_text = f"Skills: {skills_text}. Professional Summary: {summary_text}. Highlights: {raw_text[:1200]}"
     if not candidate_profile_text.strip():
@@ -154,7 +158,7 @@ async def find_jobs_for_candidate(
     applied_job_ids = set()
     try:
         app_cursor = db.applications.find({"candidate_id": str(candidate_id)}, {"job_id": 1})
-        applied_docs = await app_cursor.to_list(length=500)
+        applied_docs = await stream_cursor(app_cursor)
         for a in applied_docs:
             if a.get("job_id"):
                 applied_job_ids.add(str(a["job_id"]))
@@ -187,6 +191,9 @@ async def find_jobs_for_candidate(
                         "_id": 1,
                         "title": 1,
                         "company_name": 1,
+                        "company_logo": 1,
+                        "company_logo_url": 1,
+                        "logo_url": 1,
                         "location": 1,
                         "work_mode": 1,
                         "salary_range": 1,
@@ -212,6 +219,8 @@ async def find_jobs_for_candidate(
                     "id": job_id_str,
                     "title": doc.get("title", "Software Engineer"),
                     "company_name": doc.get("company_name", "Technology Corp"),
+                    "company_logo": doc.get("company_logo") or doc.get("company_logo_url") or doc.get("logo_url") or doc.get("logo"),
+                    "company_logo_url": doc.get("company_logo_url") or doc.get("company_logo") or doc.get("logo_url") or doc.get("logo"),
                     "location": doc.get("location", "Remote"),
                     "work_mode": doc.get("work_mode", "Remote"),
                     "salary_range": doc.get("salary_range"),
@@ -248,6 +257,9 @@ async def find_jobs_for_candidate(
                 "_id": 1,
                 "title": 1,
                 "company_name": 1,
+                "company_logo": 1,
+                "company_logo_url": 1,
+                "logo_url": 1,
                 "location": 1,
                 "work_mode": 1,
                 "salary_range": 1,
@@ -260,7 +272,7 @@ async def find_jobs_for_candidate(
                 "created_at": 1,
             },
         )
-        open_jobs = await cursor.to_list(length=500)
+        open_jobs = await stream_cursor(cursor)
         total_open_count = len(open_jobs)
 
         if not open_jobs:
@@ -273,36 +285,86 @@ async def find_jobs_for_candidate(
                 "message": "No open jobs currently available in the marketplace.",
             }
 
-        for job in open_jobs:
-            job_id_str = str(job["_id"])
-            jd_embedding = job.get("jd_embedding_bge") or job.get("jd_embedding") or []
+        if FEATURE_HYBRID_RETRIEVAL:
+            try:
+                from services.retrieval.hybrid_pipeline import HybridRetrievalPipeline
+                pipeline = HybridRetrievalPipeline(
+                    corpus=open_jobs,
+                    text_field="jd_text_raw",
+                    vector_field="jd_embedding",
+                    id_field="_id",
+                    rrf_k=60,
+                )
+                query_text = f"{candidate_summary} {' '.join(candidate_skills)}".strip() or (raw_text[:500] if raw_text else "Software Engineer")
+                fused_candidates = pipeline.retrieve(
+                    query_text=query_text,
+                    query_vector=candidate_vec,
+                    top_k=max(20, limit * 3),
+                    excluded_ids=applied_job_ids,
+                    recall_budget=100,
+                )
+                for doc in fused_candidates:
+                    job_id_str = str(doc.get("_id", "") or doc.get("id", ""))
+                    raw_similarity = float(doc.get("dense_score", 0.50))
+                    match_score = _calibrate_match_score(raw_similarity)
+                    req_skills = doc.get("required_skills") or []
+                    matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
+                    ranked_jobs.append({
+                        "id": job_id_str,
+                        "title": doc.get("title", "Software Engineer"),
+                        "company_name": doc.get("company_name", "Technology Corp"),
+                        "company_logo": doc.get("company_logo") or doc.get("company_logo_url") or doc.get("logo_url") or doc.get("logo"),
+                        "company_logo_url": doc.get("company_logo_url") or doc.get("company_logo") or doc.get("logo_url") or doc.get("logo"),
+                        "location": doc.get("location", "Remote"),
+                        "work_mode": doc.get("work_mode", "Remote"),
+                        "salary_range": doc.get("salary_range"),
+                        "department": doc.get("department"),
+                        "min_years": float(doc.get("min_years", 0.0)),
+                        "required_skills": req_skills[:6],
+                        "matched_skills": matched_skills[:4],
+                        "match_score": match_score,
+                        "raw_similarity": round(raw_similarity, 4),
+                        "rrf_score": doc.get("rrf_score"),
+                        "is_applied": job_id_str in applied_job_ids,
+                        "created_at": doc.get("created_at"),
+                    })
+            except Exception as e:
+                logger.warning("Hybrid retrieval pipeline failed, falling back to linear scan", error=str(e))
+                ranked_jobs = []
 
-            # Calculate vector similarity
-            if jd_embedding and len(jd_embedding) == EMBEDDING_DIMENSIONS:
-                raw_cosine = _calculate_cosine_similarity(candidate_vec, jd_embedding)
-            else:
-                raw_cosine = 0.50
+        if not ranked_jobs:
+            for job in open_jobs:
+                job_id_str = str(job["_id"])
+                jd_embedding = job.get("jd_embedding_bge") or job.get("jd_embedding") or []
 
-            req_skills = job.get("required_skills") or []
-            matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
-            match_score = _calibrate_match_score(raw_cosine)
+                # Calculate vector similarity
+                if jd_embedding and len(jd_embedding) == EMBEDDING_DIMENSIONS:
+                    raw_cosine = _calculate_cosine_similarity(candidate_vec, jd_embedding)
+                else:
+                    raw_cosine = 0.50
 
-            ranked_jobs.append({
-                "id": job_id_str,
-                "title": job.get("title", "Software Engineer"),
-                "company_name": job.get("company_name", "Technology Corp"),
-                "location": job.get("location", "Remote"),
-                "work_mode": job.get("work_mode", "Remote"),
-                "salary_range": job.get("salary_range"),
-                "department": job.get("department"),
-                "min_years": float(job.get("min_years", 0.0)),
-                "required_skills": req_skills[:6],
-                "matched_skills": matched_skills[:4],
-                "match_score": match_score,
-                "raw_similarity": round(raw_cosine, 4),
-                "is_applied": job_id_str in applied_job_ids,
-                "created_at": job.get("created_at"),
-            })
+                req_skills = job.get("required_skills") or []
+                matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
+                match_score = _calibrate_match_score(raw_cosine)
+
+                ranked_jobs.append({
+                    "id": job_id_str,
+                    "title": job.get("title", "Software Engineer"),
+                    "company_name": job.get("company_name", "Technology Corp"),
+                    "company_logo": job.get("company_logo") or job.get("company_logo_url") or job.get("logo_url") or job.get("logo"),
+                    "company_logo_url": job.get("company_logo_url") or job.get("company_logo") or job.get("logo_url") or job.get("logo"),
+                    "location": job.get("location", "Remote"),
+                    "work_mode": job.get("work_mode", "Remote"),
+                    "salary_range": job.get("salary_range"),
+                    "department": job.get("department"),
+                    "min_years": float(job.get("min_years", 0.0)),
+                    "required_skills": req_skills[:6],
+                    "matched_skills": matched_skills[:4],
+                    "match_score": match_score,
+                    "raw_similarity": round(raw_cosine, 4),
+                    "is_applied": job_id_str in applied_job_ids,
+                    "created_at": job.get("created_at"),
+                })
     else:
         try:
             total_open_count = await db.jobs.count_documents({"status": "open"})

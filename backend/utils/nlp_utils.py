@@ -51,8 +51,12 @@ TECH_SKILLS = {
     # Databases
     "postgresql", "mysql", "mongodb", "redis", "elasticsearch", "cassandra",
     "dynamodb", "neo4j", "sqlite",
-    # Tools
+    # Tools & Fundamentals / Coursework
     "git", "linux", "jira", "confluence", "figma", "postman",
+    "dsa", "data structures", "algorithms", "dbms", "database management systems",
+    "operating systems", "computer networks", "computer networking", "networking",
+    "object-oriented programming", "oop", "oops", "system design", "lld", "hld",
+    "distributed systems", "software engineering",
 }
 
 SOFT_SKILLS = {
@@ -134,9 +138,18 @@ def count_words(text: str) -> int:
 
 def extract_years_of_experience(text: str) -> float:
     """
-    Parse total years of experience from resume text.
-    Looks for patterns like '5 years', '3+ years', etc.
+    Parse total years of experience from resume/JD text.
+    Looks for patterns like '5 years', '3+ years', '0-1 years', etc.
     """
+    if not text or not text.strip():
+        return 0.0
+
+    # Explicit zero/entry-level/fresher check
+    if re.search(r"\b(fresher|freshers|entry[\s-]level|trainee|intern|internship|graduate|no\s+prior\s+experience|no\s+experience\s+required|no\s+experience\s+needed|zero\s+experience|0\s*(?:[-–]|to)\s*1\s*(?:years?|yrs?)|0\+?\s*(?:years?|yrs?)|0\s*(?:years?|yrs?)\s+experience)\b", text, re.IGNORECASE):
+        # If there's no higher tenure pattern (e.g. 3+ years), return 0.0
+        if not re.search(r"\b([2-9]|\d{2,})\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)", text, re.IGNORECASE):
+            return 0.0
+
     patterns = [
         r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)",
         r"experience\s*(?:of\s*)?(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)",
@@ -144,6 +157,9 @@ def extract_years_of_experience(text: str) -> float:
     max_years = 0.0
     for pattern in patterns:
         for match in re.finditer(pattern, text, re.IGNORECASE):
+            prefix = text[max(0, match.start() - 6):match.start()]
+            if re.search(r"0\s*(?:[-–]|to)\s*$", prefix, re.IGNORECASE):
+                continue
             try:
                 years = float(match.group(1))
                 max_years = max(max_years, years)

@@ -8,6 +8,9 @@
 export function optimizeCloudinaryUrl(url, width = 100) {
   if (!url || typeof url !== 'string') return null
   const trimmed = url.trim()
+  if (trimmed.startsWith('data:')) {
+    return trimmed
+  }
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('/')) {
     return null
   }
@@ -49,3 +52,38 @@ export function getInitials(fullName) {
   }
   return parts[0][0].toUpperCase()
 }
+
+/**
+ * Clean logo resolution helper for companies.
+ * Returns valid uploaded logo image URL if present, or null for monogram fallback.
+ */
+export function resolveCompanyLogo(companyOrName) {
+  if (!companyOrName) return null
+
+  let logoCandidate = null
+
+  if (typeof companyOrName === 'string') {
+    const trimmed = companyOrName.trim()
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/') || trimmed.startsWith('data:')) {
+      logoCandidate = trimmed
+    }
+  } else if (typeof companyOrName === 'object') {
+    logoCandidate =
+      companyOrName.company_logo ||
+      companyOrName.logo_url ||
+      companyOrName.logo ||
+      companyOrName.profile_picture ||
+      null
+  }
+
+  if (logoCandidate && typeof logoCandidate === 'string' && logoCandidate.trim()) {
+    const trimmed = logoCandidate.trim()
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/') || trimmed.startsWith('data:')) {
+      return optimizeCloudinaryUrl(trimmed, 140)
+    }
+  }
+
+  return null
+}
+
+

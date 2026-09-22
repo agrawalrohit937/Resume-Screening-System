@@ -15,7 +15,8 @@ from core.llm_client import groq_key_pool
 logger = structlog.get_logger(__name__)
 
 GROQ_URL  = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
+
 
 # Hesitation sounds vs structural transition words for ESL speech calibration
 HESITATION_SOUNDS  = {"um", "uh", "ah", "er"}

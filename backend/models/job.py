@@ -46,9 +46,25 @@ class JobModel(BaseModel):
     company_website: Optional[str] = None
     company_about: Optional[str] = None
     company_size: Optional[str] = None
-    company_industry: Optional[str] = None
     created_by: Optional[str] = None  # Recruiter / Admin user_id
+    tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
     applicant_count: int = 0
+    education_requirement_mode: str = Field(
+        default="preferred",
+        description="Skills-first education mode: 'required' | 'preferred' | 'ignored'"
+    )
+    required_credentials: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Mandatory or preferred credentials e.g. [{'type': 'RN', 'is_mandatory': True}]"
+    )
+    occupation_code: Optional[str] = Field(
+        default=None,
+        description="ESCO / NCO / SOC code for domain scoring adapter dispatch"
+    )
+    requirements_structured: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Structured requirements parsed from JD text"
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -73,6 +89,10 @@ class JobCreateRequest(BaseModel):
     company_about: Optional[str] = None
     company_size: Optional[str] = None
     company_industry: Optional[str] = None
+    education_requirement_mode: str = Field(default="preferred")
+    required_credentials: List[Dict[str, Any]] = Field(default_factory=list)
+    occupation_code: Optional[str] = None
+    requirements_structured: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class JobResponse(BaseModel):
@@ -94,9 +114,15 @@ class JobResponse(BaseModel):
     company_size: Optional[str] = None
     company_industry: Optional[str] = None
     created_by: Optional[str] = None
+    tenant_id: Optional[str] = "default"
     applicant_count: int = 0
+    education_requirement_mode: str = "preferred"
+    required_credentials: List[Dict[str, Any]] = Field(default_factory=list)
+    occupation_code: Optional[str] = None
+    requirements_structured: List[Dict[str, Any]] = Field(default_factory=list)
     created_at: datetime
     has_embedding: bool = True
+    has_applied: bool = False
 
     class Config:
         populate_by_name = True

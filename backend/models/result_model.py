@@ -44,6 +44,7 @@ class JobDescriptionModel(BaseModel):
 class ATSResultModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str
+    tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
     resume_id: str
     job_description_id: str
 
@@ -68,6 +69,7 @@ class ATSResultModel(BaseModel):
     overall_assessment: str = ""
 
     processing_time_ms: int = 0
+    scoring_version: Optional[str] = "1.0.0"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = ConfigDict(

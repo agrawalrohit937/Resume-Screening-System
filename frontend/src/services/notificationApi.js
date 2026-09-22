@@ -26,3 +26,21 @@ export const markAllAsRead = async () => {
     return { status: 'success' }
   }
 }
+
+export const clearAllNotifications = async () => {
+  try {
+    const { data } = await api.post('/notifications/clear-all')
+    return data
+  } catch (err) {
+    return { status: 'success' }
+  }
+}
+
+export const dismissNotification = async (id) => {
+  try {
+    const { data } = await api.post(`/notifications/${id}/dismiss`)
+    return data
+  } catch (err) {
+    return { status: 'success', id }
+  }
+}

@@ -122,8 +122,6 @@ export function useInterviewSession() {
       speech_rate_wpm: speechRate,
     };
 
-    console.log("🚀 FINAL PAYLOAD:", payload);
-
     const { data } = await api.post(
       `${BASE}/sessions/${session.session_id}/answer`,
       payload

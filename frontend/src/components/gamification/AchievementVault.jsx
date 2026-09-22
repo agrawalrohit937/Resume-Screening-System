@@ -1,7 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { Lock, Award, Sparkles, Star } from 'lucide-react'
-import Card from './Card'
+import Card from '../Card'
 
 // ─── Premium Tier Styles ────────────────────────────────────────────────────
 const TIER_STYLES = {

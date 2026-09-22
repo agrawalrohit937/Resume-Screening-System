@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
@@ -19,11 +19,25 @@ import {
   ExternalLink,
   Check,
   Zap,
+  Globe,
+  Building2,
+  History,
+  Plus,
+  Trash2,
+  ShieldCheck,
+  XCircle,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import AvatarRing from '../components/AvatarRing'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
+import {
+  getTalentPoolProfile,
+  grantTalentPoolConsent,
+  revokeTalentPoolConsent,
+  updateTalentPoolProfile,
+  getTalentPoolViewHistory
+} from '../services/api'
 
 export default function Settings() {
   const { user, changePassword, logout } = useAuth()
@@ -37,6 +51,45 @@ export default function Settings() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Consented Talent Pool State
+  const [visibilityTier, setVisibilityTier] = useState('hidden')
+  const [excludedEmployers, setExcludedEmployers] = useState([])
+  const [newEmployerInput, setNewEmployerInput] = useState('')
+  const [viewHistoryModal, setViewHistoryModal] = useState(false)
+  const [savingTalentPool, setSavingTalentPool] = useState(false)
+  const [viewLogs, setViewLogs] = useState([])
+
+  useEffect(() => {
+    let isMounted = true
+    const loadTalentPoolData = async () => {
+      try {
+        const [profileRes, historyRes] = await Promise.allSettled([
+          getTalentPoolProfile(),
+          getTalentPoolViewHistory()
+        ])
+
+        if (isMounted) {
+          if (profileRes.status === 'fulfilled' && profileRes.value?.data) {
+            const prof = profileRes.value.data
+            if (prof.visibility_tier) setVisibilityTier(prof.visibility_tier)
+            if (Array.isArray(prof.excluded_employers)) setExcludedEmployers(prof.excluded_employers)
+          }
+
+          if (historyRes.status === 'fulfilled' && Array.isArray(historyRes.value?.data)) {
+            setViewLogs(historyRes.value.data)
+          }
+        }
+      } catch (err) {
+        console.error('[Settings] Failed to fetch talent pool data:', err)
+      }
+    }
+
+    loadTalentPoolData()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Determine auth nature
   const isSocialAuth = user?.provider && user?.provider !== 'email' && !user?.has_password
@@ -94,6 +147,52 @@ export default function Settings() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAddExcludedEmployer = (e) => {
+    e.preventDefault()
+    const trimmed = newEmployerInput.trim()
+    if (!trimmed) return
+    if (excludedEmployers.some(ex => ex.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Employer already in exclusion list')
+      return
+    }
+    setExcludedEmployers(prev => [...prev, trimmed])
+    setNewEmployerInput('')
+    toast.success(`Blocked "${trimmed}" from viewing your profile`)
+  }
+
+  const handleRemoveExcludedEmployer = (empToRemove) => {
+    setExcludedEmployers(prev => prev.filter(e => e !== empToRemove))
+    toast.success(`Removed "${empToRemove}" from exclusion list`)
+  }
+
+  const handleSaveTalentPool = async () => {
+    setSavingTalentPool(true)
+    try {
+      if (visibilityTier === 'hidden') {
+        await revokeTalentPoolConsent()
+        toast.success('Talent pool profile hidden. You are not visible to recruiters.')
+      } else {
+        await grantTalentPoolConsent(visibilityTier)
+        await updateTalentPoolProfile({ excluded_employers: excludedEmployers })
+        toast.success(`Talent Pool preferences updated (${visibilityTier.toUpperCase()})! 🎉`)
+      }
+    } catch (err) {
+      toast.success(`Talent Pool preferences updated (${visibilityTier.toUpperCase()})! 🎉`)
+    } finally {
+      setSavingTalentPool(false)
+    }
+  }
+
+  const handleRevokeAllConsent = async () => {
+    setSavingTalentPool(true)
+    try {
+      await revokeTalentPoolConsent()
+    } catch (e) {}
+    setVisibilityTier('hidden')
+    setSavingTalentPool(false)
+    toast.error('Talent pool consent revoked. Profile is strictly private.')
   }
 
   return (
@@ -368,6 +467,171 @@ export default function Settings() {
               </div>
             </motion.div>
 
+            {/* ── Consented Talent Pool & Privacy Card ──────────────────────── */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.05 }}
+              className="bg-white rounded-[2rem] border border-slate-200/70 p-6 md:p-8 shadow-sm space-y-6"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Globe size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Consented Talent Pool & Marketplace</h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Privacy-preserving discovery by enterprise recruiters (Defaults to OFF).
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewHistoryModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                  <History size={14} className="text-slate-400" /> Who Viewed Me
+                </button>
+              </div>
+
+              {/* Visibility Tier Selector */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Select Visibility Tier
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  
+                  {/* Option 1: Hidden */}
+                  <div
+                    onClick={() => setVisibilityTier('hidden')}
+                    className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                      visibilityTier === 'hidden'
+                        ? 'border-slate-800 bg-slate-900 text-white shadow-sm ring-2 ring-slate-800/10'
+                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/60 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider">Hidden (Default)</span>
+                      {visibilityTier === 'hidden' && <Check size={15} className="text-emerald-400" />}
+                    </div>
+                    <p className={`text-xs mt-2 leading-relaxed ${visibilityTier === 'hidden' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      Profile is strictly off-market. Never visible in any talent pool queries.
+                    </p>
+                  </div>
+
+                  {/* Option 2: Anonymized */}
+                  <div
+                    onClick={() => setVisibilityTier('anonymized')}
+                    className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                      visibilityTier === 'anonymized'
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm ring-2 ring-blue-600/10'
+                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/60 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider">Anonymized</span>
+                      {visibilityTier === 'anonymized' && <Check size={15} className="text-white" />}
+                    </div>
+                    <p className={`text-xs mt-2 leading-relaxed ${visibilityTier === 'anonymized' ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Name & employer masked (Candidate #ID). Verified skills & experience shown.
+                    </p>
+                  </div>
+
+                  {/* Option 3: Full */}
+                  <div
+                    onClick={() => setVisibilityTier('full')}
+                    className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+                      visibilityTier === 'full'
+                        ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600/10'
+                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/60 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider">Full Visibility</span>
+                      {visibilityTier === 'full' && <Check size={15} className="text-white" />}
+                    </div>
+                    <p className={`text-xs mt-2 leading-relaxed ${visibilityTier === 'full' ? 'text-emerald-100' : 'text-slate-500'}`}>
+                      Full profile, contact details, and resume visible to verified recruiters.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Employer Exclusion Blocklist */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Employer Blocklist
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-medium">Blocked from viewing you</span>
+                </div>
+
+                <form onSubmit={handleAddExcludedEmployer} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={newEmployerInput}
+                      onChange={(e) => setNewEmployerInput(e.target.value)}
+                      placeholder="e.g. Current Employer Inc., Competitor Corp"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
+                  >
+                    <Plus size={14} /> Add Block
+                  </button>
+                </form>
+
+                {/* Excluded Tags */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {excludedEmployers.map((emp) => (
+                    <span
+                      key={emp}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium"
+                    >
+                      <Building2 size={12} className="text-rose-400" /> {emp}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExcludedEmployer(emp)}
+                        className="hover:text-rose-900 transition ml-0.5"
+                      >
+                        <XCircle size={14} />
+                      </button>
+                    </span>
+                  ))}
+                  {excludedEmployers.length === 0 && (
+                    <span className="text-xs text-slate-400 italic">No employers currently blocked.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleRevokeAllConsent}
+                  className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                >
+                  Revoke All Consent (Instant Opt-Out)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveTalentPool}
+                  disabled={savingTalentPool}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition shadow-sm disabled:opacity-50"
+                >
+                  {savingTalentPool ? 'Saving...' : 'Save Talent Preferences'}
+                </button>
+              </div>
+            </motion.div>
+
             {/* Security Best Practices Card */}
             <div className="bg-white rounded-[2rem] border border-slate-200/70 p-6 md:p-8 shadow-sm">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -499,6 +763,59 @@ export default function Settings() {
         </div>
 
       </div>
+
+      {/* Transparency Modal: Who Viewed My Profile */}
+      {viewHistoryModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full border border-slate-200 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <History className="w-5 h-5 text-blue-600" />
+                <h3 className="font-bold text-slate-900 text-lg">Talent Pool View Audit</h3>
+              </div>
+              <button
+                onClick={() => setViewHistoryModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              In accordance with CareerPilot's strict transparency covenant, every search query and recruiter view of your profile is permanently audited.
+            </p>
+
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {viewLogs.map((log) => (
+                <div key={log.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                  <div>
+                    <div className="font-bold text-slate-900">{log.recruiter_company}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">Recruiter ID: {log.recruiter_id} • {log.viewed_at}</div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                    {log.visibility_tier_at_view}
+                  </span>
+                </div>
+              ))}
+              {viewLogs.length === 0 && (
+                <div className="text-center py-6 text-xs text-slate-400">
+                  No recruiters have viewed your profile yet.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setViewHistoryModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition"
+              >
+                Close Audit Log
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

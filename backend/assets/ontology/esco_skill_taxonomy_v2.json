@@ -1,0 +1,263 @@
+{
+  "version": "2.1.0",
+  "metadata": {
+    "standard": "ESCO v1.2 / O*NET 28.0 / NCO-2015 Hybrid Taxonomy",
+    "domain": "CareerShala Global & Indian ATS Skill Taxonomy",
+    "updated_at": "2026-09-22T00:00:00Z"
+  },
+  "skills": [
+    {
+      "id": "skill:tech:python",
+      "canonical": "Python",
+      "category": "Programming Languages",
+      "aliases": ["python3", "python 3", "py", "cpython"],
+      "labels": {"en": "Python", "hi": "पायथन"}
+    },
+    {
+      "id": "skill:tech:javascript",
+      "canonical": "JavaScript",
+      "category": "Programming Languages",
+      "aliases": ["js", "ecmascript", "es6", "vanilla js"],
+      "labels": {"en": "JavaScript"}
+    },
+    {
+      "id": "skill:tech:typescript",
+      "canonical": "TypeScript",
+      "category": "Programming Languages",
+      "aliases": ["ts", "type script"],
+      "labels": {"en": "TypeScript"}
+    },
+    {
+      "id": "skill:tech:java",
+      "canonical": "Java",
+      "category": "Programming Languages",
+      "aliases": ["java 8", "java 11", "java 17", "core java", "j2ee"],
+      "labels": {"en": "Java"}
+    },
+    {
+      "id": "skill:tech:golang",
+      "canonical": "Go",
+      "category": "Programming Languages",
+      "aliases": ["golang", "go lang"],
+      "labels": {"en": "Go"}
+    },
+    {
+      "id": "skill:tech:rust",
+      "canonical": "Rust",
+      "category": "Programming Languages",
+      "aliases": ["rustlang"],
+      "labels": {"en": "Rust"}
+    },
+    {
+      "id": "skill:tech:csharp",
+      "canonical": "C#",
+      "category": "Programming Languages",
+      "aliases": ["csharp", "c sharp", ".net c#"],
+      "labels": {"en": "C#"}
+    },
+    {
+      "id": "skill:tech:cpp",
+      "canonical": "C++",
+      "category": "Programming Languages",
+      "aliases": ["cpp", "c plus plus"],
+      "labels": {"en": "C++"}
+    },
+    {
+      "id": "skill:tech:react",
+      "canonical": "React",
+      "category": "Web & Frontend Frameworks",
+      "aliases": ["react.js", "reactjs", "react 18", "react native"],
+      "labels": {"en": "React"}
+    },
+    {
+      "id": "skill:tech:node",
+      "canonical": "Node.js",
+      "category": "Backend Frameworks & Runtimes",
+      "aliases": ["nodejs", "node js", "node"],
+      "labels": {"en": "Node.js"}
+    },
+    {
+      "id": "skill:tech:fastapi",
+      "canonical": "FastAPI",
+      "category": "Backend Frameworks & Runtimes",
+      "aliases": ["fast-api", "fast api"],
+      "labels": {"en": "FastAPI"}
+    },
+    {
+      "id": "skill:tech:django",
+      "canonical": "Django",
+      "category": "Backend Frameworks & Runtimes",
+      "aliases": ["django rest framework", "drf"],
+      "labels": {"en": "Django"}
+    },
+    {
+      "id": "skill:tech:flask",
+      "canonical": "Flask",
+      "category": "Backend Frameworks & Runtimes",
+      "aliases": ["flask framework"],
+      "labels": {"en": "Flask"}
+    },
+    {
+      "id": "skill:tech:docker",
+      "canonical": "Docker",
+      "category": "DevOps & Infrastructure",
+      "aliases": ["docker containers", "dockerfile", "docker-compose"],
+      "labels": {"en": "Docker"}
+    },
+    {
+      "id": "skill:tech:kubernetes",
+      "canonical": "Kubernetes",
+      "category": "DevOps & Infrastructure",
+      "aliases": ["k8s", "kube", "kubectl"],
+      "labels": {"en": "Kubernetes"}
+    },
+    {
+      "id": "skill:tech:aws",
+      "canonical": "AWS",
+      "category": "Cloud Computing",
+      "aliases": ["amazon web services", "amazon aws", "aws cloud"],
+      "labels": {"en": "Amazon Web Services"}
+    },
+    {
+      "id": "skill:tech:gcp",
+      "canonical": "GCP",
+      "category": "Cloud Computing",
+      "aliases": ["google cloud platform", "google cloud"],
+      "labels": {"en": "Google Cloud Platform"}
+    },
+    {
+      "id": "skill:tech:azure",
+      "canonical": "Azure",
+      "category": "Cloud Computing",
+      "aliases": ["microsoft azure", "azure cloud"],
+      "labels": {"en": "Microsoft Azure"}
+    },
+    {
+      "id": "skill:tech:mongodb",
+      "canonical": "MongoDB",
+      "category": "Databases & Storage",
+      "aliases": ["mongo", "mongodb atlas", "motor"],
+      "labels": {"en": "MongoDB"}
+    },
+    {
+      "id": "skill:tech:postgresql",
+      "canonical": "PostgreSQL",
+      "category": "Databases & Storage",
+      "aliases": ["postgres", "postgresql db", "psql"],
+      "labels": {"en": "PostgreSQL"}
+    },
+    {
+      "id": "skill:tech:opensearch",
+      "canonical": "OpenSearch",
+      "category": "Databases & Storage",
+      "aliases": ["elasticsearch", "elastic search", "opensearch cluster"],
+      "labels": {"en": "OpenSearch"}
+    },
+    {
+      "id": "skill:tech:qdrant",
+      "canonical": "Qdrant",
+      "category": "AI & Vector Databases",
+      "aliases": ["qdrant vector db", "qdrant engine"],
+      "labels": {"en": "Qdrant"}
+    },
+    {
+      "id": "skill:tech:langchain",
+      "canonical": "LangChain",
+      "category": "AI & Large Language Models",
+      "aliases": ["langchain framework", "langgraph", "langsmith"],
+      "labels": {"en": "LangChain"}
+    },
+    {
+      "id": "skill:tech:pytorch",
+      "canonical": "PyTorch",
+      "category": "Machine Learning & AI",
+      "aliases": ["torch", "pytorch lightning"],
+      "labels": {"en": "PyTorch"}
+    },
+    {
+      "id": "skill:tech:tensorflow",
+      "canonical": "TensorFlow",
+      "category": "Machine Learning & AI",
+      "aliases": ["tf", "keras"],
+      "labels": {"en": "TensorFlow"}
+    },
+    {
+      "id": "skill:tech:sql",
+      "canonical": "SQL",
+      "category": "Databases & Storage",
+      "aliases": ["relational database", "ansi sql", "structured query language"],
+      "labels": {"en": "SQL"}
+    },
+    {
+      "id": "skill:tech:graphql",
+      "canonical": "GraphQL",
+      "category": "Web & API Technologies",
+      "aliases": ["apollo graphql", "graphql api"],
+      "labels": {"en": "GraphQL"}
+    }
+  ],
+  "occupations": [
+    {
+      "id": "occ:swe",
+      "code": "2512.01",
+      "title": "Software Engineer",
+      "family_code": "software_engineering",
+      "esco_code": "2512",
+      "soc_code": "15-1252.00",
+      "alt_titles": ["Software Developer", "Full Stack Developer", "Backend Engineer", "Frontend Developer", "Programmer Analyst"],
+      "essential_skills": ["Python", "JavaScript", "SQL", "Git", "Data Structures"]
+    },
+    {
+      "id": "occ:devops",
+      "code": "2519.03",
+      "title": "DevOps Engineer",
+      "family_code": "devops_infrastructure",
+      "esco_code": "2519",
+      "soc_code": "15-1254.00",
+      "alt_titles": ["Site Reliability Engineer", "SRE", "Cloud Platform Engineer", "Infrastructure Engineer"],
+      "essential_skills": ["Docker", "Kubernetes", "AWS", "CI/CD", "Linux"]
+    },
+    {
+      "id": "occ:data_scientist",
+      "code": "2120.02",
+      "title": "Data Scientist",
+      "family_code": "data_science_ai",
+      "esco_code": "2120",
+      "soc_code": "15-2051.00",
+      "alt_titles": ["Machine Learning Engineer", "AI Engineer", "Data Analyst", "Applied Scientist"],
+      "essential_skills": ["Python", "PyTorch", "SQL", "Machine Learning", "Statistics"]
+    }
+  ],
+  "edges": [
+    {
+      "source": "FastAPI",
+      "target": "Python",
+      "relation": "subsumes",
+      "weight": 0.95
+    },
+    {
+      "source": "Django",
+      "target": "Python",
+      "relation": "subsumes",
+      "weight": 0.95
+    },
+    {
+      "source": "React",
+      "target": "JavaScript",
+      "relation": "subsumes",
+      "weight": 0.9
+    },
+    {
+      "source": "TypeScript",
+      "target": "JavaScript",
+      "relation": "generalizes",
+      "weight": 0.9
+    },
+    {
+      "source": "Kubernetes",
+      "target": "Docker",
+      "relation": "related_to",
+      "weight": 0.85
+    }
+  ]
+}

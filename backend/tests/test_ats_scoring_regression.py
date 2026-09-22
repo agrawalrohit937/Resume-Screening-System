@@ -239,12 +239,11 @@ def test_7_apply_time_score_resume_dual_produces_both_scores():
 
 def test_8_split_eligibility_from_quality_score():
     """
-    TEST 8 (Task 0.3):
+    TEST 8 (Task 0.3 & Phase 1.5):
     Eligibility is split from Quality Score:
     - quality_score is NEVER capped at 45.0 (reflects true quality).
-    - final_score equals quality_score.
+    - final_score and recruiter_score equal quality_score (natural math calculation).
     - eligibility.status is 'ineligible' with failing checks and eligibility_rank == 2.
-    - Deprecated recruiter_score retains legacy 45.0 cap for backward compatibility.
     """
     resume_data = {
         "raw_text": "High school graduate with 6 months Python practice.",
@@ -261,18 +260,16 @@ def test_8_split_eligibility_from_quality_score():
         mode="recruiter",
         required_skills=["Python"],
     )
-    # Quality score is NOT artificially capped at 45.0
+    # Quality score and recruiter score are NOT artificially capped at 45.0
     assert "quality_score" in recruiter_res
     assert recruiter_res["final_score"] == recruiter_res["quality_score"]
+    assert recruiter_res["recruiter_score"] == recruiter_res["final_score"]
 
     # Structured eligibility
     assert "eligibility" in recruiter_res
     assert recruiter_res["eligibility"]["status"] == "ineligible"
     assert len(recruiter_res["eligibility"]["checks"]) > 0
     assert recruiter_res["eligibility_rank"] == 2
-
-    # Deprecated recruiter_score retains legacy 45.0 cap
-    assert recruiter_res.get("recruiter_score", 0.0) <= 45.0
 
     candidate_res = score_resume(
         resume=resume_data,

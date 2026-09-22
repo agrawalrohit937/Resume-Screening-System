@@ -56,8 +56,10 @@ class Settings(BaseSettings):
     # ── 3. Security & JWT ─────────────────────────────────────────────────────
     SECRET_KEY: str = Field(..., min_length=32)
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_PREVIOUS_SECRET_KEY: Optional[str] = None
+    JWT_SECRET_ROTATION_ENABLED: bool = True
 
     # ── 4. CORS ───────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: List[str] = Field(default_factory=list)
@@ -65,11 +67,20 @@ class Settings(BaseSettings):
 
     # ── 5. File & Upload Constraints ──────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 10
+    MAX_PDF_PAGES: int = 15
     ALLOWED_FILE_TYPES: List[str] = [
         "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ]
     UPLOAD_DIR: str = "./uploads"
+
+    # ── Rate Limits ───────────────────────────────────────────────────────────
+    RATELIMIT_DEFAULT: str = "300/minute"
+    RATELIMIT_ATS: str = "30/minute"
+    RATELIMIT_RESUME: str = "20/minute"
+    RATELIMIT_COPILOT: str = "30/minute"
+    RATELIMIT_AUTH: str = "10/minute"
+    RATELIMIT_ENHANCE: str = "20/minute"
 
     PROFILE_MAX_SIZE_MB: int = 5
     PROFILE_ALLOWED_CONTENT_TYPES: List[str] = [

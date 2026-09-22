@@ -82,11 +82,14 @@ class ParsedResumeData(BaseModel):
     total_experience_years: float = 0.0
     word_count: int = 0
     sections_detected: List[str] = []
+    page_count: Optional[int] = 1
+    parsing_source: Optional[str] = "pdfplumber"
 
 
 class ResumeModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str
+    tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
     filename: str
     original_filename: str
     file_type: str  # pdf | docx
@@ -97,6 +100,7 @@ class ResumeModel(BaseModel):
     status: ResumeStatus = ResumeStatus.PENDING
     parsed_data: Optional[ParsedResumeData] = None
     parse_error: Optional[str] = None
+    error_message: Optional[str] = None
     ats_score_history: List[Dict] = []
     tags: List[str] = []
     is_primary: bool = False

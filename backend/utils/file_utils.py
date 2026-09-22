@@ -28,10 +28,10 @@ async def validate_and_save_file(
     user_id: str,
 ) -> Tuple[str, str, str, int]:
     """
-    Validate & persist uploaded file.
+    Validate & persist uploaded file with strict magic byte validation,
+    page count limits, and sanitized storage paths.
     Returns: (storage_path, filename, file_type, file_size_bytes)
     """
-    # Content type check
     content_type = file.content_type or ""
     if content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -57,12 +57,43 @@ async def validate_and_save_file(
             detail="File appears to be empty or corrupt.",
         )
 
-    # Generate unique filename
+    # Magic-Byte Verification
+    if file_ext == "pdf":
+        if not contents.startswith(b"%PDF-") and b"%PDF-" not in contents[:1024]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Corrupt or invalid PDF file header (magic-byte check failed).",
+            )
+        # Check PDF page count cap
+        try:
+            import io
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(contents))
+            page_count = len(reader.pages)
+            if page_count > settings.MAX_PDF_PAGES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"PDF exceeds page limit ({page_count} pages > max {settings.MAX_PDF_PAGES} pages).",
+                )
+        except HTTPException:
+            raise
+        except Exception as pdf_err:
+            logger.debug("pypdf page count check fallback", error=str(pdf_err))
+
+    elif file_ext == "docx":
+        if not contents.startswith(b"PK\x03\x04"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Corrupt or invalid DOCX file header (magic-byte check failed).",
+            )
+
+    # Generate unique sanitized filename
     file_hash = hashlib.md5(contents).hexdigest()[:8]
     unique_name = f"{uuid.uuid4().hex}_{file_hash}.{file_ext}"
 
     # Ensure upload dir exists
-    upload_path = Path(settings.UPLOAD_DIR) / user_id
+    safe_user_id = "".join(c for c in str(user_id) if c.isalnum() or c in ("-", "_"))
+    upload_path = Path(settings.UPLOAD_DIR) / safe_user_id
     upload_path.mkdir(parents=True, exist_ok=True)
     file_path = upload_path / unique_name
 
@@ -70,7 +101,7 @@ async def validate_and_save_file(
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(contents)
 
-    logger.info("File saved", path=str(file_path), size=file_size, user=user_id)
+    logger.info("File saved securely", path=str(file_path), size=file_size, user=user_id)
     return str(file_path), unique_name, file_ext, file_size
 
 
@@ -89,9 +120,11 @@ def get_file_extension(filename: str) -> str:
 
 
 def sanitize_filename(filename: str) -> str:
-    """Remove dangerous characters from filename."""
+    """Remove dangerous characters and directory traversal from filename."""
     import re
-    name = Path(filename).stem
-    ext = Path(filename).suffix
+    # Strip directory components
+    base_name = os.path.basename(filename)
+    name = Path(base_name).stem
+    ext = Path(base_name).suffix
     safe_name = re.sub(r"[^\w\-_\. ]", "_", name)
     return f"{safe_name[:100]}{ext}"

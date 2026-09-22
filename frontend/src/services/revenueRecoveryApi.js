@@ -6,44 +6,44 @@ import api from './api'
 
 // ── Overview & Analytics ───────────────────────────────────────────────────
 export const getRecoveryOverview = async () => {
-  const { data } = await api.get('/admin/revenue-recovery/overview')
+  const { data } = await api.get('/revenue-recovery/overview')
   return data
 }
 
 // ── Cases Queue ────────────────────────────────────────────────────────────
 export const getRecoveryCases = async (params = {}) => {
-  const { data } = await api.get('/admin/revenue-recovery/cases', { params })
+  const { data } = await api.get('/revenue-recovery/cases', { params })
   return data
 }
 
 export const getRecoveryCaseDetail = async (caseId) => {
-  const { data } = await api.get(`/admin/revenue-recovery/cases/${caseId}`)
+  const { data } = await api.get(`/revenue-recovery/cases/${caseId}`)
   return data
 }
 
 // ── Admin Actions ──────────────────────────────────────────────────────────
 export const retryRecoveryCase = async (caseId) => {
-  const { data } = await api.post(`/admin/revenue-recovery/cases/${caseId}/retry`)
+  const { data } = await api.post(`/revenue-recovery/cases/${caseId}/retry`)
   return data
 }
 
 export const approveRecoveryCase = async (caseId, payload = {}) => {
-  const { data } = await api.post(`/admin/revenue-recovery/cases/${caseId}/approve`, payload)
+  const { data } = await api.post(`/revenue-recovery/cases/${caseId}/approve`, payload)
   return data
 }
 
 export const rejectRecoveryCase = async (caseId) => {
-  const { data } = await api.post(`/admin/revenue-recovery/cases/${caseId}/reject`)
+  const { data } = await api.post(`/revenue-recovery/cases/${caseId}/reject`)
   return data
 }
 
 export const closeRecoveryCase = async (caseId) => {
-  const { data } = await api.post(`/admin/revenue-recovery/cases/${caseId}/close`)
+  const { data } = await api.post(`/revenue-recovery/cases/${caseId}/close`)
   return data
 }
 
 export const triggerChannelOutreach = async (caseId, payload) => {
-  const { data } = await api.post(`/admin/revenue-recovery/cases/${caseId}/trigger-channel`, payload)
+  const { data } = await api.post(`/revenue-recovery/cases/${caseId}/trigger-channel`, payload)
   return data
 }
 

@@ -1,9 +1,10 @@
 {
-  "num_pairs": 50,
-  "ndcg_at_10": 0.5489,
-  "ndcg_at_50": 0.8148,
-  "precision_at_10": 0.7,
-  "mrr": 0.25,
-  "kendall_tau": -0.0148,
-  "ece": 0.2629
+  "num_pairs": 9,
+  "ndcg_at_10": 0.9927,
+  "ndcg_at_5": 0.9927,
+  "precision_at_10": 0.45,
+  "map": 1.0,
+  "spearman": 0.9313,
+  "kendall_tau": 0.8641,
+  "knockout_accuracy": 0.65
 }

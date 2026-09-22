@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { createSupportTicket, collectSystemMetadata, SUBCATEGORY_LABELS } from '../../services/supportApi'
+import CustomDropdown from '../common/CustomDropdown'
 
 const PRIORITIES = [
   { value: 'low', label: 'Low', description: 'General inquiry', color: 'bg-slate-100 text-slate-600 border-slate-200' },
@@ -165,18 +166,18 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
             Subcategory
           </label>
-          <select
+          <CustomDropdown
             value={selectedSubcategory}
-            onChange={(e) => setSelectedSubcategory(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all appearance-none"
-          >
-            <option value="">General {category}</option>
-            {availableSubcategories.map((sc) => (
-              <option key={sc} value={sc}>
-                {SUBCATEGORY_LABELS[sc] || sc.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setSelectedSubcategory(val)}
+            options={[
+              { value: '', label: `General ${category}` },
+              ...availableSubcategories.map((sc) => ({
+                value: sc,
+                label: SUBCATEGORY_LABELS[sc] || sc.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+              }))
+            ]}
+            className="w-full"
+          />
         </div>
       )}
 

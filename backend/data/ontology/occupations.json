@@ -1,0 +1,221 @@
+{
+  "occupations": [
+    {
+      "id": "occ:swe:001",
+      "code": "2512.0101",
+      "soc_code": "15-1252.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2512",
+      "title": "Software Developer",
+      "family_code": "software_engineering",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Software Engineer",
+        "Backend Developer",
+        "Full Stack Engineer",
+        "Full Stack Developer",
+        "Frontend Developer",
+        "Programmer Analyst",
+        "Python Developer",
+        "Java Developer",
+        "Systems Engineer"
+      ],
+      "description": "Designs, writes, tests, and maintains computer software programs.",
+      "essential_skills": ["Python", "JavaScript", "SQL", "Git", "System Design"],
+      "optional_skills": ["Docker", "Kubernetes", "AWS", "FastAPI", "React"]
+    },
+    {
+      "id": "occ:health:001",
+      "code": "2221.0101",
+      "soc_code": "29-1141.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2221",
+      "title": "Registered Nurse",
+      "family_code": "healthcare",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Staff Nurse",
+        "Clinical Nurse",
+        "ICU Nurse",
+        "Emergency Room Nurse",
+        "Nursing Officer",
+        "Charge Nurse"
+      ],
+      "description": "Provides patient care, administers medication, and monitors patient recovery in clinical environments.",
+      "essential_skills": ["Nursing Care", "Clinical Pharmacology", "Emergency Medicine"],
+      "optional_skills": ["Triage", "Patient Assessment", "Infection Control"]
+    },
+    {
+      "id": "occ:fin:001",
+      "code": "2411.0101",
+      "soc_code": "13-2011.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2411",
+      "title": "Chartered Accountant",
+      "family_code": "legal_finance",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Auditor",
+        "Tax Consultant",
+        "Certified Public Accountant",
+        "CPA",
+        "Statutory Auditor",
+        "Finance Manager",
+        "Corporate Counsel"
+      ],
+      "description": "Prepares and examines financial records, ensures tax compliance, and conducts statutory audits.",
+      "essential_skills": ["Statutory Auditing", "Corporate Law", "Taxation Law"],
+      "optional_skills": ["Financial Modeling", "IFRS", "GST Compliance"]
+    },
+    {
+      "id": "occ:trade:001",
+      "code": "7212.0101",
+      "soc_code": "51-4121.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/7212",
+      "title": "Welder, Gas and Electric",
+      "family_code": "skilled_trades",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Arc Welder",
+        "TIG Welder",
+        "MIG Welder",
+        "Pipe Welder",
+        "Fabricator",
+        "Industrial Electrician",
+        "Wireman"
+      ],
+      "description": "Fuses metal parts using electric arc, oxy-fuel gas, and specialized welding apparatus.",
+      "essential_skills": ["Shielded Metal Arc Welding", "Gas Tungsten Arc Welding", "Industrial Electrical Wiring"],
+      "optional_skills": ["Blueprint Reading", "Pipe Fitting", "OSHA Safety"]
+    },
+    {
+      "id": "occ:teach:001",
+      "code": "2320.0101",
+      "soc_code": "25-2031.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2320",
+      "title": "Secondary School Teacher",
+      "family_code": "teaching",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "High School Teacher",
+        "TGT",
+        "PGT",
+        "Lecturer",
+        "Educator",
+        "School Teacher"
+      ],
+      "description": "Instructs secondary school students in academic subjects following educational board standards.",
+      "essential_skills": ["Classroom Pedagogy", "Educational Assessment"],
+      "optional_skills": ["Curriculum Development", "Student Counseling"]
+    },
+    {
+      "id": "occ:sales:001",
+      "code": "2433.0101",
+      "soc_code": "41-4011.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2433",
+      "title": "Account Executive",
+      "family_code": "sales",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Enterprise Sales Executive",
+        "Business Development Manager",
+        "Sales Manager",
+        "B2B Sales Representative"
+      ],
+      "description": "Drives B2B revenue generation, prospective client acquisition, and client relationship management.",
+      "essential_skills": ["Enterprise B2B Sales", "Pipeline Management"],
+      "optional_skills": ["CRM Management", "Contract Negotiation", "Lead Generation"]
+    },
+    {
+      "id": "occ:hosp:001",
+      "code": "5120.0101",
+      "soc_code": "35-1011.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/5120",
+      "title": "Head Chef",
+      "family_code": "hospitality_retail",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Executive Chef",
+        "Sous Chef",
+        "Culinary Manager",
+        "Restaurant Manager",
+        "Store Associate"
+      ],
+      "description": "Directs the culinary preparation, menu creation, and kitchen hygiene in hospitality establishments.",
+      "essential_skills": ["Food Safety Standards", "Culinary Preparation"],
+      "optional_skills": ["Menu Engineering", "Inventory Management"]
+    },
+    {
+      "id": "occ:log:001",
+      "code": "8332.0101",
+      "soc_code": "53-3032.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/8332",
+      "title": "Heavy Commercial Vehicle Driver",
+      "family_code": "logistics_operations",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "HMV Driver",
+        "CDL Driver",
+        "Truck Driver",
+        "Fleet Driver",
+        "Warehouse Dispatcher",
+        "Logistics Coordinator"
+      ],
+      "description": "Operates heavy freight transport vehicles over scheduled commercial routes safely and punctually.",
+      "essential_skills": ["Heavy Vehicle Operation", "Warehouse Management Systems"],
+      "optional_skills": ["Route Navigation", "Defensive Driving", "Logistics Documentation"]
+    },
+    {
+      "id": "occ:design:001",
+      "code": "2166.0101",
+      "soc_code": "27-1024.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2166",
+      "title": "Product Designer",
+      "family_code": "creative_design",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "UI/UX Designer",
+        "User Experience Designer",
+        "Interaction Designer",
+        "Graphic Designer",
+        "Visual Designer"
+      ],
+      "description": "Designs intuitive user interfaces, visual design systems, and digital product experiences.",
+      "essential_skills": ["User Experience Design", "Visual Design"],
+      "optional_skills": ["Figma", "Design Systems", "Prototyping", "User Research"]
+    },
+    {
+      "id": "occ:acad:001",
+      "code": "2310.0101",
+      "soc_code": "25-1099.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2310",
+      "title": "Research Scientist",
+      "family_code": "academic_research",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Postdoctoral Researcher",
+        "Assistant Professor",
+        "Principal Investigator",
+        "Scientific Researcher"
+      ],
+      "description": "Conducts scientific investigations, publishes research findings in peer-reviewed journals, and secures grants.",
+      "essential_skills": ["Scientific Research Methodology", "Statistical Modeling"],
+      "optional_skills": ["Grant Writing", "Data Analysis", "Peer Review"]
+    },
+    {
+      "id": "occ:data:001",
+      "code": "2511.0101",
+      "soc_code": "15-2051.00",
+      "esco_code": "http://data.europa.eu/esco/occupation/2511",
+      "title": "Data Scientist",
+      "family_code": "data_analytics",
+      "source": "nco_esco_onet",
+      "alt_titles": [
+        "Data Analyst",
+        "BI Analyst",
+        "Machine Learning Engineer",
+        "Analytics Engineer"
+      ],
+      "description": "Analyzes complex datasets to extract business insights and builds predictive statistical models.",
+      "essential_skills": ["Statistical Modeling", "Business Intelligence Reporting", "Python", "SQL"],
+      "optional_skills": ["PowerBI", "Tableau", "Machine Learning"]
+    }
+  ]
+}

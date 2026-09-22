@@ -5,7 +5,7 @@ import {
   Flame, ShieldCheck, Star
 } from 'lucide-react'
 import { getDailyRewardStatus, claimDailyReward } from '../../services/interviewApi'
-import Card from './Card'
+import Card from '../Card'
 
 function getTimeUntilMidnight() {
   const now = new Date()

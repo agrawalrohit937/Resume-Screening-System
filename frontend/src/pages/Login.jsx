@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
-import { Mail, Lock, Eye, EyeOff, User, Briefcase, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User, Briefcase, Building2, ArrowRight, CheckCircle2 } from 'lucide-react'
 
 const illustration = '/illustration.webp';
 
@@ -16,6 +16,39 @@ const LINKEDIN_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_LINKEDIN_
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || 'Ov23liO6t7Tun6tzlpYq';
 const GITHUB_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_GITHUB_REDIRECT_URI, '/github-callback');
+
+// ─── Smart redirect: respect the user's last-active view context ──────────────
+// Priority order:
+//   1. If saved context is 'employer' AND user has an enterprise role → enterprise dashboard
+//   2. If saved context is 'candidate' → /dashboard
+//   3. No saved context → fall back to role-based default (enterprise first if available)
+function getSmartRedirectPath(userRoles) {
+  const normalised = userRoles.map((r) => String(r).toLowerCase().trim())
+  const savedCtx = localStorage.getItem('careerpilot_view_context') // 'employer' | 'candidate' | null
+
+  const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
+  const hasEnterpriseRole = normalised.some((r) => ENTERPRISE_ROLES.includes(r))
+
+  const getEnterprisePath = () => {
+    if (normalised.includes('admin') || normalised.includes('platform_admin')) return '/admin'
+    if (normalised.includes('executive') || normalised.includes('exec')) return '/exec/dashboard'
+    if (normalised.includes('recruiter')) return '/recruiter/dashboard'
+    if (normalised.includes('hiring_manager')) return '/hiring-manager/dashboard'
+    if (normalised.includes('interviewer')) return '/interviewer/dashboard'
+    return '/recruiter/dashboard'
+  }
+
+  // Saved preference: employer view
+  if (savedCtx === 'employer' && hasEnterpriseRole) return getEnterprisePath()
+
+  // Saved preference: candidate view
+  if (savedCtx === 'candidate') return '/dashboard'
+
+  // No saved preference → enterprise users go to enterprise dashboard by default
+  if (hasEnterpriseRole) return getEnterprisePath()
+
+  return '/dashboard'
+}
 
 export default function Login() {
   const { login, googleLogin } = useAuth()
@@ -41,16 +74,27 @@ export default function Login() {
     window.location.href = githubUrl;
   };
 
+  const formatError = (err, fallback = 'An error occurred') => {
+    const detail = err?.response?.data?.detail
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail)) return detail.map((d) => d.msg || JSON.stringify(d)).join(', ')
+    if (detail && typeof detail === 'object') return detail.message || JSON.stringify(detail)
+    return err?.message || fallback
+  }
+
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (codeResponse) => {
       setLoading(true)
       try {
-        await googleLogin(codeResponse.access_token, selectedRole)
+        const data = await googleLogin(codeResponse.access_token, selectedRole)
         toast.success('Welcome! 🚀')
-        navigate('/dashboard')
+        const userRoles = (Array.isArray(data?.user?.roles) && data?.user?.roles?.length > 0)
+          ? data.user.roles.map((r) => String(r).toLowerCase())
+          : [String(data?.user?.role || selectedRole).toLowerCase()]
+        navigate(getSmartRedirectPath(userRoles))
       } catch (err) {
         console.error('Google Auth Backend Error:', err)
-        toast.error(err.response?.data?.detail || 'Google login failed')
+        toast.error(formatError(err, 'Google login failed'))
       } finally {
         setLoading(false)
       }
@@ -75,9 +119,13 @@ export default function Login() {
       }
 
       toast.success('Welcome back! 🚀')
-      navigate('/dashboard')
+      const userRoles = (Array.isArray(result?.user?.roles) && result?.user?.roles?.length > 0)
+        ? result.user.roles.map((r) => String(r).toLowerCase())
+        : [String(result?.user?.role || selectedRole).toLowerCase()]
+
+      navigate(getSmartRedirectPath(userRoles))
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Invalid credentials')
+      toast.error(formatError(err, 'Invalid credentials'))
     } finally {
       setLoading(false)
     }
@@ -150,8 +198,8 @@ export default function Login() {
       </div>
 
       {/* RIGHT — AUTH FORM */}
-      <div className="flex h-full items-center justify-center bg-white px-6 py-8 sm:px-12 lg:justify-start lg:pl-16 xl:pl-24 overflow-y-auto">
-        <div className="w-full max-w-[400px] py-4">
+      <div className="flex h-full flex-col justify-start bg-white px-6 py-6 sm:px-12 lg:pl-16 xl:pl-24 overflow-y-auto">
+        <div className="w-full max-w-[400px] my-auto py-4">
 
           {/* Mobile-only logo */}
           <div className="mb-6 flex items-center gap-2.5 lg:hidden">
@@ -176,16 +224,18 @@ export default function Login() {
 
           {/* ROLE SELECTOR */}
           <div className="relative mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Select role">
-            {['candidate', 'recruiter'].map((role) => {
-              const Icon = role === 'candidate' ? User : Briefcase
-              const active = selectedRole === role
+            {[
+              { id: 'candidate', label: 'Candidate', icon: User },
+              { id: 'recruiter', label: 'Employer / Company', icon: Building2 },
+            ].map(({ id, label, icon: Icon }) => {
+              const active = selectedRole === id
               return (
                 <button
-                  key={role}
+                  key={id}
                   type="button"
-                  onClick={() => setSelectedRole(role)}
+                  onClick={() => setSelectedRole(id)}
                   aria-pressed={active}
-                  aria-label={`Login as ${role}`}
+                  aria-label={`Login as ${label}`}
                   className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
                     active ? 'text-[#1d6fa5]' : 'text-slate-500 hover:text-slate-800'
                   }`}
@@ -198,7 +248,7 @@ export default function Login() {
                     />
                   )}
                   <Icon className="relative z-10 h-4 w-4" />
-                  <span className="relative z-10 capitalize">{role}</span>
+                  <span className="relative z-10 font-medium">{label}</span>
                 </button>
               )
             })}

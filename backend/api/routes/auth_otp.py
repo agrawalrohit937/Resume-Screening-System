@@ -5,12 +5,14 @@ OTPService/OTPRepository dependency and the challenge-token pattern.
 """
 
 from datetime import datetime, timedelta, timezone
+import re
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from api.deps import get_user_repo, get_otp_service, get_otp_repo
+from typing import Any
+from api.deps import get_user_repo, get_otp_service, get_otp_repo, get_database
 from core.config import settings
 from core.security import (
     decode_token,
@@ -21,7 +23,7 @@ from core.security import (
     verify_device_id,
     generate_challenge_token,
 )
-from models.user_model import UserModel, UserStatus, AuthProvider, TrustedDevice
+from models.user_model import UserModel, UserRole, UserStatus, AuthProvider, TrustedDevice
 from models.otp_model import OTPPurpose
 from repositories.user_repo import UserRepository
 from repositories.otp_repo import OTPRepository
@@ -45,6 +47,7 @@ async def signup(
     payload: SignupRequest,
     user_repo: UserRepository = Depends(get_user_repo),
     otp_service: OTPService = Depends(get_otp_service),
+    db: Any = Depends(get_database),
 ):
     """
     Register a new account — DOES NOT activate it or issue tokens yet (FEATURE 1).
@@ -64,12 +67,60 @@ async def signup(
             detail="An account with this email already exists.",
         )
 
+    # Resolve roles array
+    # Team Invites: Standard standalone RECRUITER or INTERVIEWER roles should only be assigned
+    # when an EXECUTIVE invites a team member from inside the dashboard via the Team Invites flow.
+    # [PLACEHOLDER: Team Invites flow endpoint /api/v1/tenants/invite-member will assign scoped
+    # single roles like RECRUITER or INTERVIEWER to invited teammates].
+
+    initial_role_input = payload.role.value if hasattr(payload.role, "value") else str(payload.role).lower()
+
+    if payload.roles and isinstance(payload.roles, list):
+        roles_list = [r.value if hasattr(r, "value") else str(r).lower() for r in payload.roles]
+    elif initial_role_input in ("employer", "recruiter", "executive", "exec"):
+        # Tenant creator / owner signup is strictly assigned EXECUTIVE role.
+        # Backend role inheritance automatically grants recruiter, hiring manager, and interviewer capabilities.
+        roles_list = [UserRole.EXECUTIVE.value]
+    elif initial_role_input:
+        roles_list = [initial_role_input]
+    else:
+        roles_list = [UserRole.CANDIDATE.value]
+
+    primary_role = roles_list[0]
+
+    # Resolve tenant_id for enterprise accounts
+    is_enterprise = any(
+        r in ("platform_admin", "admin", "executive", "exec", "employer", "recruiter", "hiring_manager", "interviewer")
+        for r in roles_list
+    )
+
+    resolved_tenant = "default"
+    if payload.tenant_id and payload.tenant_id.strip():
+        resolved_tenant = payload.tenant_id.strip()
+    elif payload.company_name and payload.company_name.strip():
+        slug = re.sub(r"[^a-zA-Z0-9_-]", "", payload.company_name.lower().replace(" ", "-")).strip("-")
+        resolved_tenant = slug or "default"
+    elif is_enterprise and "@" in email:
+        domain = email.split("@")[1].split(".")[0].lower()
+        common_domains = {"gmail", "yahoo", "hotmail", "outlook", "icloud", "proton", "mail", "aol"}
+        if domain not in common_domains:
+            resolved_tenant = domain
+        elif "platform_admin" in roles_list or "admin" in roles_list:
+            resolved_tenant = "system"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enterprise accounts must provide a company_name or tenant_id.",
+            )
+
     if existing and not existing.email_verified:
         # Re-signup attempt with an unverified account — refresh password & resend OTP
         await user_repo.update(str(existing.id), {
             "hashed_password": hash_password(payload.password),
             "full_name": payload.full_name,
-            "role": payload.role,
+            "role": primary_role,
+            "roles": roles_list,
+            "tenant_id": resolved_tenant,
             "phone": payload.phone,
             "linkedin_url": payload.linkedin_url,
             "github_username": payload.github_username,
@@ -82,7 +133,9 @@ async def signup(
         "email": email,
         "hashed_password": hash_password(payload.password),
         "full_name": payload.full_name,
-        "role": payload.role,
+        "role": primary_role,
+        "roles": roles_list,
+        "tenant_id": resolved_tenant,
         "phone": payload.phone,
         "linkedin_url": payload.linkedin_url,
         "github_username": payload.github_username,
@@ -104,6 +157,35 @@ async def signup(
 
     user = await user_repo.create(user_data)
     logger.info("New user pending verification", user_id=str(user.id), email=user.email)
+
+    # Establish global CompanyProfile for the tenant if this is an Executive / Employer signup
+    if is_enterprise and resolved_tenant != "default":
+        from services.multi_tenancy.tenant_cleanup import purge_orphaned_tenant_if_needed
+        await purge_orphaned_tenant_if_needed(db, resolved_tenant, excluding_user_id=str(user.id))
+
+        c_name = (payload.company_name or "").strip() or resolved_tenant.replace("-", " ").title()
+        await db.companies.update_one(
+            {"tenant_id": resolved_tenant},
+            {
+                "$setOnInsert": {
+                    "tenant_id": resolved_tenant,
+                    "company_name": c_name,
+                    "logo_url": None,
+                    "cover_url": None,
+                    "created_at": now,
+                    "created_by": str(user.id),
+                    "location": "Remote",
+                    "industry": "Technology",
+                    "team_size": "50-200 employees",
+                    "perks": ["Flexible Hours", "Health Insurance", "Remote Work"],
+                    "about": f"Welcome to {c_name}.",
+                },
+                "$set": {
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+        )
 
     await otp_service.issue(email, payload.full_name, OTPPurpose.SIGNUP_VERIFICATION)
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="overscroll-none overflow-hidden h-full">
 
 <head>
   <meta charset="UTF-8" />
@@ -31,7 +31,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Careershala" />
 
-  <!-- Preload Critical LCP Assets (High Priority Logo & Fonts) -->
+  <!-- Preload Critical LCP Assets (High Priority Logo) -->
   <link rel="preload" as="image" href="/logo_t.webp" type="image/webp" fetchpriority="high" />
 
   <!-- Essential Preconnects & Asset DNS Prefetch -->
@@ -42,11 +42,9 @@
   <link rel="dns-prefetch" href="https://careershala-hghwgae4ebesdsb3.centralindia-01.azurewebsites.net" />
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
   <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  </noscript>
+  
+  <!-- ✅ FOUT FIX: Removed async loading to prevent font flickering -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Poppins:wght@500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B3T7N6LW8"></script>
@@ -65,8 +63,9 @@
     html, body, #root {
       width: 100%;
       max-width: 100%;
-      overflow-x: hidden;
-      min-height: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
     }
     html {
       scroll-behavior: smooth;
@@ -101,8 +100,8 @@
 
 </head>
 
-<body>
-  <div id="root"></div>
+<body class="overscroll-none overflow-hidden h-full">
+  <div id="root" class="h-full w-full overflow-hidden"></div>
 
   <script type="module" src="/src/main.jsx"></script>
 </body>

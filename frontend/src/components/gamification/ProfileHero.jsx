@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Flame, Medal, TrendingUp, Sparkles, Trophy } from 'lucide-react'
 import { deriveLeagueName } from './mockConfig'
-import Card from './Card'
+import Card from '../Card'
 
 function StatChip({ icon: Icon, value, label, color }) {
   const colorStyles = {

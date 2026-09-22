@@ -47,7 +47,7 @@ export const createInterviewWebSocket = (sessionId) => {
   const wsBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1')
     .replace('http://', 'ws://')
     .replace('https://', 'wss://')
-  return new WebSocket(`${wsBase}/interview/ws/${sessionId}`)
+  return new WebSocket(`${wsBase}/interview/ai/ws/${sessionId}`)
 }
 
 // ── Daily Activity (first visit bonus) ───────────────────────

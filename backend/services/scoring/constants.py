@@ -39,7 +39,9 @@ DEFAULT_SKILL_CREDIT_TABLE: Dict[str, Dict[str, Any]] = {
     "ALIAS": {"credit": 1.00, "bucket": "matched"},
     "VERSION_VARIANT": {"credit": 1.00, "bucket": "matched"},
     "TAXONOMY_PARENT": {"credit": 0.90, "bucket": "matched"},
+    "FUZZY": {"credit": 0.85, "bucket": "matched"},
     "TAXONOMY_SIBLING": {"credit": 0.40, "bucket": "transferable"},
+    "EMBEDDING": {"credit": 0.60, "bucket": "transferable"},
     "EMBEDDING_NEIGHBOR": {"credit": 0.30, "bucket": "transferable"},
     "NONE": {"credit": 0.00, "bucket": "missing"},
 }

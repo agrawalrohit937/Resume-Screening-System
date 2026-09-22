@@ -6,14 +6,34 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from bson import ObjectId
 
 
 class UserRole(str, Enum):
-    CANDIDATE = "candidate"
+    PLATFORM_ADMIN = "platform_admin"
+    EXECUTIVE = "executive"
     RECRUITER = "recruiter"
-    ADMIN = "admin"
+    HIRING_MANAGER = "hiring_manager"
+    INTERVIEWER = "interviewer"
+    COORDINATOR = "coordinator"
+    CANDIDATE = "candidate"
+    ADMIN = "admin"  # Backward-compatibility alias for platform_admin
+    EXEC = "exec"    # Backward-compatibility alias for executive
+    EMPLOYER = "employer"  # Signup alias for company founder / executive
+
+
+ENTERPRISE_ROLES = {
+    UserRole.PLATFORM_ADMIN,
+    UserRole.ADMIN,
+    UserRole.EXECUTIVE,
+    UserRole.EXEC,
+    UserRole.EMPLOYER,
+    UserRole.RECRUITER,
+    UserRole.HIRING_MANAGER,
+    UserRole.INTERVIEWER,
+    UserRole.COORDINATOR,
+}
 
 
 class UserStatus(str, Enum):
@@ -57,7 +77,12 @@ class UserModel(BaseModel):
     hashed_password: Optional[str] = None
     full_name: str
     role: UserRole = UserRole.CANDIDATE
+    roles: List[UserRole] = Field(default_factory=lambda: [UserRole.CANDIDATE])
     status: UserStatus = UserStatus.ACTIVE
+    tenant_id: Optional[str] = Field(default=None, description="Multi-tenant organization identifier")
+    is_invited_staff: bool = False
+    invited_by: Optional[str] = None
+    company_name: Optional[str] = None
     # Premium / subscription fields (saved to user document)
     plan: str = "free"  # "free" | "pro" | "premium"
     subscription_active: bool = False
@@ -113,9 +138,72 @@ class UserModel(BaseModel):
     # ── NEW: Trusted devices for secure login ──────────────────────────────
     trusted_devices: List[TrustedDevice] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_roles(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            raw_roles = data.get("roles")
+            raw_role = data.get("role")
+
+            resolved_roles: List[str] = []
+            if raw_roles and isinstance(raw_roles, list):
+                for r in raw_roles:
+                    val = r.value if hasattr(r, "value") else str(r)
+                    resolved_roles.append(val.lower())
+            elif raw_role:
+                val = raw_role.value if hasattr(raw_role, "value") else str(raw_role)
+                resolved_roles.append(val.lower())
+            else:
+                resolved_roles.append("candidate")
+
+            # Deduplicate preserving order
+            seen = set()
+            unique_roles = []
+            for r in resolved_roles:
+                if r not in seen:
+                    seen.add(r)
+                    unique_roles.append(r)
+
+            data["roles"] = unique_roles
+            if raw_role:
+                r_val = raw_role.value if hasattr(raw_role, "value") else str(raw_role).lower()
+                data["role"] = r_val if r_val in unique_roles else unique_roles[0]
+            else:
+                data["role"] = unique_roles[0]
+        return data
+
     class Config:
         populate_by_name = True
         arbitrary_types_allowed = True
+
+    # ── Role & RBAC Helpers ────────────────────────────────────────────────
+    @property
+    def user_roles(self) -> set:
+        """Set of normalized lowercase role strings from roles array (falling back to role)."""
+        roles = self.roles or [self.role]
+        result = set()
+        for r in roles:
+            if hasattr(r, "value"):
+                result.add(str(r.value).lower())
+            elif r:
+                result.add(str(r).lower())
+        return result
+
+    def has_role(self, *role_names: Any) -> bool:
+        """
+        Check if user has any of the specified roles.
+        Root administrators ('platform_admin', 'admin') inherit all role privileges.
+        """
+        roles_set = self.user_roles
+        if "platform_admin" in roles_set or "admin" in roles_set:
+            return True
+        targets = set()
+        for r in role_names:
+            if hasattr(r, "value"):
+                targets.add(str(r.value).lower())
+            elif r:
+                targets.add(str(r).lower())
+        return bool(roles_set.intersection(targets))
 
     # ── Helpers (not persisted) ─────────────────────────────────────────────
     @property

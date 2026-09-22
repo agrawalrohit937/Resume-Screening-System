@@ -14,7 +14,10 @@ from models.support_ticket_model import SupportTicketModel
 logger = structlog.get_logger(__name__)
 
 
-class SupportTicketRepository:
+from repositories.base_repo import BaseRepository
+
+
+class SupportTicketRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db.support_tickets
 
@@ -28,9 +31,8 @@ class SupportTicketRepository:
         return value
 
     def _serialize(self, doc: dict) -> dict:
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-        return self._normalize_value(doc)
+        doc = super()._serialize(doc)
+        return self._normalize_value(doc) if doc else doc
 
     async def create(self, ticket_data: dict) -> SupportTicketModel:
         ticket_data["created_at"] = datetime.now(timezone.utc)

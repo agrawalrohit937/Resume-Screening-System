@@ -23,27 +23,12 @@ import {
   PRIORITY_LEVELS,
 } from '../services/adminApi'
 import RevenueRecoveryTab from '../components/recovery/RevenueRecoveryTab'
+import CustomDropdown from '../components/common/CustomDropdown'
+import { formatDate, formatDateTime } from '../utils/formatters'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  })
-}
-
-function formatDateTime(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
 
 function timeAgo(dateStr) {
   if (!dateStr) return ''
@@ -508,22 +493,18 @@ export default function AdminDashboard() {
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[12.5px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all"
               />
             </div>
-            <select
+            <CustomDropdown
               value={ticketFilters.status}
-              onChange={e => setTicketFilters(f => ({ ...f, status: e.target.value, page: 1 }))}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[12.5px] font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer min-w-[130px]"
-            >
-              <option value="">All Statuses</option>
-              {TICKET_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <select
+              onChange={val => setTicketFilters(f => ({ ...f, status: val, page: 1 }))}
+              options={[{ value: '', label: 'All Statuses' }, ...TICKET_STATUSES]}
+              className="min-w-[140px]"
+            />
+            <CustomDropdown
               value={ticketFilters.priority}
-              onChange={e => setTicketFilters(f => ({ ...f, priority: e.target.value, page: 1 }))}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[12.5px] font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer min-w-[130px]"
-            >
-              <option value="">All Priorities</option>
-              {PRIORITY_LEVELS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
+              onChange={val => setTicketFilters(f => ({ ...f, priority: val, page: 1 }))}
+              options={[{ value: '', label: 'All Priorities' }, ...PRIORITY_LEVELS]}
+              className="min-w-[140px]"
+            />
             <button
               onClick={loadTickets}
               disabled={loadingTickets}
@@ -636,14 +617,12 @@ export default function AdminDashboard() {
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[12.5px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all"
               />
             </div>
-            <select
+            <CustomDropdown
               value={appFilters.status}
-              onChange={e => setAppFilters(f => ({ ...f, status: e.target.value, page: 1 }))}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-[12.5px] font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer min-w-[140px]"
-            >
-              <option value="">All Statuses</option>
-              {APP_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+              onChange={val => setAppFilters(f => ({ ...f, status: val, page: 1 }))}
+              options={[{ value: '', label: 'All Statuses' }, ...APP_STATUSES]}
+              className="min-w-[150px]"
+            />
             <button
               onClick={loadApplications}
               disabled={loadingApps}

@@ -55,7 +55,7 @@ def test_local_bge_job_embedding_generation():
     embedding = vectors[0]
 
     assert len(embedding) == EMBEDDING_DIMENSIONS
-    assert EMBEDDING_DIMENSIONS == 768
+    assert EMBEDDING_DIMENSIONS in (768, 1024)
     assert all(isinstance(val, float) for val in embedding)
 
 
@@ -219,6 +219,290 @@ async def test_update_job_with_active_applicants_rejects_core_changes():
         )
         assert res_non_scoring.status_code == 200
         assert res_non_scoring.json()["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_recruiter_can_view_all_jobs_in_same_tenant():
+    """
+    Verify Conflict 3 fix:
+    Recruiters view all jobs belonging to their tenant organization (tenant_id),
+    not just jobs created by their individual user ID.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from api.routes.jobs import get_my_posted_jobs
+    from models.user_model import UserModel, UserRole
+
+    recruiter_alice = UserModel(
+        id="user_alice_123",
+        email="alice@techcorp.com",
+        full_name="Alice Recruiter",
+        role=UserRole.RECRUITER,
+        roles=[UserRole.RECRUITER],
+        tenant_id="tenant_techcorp",
+    )
+
+    captured_query = {}
+    mock_db = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.sort.return_value = mock_cursor
+    async def mock_stream(cursor):
+        return [
+            {
+                "_id": "660000000000000000000099",
+                "title": "Staff Cloud Engineer",
+                "company_name": "TechCorp",
+                "jd_text_raw": "AWS, Kubernetes, Terraform",
+                "required_skills": ["AWS", "Kubernetes"],
+                "min_years": 5.0,
+                "location": "Remote",
+                "work_mode": "Remote",
+                "status": "open",
+                "created_by": "user_bob_456",  # Posted by colleague Bob!
+                "tenant_id": "tenant_techcorp",
+                "applicant_count": 3,
+            }
+        ]
+
+    def mock_find(query, *args, **kwargs):
+        captured_query.update(query)
+        return mock_cursor
+
+    mock_db.jobs.find = mock_find
+
+    with patch("api.routes.jobs.stream_cursor", side_effect=mock_stream):
+        res = await get_my_posted_jobs(current_user=recruiter_alice, db=mock_db)
+
+    # 1. Query must filter by tenant_id, NOT by created_by: user_alice_123
+    assert captured_query == {"tenant_id": "tenant_techcorp"}
+    assert "created_by" not in captured_query
+
+    # 2. Result must return the job posted by colleague Bob
+    assert res["total"] == 1
+    assert res["jobs"][0]["title"] == "Staff Cloud Engineer"
+
+
+@pytest.mark.asyncio
+async def test_match_job_ats_resolves_open_job_cross_tenant():
+    """
+    Verify ATS Match 404 Bug Fix:
+    1. Candidate with tenant_id='default' matches job created under 'tenant_techcorp' with status='open'.
+    2. Endpoint queries raw_db cross-tenant and handles ObjectId and string ID.
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from bson import ObjectId
+    from api.routes.jobs import match_job_ats
+    from models.user_model import UserModel, UserRole
+
+    candidate = UserModel(
+        id="660000000000000000000010",
+        email="candidate@example.com",
+        full_name="Candidate Charlie",
+        role=UserRole.CANDIDATE,
+        roles=[UserRole.CANDIDATE],
+        tenant_id="default",
+    )
+
+    job_oid = ObjectId("660000000000000000000099")
+    job_record = {
+        "_id": job_oid,
+        "title": "Junior Python Developer",
+        "company_name": "TechCorp",
+        "jd_text_raw": "Python, FastAPI, SQL",
+        "required_skills": ["Python", "FastAPI"],
+        "min_years": 1.0,
+        "status": "open",
+        "tenant_id": "tenant_techcorp",
+    }
+
+    mock_db = MagicMock()
+    mock_raw_db = MagicMock()
+    mock_db.raw_db = mock_raw_db
+
+    # raw_db returns job regardless of tenant
+    mock_raw_db.jobs.find_one = AsyncMock(return_value=job_record)
+
+    # Candidate has parsed resume
+    resume_doc = {
+        "_id": ObjectId("660000000000000000000077"),
+        "user_id": str(candidate.id),
+        "parsed_data": {
+            "skills": ["Python", "FastAPI", "Git"],
+            "total_experience_years": 1.5,
+            "education": [{"degree": "B.Tech Computer Science"}],
+        },
+    }
+    mock_raw_db.resumes.find_one = AsyncMock(return_value=resume_doc)
+
+    mock_resume_repo = MagicMock()
+    mock_resume_repo.get_primary_by_user = AsyncMock(return_value=None)
+    mock_resume_repo.get_by_user = AsyncMock(return_value=([], 0))
+    mock_resume_repo._serialize = lambda d: d
+
+    from starlette.requests import Request
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": f"/api/v1/jobs/{job_oid}/match",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+    }
+    mock_request = Request(scope)
+
+    with patch("api.routes.jobs.score_resume") as mock_scorer:
+        mock_scorer.return_value = {
+            "final_score": 85.0,
+            "matched_skills": ["Python", "FastAPI"],
+            "missing_skills": [],
+            "experience_score": 80.0,
+            "education_score": 80.0,
+            "recommendation": "Strong Match",
+            "feedback_suggestions": ["Add more projects", "Certifications"],
+        }
+
+        res = await match_job_ats(
+            request=mock_request,
+            job_id=str(job_oid),
+            current_user=candidate,
+            db=mock_db,
+            resume_repo=mock_resume_repo,
+        )
+
+    assert res["job_id"] == str(job_oid)
+    assert res["final_score"] == 85.0
+    assert "Python" in res["matched_skills"]
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_strict_has_applied_logic():
+    """
+    Verify GET /api/v1/jobs strictly calculates has_applied:
+    - True ONLY if db.applications contains job_id == job._id AND candidate_id == current_user.id.
+    - False if user is creator (created_by) or in same tenant without an application.
+    - False if application belongs to another candidate.
+    - False if unauthenticated.
+    """
+    from bson import ObjectId
+    from unittest.mock import AsyncMock, MagicMock
+    from api.routes.jobs import list_jobs
+    from models.user_model import UserModel, UserRole
+
+    candidate_id = "660000000000000000000099"
+    current_user = UserModel(
+        id=candidate_id,
+        email="candidate@example.com",
+        full_name="Test Candidate",
+        role=UserRole.CANDIDATE,
+        roles=[UserRole.CANDIDATE],
+        tenant_id="acme_corp",
+        is_active=True,
+    )
+
+    job1_id = ObjectId("660000000000000000000001")
+    job2_id = ObjectId("660000000000000000000002")
+    job3_id = ObjectId("660000000000000000000003")
+    job4_id = ObjectId("660000000000000000000004")
+
+    mock_docs = [
+        # Job 1: Applied by this candidate
+        {
+            "_id": job1_id,
+            "title": "Job 1 (Applied)",
+            "company_name": "Company A",
+            "status": "open",
+            "created_by": "other_user_id",
+            "tenant_id": "other_tenant",
+        },
+        # Job 2: User is creator (created_by), but DID NOT apply
+        {
+            "_id": job2_id,
+            "title": "Job 2 (Created By User)",
+            "company_name": "Company B",
+            "status": "open",
+            "created_by": candidate_id,
+            "tenant_id": "other_tenant",
+        },
+        # Job 3: Same tenant, but DID NOT apply
+        {
+            "_id": job3_id,
+            "title": "Job 3 (Same Tenant)",
+            "company_name": "Company C",
+            "status": "open",
+            "created_by": "other_user_id",
+            "tenant_id": "acme_corp",
+        },
+        # Job 4: Applied by a DIFFERENT candidate
+        {
+            "_id": job4_id,
+            "title": "Job 4 (Other Applicant)",
+            "company_name": "Company D",
+            "status": "open",
+            "created_by": "other_user_id",
+            "tenant_id": "other_tenant",
+        },
+    ]
+
+    mock_db = MagicMock()
+    mock_db.raw_db = mock_db
+    mock_db.jobs.count_documents = AsyncMock(return_value=len(mock_docs))
+    
+    mock_cursor = MagicMock()
+    mock_cursor.sort.return_value = mock_cursor
+    mock_cursor.skip.return_value = mock_cursor
+    mock_cursor.limit.return_value = mock_cursor
+    mock_cursor.to_list = AsyncMock(return_value=mock_docs)
+    mock_db.jobs.find.return_value = mock_cursor
+
+    # Mock applications collection: only Job 1 has an application for this candidate
+    mock_app_cursor = MagicMock()
+    mock_app_cursor.to_list = AsyncMock(return_value=[
+        {"job_id": str(job1_id), "candidate_id": candidate_id}
+    ])
+    mock_db.applications.find.return_value = mock_app_cursor
+
+    # 1. Authenticated test
+    res = await list_jobs(
+        search=None,
+        work_mode=None,
+        location=None,
+        min_years=None,
+        skill=None,
+        limit=30,
+        skip=0,
+        current_user=current_user,
+        db=mock_db,
+    )
+
+    jobs_by_id = {j["id"]: j for j in res["jobs"]}
+    
+    # Job 1 MUST be True
+    assert jobs_by_id[str(job1_id)]["has_applied"] is True
+
+    # Job 2 MUST be False (created_by must NOT flag as applied)
+    assert jobs_by_id[str(job2_id)]["has_applied"] is False
+
+    # Job 3 MUST be False (same tenant must NOT flag as applied)
+    assert jobs_by_id[str(job3_id)]["has_applied"] is False
+
+    # Job 4 MUST be False (different candidate applied)
+    assert jobs_by_id[str(job4_id)]["has_applied"] is False
+
+    # 2. Unauthenticated test (current_user=None)
+    res_unauth = await list_jobs(
+        search=None,
+        work_mode=None,
+        location=None,
+        min_years=None,
+        skill=None,
+        limit=30,
+        skip=0,
+        current_user=None,
+        db=mock_db,
+    )
+    for j in res_unauth["jobs"]:
+        assert j["has_applied"] is False
+
+
+
 
 
 

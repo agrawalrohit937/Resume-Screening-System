@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
-import { Mail, Lock, User, Eye, EyeOff, Briefcase, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Mail, Lock, User, Eye, EyeOff, Briefcase, Building2, ArrowRight, CheckCircle2 } from 'lucide-react'
 
 const illustration = '/illustration.webp';
 
@@ -56,6 +56,7 @@ export default function Signup() {
         email: data.email,
         password: data.password,
         role: data.role,
+        company_name: data.company_name || "",
         phone: "",
         linkedin_url: "",
         github_username: ""
@@ -87,7 +88,12 @@ export default function Signup() {
         navigate('/dashboard')
       } catch (err) {
         console.error('Google Auth Backend Error:', err)
-        toast.error(err.response?.data?.detail || 'Google signup failed')
+        const errorMsg = typeof err.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : (Array.isArray(err.response?.data?.detail)
+              ? err.response.data.detail.map((d) => d.msg || JSON.stringify(d)).join(', ')
+              : err.response?.data?.detail?.message || 'Google signup failed')
+        toast.error(errorMsg)
       } finally {
         setLoading(false)
       }
@@ -168,12 +174,11 @@ export default function Signup() {
       </div>
 
       {/* RIGHT — AUTH FORM */}
-      {/* FIX 2: Switched items-center to items-start on mobile viewports so content stays top-anchored and scrolls elegantly */}
-      <div className="flex h-full items-start lg:items-center justify-center bg-white px-6 py-10 sm:px-12 lg:justify-start lg:pl-16 xl:pl-24 overflow-y-auto">
-        <div className="w-full max-w-[400px]">
+      <div className="flex h-full flex-col justify-start bg-white px-6 py-6 sm:px-12 lg:pl-16 xl:pl-24 overflow-y-auto">
+        <div className="w-full max-w-[410px] my-auto py-4 sm:py-6">
 
           {/* Mobile-only logo */}
-          <div className="mb-6 flex items-center gap-2.5 lg:hidden">
+          <div className="mb-4 sm:mb-5 flex items-center gap-2.5 lg:hidden">
             <img
               src="/logo_t.webp"
               alt="CareerShala Logo"
@@ -188,24 +193,26 @@ export default function Signup() {
             </span>
           </div>
 
-          <h2 className="font-display text-[32px] font-bold tracking-tight text-[#111827]">Join the future.</h2>
-          <p className="mt-1 text-[14px] font-medium text-[#2E9BDA]">
+          <h2 className="font-display text-[26px] sm:text-[30px] font-bold tracking-tight text-[#111827]">Join the future.</h2>
+          <p className="mt-1 text-[13px] sm:text-[14px] font-medium text-[#2E9BDA]">
             Get AI-powered resume insights & job matches in seconds.
           </p>
 
           {/* ROLE SELECTOR */}
-          <div className="relative mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Select role">
-            {['candidate', 'recruiter'].map((role) => {
-              const Icon = role === 'candidate' ? User : Briefcase
-              const active = selectedRole === role
+          <div className="relative mt-4 sm:mt-5 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Select role">
+            {[
+              { id: 'candidate', label: 'Candidate', icon: User },
+              { id: 'employer', label: 'Employer / Company', icon: Building2 },
+            ].map(({ id, label, icon: Icon }) => {
+              const active = selectedRole === id
               return (
                 <button
-                  key={role}
+                  key={id}
                   type="button"
-                  onClick={() => setValue("role", role)}
+                  onClick={() => setValue("role", id)}
                   aria-pressed={active}
-                  aria-label={`Sign up as ${role}`}
-                  className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
+                  aria-label={`Sign up as ${label}`}
+                  className={`relative z-10 flex items-center justify-center gap-2 rounded-lg py-2 text-[12.5px] sm:text-[13px] font-semibold transition-colors ${
                     active ? 'text-[#1d6fa5]' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -217,22 +224,22 @@ export default function Signup() {
                     />
                   )}
                   <Icon className="relative z-10 h-4 w-4" />
-                  <span className="relative z-10 capitalize">{role}</span>
+                  <span className="relative z-10 font-medium">{label}</span>
                 </button>
               )
             })}
           </div>
           <input type="hidden" {...register("role")} />
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="mt-4 sm:mt-5 space-y-3 sm:space-y-3.5">
 
             {/* FULL NAME */}
             <div>
-              <label htmlFor="full_name" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <label htmlFor="full_name" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                 Full Name
               </label>
               <div className="relative">
-                <User className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                <User className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
                 <input
                   id="full_name"
                   type="text"
@@ -243,23 +250,52 @@ export default function Signup() {
                     required: 'Full name is required',
                     minLength: { value: 2, message: 'Name must be at least 2 characters' }
                   })}
-                  className={`h-[46px] w-full rounded-xl border bg-white pl-12 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
+                  className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-4 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
                     errors.full_name
                       ? 'border-red-400 focus:ring-2 focus:ring-red-100'
                       : 'border-slate-200/80 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10'
                   }`}
                 />
               </div>
-              {errors.full_name && <p className="mt-1 ml-1 text-[12px] text-red-500">{errors.full_name.message}</p>}
+              {errors.full_name && <p className="mt-1 ml-1 text-[11.5px] text-red-500">{errors.full_name.message}</p>}
             </div>
+
+            {/* COMPANY NAME (Shown if Employer / Company is selected) */}
+            {selectedRole === 'employer' && (
+              <div>
+                <label htmlFor="company_name" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                  Company / Organization Name
+                </label>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="company_name"
+                    type="text"
+                    placeholder="Acme Technologies Inc."
+                    aria-label="Company Name"
+                    disabled={loading}
+                    {...register('company_name', {
+                      required: selectedRole === 'employer' ? 'Company name is required' : false,
+                      minLength: { value: 2, message: 'Company name must be at least 2 characters' }
+                    })}
+                    className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-4 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
+                      errors.company_name
+                        ? 'border-red-400 focus:ring-2 focus:ring-red-100'
+                        : 'border-slate-200/80 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10'
+                    }`}
+                  />
+                </div>
+                {errors.company_name && <p className="mt-1 ml-1 text-[11.5px] text-red-500">{errors.company_name.message}</p>}
+              </div>
+            )}
 
             {/* EMAIL */}
             <div>
-              <label htmlFor="email" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <label htmlFor="email" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
                 <input
                   id="email"
                   type="email"
@@ -273,23 +309,23 @@ export default function Signup() {
                       message: "Invalid email address"
                     }
                   })}
-                  className={`h-[46px] w-full rounded-xl border bg-white pl-12 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
+                  className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-4 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
                     errors.email
                       ? 'border-red-400 focus:ring-2 focus:ring-red-100'
                       : 'border-slate-200/80 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10'
                   }`}
                 />
               </div>
-              {errors.email && <p className="mt-1 ml-1 text-[12px] text-red-500">{errors.email.message}</p>}
+              {errors.email && <p className="mt-1 ml-1 text-[11.5px] text-red-500">{errors.email.message}</p>}
             </div>
 
             {/* PASSWORD */}
             <div>
-              <label htmlFor="password" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <label htmlFor="password" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                 Password
               </label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -297,7 +333,7 @@ export default function Signup() {
                   aria-label="Password"
                   disabled={loading}
                   {...register('password', { required: 'Password is required', minLength: { value: 6, message: 'Password must be at least 6 characters' } })}
-                  className={`h-[46px] w-full rounded-xl border bg-white pl-12 pr-12 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
+                  className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-11 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
                     errors.password
                       ? 'border-red-400 focus:ring-2 focus:ring-red-100'
                       : 'border-slate-200/80 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10'
@@ -308,21 +344,21 @@ export default function Signup() {
                   tabIndex={-1}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => !loading && setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2E9BDA]"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-[#2E9BDA]"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
-              {errors.password && <p className="mt-1 ml-1 text-[12px] text-red-500">{errors.password.message}</p>}
+              {errors.password && <p className="mt-1 ml-1 text-[11.5px] text-red-500">{errors.password.message}</p>}
             </div>
 
             {/* CONFIRM PASSWORD */}
             <div>
-              <label htmlFor="confirm_password" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <label htmlFor="confirm_password" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
                 <input
                   id="confirm_password"
                   type={showPassword ? 'text' : 'password'}
@@ -332,21 +368,21 @@ export default function Signup() {
                     required: 'Please confirm your password',
                     validate: (value) => value === watch('password') || 'Passwords do not match'
                   })}
-                  className={`h-[46px] w-full rounded-xl border bg-white pl-12 pr-4 text-[14px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
+                  className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-4 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
                     errors.confirm_password
                       ? 'border-red-400 focus:ring-2 focus:ring-red-100'
                       : 'border-slate-200/80 focus:border-[#2E9BDA] focus:ring-4 focus:ring-[#2E9BDA]/10'
                   }`}
                 />
               </div>
-              {errors.confirm_password && <p className="mt-1 ml-1 text-[12px] text-red-500">{errors.confirm_password.message}</p>}
+              {errors.confirm_password && <p className="mt-1 ml-1 text-[11.5px] text-red-500">{errors.confirm_password.message}</p>}
             </div>
 
             {/* SUBMIT BUTTON */}
             <button
               type="submit"
               disabled={loading}
-              className="group mt-2 flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-[14px] font-bold text-white shadow-lg shadow-[#2E9BDA]/20 transition-all hover:shadow-[#2E9BDA]/35 disabled:opacity-60"
+              className="group mt-2.5 flex h-[42px] sm:h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-[13.5px] font-bold text-white shadow-lg shadow-[#2E9BDA]/20 transition-all hover:shadow-[#2E9BDA]/35 disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -363,21 +399,21 @@ export default function Signup() {
           </form>
 
           {/* SEPARATOR */}
-          <div className="my-5 flex items-center gap-3">
+          <div className="my-3.5 sm:my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-100" />
-            <span className="text-[12px] font-medium text-slate-400">or continue with</span>
+            <span className="text-[11.5px] font-medium text-slate-400">or continue with</span>
             <div className="h-px flex-1 bg-slate-100" />
           </div>
 
           {/* SOCIAL LOGINS GRID */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={() => handleGoogleLogin()}
               disabled={loading}
               title="Continue with Google"
               aria-label="Continue with Google"
-              className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
+              className="flex h-[42px] sm:h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -393,7 +429,7 @@ export default function Signup() {
               disabled={loading}
               title="Continue with LinkedIn"
               aria-label="Continue with LinkedIn"
-              className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-[#0A66C2] shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
+              className="flex h-[42px] sm:h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-[#0A66C2] shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
@@ -406,7 +442,7 @@ export default function Signup() {
               disabled={loading}
               title="Continue with GitHub"
               aria-label="Continue with GitHub"
-              className="flex h-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
+              className="flex h-[42px] sm:h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:shadow-md disabled:opacity-60"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                 <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
@@ -414,7 +450,7 @@ export default function Signup() {
             </button>
           </div>
 
-          <p className="mt-6 text-center text-[14px] text-slate-500">
+          <p className="mt-4 sm:mt-5 text-center text-[13.5px] text-slate-500">
             Already a member?{' '}
             <Link to="/login" className="font-semibold text-[#2E9BDA] hover:underline">
               Sign In
