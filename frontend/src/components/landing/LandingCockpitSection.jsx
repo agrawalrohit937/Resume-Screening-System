@@ -1,5 +1,19 @@
+/**
+ * LandingCockpitSection (Merged Interactive Demo Suite)
+ * ----------------------------------------------------
+ * Unified interactive suite combining the former Telemetry Cockpit & ATS Playground.
+ * Provides live tabs for:
+ *  1. ATS Matcher HUD (Keyword alignment, matched tokens, bullet optimizer)
+ *  2. AI Mock Interview Coach (Vision proctoring HUD, speech pace gauge)
+ *  3. 1-Click GitHub Portfolio Sync
+ *  4. Tamper-Proof QR Certificate Preview
+ *
+ * Primary Anchor: #demo (also supports legacy #cockpit)
+ */
+
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import {
   BarChart3,
   FileText,
@@ -23,23 +37,24 @@ import {
   Cpu,
   Layers,
   Send,
-  Sparkle,
+  Award,
+  CheckSquare,
+  QrCode,
 } from 'lucide-react'
 
 const TABS = [
-  { id: 'ats', label: 'Smart ATS Optimization', subtitle: 'Keyword & Metric Alignment', icon: FileText },
+  { id: 'ats', label: 'ATS Matcher HUD', subtitle: 'Keyword & Metric Alignment', icon: FileText },
   { id: 'interview', label: 'AI Mock Interview Coach', subtitle: 'Vision & Speech Proctoring', icon: Video },
   { id: 'portfolio', label: 'GitHub Portfolio Builder', subtitle: 'Instant 1-Click Dev Site', icon: Globe },
-  { id: 'apply', label: 'AI Career Assistant', subtitle: 'Automated Outreach Copilot', icon: Send },
+  { id: 'certificate', label: 'Verified QR Certificate', subtitle: 'Tamper-Proof Skill Badge', icon: Award },
 ]
 
-const ROTATION_INTERVAL = 1660 // 3x speed (1.66s)
+const ROTATION_INTERVAL = 3000
 
 export default function LandingCockpitSection({
   activeCockpitTab,
   setActiveCockpitTab,
-  fadeInUp,
-  scaleUp,
+  user,
 }) {
   const [isHovered, setIsHovered] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -71,7 +86,8 @@ export default function LandingCockpitSection({
   }, [activeCockpitTab, isHovered, setActiveCockpitTab])
 
   return (
-    <section id="cockpit" className="py-14 sm:py-20 bg-gradient-to-b from-[#F8FAFC] via-[#F1F5F9] to-white relative overflow-hidden text-slate-900 border-y border-slate-200/80">
+    <section id="demo" className="py-14 sm:py-20 bg-gradient-to-b from-[#F8FAFC] via-[#F1F5F9] to-white relative overflow-hidden text-slate-900 border-y border-slate-200/80">
+      <span id="cockpit" className="sr-only" />
       
       {/* Background Lighting Glows */}
       <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] bg-gradient-to-b from-[#2E9BDA]/15 via-indigo-500/10 to-transparent blur-[140px] rounded-full" />
@@ -424,10 +440,10 @@ export default function LandingCockpitSection({
                 </motion.div>
               )}
 
-              {/* TAB 4: AI APPLY ASSISTANT */}
-              {activeCockpitTab === 'apply' && (
+              {/* TAB 4: VERIFIED QR CERTIFICATE */}
+              {activeCockpitTab === 'certificate' && (
                 <motion.div
-                  key="apply"
+                  key="certificate"
                   initial={{ opacity: 0, y: 15, scale: 0.99 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -15, scale: 0.99 }}
@@ -435,48 +451,66 @@ export default function LandingCockpitSection({
                   className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
                 >
                   <div className="lg:col-span-6 space-y-6">
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold uppercase tracking-wider">
-                      <Send size={14} className="text-purple-600" />
-                      <span>Automated HR Outreach & Cold Mail</span>
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider">
+                      <Award size={14} className="text-amber-600" />
+                      <span>Tamper-Proof Credential System</span>
                     </div>
 
                     <h3 className="text-2xl sm:text-4xl font-black text-slate-900 leading-tight tracking-tight">
-                      1-Click AI Apply Assistant & Personalized Outreach
+                      Instant Recruiter-Verifiable QR Certificates
                     </h3>
 
                     <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-medium">
-                      CareerShala automatically analyzes job postings, drafts tailored personalized cover emails highlighting your top metrics, attaches your verified resume, and dispatches direct outreach to hiring managers.
+                      Score 90%+ on any proctored AI assessment to unlock a cryptographically signed verifiable digital certificate. Hiring managers scan the QR to inspect your full video interview telemetry.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                        <p className="text-xs text-slate-500 font-bold">Recruiter Response Lift</p>
-                        <p className="text-2xl font-black text-purple-700 mt-1">+65%</p>
+                        <p className="text-xs text-slate-500 font-bold">Verification Speed</p>
+                        <p className="text-2xl font-black text-emerald-600 mt-1">&lt; 1 Second</p>
                       </div>
                       <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                        <p className="text-xs text-slate-500 font-bold">Hours Saved / Week</p>
-                        <p className="text-2xl font-black text-emerald-700 mt-1">10+ Hours</p>
+                        <p className="text-xs text-slate-500 font-bold">Recruiter Callback</p>
+                        <p className="text-2xl font-black text-[#2E9BDA] mt-1">4.2x Faster</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="lg:col-span-6 bg-slate-50 rounded-3xl p-5 border border-slate-200 space-y-3.5 shadow-xl">
-                    <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono text-slate-700 shadow-sm">
-                      <span className="font-bold truncate text-slate-900">To: hr@stripe.com</span>
-                      <span className="px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold text-[10px]">READY TO DISPATCH</span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5 shadow-sm text-xs">
-                      <p className="font-extrabold text-slate-900">Subject: Senior React & Full-Stack Architect — Rohit Agrawal</p>
-                      <p className="text-slate-600 leading-relaxed font-medium">
-                        "Hi Hiring Team, I saw your opening for Senior React Engineer. Recently I refactored React core asset delivery, cutting initial payload by 1.6 MB and lifting Lighthouse score from 70 to 94+..."
-                      </p>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#2E9BDA] bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
-                          📎 Rohit_Agrawal_Optimized_Resume.pdf
+                    <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white border border-slate-700 shadow-2xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-[#2E9BDA]/20 rounded-full blur-2xl pointer-events-none" />
+                      
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-700">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-[#2E9BDA] flex items-center justify-center font-black text-white text-xs">
+                            CS
+                          </div>
+                          <div>
+                            <p className="text-xs font-black tracking-wider uppercase text-slate-200">CareerShala Verified</p>
+                            <p className="text-[10px] text-slate-400 font-mono">ID: CS-2026-9821</p>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-500/30">
+                          100% CLUB VERIFIED
                         </span>
-                        <span className="text-emerald-600 font-mono font-bold text-[11px] flex items-center gap-1">
-                          ✓ Sent via Gmail API
+                      </div>
+
+                      <div className="py-4 space-y-1">
+                        <p className="text-[11px] text-slate-400 uppercase tracking-widest font-mono">CANDIDATE CREDENTIAL</p>
+                        <h4 className="text-lg font-black text-white">Full-Stack AI &amp; React Architect</h4>
+                        <p className="text-xs text-slate-300">Awarded to <span className="text-white font-bold">Rohit Agrawal</span> with 98% Proctor Score</p>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-700 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <QrCode size={32} className="text-[#2E9BDA] bg-white/10 p-1 rounded-lg" />
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-mono">Scan to Verify</p>
+                            <p className="text-[11px] font-bold text-sky-300">careershala.tech/verify/CS-2026</p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-emerald-400 font-mono font-bold">
+                          ✓ Signed &amp; Authentic
                         </span>
                       </div>
                     </div>
