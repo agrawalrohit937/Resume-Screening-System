@@ -58,6 +58,6 @@ local.properties
 *.log
 
 # Temporary tunnel binaries and tools
-tools/
+/tools/
 *.exe
 scratch_synopsis.txt
