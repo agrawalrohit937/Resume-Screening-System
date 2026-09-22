@@ -14,14 +14,12 @@ from models.resume_model import ResumeModel, ResumeStatus
 logger = structlog.get_logger(__name__)
 
 
-class ResumeRepository:
+from repositories.base_repo import BaseRepository
+
+
+class ResumeRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db.resumes
-
-    def _serialize(self, doc: dict) -> dict:
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-        return doc
 
     async def create(self, resume_data: dict) -> ResumeModel:
         result = await self.collection.insert_one(resume_data)
@@ -45,6 +43,21 @@ class ResumeRepository:
             })
         except Exception:
             return None
+        if not doc:
+            return None
+        return ResumeModel(**self._serialize(doc))
+
+    async def get_primary_by_user(self, user_id: str) -> Optional[ResumeModel]:
+        """Fetches the primary parsed resume for a candidate, falling back to their latest parsed resume."""
+        doc = await self.collection.find_one(
+            {"user_id": user_id, "status": ResumeStatus.PARSED.value},
+            sort=[("is_primary", -1), ("created_at", -1)],
+        )
+        if not doc:
+            doc = await self.collection.find_one(
+                {"user_id": user_id},
+                sort=[("is_primary", -1), ("created_at", -1)],
+            )
         if not doc:
             return None
         return ResumeModel(**self._serialize(doc))

@@ -13,7 +13,7 @@ from fastapi.encoders import jsonable_encoder
 
 from core.config import settings
 from core.security import create_access_token, create_refresh_token
-from models.user_model import UserModel, UserStatus, AuthProvider
+from models.user_model import UserModel, UserRole, UserStatus, AuthProvider
 from models.otp_model import OTPPurpose
 from repositories.user_repo import UserRepository
 from repositories.otp_repo import OTPRepository
@@ -29,6 +29,8 @@ def user_to_public(user: UserModel) -> UserPublicResponse:
         email=user.email,
         full_name=user.full_name,
         role=user.role,
+        roles=user.roles or [user.role],
+        tenant_id=user.tenant_id,
         status=user.status,
         profile_picture=user.profile_picture,
         phone=user.phone,
@@ -65,7 +67,13 @@ def user_to_public(user: UserModel) -> UserPublicResponse:
 
 
 def build_token_response(user: UserModel) -> TokenResponse:
-    extra = {"role": user.role, "email": user.email}
+    user_roles = [r.value if hasattr(r, "value") else str(r) for r in (user.roles or [user.role])]
+    extra = {
+        "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+        "roles": user_roles,
+        "tenant_id": user.tenant_id,
+        "email": user.email,
+    }
     access_token = create_access_token(str(user.id), extra_claims=extra)
     refresh_token = create_refresh_token(str(user.id))
     return TokenResponse(
@@ -92,17 +100,28 @@ def set_trusted_device_cookie(response: JSONResponse, device_id_plain: str) -> N
     )
 
 
+from services.token_service import TokenService
+from core.security import decode_token
+
 async def build_and_persist_tokens(
     user: UserModel,
     user_repo: UserRepository,
     trusted_device_id_plain: str | None = None,
 ) -> JSONResponse:
-    """Builds tokens, persists the refresh token for rotation, and returns a
-    JSONResponse with auth cookies (and optionally the trusted-device cookie)
-    already set. This is the common tail end of signup/login/OAuth/verify-otp
-    handlers, extracted so every flow issues tokens identically."""
+    """Builds tokens, persists the refresh token for rotation, registers with TokenService,
+    and returns a JSONResponse with auth cookies already set."""
     token_data = build_token_response(user)
     await user_repo.update(str(user.id), {"refresh_token": token_data.refresh_token})
+
+    # Register in TokenService collection
+    refresh_payload = decode_token(token_data.refresh_token) or {}
+    await TokenService.store_refresh_token(
+        raw_token=token_data.refresh_token,
+        user_id=str(user.id),
+        tenant_id=user.tenant_id or "default",
+        family_id=refresh_payload.get("family_id", str(user.id)),
+        jti=refresh_payload.get("jti", ""),
+    )
 
     response = JSONResponse(content=jsonable_encoder(token_data))
     set_auth_cookies(response, token_data)
@@ -284,10 +303,31 @@ async def link_or_create_user(
     }
 
     picture = provider_data.get("picture")
+
+    r_val = str(role).lower() if role else "candidate"
+    if r_val in ("employer", "recruiter", "executive", "exec"):
+        roles_list = [UserRole.EXECUTIVE.value]
+        primary_role = UserRole.EXECUTIVE.value
+    elif r_val:
+        roles_list = [r_val]
+        primary_role = r_val
+    else:
+        roles_list = [UserRole.CANDIDATE.value]
+        primary_role = UserRole.CANDIDATE.value
+
+    resolved_tenant = "default"
+    if any(r in ("executive", "exec", "employer", "recruiter", "hiring_manager") for r in roles_list) and "@" in email:
+        domain = email.split("@")[1].split(".")[0].lower()
+        common = {"gmail", "yahoo", "hotmail", "outlook", "icloud", "proton", "mail", "aol"}
+        if domain not in common:
+            resolved_tenant = domain
+
     user_data: Dict[str, Any] = {
         "email": email.lower(),
         "full_name": full_name,
-        "role": role,
+        "role": primary_role,
+        "roles": roles_list,
+        "tenant_id": resolved_tenant,
         "status": UserStatus.ACTIVE,
         "provider": provider_enum_rev.get(provider, AuthProvider.EMAIL),
         "email_verified": True,

@@ -185,10 +185,11 @@ async def migrate_all_users(mongo_uri: str, db_name: str, dry_run: bool = True):
     )
 
     if dry_run:
-        print("\n" + "=" * 60)
-        print(f"DRY RUN: {migrated_count} users would be migrated.")
-        print(f"Run with --apply flag to execute the migration.")
-        print("=" * 60)
+        logger.info(
+            "Dry run complete",
+            migrated_count=migrated_count,
+            message="Run with --apply flag to execute the migration.",
+        )
 
     client.close()
 

@@ -211,8 +211,6 @@ async def get_my_recovery_banner(
 # ADMIN REVENUE RECOVERY DASHBOARD & MANAGEMENT ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/admin/revenue-recovery/overview")
-@router.get("/admin/overview")
 @router.get("/overview")
 async def get_admin_overview(
     admin: UserModel = Depends(get_admin_user),
@@ -225,8 +223,6 @@ async def get_admin_overview(
     return await recovery_repo.get_overview_analytics()
 
 
-@router.get("/admin/revenue-recovery/cases")
-@router.get("/admin/cases")
 @router.get("/cases")
 async def list_admin_cases(
     status: Optional[str] = Query(None),
@@ -269,8 +265,6 @@ async def list_admin_cases(
     }
 
 
-@router.get("/admin/revenue-recovery/cases/{case_id}")
-@router.get("/admin/cases/{case_id}")
 @router.get("/cases/{case_id}")
 async def get_admin_case_detail(
     case_id: str,
@@ -287,8 +281,6 @@ async def get_admin_case_detail(
     return case.model_dump() if hasattr(case, "model_dump") else case.dict()
 
 
-@router.post("/admin/revenue-recovery/cases/{case_id}/retry")
-@router.post("/admin/cases/{case_id}/retry")
 @router.post("/cases/{case_id}/retry")
 async def trigger_case_retry(
     case_id: str,
@@ -344,8 +336,6 @@ async def trigger_case_retry(
     return updated_case.model_dump() if hasattr(updated_case, "model_dump") else updated_case.dict()
 
 
-@router.post("/admin/revenue-recovery/cases/{case_id}/approve")
-@router.post("/admin/cases/{case_id}/approve")
 @router.post("/cases/{case_id}/approve")
 async def approve_case_escalation(
     case_id: str,
@@ -408,8 +398,6 @@ async def approve_case_escalation(
     return updated.model_dump() if hasattr(updated, "model_dump") else updated.dict()
 
 
-@router.post("/admin/revenue-recovery/cases/{case_id}/reject")
-@router.post("/admin/cases/{case_id}/reject")
 @router.post("/cases/{case_id}/reject")
 async def reject_case_escalation(
     case_id: str,
@@ -442,8 +430,6 @@ async def reject_case_escalation(
     return updated.model_dump() if hasattr(updated, "model_dump") else updated.dict()
 
 
-@router.post("/admin/revenue-recovery/cases/{case_id}/close")
-@router.post("/admin/cases/{case_id}/close")
 @router.post("/cases/{case_id}/close")
 async def close_case(
     case_id: str,
@@ -476,8 +462,6 @@ async def close_case(
     return updated.model_dump() if hasattr(updated, "model_dump") else updated.dict()
 
 
-@router.post("/admin/revenue-recovery/cases/{case_id}/trigger-channel")
-@router.post("/admin/cases/{case_id}/trigger-channel")
 @router.post("/cases/{case_id}/trigger-channel")
 async def trigger_channel_outreach(
     case_id: str,

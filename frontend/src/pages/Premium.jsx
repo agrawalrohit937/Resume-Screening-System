@@ -222,7 +222,6 @@ export default function Premium() {
             failure_reason: errorDesc,
             failure_code: response.error?.code || 'payment_failed',
           })
-          console.log('[Razorpay] Payment failure successfully reported to AI recovery pipeline.')
         } catch (reportErr) {
           console.error('[Razorpay] Failed to report payment failure to server:', reportErr)
         }

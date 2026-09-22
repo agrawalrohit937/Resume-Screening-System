@@ -21,9 +21,9 @@ logger = structlog.get_logger(__name__)
 # ─── Provider Config ──────────────────────────────────────────────────────────
 GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions"
 MISTRAL_BASE = "https://api.mistral.ai/v1/chat/completions"
-# GROQ_MODEL = "llama3-8b-8192"
-GROQ_MODEL = "llama-3.3-70b-versatile"
-MISTRAL_MODEL = "mistral-large-latest"
+GROQ_MODEL = "openai/gpt-oss-120b"
+MISTRAL_MODEL = "open-mistral-7b"
+
 
 
 class AIInterviewService:

@@ -14,14 +14,12 @@ from models.user_model import UserModel, UserRole, UserStatus
 logger = structlog.get_logger(__name__)
 
 
-class UserRepository:
+from repositories.base_repo import BaseRepository
+
+
+class UserRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db.users
-
-    def _serialize(self, doc: dict) -> dict:
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-        return doc
 
     async def create(self, user_data: dict) -> UserModel:
         result = await self.collection.insert_one(user_data)

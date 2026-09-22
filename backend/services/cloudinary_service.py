@@ -65,6 +65,8 @@ def _sync_upload(
     folder: str,
     public_id: Optional[str] = None,
     resource_type: str = "auto",
+    access_mode: Optional[str] = None,
+    delivery_type: Optional[str] = None,
 ) -> dict:
     """Synchronous Cloudinary upload — called via run_in_executor to stay async-safe."""
     upload_kwargs: dict = {
@@ -74,6 +76,10 @@ def _sync_upload(
     }
     if public_id:
         upload_kwargs["public_id"] = public_id
+    if access_mode:
+        upload_kwargs["access_mode"] = access_mode
+    if delivery_type:
+        upload_kwargs["type"] = delivery_type
 
     try:
         with io.BytesIO(file_bytes) as bio:
@@ -91,11 +97,19 @@ def _sync_delete(public_id: str, resource_type: str = "auto") -> dict:
     return cloudinary.uploader.destroy(public_id, resource_type=resource_type)
 
 
+async def delete_file(public_id: str, resource_type: str = "raw") -> dict:
+    """Async delete file from Cloudinary."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _sync_delete, public_id, resource_type)
+
+
 async def upload_file(
     file_bytes: bytes,
     folder: str,
     public_id: Optional[str] = None,
     resource_type: str = "auto",
+    access_mode: Optional[str] = None,
+    delivery_type: Optional[str] = None,
 ) -> Tuple[str, str]:
     """
     Upload bytes to Cloudinary.
@@ -105,7 +119,15 @@ async def upload_file(
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(
         None,
-        partial(_sync_upload, file_bytes, folder, public_id, resource_type),
+        partial(
+            _sync_upload,
+            file_bytes,
+            folder,
+            public_id,
+            resource_type,
+            access_mode,
+            delivery_type,
+        ),
     )
     secure_url = result["secure_url"]
     pid = result["public_id"]
@@ -143,7 +165,7 @@ async def upload_profile_picture(file_bytes: bytes, user_id: str, ext: str = "jp
 
 
 async def upload_resume(file_bytes: bytes, filename: str) -> Tuple[str, str]:
-    """Upload a PDF/DOCX resume. Returns (secure_url, public_id)."""
+    """Upload a PDF/DOCX resume with authenticated access mode. Returns (secure_url, public_id)."""
     
     # 1. Extract the original extension (fallback to .pdf if none exists)
     _, ext = os.path.splitext(filename or "resume.pdf")
@@ -154,18 +176,19 @@ async def upload_resume(file_bytes: bytes, filename: str) -> Tuple[str, str]:
     # Example output: resume_a1b2c3d4.pdf
     unique_id = f"resume_{uuid.uuid4().hex[:8]}{ext}"
     
-    # 3. Pass the unique_id as the public_id
+    # 3. Pass the unique_id as the public_id with authenticated access mode
     return await upload_file(
         file_bytes, 
         FOLDER_RESUMES, 
         public_id=unique_id, 
-        resource_type="raw"
+        resource_type="raw",
+        access_mode="authenticated",
     )
 
 
 async def upload_ats_resume(file_bytes: bytes, filename: str) -> Tuple[str, str]:
     """
-    Upload generated ATS resume PDF to Cloudinary.
+    Upload generated ATS resume PDF to Cloudinary with authenticated access.
 
     - Preserves filename
     - Ensures .pdf extension
@@ -203,6 +226,7 @@ async def upload_ats_resume(file_bytes: bytes, filename: str) -> Tuple[str, str]
                 folder=FOLDER_ATS_RESUMES,
                 resource_type="raw",
                 public_id=public_id,
+                access_mode="authenticated",
                 overwrite=True,
                 use_filename=True,
                 unique_filename=False,
@@ -220,13 +244,55 @@ async def upload_ats_resume(file_bytes: bytes, filename: str) -> Tuple[str, str]
     pid = result["public_id"]
 
     logger.info(
-        "Cloudinary ATS upload success",
+        "Cloudinary ATS upload success (authenticated)",
         folder=FOLDER_ATS_RESUMES,
         public_id=pid,
         url=secure_url,
     )
 
     return secure_url, pid
+
+
+def extract_public_id_from_url(url: str) -> Optional[str]:
+    """
+    Extracts canonical Cloudinary public_id from a raw or signed Cloudinary URL.
+    Works for:
+      - https://res.cloudinary.com/.../raw/upload/v12345/careerpilot/resumes/resume_abc.pdf
+      - https://res.cloudinary.com/.../raw/authenticated/s--xxx--/v12345/careerpilot/resumes/resume_abc.pdf
+    """
+    if not url:
+        return None
+    match = re.search(r"/(?:upload|authenticated)/(?:s--[^/]+--/)?(?:v\d+/)?(careerpilot/.+?)(?:\?[^#]*)?$", url)
+    if match:
+        return match.group(1)
+    return None
+
+
+def generate_signed_resume_url(public_id: str, expires_in: int = 300, resource_type: str = "raw") -> str:
+    """
+    Generates a time-limited signed URL (default 5 minutes) for private/authenticated resume delivery.
+    Ensures safe access without exposing raw public Cloudinary URLs.
+    """
+    import time
+    import cloudinary.utils
+
+    if not public_id:
+        return ""
+
+    clean_pid = public_id.strip()
+    if not clean_pid.startswith(FOLDER_ROOT) and not clean_pid.startswith("http"):
+        clean_pid = f"{FOLDER_RESUMES}/{clean_pid}"
+
+    expires_at = int(time.time()) + expires_in
+
+    url, _ = cloudinary.utils.cloudinary_url(
+        clean_pid,
+        resource_type=resource_type,
+        type="authenticated",
+        sign_url=True,
+        expires_at=expires_at,
+    )
+    return url
 
 
 async def upload_certificate(file_bytes: bytes, cert_id: str):
@@ -245,9 +311,30 @@ async def upload_certificate(file_bytes: bytes, cert_id: str):
     result = await loop.run_in_executor(None, _sync_upload_certificate)
     return result["secure_url"], result["public_id"]
 
-async def upload_company_logo(file_bytes: bytes, company_id: str) -> Tuple[str, str]:
+async def upload_company_logo(file_bytes: bytes, company_id: str = "company") -> Tuple[str, str]:
     """Upload company logo. Returns (secure_url, public_id)."""
     return await upload_file(file_bytes, FOLDER_COMPANY_LOGOS, resource_type="image")
+
+
+async def upload_base64_company_logo(b64_str: str, company_id: str = "company") -> Optional[str]:
+    """
+    Decodes a base64 data URI (e.g. data:image/png;base64,...) and uploads it to Cloudinary.
+    Returns the secure HTTPS URL.
+    """
+    import base64
+    if not b64_str or not isinstance(b64_str, str):
+        return None
+    b64_clean = b64_str.strip()
+    if not b64_clean.startswith("data:image/"):
+        return b64_clean
+    try:
+        header, data = b64_clean.split(",", 1)
+        file_bytes = base64.b64decode(data)
+        url, _ = await upload_company_logo(file_bytes, company_id)
+        return url
+    except Exception as e:
+        logger.warning("Failed to upload base64 logo to Cloudinary", error=str(e))
+        return None
 
 
 async def upload_course_image(file_bytes: bytes) -> Tuple[str, str]:

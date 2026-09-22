@@ -22,7 +22,6 @@ class RevenueRecoveryRepository:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
         self.collection = db.recovery_cases
-        self.attempts_col = db.recovery_attempts
 
     async def get_by_id(self, case_id: str) -> Optional[RecoveryCaseModel]:
         """Fetch by MongoDB _id or string case_id."""

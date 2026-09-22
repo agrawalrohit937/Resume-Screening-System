@@ -270,7 +270,7 @@ async def report_payment_failure(
     attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
 
     # Fetch user gamification and profile
-    gamification_profile = await db.gamification_profiles.find_one({"user_id": str(current_user.id)}) or {}
+    gamification_profile = await db.user_gamification.find_one({"user_id": str(current_user.id)}) or {}
 
     # Run LangGraph pipeline
     init_state = {
@@ -417,7 +417,7 @@ async def razorpay_webhook(
         existing_case = await recovery_repo.get_active_case_for_user(user_id) if user_doc else None
         attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
 
-        gamification_profile = (await db.gamification_profiles.find_one({"user_id": user_id})) or {}
+        gamification_profile = (await db.user_gamification.find_one({"user_id": user_id})) or {}
 
         init_state = {
             "case_id": existing_case.case_id if existing_case else "",

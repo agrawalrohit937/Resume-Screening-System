@@ -16,6 +16,9 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=2, max_length=100)
     role: UserRole = UserRole.CANDIDATE
+    roles: Optional[List[UserRole]] = None
+    tenant_id: Optional[str] = Field(default=None, description="Company / Organization ID for enterprise accounts")
+    company_name: Optional[str] = Field(default=None, description="Company name for enterprise onboarding")
     phone: Optional[str] = None
     linkedin_url: Optional[str] = None
     github_username: Optional[str] = None
@@ -77,6 +80,8 @@ class UserPublicResponse(BaseModel):
     email: str
     full_name: str
     role: UserRole
+    roles: List[UserRole] = Field(default_factory=list)
+    tenant_id: Optional[str] = None
     status: UserStatus
     profile_picture: Optional[str]
     phone: Optional[str]

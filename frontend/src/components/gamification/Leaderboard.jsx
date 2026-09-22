@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Medal, Flame, Trophy, Crown, Sparkles } from 'lucide-react'
-import Card from './Card' 
+import { Medal, Flame, Trophy, Crown, Sparkles, ChevronDown } from 'lucide-react'
+import Card from '../Card' 
 import { useAuth } from '../../context/AuthContext'
 import { resolveAvatarUrl, getInitials } from '../../utils/avatarUtils'
 
@@ -73,20 +73,25 @@ const TOP_RANKS = {
 
 export default function Leaderboard({ leaderboard = [], currentUserId }) {
   const { user: currentUser } = useAuth()
+  const [visibleCount, setVisibleCount] = useState(10)
+
   // Only display candidates on the leaderboard (exclude admin & recruiter)
   const candidateLeaderboard = leaderboard.filter(
     (e) => !e.role || e.role.toLowerCase() === 'candidate'
   )
-  const myEntry = candidateLeaderboard.find((e) => e.user_id === currentUserId)
 
-  // Dynamic subtitle based on available candidates count
-  const getDynamicSubtitle = (count) => {
-    if (count >= 30) return 'Top 30 candidates ranked by XP'
-    if (count >= 20) return 'Top 20 candidates ranked by XP'
-    if (count >= 10) return 'Top 10 candidates ranked by XP'
-    if (count >= 5) return 'Top 5 candidates ranked by XP'
-    if (count > 0) return `Top ${count} candidates ranked by XP`
-    return 'Top candidates ranked by XP'
+  const myIndex = candidateLeaderboard.findIndex((e) => e.user_id === currentUserId)
+  const myRank = myIndex !== -1 ? myIndex + 1 : null
+  const myEntry = myIndex !== -1 ? candidateLeaderboard[myIndex] : null
+
+  const displayedCandidates = candidateLeaderboard.slice(0, visibleCount)
+
+  // Dynamic subtitle based on currently displayed vs total candidates
+  const getDynamicSubtitle = () => {
+    const total = candidateLeaderboard.length
+    if (total === 0) return 'Top candidates ranked by XP'
+    const shown = displayedCandidates.length
+    return `Top ${shown} candidates ranked by XP`
   }
 
   // Animation variants for staggered list loading
@@ -116,17 +121,16 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
           <h3 className="font-extrabold text-lg sm:text-[22px] text-slate-900 tracking-tight flex items-center gap-2">
             Leaderboard
           </h3>
-          <p className="text-[11px] sm:text-[13px] font-medium text-slate-500 mt-0.5 truncate">{getDynamicSubtitle(candidateLeaderboard.length)}</p>
+          <p className="text-[11px] sm:text-[13px] font-medium text-slate-500 mt-0.5 truncate">{getDynamicSubtitle()}</p>
         </div>
 
-        {myEntry && (
+        {myEntry && myRank && (
           <div className="text-right relative z-10 bg-white px-2.5 py-1 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs shrink-0">
             <p className="text-[8px] sm:text-[10px] font-extrabold text-[#1d6fa5] uppercase tracking-wider">Your Rank</p>
-            <p className="font-extrabold text-base sm:text-2xl text-slate-900 leading-none mt-0.5">#{myEntry.rank}</p>
+            <p className="font-extrabold text-base sm:text-2xl text-slate-900 leading-none mt-0.5">#{myRank}</p>
           </div>
         )}
       </div>
-
 
       {/* Empty State */}
       {candidateLeaderboard.length === 0 ? (
@@ -144,91 +148,107 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
         </div>
       ) : (
         /* Leaderboard List */
-        <motion.div 
-          className="p-1.5 sm:p-3 space-y-1 sm:space-y-1.5"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {candidateLeaderboard.map((entry, i) => {
-            const actualRank = entry.rank ?? i + 1
-            const isTop3 = actualRank <= 3
-            const rankStyle = TOP_RANKS[actualRank]
-            const isMe = entry.user_id === currentUserId
-            
-            // Icon to display for rank
-            const RankIcon = isTop3 ? rankStyle.icon : undefined
+        <>
+          <motion.div 
+            className="p-1.5 sm:p-3 space-y-1 sm:space-y-1.5"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {displayedCandidates.map((entry, i) => {
+              const rank = i + 1
+              const isTop3 = rank <= 3
+              const rankStyle = TOP_RANKS[rank]
+              const isMe = entry.user_id === currentUserId
+              
+              // Icon to display for rank
+              const RankIcon = isTop3 ? rankStyle.icon : undefined
 
-            const displayName = (!entry.full_name || entry.full_name === 'Unknown') ? 'Anonymous Candidate' : entry.full_name
+              const displayName = (!entry.full_name || entry.full_name === 'Unknown') ? 'Anonymous Candidate' : entry.full_name
 
-            return (
-              <motion.div
-                key={entry.user_id || i}
-                variants={itemVariants}
-                whileHover={{ scale: 1.008, transition: { type: 'spring', stiffness: 400 } }}
-                className={`relative flex items-center gap-2 sm:gap-3.5 px-2.5 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-[20px] transition-all duration-200 
-                  ${isTop3 ? `${rankStyle.bg} border ${rankStyle.border}` : 'bg-white border border-transparent hover:bg-slate-50 hover:border-slate-100'}
-                  ${isMe && !isTop3 ? 'ring-1 ring-[#2E9BDA]/40 shadow-xs bg-blue-50/30' : ''}
-                `}
-              >
-                {/* Glowing ring for current user */}
-                {isMe && <div className="absolute inset-0 rounded-xl sm:rounded-[20px] ring-2 ring-[#2E9BDA]/30 animate-pulse opacity-50 pointer-events-none" />}
+              return (
+                <motion.div
+                  key={entry.user_id || i}
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.008, transition: { type: 'spring', stiffness: 400 } }}
+                  className={`relative flex items-center gap-2 sm:gap-3.5 px-2.5 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-[20px] transition-all duration-200 
+                    ${isTop3 ? `${rankStyle.bg} border ${rankStyle.border}` : 'bg-white border border-transparent hover:bg-slate-50 hover:border-slate-100'}
+                    ${isMe && !isTop3 ? 'ring-1 ring-[#2E9BDA]/40 shadow-xs bg-blue-50/30' : ''}
+                  `}
+                >
+                  {/* Glowing ring for current user */}
+                  {isMe && <div className="absolute inset-0 rounded-xl sm:rounded-[20px] ring-2 ring-[#2E9BDA]/30 animate-pulse opacity-50 pointer-events-none" />}
 
-                {/* Rank Number / Icon */}
-                <div className="w-5 sm:w-7 flex items-center justify-center shrink-0 relative z-10 text-center">
-                  {isTop3 ? (
-                    <RankIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${rankStyle.iconColor}`} />
-                  ) : (
-                    <span className="text-[11px] sm:text-[13.5px] font-extrabold text-slate-400">#{actualRank}</span>
-                  )}
-                </div>
-
-                {/* Avatar */}
-                <div className="shrink-0 relative z-10">
-                  <LeaderboardAvatar
-                    entry={entry}
-                    isTop3={isTop3}
-                    rankStyle={rankStyle}
-                    isMe={isMe}
-                    currentUser={currentUser}
-                  />
-                </div>
-
-                {/* User Info */}
-                <div className="flex-1 min-w-0 relative z-10">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <p className={`text-xs sm:text-[13.5px] font-bold truncate ${isTop3 ? rankStyle.text : isMe ? 'text-[#1d6fa5]' : 'text-blue-950'}`}>
-                      {displayName}
-                    </p>
-                    {isMe && (
-                      <span className="bg-[#2E9BDA]/10 text-[#1d6fa5] text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded-full border border-[#2E9BDA]/20 shrink-0">
-                        You
-                      </span>
+                  {/* Rank Number / Icon */}
+                  <div className="w-5 sm:w-7 flex items-center justify-center shrink-0 relative z-10 text-center">
+                    {isTop3 ? (
+                      <RankIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${rankStyle.iconColor}`} />
+                    ) : (
+                      <span className="text-[11px] sm:text-[13.5px] font-extrabold text-slate-400">#{rank}</span>
                     )}
                   </div>
-                  
-                  {/* Badges/Streaks */}
-                  <div className="flex items-center gap-1 sm:gap-1.5 mt-0.5">
-                    <span className="inline-flex items-center gap-0.5 text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-white/70 px-1.5 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
-                      <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500 shrink-0" /> {entry.current_streak || 0}
-                    </span>
-                    <span className="inline-flex items-center gap-0.5 text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-white/70 px-1.5 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
-                      <Medal className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" /> {entry.badge_count || 0}
-                    </span>
-                  </div>
-                </div>
 
-                {/* XP / Points */}
-                <div className={`shrink-0 relative z-10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl font-extrabold text-[11px] sm:text-[13px] border shadow-2xs whitespace-nowrap tabular-nums
-                  ${isTop3 ? rankStyle.points : 'bg-slate-50 text-blue-950 border-slate-200'}
-                  ${isMe && !isTop3 ? 'bg-[#2E9BDA] text-white border-[#1d6fa5]' : ''}
-                `}>
-                  {(entry.total_points || 0).toLocaleString()} <span className={`text-[8.5px] sm:text-[9.5px] ${isMe && !isTop3 ? 'text-blue-100' : 'text-slate-400'}`}>XP</span>
-                </div>
-              </motion.div>
-            )
-          })}
-        </motion.div>
+                  {/* Avatar */}
+                  <div className="shrink-0 relative z-10">
+                    <LeaderboardAvatar
+                      entry={entry}
+                      isTop3={isTop3}
+                      rankStyle={rankStyle}
+                      isMe={isMe}
+                      currentUser={currentUser}
+                    />
+                  </div>
+
+                  {/* User Info */}
+                  <div className="flex-1 min-w-0 relative z-10">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <p className={`text-xs sm:text-[13.5px] font-bold truncate ${isTop3 ? rankStyle.text : isMe ? 'text-[#1d6fa5]' : 'text-blue-950'}`}>
+                        {displayName}
+                      </p>
+                      {isMe && (
+                        <span className="bg-[#2E9BDA]/10 text-[#1d6fa5] text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded-full border border-[#2E9BDA]/20 shrink-0">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Badges/Streaks */}
+                    <div className="flex items-center gap-1 sm:gap-1.5 mt-0.5">
+                      <span className="inline-flex items-center gap-0.5 text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-white/70 px-1.5 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                        <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500 shrink-0" /> {entry.current_streak || 0}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-white/70 px-1.5 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                        <Medal className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" /> {entry.badge_count || 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* XP / Points */}
+                  <div className={`shrink-0 relative z-10 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl font-extrabold text-[11px] sm:text-[13px] border shadow-2xs whitespace-nowrap tabular-nums
+                    ${isTop3 ? rankStyle.points : 'bg-slate-50 text-blue-950 border-slate-200'}
+                    ${isMe && !isTop3 ? 'bg-[#2E9BDA] text-white border-[#1d6fa5]' : ''}
+                  `}>
+                    {(entry.total_points || 0).toLocaleString()} <span className={`text-[8.5px] sm:text-[9.5px] ${isMe && !isTop3 ? 'text-blue-100' : 'text-slate-400'}`}>XP</span>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </motion.div>
+
+          {/* See More Button */}
+          {candidateLeaderboard.length > visibleCount && (
+            <div className="p-3 sm:p-4 text-center border-t border-slate-100 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setVisibleCount(candidateLeaderboard.length)}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-[#1d6fa5] hover:text-[#175884] bg-white hover:bg-blue-50/80 active:scale-[0.98] rounded-xl transition-all duration-150 border border-slate-200 hover:border-blue-200 shadow-2xs cursor-pointer"
+              >
+                <span>See More ({candidateLeaderboard.length - visibleCount} remaining)</span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </Card>
   )

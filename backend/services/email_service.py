@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 import httpx
+import jinja2
 import structlog
 
 from core.config import settings
@@ -23,6 +24,11 @@ logger = structlog.get_logger(__name__)
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "email"
 
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
+    autoescape=jinja2.select_autoescape(["html", "xml"]),
+)
+
 _OTP_DISPATCH = {
     OTPPurpose.SIGNUP_VERIFICATION: ("otp_verification.html", "Verify your CareerShala email"),
     OTPPurpose.LOGIN_VERIFICATION: ("otp_verification.html", "Your CareerShala login code"),
@@ -31,27 +37,28 @@ _OTP_DISPATCH = {
 
 
 def _render_template(filename: str, **context) -> str:
-    path = TEMPLATES_DIR / filename
-    if not path.exists():
-        logger.error(f"Template {filename} not found at {path}")
-        return f"<p>Your OTP code is {context.get('otp', '')}</p>"
-    html = path.read_text(encoding="utf-8")
-
-    from datetime import datetime
-
     base_url = settings.FRONTEND_URL.rstrip("/")
-
+    public_base = "https://careershala.tech" if ("localhost" in base_url or "127.0.0.1" in base_url) else base_url
     context.setdefault("base_url", base_url)
-    context.setdefault("logo_url", f"{base_url}/logo_t.png")
+    context.setdefault("logo_url", "https://res.cloudinary.com/docxk5qop/image/upload/v1789955361/careerpilot/brand/careershala_logo.png")
     context.setdefault("support_url", f"{base_url}/support")
     context.setdefault("support_email", getattr(settings, "SUPPORT_EMAIL", "support@careershala.tech") or "support@careershala.tech")
     context.setdefault("careers_email", getattr(settings, "CAREERS_EMAIL", "careers@careershala.tech") or "careers@careershala.tech")
     context.setdefault("info_email", getattr(settings, "INFO_EMAIL", "info@careershala.tech") or "info@careershala.tech")
     context.setdefault("year", str(datetime.now().year))
 
-    for key, value in context.items():
-        html = html.replace("{{" + key + "}}", str(value))
-    return html
+    try:
+        template = _jinja_env.get_template(filename)
+        return template.render(**context)
+    except Exception as e:
+        logger.warning(f"Jinja2 template render exception for {filename}: {e}")
+        path = TEMPLATES_DIR / filename
+        if path.exists():
+            html = path.read_text(encoding="utf-8")
+            for key, value in context.items():
+                html = html.replace("{{" + key + "}}", str(value))
+            return html
+        return f"<p>{context.get('otp', '')}</p>"
 
 
 class EmailService:
@@ -116,13 +123,17 @@ class EmailService:
 
         headers = self._get_api_headers()
 
-        logger.info(
-            "Sending Email via Brevo HTTP API",
-            to=to_email,
-            subject=subject,
-            has_reply_to=bool(reply_to_email),
-            attachment_count=len(attachments or []),
-        )
+        try:
+            safe_subj = str(subject).encode("ascii", "replace").decode("ascii")
+            logger.info(
+                "Sending Email via Brevo HTTP API",
+                to=to_email,
+                subject=safe_subj,
+                has_reply_to=bool(reply_to_email),
+                attachment_count=len(attachments or []),
+            )
+        except Exception:
+            pass
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -131,7 +142,11 @@ class EmailService:
             if response.status_code in (200, 201, 202):
                 data = response.json()
                 message_id = data.get("messageId") or data.get("message_id") or "brevo-success"
-                logger.info("Brevo Email Sent Successfully", to=to_email, subject=subject, message_id=message_id)
+                try:
+                    safe_subj = str(subject).encode("ascii", "replace").decode("ascii")
+                    logger.info("Brevo Email Sent Successfully", to=to_email, subject=safe_subj, message_id=message_id)
+                except Exception:
+                    pass
                 return {"sent": True, "to": to_email, "subject": subject, "message_id": message_id}
             else:
                 logger.error(
@@ -203,6 +218,38 @@ class EmailService:
         )
         return await self._send(to_email, subject, html)
 
+    async def send_team_invitation(
+        self,
+        *,
+        recipient_email: str,
+        inviter_name: str,
+        organization_name: str,
+        role: str,
+        invite_url: str,
+        expires_days: int = 7,
+    ) -> bool:
+        """Sends an enterprise team invitation email via Brevo HTTP API with an acceptance CTA button."""
+        role_label_map = {
+            "recruiter": "Talent Recruiter",
+            "hiring_manager": "Hiring Manager",
+            "interviewer": "Technical Interviewer",
+            "coordinator": "Interview Coordinator",
+            "executive": "Executive Owner",
+        }
+        role_name = role_label_map.get(role.lower(), role.title().replace("_", " "))
+        subject = f"You're invited to join {organization_name} on CareerShala as {role_name}"
+
+        html = _render_template(
+            "team_invitation.html",
+            recipient_email=recipient_email,
+            inviter_name=inviter_name or "An organization administrator",
+            organization_name=organization_name or "CareerShala Enterprise",
+            role_name=role_name,
+            invite_url=invite_url,
+            expiry_days=expires_days,
+        )
+        return await self._send(recipient_email, subject, html)
+
     async def send_certificate(
         self,
         *,
@@ -242,134 +289,19 @@ class EmailService:
             f"&certUrl={encoded_cert_url}"
         )
 
-        base_url = settings.FRONTEND_URL.rstrip("/")
-        logo_url = f"{base_url}/logo_t.png"
-        support_email = settings.SUPPORT_EMAIL or "support@careershala.tech"
-        year = str(datetime.now().year)
-
-        html_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your certificate for {escape(topic)} is ready</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
-    <tr>
-      <td align="center">
-        <!--[if (gte mso 9)|(IE)]>
-        <table role="presentation" width="520" align="center" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td>
-        <![endif]-->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          
-          <!-- Brand Header -->
-          <tr>
-            <td style="padding: 36px 40px 24px 40px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <a href="{base_url}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
-                      <img src="{logo_url}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
-                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
-                        Career<span style="color: #2E9BDA;">Shala</span>
-                      </span>
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <div style="border-top: 1px solid #f1f5f9;"></div>
-            </td>
-          </tr>
-
-          <!-- Content Body -->
-          <tr>
-            <td style="padding: 32px 40px 24px 40px;">
-              <h1 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
-                Your certificate is ready
-              </h1>
-              <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
-                Hi {escape(recipient_name)},
-              </p>
-              <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6;">
-                Congratulations! You have successfully passed the assessment for <strong>{escape(topic)}</strong> ({escape(difficulty)} level) on CareerShala.
-              </p>
-
-              <!-- Certificate Details Table -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 28px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <tr>
-                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 40%;">Topic</td>
-                  <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{escape(topic)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Score</td>
-                  <td style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{score}% ({escape(grade_label)})</td>
-                </tr>
-                <tr>
-                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Issued on</td>
-                  <td style="padding: 12px 16px; font-size: 13px; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{issued_str}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 12px 16px; font-size: 13px; color: #64748b;">Certificate ID</td>
-                  <td style="padding: 12px 16px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace; color: #334155; text-align: right;">{escape(cert_id)}</td>
-                </tr>
-              </table>
-
-              <!-- Primary Action Buttons -->
-              <div style="margin: 0 0 24px 0;">
-                <a href="{escape(public_url)}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; margin-right: 8px; margin-bottom: 8px;">
-                  View & Download PDF →
-                </a>
-                <a href="{escape(linkedin_url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0A66C2; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; margin-bottom: 8px;">
-                  Add to LinkedIn
-                </a>
-              </div>
-
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; line-height: 1.6;">
-                The official PDF certificate is also attached to this email. Anyone can verify its authenticity at{' '}
-                <a href="{escape(verification_url)}" target="_blank" style="color: #2E9BDA; text-decoration: underline;">{escape(verification_url)}</a>.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <div style="border-top: 1px solid #f1f5f9;"></div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 24px 40px 32px 40px;">
-              <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                Sent by CareerShala Technologies Pvt. Ltd. · Credentials Authority
-              </p>
-              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                Questions? <a href="mailto:{support_email}" style="color: #64748b; text-decoration: underline;">{support_email}</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-        <!--[if (gte mso 9)|(IE)]>
-            </td>
-          </tr>
-        </table>
-        <![endif]-->
-      </td>
-    </tr>
-  </table>
-</body>
-</html>"""
+        html_body = _render_template(
+            "certificate_delivery.html",
+            recipient_name=recipient_name,
+            topic=topic,
+            difficulty=difficulty,
+            score=score,
+            grade_label=grade_label,
+            issued_str=issued_str,
+            cert_id=cert_id,
+            public_url=public_url,
+            linkedin_url=linkedin_url,
+            verification_url=verification_url,
+        )
 
         pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
         filename = f"CareerShala_Certificate_{topic.replace(' ', '_')}.pdf"
@@ -531,143 +463,24 @@ class EmailService:
 
         attachments_block = "<p style='margin:0;font-size:13px;color:#94a3b8;font-style:italic;'>No attachments uploaded with this ticket.</p>" if not attachment_html_items else f"<div>{''.join(attachment_html_items)}</div>"
 
-        html_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Support ticket #{ticket_id}</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
-    <tr>
-      <td align="center">
-        <!--[if (gte mso 9)|(IE)]>
-        <table role="presentation" width="560" align="center" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td>
-        <![endif]-->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          
-          <!-- Brand Header -->
-          <tr>
-            <td style="padding: 36px 40px 24px 40px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <a href="{base_url}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
-                      <img src="{logo_url}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
-                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
-                        Career<span style="color: #2E9BDA;">Shala</span> Support
-                      </span>
-                    </a>
-                  </td>
-                  <td align="right">
-                    <span style="font-size: 12px; font-weight: 600; color: #64748b; background-color: #f1f5f9; padding: 4px 10px; border-radius: 6px;">
-                      #{ticket_id}
-                    </span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <div style="border-top: 1px solid #f1f5f9;"></div>
-            </td>
-          </tr>
-
-          <!-- Content Body -->
-          <tr>
-            <td style="padding: 32px 40px 24px 40px;">
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px;">
-                {ticket_category} · {ticket_priority} priority
-              </div>
-              <h1 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.35;">
-                {ticket_subject}
-              </h1>
-
-              <!-- Reporter Meta Table -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 35%;">Reporter</td>
-                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{user_name}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Email</td>
-                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">
-                    <a href="mailto:{user_email}" style="color: #2E9BDA; text-decoration: none;">{user_email}</a>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Plan</td>
-                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">{user_plan}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Submitted</td>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: right;">{created_time}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b;">Client Info</td>
-                  <td style="padding: 10px 14px; font-size: 12px; color: #64748b; text-align: right;">{browser_info} · {os_info}</td>
-                </tr>
-              </table>
-
-              <!-- Description Body -->
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
-                Description
-              </div>
-              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: #1e293b; margin-bottom: 24px;">
-                {description}
-              </div>
-
-              <!-- Attachments -->
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
-                Attachments
-              </div>
-              <div style="margin-bottom: 28px;">
-                {attachments_block}
-              </div>
-
-              <!-- Action Reply Button -->
-              <div style="margin-bottom: 12px;">
-                <a href="mailto:{user_email}?subject=Re:%20[Support%20Ticket%20{ticket_id}]%20{quote(ticket_subject)}" 
-                   style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
-                  Reply to reporter →
-                </a>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <div style="border-top: 1px solid #f1f5f9;"></div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 24px 40px 32px 40px;">
-              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                Internal Support Dispatch · CareerShala Technologies Pvt. Ltd.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-        <!--[if (gte mso 9)|(IE)]>
-            </td>
-          </tr>
-        </table>
-        <![endif]-->
-      </td>
-    </tr>
-  </table>
-</body>
-</html>"""
+        html_body = _render_template(
+            "support_ticket.html",
+            ticket_id=ticket_id,
+            ticket_subject=ticket_subject,
+            ticket_priority=ticket_priority,
+            ticket_category=ticket_category,
+            user_name=user_name,
+            user_email=user_email,
+            user_plan=user_plan,
+            description=description,
+            created_time=created_time,
+            browser_info=browser_info,
+            os_info=os_info,
+            page_url=page_url,
+            priority_bg=priority_bg,
+            priority_color=priority_color,
+            attachments_block=attachments_block,
+        )
 
         return support_email, subject, "\n".join(text_lines), html_body
 
@@ -703,8 +516,10 @@ class EmailService:
         applicant_name: str,
         applicant_email: str,
         role_title: str,
-        portfolio_url: Optional[str],
-        cover_letter: str,
+        linkedin_url: Optional[str] = None,
+        github_url: Optional[str] = None,
+        portfolio_url: Optional[str] = None,
+        cover_letter: Optional[str] = None,
         resume_bytes: Optional[bytes] = None,
         resume_filename: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -712,149 +527,47 @@ class EmailService:
         careers_email = getattr(settings, "CAREERS_EMAIL", None) or "careers@careershala.tech"
         subject = f"💼 New Job Application: {applicant_name} — {role_title}"
 
-        portfolio_html = (
-            f'<a href="{escape(portfolio_url)}" target="_blank" style="color:#2E9BDA; font-weight:bold;">{escape(portfolio_url)}</a>'
-            if portfolio_url
-            else '<span style="color:#94a3b8; font-style:italic;">Not provided</span>'
-        )
+        def _fmt_link(url: Optional[str]) -> str:
+            if not url:
+                return '<span style="color:#9ca3af; font-style:italic;">Not provided</span>'
+            clean_url = url.strip()
+            href = clean_url if clean_url.startswith("http") else f"https://{clean_url}"
+            return f'<a href="{escape(href)}" target="_blank" style="color:#2563eb; text-decoration:none; font-weight:500;">{escape(clean_url)}</a>'
 
-        formatted_cover = escape(cover_letter).replace("\n", "<br/>")
+        linkedin_html = _fmt_link(linkedin_url)
+        github_html = _fmt_link(github_url)
+        portfolio_html = _fmt_link(portfolio_url) if portfolio_url else ""
+
+        formatted_cover = escape(cover_letter or "").replace("\n", "<br/>")
+        if not formatted_cover.strip():
+            formatted_cover = '<span style="color:#9ca3af; font-style:italic;">No cover letter provided.</span>'
 
         resume_status_html = (
-            f'<span style="color:#10b981; font-weight:bold;">Attached ({escape(resume_filename)})</span>'
+            f'<span style="color:#16a34a; font-weight:600;">Attached ({escape(resume_filename)})</span>'
             if resume_bytes and resume_filename
-            else '<span style="color:#94a3b8; font-style:italic;">No file attached</span>'
+            else '<span style="color:#9ca3af; font-style:italic;">No file attached</span>'
         )
 
-        base_url = settings.FRONTEND_URL.rstrip("/")
-        logo_url = f"{base_url}/logo_t.png"
-        careers_email = getattr(settings, "CAREERS_EMAIL", None) or "careers@careershala.tech"
-        year = str(datetime.now().year)
+        applied_date = datetime.now(timezone.utc).strftime("%B %d, %Y • %H:%M UTC")
+        
+        # Extract 2-letter initials
+        name_parts = [p for p in applicant_name.strip().split() if p]
+        applicant_initials = (name_parts[0][0] + (name_parts[-1][0] if len(name_parts) > 1 else "")) if name_parts else "CS"
+        applicant_initials = applicant_initials.upper()
 
-        html_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Application: {escape(applicant_name)} — {escape(role_title)}</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; padding: 48px 16px;">
-    <tr>
-      <td align="center">
-        <!--[if (gte mso 9)|(IE)]>
-        <table role="presentation" width="560" align="center" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td>
-        <![endif]-->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          
-          <!-- Brand Header -->
-          <tr>
-            <td style="padding: 36px 40px 24px 40px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <a href="{base_url}" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center;">
-                      <img src="{logo_url}" alt="CareerShala" width="30" height="30" style="display: block; width: 30px; height: 30px; border: 0; vertical-align: middle;" />
-                      <span style="font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-left: 10px; vertical-align: middle;">
-                        Career<span style="color: #2E9BDA;">Shala</span> Careers
-                      </span>
-                    </a>
-                  </td>
-                  <td align="right">
-                    <span style="font-size: 12px; font-weight: 600; color: #0284c7; background-color: #f0f9ff; padding: 4px 10px; border-radius: 6px;">
-                      New Applicant
-                    </span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <div style="border-top: 1px solid #f1f5f9;"></div>
-            </td>
-          </tr>
-
-          <!-- Content Body -->
-          <tr>
-            <td style="padding: 32px 40px 24px 40px;">
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px;">
-                Application Received
-              </div>
-              <h1 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;">
-                {escape(applicant_name)}
-              </h1>
-              <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.5;">
-                Applied for <strong>{escape(role_title)}</strong>
-              </p>
-
-              <!-- Applicant Details Table -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 35%;">Candidate Email</td>
-                  <td style="padding: 10px 14px; font-size: 13px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9; text-align: right;">
-                    <a href="mailto:{escape(applicant_email)}" style="color: #2E9BDA; text-decoration: none;">{escape(applicant_email)}</a>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Portfolio / Profile</td>
-                  <td style="padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f1f5f9; text-align: right;">{portfolio_html}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 14px; font-size: 13px; color: #64748b;">Resume</td>
-                  <td style="padding: 10px 14px; font-size: 13px; text-align: right;">{resume_status_html}</td>
-                </tr>
-              </table>
-
-              <!-- Cover Letter / Pitch -->
-              <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
-                Note / Cover Letter
-              </div>
-              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: #1e293b; margin-bottom: 24px;">
-                {formatted_cover}
-              </div>
-
-              <!-- Quick Reply Action -->
-              <div style="margin-bottom: 12px;">
-                <a href="mailto:{escape(applicant_email)}?subject=Re:%20Application%20for%20{quote(role_title)}%20at%20CareerShala" 
-                   style="display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; letter-spacing: -0.01em;">
-                  Reply to candidate →
-                </a>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <div style="border-top: 1px solid #f1f5f9;"></div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 24px 40px 32px 40px;">
-              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-                CareerShala Talent Acquisition · Confidential hiring dispatch to <a href="mailto:{careers_email}" style="color: #64748b; text-decoration: underline;">{careers_email}</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-        <!--[if (gte mso 9)|(IE)]>
-            </td>
-          </tr>
-        </table>
-        <![endif]-->
-      </td>
-    </tr>
-  </table>
-</body>
-</html>"""
+        html_body = _render_template(
+            "career_application.html",
+            applicant_name=applicant_name,
+            applicant_initials=applicant_initials,
+            role_title=role_title,
+            applicant_email=applicant_email,
+            linkedin_html=linkedin_html,
+            github_html=github_html,
+            portfolio_html=portfolio_html,
+            resume_status_html=resume_status_html,
+            formatted_cover=formatted_cover,
+            applied_date=applied_date,
+        )
 
         attachments_payload = []
         if resume_bytes and resume_filename:
@@ -1045,3 +758,269 @@ async def send_application_via_gmail_api(
         candidate_email=candidate_email or settings.mail_sender["email"],
         candidate_name=candidate_name or settings.mail_sender["name"],
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NIGHTLY AI JOB ALERT EMAIL SERVICE (SMTP & MIME)
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def send_job_alert_email(
+    to_email: str,
+    candidate_name: str,
+    matched_jobs: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Sends a nightly AI Job Alert email to a candidate with high-matching opportunities.
+    Uses built-in smtplib and email.mime with non-blocking async execution.
+    Configured via SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FROM_EMAIL env vars.
+    Falls back gracefully to simulated delivery in dev environments if SMTP is unconfigured.
+    """
+    import asyncio
+    import os
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    if not to_email or not matched_jobs:
+        return {"sent": False, "error": "Recipient email and matched jobs are required"}
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    from_email = os.getenv("FROM_EMAIL", getattr(settings, "MAIL_FROM_EMAIL", None) or "alerts@careershala.tech")
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+
+    count = len(matched_jobs)
+    plural_roles = "roles" if count != 1 else "role"
+    subject = f"New job recommendation{'s' if count != 1 else ''} matching your profile | CareerShala"
+
+    # 1. Construct Premium Modern Job Cards HTML
+    job_cards_html = []
+    color_palette = [
+        ("#4f46e5", "#6366f1"),
+        ("#0284c7", "#38bdf8"),
+        ("#0d9488", "#14b8a6"),
+        ("#7c3aed", "#a855f7"),
+        ("#2563eb", "#60a5fa"),
+    ]
+
+    for idx, job in enumerate(matched_jobs):
+        title = escape(str(job.get("title") or "Software Engineer"))
+        raw_company = str(job.get("company_name") or job.get("company") or "CareerShala Partner")
+        company = escape(raw_company)
+        raw_loc = str(job.get("location") or "Remote").strip()
+        raw_mode = str(job.get("work_mode") or job.get("job_type") or job.get("type") or "").strip()
+        salary = escape(str(job.get("salary_range") or job.get("salary") or "")) if (job.get("salary_range") or job.get("salary")) else None
+        match_score = int(round(float(job.get("match_score", 85))))
+        job_id = str(job.get("id") or job.get("_id") or "")
+        job_url = f"{frontend_url}/jobs"
+
+        # Company logo resolution: dynamically use employer's company_logo_url
+        raw_logo = (
+            job.get("company_logo_url")
+            or job.get("company_logo")
+            or job.get("logo_url")
+            or job.get("logo")
+        )
+        c_initial = escape(raw_company[:1].upper() if raw_company else "C")
+        c1, c2 = color_palette[abs(hash(raw_company)) % len(color_palette)]
+
+        # Resolve logo to an absolute HTTPS URL if provided by employer
+        logo_url = None
+        if raw_logo:
+            raw_logo_str = str(raw_logo).strip()
+            # Tenant isolation safeguard: If raw_logo points to the platform logo but company is not CareerShala, ignore it
+            if "careershala_logo" in raw_logo_str.lower() and "careershala" not in raw_company.lower():
+                logo_url = None
+            elif raw_logo_str.startswith("http://") or raw_logo_str.startswith("https://"):
+                logo_url = raw_logo_str
+            elif raw_logo_str.startswith("data:image/"):
+                from services.cloudinary_service import upload_base64_company_logo
+                c_id = raw_company.lower().replace(" ", "-") if raw_company else "company"
+                uploaded_url = await upload_base64_company_logo(raw_logo_str, company_id=c_id)
+                if uploaded_url:
+                    logo_url = uploaded_url
+            elif raw_logo_str.startswith("/"):
+                logo_url = f"{frontend_url}/{raw_logo_str.lstrip('/')}"
+            elif "." in raw_logo_str:
+                logo_url = f"{frontend_url}/{raw_logo_str.lstrip('/')}"
+
+        # Template logic: Prioritize image when logo_url exists, fallback to text avatar if missing
+        if logo_url:
+            logo_html = f"""
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 auto;">
+                <tr>
+                    <td style="width:42px;height:42px;text-align:center;vertical-align:middle;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;padding:0;">
+                        <img src="{escape(logo_url)}" alt="{company}" width="40" height="40" style="display:block;margin:0 auto;width:40px;height:40px;border-radius:6px;object-fit:contain;border:0;outline:none;" />
+                    </td>
+                </tr>
+            </table>
+            """
+        else:
+            logo_html = f"""
+            <div style="width:42px;height:42px;border-radius:8px;background:linear-gradient(135deg, {c1} 0%, {c2} 100%);text-align:center;line-height:42px;color:#ffffff;font-size:16px;font-weight:700;">
+                {c_initial}
+            </div>
+            """
+
+        # Metadata badges
+        meta_parts = []
+        if raw_loc and raw_mode and raw_loc.lower() == raw_mode.lower():
+            meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_loc)}</span>')
+        else:
+            if raw_loc:
+                meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_loc)}</span>')
+            if raw_mode:
+                meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_mode)}</span>')
+
+        if salary:
+            meta_parts.append(f'<span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-right:4px;">{salary}</span>')
+
+        meta_line_html = "".join(meta_parts)
+
+        # Skills badges HTML
+        matched_skills = job.get("matched_skills") or job.get("required_skills") or job.get("skills") or []
+        skills_pills = "".join(
+            f'<span style="display:inline-block;padding:3px 8px;margin:2px 4px 2px 0;background-color:#f1f5f9;color:#334155;border-radius:4px;font-size:11px;font-weight:500;">{escape(str(s))}</span>'
+            for s in matched_skills[:4]
+        )
+
+        skills_section = (
+            f'<div style="margin-top:10px;">{skills_pills}</div>'
+            if skills_pills
+            else ""
+        )
+
+        job_cards_html.append(f"""
+        <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:18px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td valign="top" style="width:44px;padding-right:12px;">
+                        {logo_html}
+                    </td>
+                    <td valign="top" style="padding-right:10px;">
+                        <a href="{job_url}" target="_blank" style="text-decoration:none;font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;display:inline-block;">
+                            {title}
+                        </a>
+                        <div style="font-size:13px;font-weight:500;color:#4b5563;margin-top:2px;">
+                            {company}
+                        </div>
+                    </td>
+                    <td valign="top" align="right" style="text-align:right;width:86px;">
+                        <span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">
+                            {match_score}% Match
+                        </span>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="margin-top:10px;">
+                {meta_line_html}
+            </div>
+
+            {skills_section}
+
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td>
+                            <a href="{job_url}" target="_blank" style="display:inline-block;background-color:#4F46E5;color:#ffffff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600;box-shadow:0 1px 2px rgba(79,70,229,0.2);">
+                                View Role &amp; Apply &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        """)
+
+    job_cards_rendered = "\n".join(job_cards_html)
+
+    # 2. Render HTML Email via Jinja2 Template
+    html_template = _render_template(
+        "job_alert.html",
+        subject=subject,
+        count=count,
+        plural_roles=plural_roles,
+        candidate_name=candidate_name or "there",
+        job_cards_rendered=job_cards_rendered,
+        frontend_url=frontend_url,
+    )
+
+    # Plain text alternative
+    text_lines = [
+        f"Hi {candidate_name or 'there'},",
+        f"\nWe found {count} new {plural_roles} matching your profile on CareerShala:\n",
+    ]
+    for j in matched_jobs:
+        text_lines.append(f"- {j.get('title')} at {j.get('company_name')} ({j.get('match_score', 80)}% Match)")
+        text_lines.append(f"  Location: {j.get('location')} ({j.get('work_mode')})")
+        text_lines.append(f"  View: {frontend_url}/jobs\n")
+    text_lines.append(f"View all matches: {frontend_url}/jobs")
+    plain_text = "\n".join(text_lines)
+
+    # 3. Assemble MIME message
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"CareerShala Job Alerts <{from_email}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+    msg.attach(MIMEText(html_template, "html", "utf-8"))
+    msg_bytes = msg.as_bytes()
+
+    # 4. Dispatch via Brevo HTTP API (primary) or SMTP fallback
+    if getattr(settings, "BREVO_API_KEY", None):
+        try:
+            email_svc = EmailService()
+            brevo_res = await email_svc._send_brevo_email(
+                to_email=to_email,
+                to_name=candidate_name,
+                subject=subject,
+                html_body=html_template,
+                text_body=plain_text,
+                sender_name="CareerShala Job Alerts",
+            )
+            if brevo_res.get("sent"):
+                logger.info("Job alert email dispatched via Brevo", to=to_email, count=count)
+                return {"sent": True, "method": "brevo", "to": to_email, "count": count}
+            else:
+                logger.warning("Brevo returned error for job alert", res=brevo_res)
+        except Exception as exc:
+            logger.warning("Brevo dispatch exception for job alert, falling back to SMTP", error=str(exc))
+
+    # 5. Synchronous SMTP transport helper
+    def _send_smtp_sync() -> None:
+        server = smtplib.SMTP(smtp_host, smtp_port, timeout=20)
+        try:
+            server.ehlo()
+            if server.has_extn("STARTTLS"):
+                server.starttls()
+                server.ehlo()
+            if smtp_user and smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.sendmail(from_email, [to_email], msg_bytes)
+        finally:
+            try:
+                server.quit()
+            except Exception:
+                pass
+
+    # 6. Dispatch via SMTP or simulate in development
+    if smtp_user and smtp_password:
+        try:
+            await asyncio.to_thread(_send_smtp_sync)
+            logger.info("Job alert email dispatched via SMTP", to=to_email, count=count)
+            return {"sent": True, "method": "smtp", "to": to_email, "count": count}
+        except Exception as exc:
+            logger.error("Failed to send job alert via SMTP", to=to_email, error=str(exc))
+            return {"sent": False, "error": str(exc), "to": to_email}
+    else:
+        logger.info(
+            "SMTP credentials not fully configured; simulated job alert email dispatch",
+            to=to_email,
+            job_count=count,
+            host=smtp_host,
+        )
+        return {"sent": True, "simulated": True, "to": to_email, "count": count}
+

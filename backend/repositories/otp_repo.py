@@ -11,14 +11,12 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from models.otp_model import OTPModel, OTPPurpose
 
 
-class OTPRepository:
+from repositories.base_repo import BaseRepository
+
+
+class OTPRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db.otps
-
-    def _serialize(self, doc: dict) -> dict:
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-        return doc
 
     async def create(self, email: str, purpose: OTPPurpose, otp_hash: str,
                       expire_minutes: int, max_attempts: int) -> OTPModel:

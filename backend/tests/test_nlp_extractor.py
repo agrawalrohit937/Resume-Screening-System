@@ -79,3 +79,28 @@ def test_extract_resume_data_deterministic():
     assert result["total_experience_years"] == 5.0
     assert result["education_level"] == "Bachelor's Degree"
     assert result["contact_info"]["email"] == "john@gmail.com"
+
+
+def test_extract_skills_contextual_negation():
+    sample_text = """
+    We are seeking a Backend Developer proficient in Python and FastAPI.
+    Note: React is not required for this role.
+    No Docker needed as deployment is fully managed.
+    Optional: Kubernetes experience is a bonus.
+    Candidates without AWS experience are welcome.
+    Candidate must have strong PostgreSQL and Redis background.
+    """
+    extracted = extract_skills_deterministic(sample_text)
+
+    # Required skills should be present
+    assert "Python" in extracted
+    assert "FastAPI" in extracted
+    assert "PostgreSQL" in extracted
+    assert "Redis" in extracted
+
+    # Negated / optional / bonus / without skills should be discarded
+    assert "React" not in extracted
+    assert "Docker" not in extracted
+    assert "Kubernetes" not in extracted
+    assert "AWS" not in extracted
+

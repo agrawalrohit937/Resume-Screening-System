@@ -29,6 +29,8 @@ import {
   CHANNEL_CONFIG,
 } from '../../services/revenueRecoveryApi'
 import { useSpeechToText, useTextToSpeech } from '../../hooks/useSpeech'
+import CustomDropdown from '../common/CustomDropdown'
+import { formatDate, formatTime } from '../../utils/formatters'
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 function formatCurrency(amount) {
@@ -38,18 +40,6 @@ function formatCurrency(amount) {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(amount)
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
 const PIE_COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6366F1']
@@ -614,45 +604,48 @@ export default function RevenueRecoveryTab() {
             </div>
 
             {/* Risk Filter */}
-            <select
+            <CustomDropdown
               value={filters.risk_level}
-              onChange={(e) => setFilters(prev => ({ ...prev, risk_level: e.target.value, page: 1 }))}
-              className="text-xs rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-medium text-slate-700 focus:outline-none"
-            >
-              <option value="">All Risk Levels</option>
-              <option value="LOW">Low Risk</option>
-              <option value="MEDIUM">Medium Risk</option>
-              <option value="HIGH">High Risk</option>
-            </select>
+              onChange={(val) => setFilters(prev => ({ ...prev, risk_level: val, page: 1 }))}
+              options={[
+                { value: '', label: 'All Risk Levels' },
+                { value: 'LOW', label: 'Low Risk' },
+                { value: 'MEDIUM', label: 'Medium Risk' },
+                { value: 'HIGH', label: 'High Risk' }
+              ]}
+              className="min-w-[130px]"
+            />
 
             {/* Status Filter */}
-            <select
+            <CustomDropdown
               value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value, page: 1 }))}
-              className="text-xs rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-medium text-slate-700 focus:outline-none"
-            >
-              <option value="">All Statuses</option>
-              <option value="AT_RISK">At Risk</option>
-              <option value="PAYMENT_FAILED">Payment Failed</option>
-              <option value="RECOVERY_ACTIVE">Recovery Active</option>
-              <option value="CONTACTED">Contacted</option>
-              <option value="RETRY_SCHEDULED">Retry Scheduled</option>
-              <option value="RECOVERED">Recovered</option>
-              <option value="ESCALATED">Escalated</option>
-              <option value="STOPPED">Stopped</option>
-            </select>
+              onChange={(val) => setFilters(prev => ({ ...prev, status: val, page: 1 }))}
+              options={[
+                { value: '', label: 'All Statuses' },
+                { value: 'AT_RISK', label: 'At Risk' },
+                { value: 'PAYMENT_FAILED', label: 'Payment Failed' },
+                { value: 'RECOVERY_ACTIVE', label: 'Recovery Active' },
+                { value: 'CONTACTED', label: 'Contacted' },
+                { value: 'RETRY_SCHEDULED', label: 'Retry Scheduled' },
+                { value: 'RECOVERED', label: 'Recovered' },
+                { value: 'ESCALATED', label: 'Escalated' },
+                { value: 'STOPPED', label: 'Stopped' }
+              ]}
+              className="min-w-[145px]"
+            />
 
             {/* Channel Filter */}
-            <select
+            <CustomDropdown
               value={filters.channel}
-              onChange={(e) => setFilters(prev => ({ ...prev, channel: e.target.value, page: 1 }))}
-              className="text-xs rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-medium text-slate-700 focus:outline-none"
-            >
-              <option value="">All Channels</option>
-              <option value="EMAIL">Email</option>
-              <option value="IN_APP">In-App</option>
-              <option value="VOICE">Voice (AI)</option>
-            </select>
+              onChange={(val) => setFilters(prev => ({ ...prev, channel: val, page: 1 }))}
+              options={[
+                { value: '', label: 'All Channels' },
+                { value: 'EMAIL', label: 'Email' },
+                { value: 'IN_APP', label: 'In-App' },
+                { value: 'VOICE', label: 'Voice (AI)' }
+              ]}
+              className="min-w-[135px]"
+            />
 
             {/* HITL Toggle */}
             <button

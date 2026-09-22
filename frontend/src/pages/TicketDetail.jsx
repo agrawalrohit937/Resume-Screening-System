@@ -30,23 +30,7 @@ import {
   PRIORITY_CONFIG,
   CATEGORY_LABELS,
 } from '../services/supportApi'
-
-function formatDate(dateStr) {
-  if (!dateStr) return ''
-  try {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return ''
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return ''
-  }
-}
+import { formatDate, formatDateTime } from '../utils/formatters'
 
 function getRelativeTime(dateStr) {
   if (!dateStr) return ''

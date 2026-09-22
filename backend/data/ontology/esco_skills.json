@@ -1,0 +1,186 @@
+{
+  "skills": [
+    {
+      "id": "esco:skill:001",
+      "canonical": "Nursing Care",
+      "aliases": ["patient care", "nursing", "clinical nursing", "bedside care"],
+      "category": "Healthcare",
+      "source": "esco",
+      "labels": {
+        "en": "Nursing Care",
+        "de": "Krankenpflege",
+        "fr": "Soins infirmiers",
+        "es": "Cuidados de enfermería",
+        "hi": "नर्सिंग देखभाल"
+      }
+    },
+    {
+      "id": "esco:skill:002",
+      "canonical": "Clinical Pharmacology",
+      "aliases": ["pharmacology", "drug administration", "medication management"],
+      "category": "Healthcare",
+      "source": "esco",
+      "labels": {"en": "Clinical Pharmacology", "hi": "क्लिनिकल फार्माकोलॉजी"}
+    },
+    {
+      "id": "esco:skill:003",
+      "canonical": "Emergency Medicine",
+      "aliases": ["triage", "emergency response", "trauma care", "icu care"],
+      "category": "Healthcare",
+      "source": "esco",
+      "labels": {"en": "Emergency Medicine", "hi": "आपातकालीन चिकित्सा"}
+    },
+    {
+      "id": "esco:skill:004",
+      "canonical": "Statutory Auditing",
+      "aliases": ["financial audit", "statutory audit", "internal audit", "tax audit"],
+      "category": "Legal & Finance",
+      "source": "esco",
+      "labels": {"en": "Statutory Auditing", "hi": "वैधानिक लेखा परीक्षा"}
+    },
+    {
+      "id": "esco:skill:005",
+      "canonical": "Corporate Law",
+      "aliases": ["company law", "commercial law", "contract negotiation", "mergers and acquisitions"],
+      "category": "Legal & Finance",
+      "source": "esco",
+      "labels": {"en": "Corporate Law", "hi": "कॉर्पोरेट कानून"}
+    },
+    {
+      "id": "esco:skill:006",
+      "canonical": "Taxation Law",
+      "aliases": ["direct tax", "indirect tax", "gst compliance", "income tax"],
+      "category": "Legal & Finance",
+      "source": "esco",
+      "labels": {"en": "Taxation Law", "hi": "कराधान कानून"}
+    },
+    {
+      "id": "esco:skill:007",
+      "canonical": "Shielded Metal Arc Welding",
+      "aliases": ["arc welding", "smaw", "manual metal arc welding", "stick welding"],
+      "category": "Skilled Trades",
+      "source": "esco",
+      "labels": {"en": "Shielded Metal Arc Welding", "hi": "आर्क वेल्डिंग"}
+    },
+    {
+      "id": "esco:skill:008",
+      "canonical": "Gas Tungsten Arc Welding",
+      "aliases": ["tig welding", "gtaw", "tungsten inert gas welding"],
+      "category": "Skilled Trades",
+      "source": "esco",
+      "labels": {"en": "Gas Tungsten Arc Welding", "hi": "टीआईजी वेल्डिंग"}
+    },
+    {
+      "id": "esco:skill:009",
+      "canonical": "Industrial Electrical Wiring",
+      "aliases": ["electrical maintenance", "plc wiring", "switchgear wiring", "control panel wiring"],
+      "category": "Skilled Trades",
+      "source": "esco",
+      "labels": {"en": "Industrial Electrical Wiring", "hi": "औद्योगिक विद्युत वायरिंग"}
+    },
+    {
+      "id": "esco:skill:010",
+      "canonical": "Classroom Pedagogy",
+      "aliases": ["lesson planning", "curriculum delivery", "student assessment", "pedagogical methods"],
+      "category": "Teaching",
+      "source": "esco",
+      "labels": {"en": "Classroom Pedagogy", "hi": "कक्षा शिक्षण शास्त्र"}
+    },
+    {
+      "id": "esco:skill:011",
+      "canonical": "Educational Assessment",
+      "aliases": ["grading", "formative assessment", "summative evaluation", "student evaluation"],
+      "category": "Teaching",
+      "source": "esco",
+      "labels": {"en": "Educational Assessment", "hi": "शैक्षिक मूल्यांकन"}
+    },
+    {
+      "id": "esco:skill:012",
+      "canonical": "Enterprise B2B Sales",
+      "aliases": ["b2b sales", "solution selling", "quota attainment", "enterprise sales", "account executive"],
+      "category": "Sales",
+      "source": "esco",
+      "labels": {"en": "Enterprise B2B Sales", "hi": "एंटरप्राइज बी2बी बिक्री"}
+    },
+    {
+      "id": "esco:skill:013",
+      "canonical": "Pipeline Management",
+      "aliases": ["sales pipeline", "lead generation", "funnel management", "deal closing"],
+      "category": "Sales",
+      "source": "esco",
+      "labels": {"en": "Pipeline Management", "hi": "पाइपलाइन प्रबंधन"}
+    },
+    {
+      "id": "esco:skill:014",
+      "canonical": "Food Safety Standards",
+      "aliases": ["food hygiene", "haccp", "fssai compliance", "servsafe", "kitchen sanitation"],
+      "category": "Hospitality & Retail",
+      "source": "esco",
+      "labels": {"en": "Food Safety Standards", "hi": "खाद्य सुरक्षा मानक"}
+    },
+    {
+      "id": "esco:skill:015",
+      "canonical": "Culinary Preparation",
+      "aliases": ["cooking", "food prep", "culinary arts", "menu execution"],
+      "category": "Hospitality & Retail",
+      "source": "esco",
+      "labels": {"en": "Culinary Preparation", "hi": "पाक कला तैयारी"}
+    },
+    {
+      "id": "esco:skill:016",
+      "canonical": "Heavy Vehicle Operation",
+      "aliases": ["hmv driving", "commercial driving", "cdl driving", "truck driving", "fleet driving"],
+      "category": "Logistics & Operations",
+      "source": "esco",
+      "labels": {"en": "Heavy Vehicle Operation", "hi": "भारी वाहन संचालन"}
+    },
+    {
+      "id": "esco:skill:017",
+      "canonical": "Warehouse Management Systems",
+      "aliases": ["wms", "inventory control", "dispatch planning", "stocktaking"],
+      "category": "Logistics & Operations",
+      "source": "esco",
+      "labels": {"en": "Warehouse Management Systems", "hi": "गोदाम प्रबंधन प्रणाली"}
+    },
+    {
+      "id": "esco:skill:018",
+      "canonical": "User Experience Design",
+      "aliases": ["ux design", "interaction design", "user research", "wireframing", "prototyping"],
+      "category": "Creative & Design",
+      "source": "esco",
+      "labels": {"en": "User Experience Design", "hi": "उपयोगकर्ता अनुभव डिज़ाइन"}
+    },
+    {
+      "id": "esco:skill:019",
+      "canonical": "Visual Design",
+      "aliases": ["ui design", "graphic design", "figma design", "typography", "design systems"],
+      "category": "Creative & Design",
+      "source": "esco",
+      "labels": {"en": "Visual Design", "hi": "दृश्य डिज़ाइन"}
+    },
+    {
+      "id": "esco:skill:020",
+      "canonical": "Scientific Research Methodology",
+      "aliases": ["experimental design", "peer review", "academic publishing", "data collection", "grant writing"],
+      "category": "Academic Research",
+      "source": "esco",
+      "labels": {"en": "Scientific Research Methodology", "hi": "वैज्ञानिक अनुसंधान पद्धति"}
+    },
+    {
+      "id": "esco:skill:021",
+      "canonical": "Statistical Modeling",
+      "aliases": ["biostatistics", "hypothesis testing", "regression analysis", "anova", "econometrics"],
+      "category": "Data Analytics",
+      "source": "esco",
+      "labels": {"en": "Statistical Modeling", "hi": "सांख्यिकीय मॉडलिंग"}
+    },
+    {
+      "id": "esco:skill:022",
+      "canonical": "Business Intelligence Reporting",
+      "aliases": ["power bi", "tableau", "bi reporting", "dashboarding", "data visualization"],
+      "category": "Data Analytics",
+      "source": "esco",
+      "labels": {"en": "Business Intelligence Reporting", "hi": "बिजनेस इंटेलिजेंस रिपोर्टिंग"}
+    }
+  ]
+}

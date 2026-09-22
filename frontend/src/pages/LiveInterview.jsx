@@ -392,7 +392,7 @@ export default function LiveInterviewV2() {
   useEffect(() => {
     if (avatarVideoRef.current) {
       if (tts.speaking) {
-        avatarVideoRef.current.play().catch((e) => console.log("Video play blocked:", e));
+        avatarVideoRef.current.play().catch(() => {});
       } else {
         avatarVideoRef.current.pause();
         avatarVideoRef.current.currentTime = 0; 

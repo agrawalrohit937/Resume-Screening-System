@@ -33,8 +33,8 @@ class EnhancementState(TypedDict):
     required_skills: List[str]
     enhanced_data: Optional[dict]
     missing_critical_info: List[str]
-    # Exact keywords the Strict ATS engine could NOT find via literal string
-    # search (services/strict_ats_service.py).
+    # Exact keywords the ATS engine could NOT find via literal string
+    # search (services/scoring_engine.py).
     strict_missing_keywords: List[str]
     # NEW — HITL wizard bundle. Shape (all keys optional):
     #   {
@@ -94,11 +94,68 @@ def _merge_verified_links(enhanced_data: dict, links: Optional[Dict[str, Optiona
     return enhanced_data
 
 
+# ── PII Masking Helpers ────────────────────────────────────────────────────────
+EMAIL_REGEX = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
+PHONE_REGEX = re.compile(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b')
+
+def mask_pii(text: str) -> tuple[str, Dict[str, str]]:
+    """
+    Masks emails and phone numbers in raw text before sending to LLM.
+    Returns the sanitized text and a map of placeholder -> original value.
+    """
+    pii_map: Dict[str, str] = {}
+    if not text:
+        return text, pii_map
+
+    email_idx = 1
+    def _mask_email(m):
+        nonlocal email_idx
+        token = f"[EMAIL_REDACTED_{email_idx}]"
+        email_idx += 1
+        pii_map[token] = m.group(0)
+        return token
+
+    text = EMAIL_REGEX.sub(_mask_email, text)
+
+    phone_idx = 1
+    def _mask_phone(m):
+        nonlocal phone_idx
+        token = f"[PHONE_REDACTED_{phone_idx}]"
+        phone_idx += 1
+        pii_map[token] = m.group(0)
+        return token
+
+    text = PHONE_REGEX.sub(_mask_phone, text)
+    return text, pii_map
+
+
+def unmask_pii(obj: Any, pii_map: Dict[str, str]) -> Any:
+    """
+    Recursively replaces redaction tokens with original values across dicts, lists, and strings.
+    """
+    if not pii_map:
+        return obj
+
+    if isinstance(obj, str):
+        res = obj
+        for token, original in pii_map.items():
+            if token in res:
+                res = res.replace(token, original)
+        return res
+    elif isinstance(obj, dict):
+        return {k: unmask_pii(v, pii_map) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [unmask_pii(item, pii_map) for item in obj]
+    return obj
+
+
 # ── Node 1: Enhance Resume via Gemini LLM ─────────────────────────────────────
 async def enhance_resume_content(state: EnhancementState) -> dict:
     """
-    Calls Google Gemini LLM (gemini-1.5-flash) with structured JSON output and
+    Calls Google Gemini LLM (gemini-2.5-flash) with structured JSON output and
     automatic 5-key pool rotation to enhance the resume.
+    Applies PII masking before sending data to Gemini, restoring verified contact
+    information deterministically post-generation.
     """
     user_verified = state.get("user_verified") or {}
     verified_skills = user_verified.get("verified_skills") or []
@@ -110,68 +167,47 @@ async def enhance_resume_content(state: EnhancementState) -> dict:
     ver_skills_str = _format_verified_skills(verified_skills)
     imp_metrics_str = _format_impact_metrics(impact_metrics)
 
-    prompt_text = f"""You are an ATS Resume Data Extraction and Optimization API. Your ONLY job is to output a clean JSON representing the candidate's resume while upgrading the professional summary and skills list.
+    # Mask candidate PII before prompt synthesis
+    sanitized_resume_text, pii_map = mask_pii(state.get("resume_text", ""))
+
+    prompt_text = f"""You are an Expert ATS Resume Optimizer. Your ONLY job is to output a clean JSON representing the candidate's resume, optimized to achieve a 95%+ ATS score against the provided Job Description (JD).
 
 =========================
-STRICT PARSER MODE (DO NOT TRUNCATE ARRAYS)
+STRICT ETHICAL GUARDRAILS (ZERO HALLUCINATION)
 =========================
-1. You are acting as a strict JSON structuring engine.
-2. You MUST extract and map EVERY single project, EVERY single education entry, and EVERY single work experience from the raw text into the JSON schema. Omitting even one entry is a critical failure.
-3. For the `highlights` arrays in Experience and Projects: Copy every single bullet point from the raw text exactly as written.
-4. DO NOT drop contact information (email, phone, linkedin, github, portfolio).
-5. Certifications must be output as a flat list of strings — copy them verbatim.
-6. SKILL CATEGORIZATION & CURATION ENGINE (STRICT RULES):
-   - STEP 1 (DEEP RESUME ANALYSIS): Analyze the entire resume first. What is the candidate's true technical specialization?
-     * For AI / ML / Data Engineers: Generate 4 to 6 specialized domain categories such as "Generative AI & LLMs", "Machine Learning & Deep Learning", "Data Engineering & Big Data", "Backend Systems & APIs", "Cloud Platforms & MLOps".
-     * For Cloud / DevOps Engineers: Generate categories such as "Cloud Architecture", "Containerization & Orchestration", "CI/CD & Infrastructure as Code", "Networking & Security", "Backend & Microservices".
-     * For Healthcare / Finance / Domain Specialists: Generate articulate domain categories matching their niche (e.g. "Quantitative Modeling", "Clinical Analytics", "Regulatory Compliance").
-   - STEP 2 (NO BLIND WEB-DEV BUCKETING): DO NOT default to generic "Frontend" or "Backend" unless the candidate is strictly a frontend/web developer.
-   - STEP 3 (STRICT CURATION - 6 TO 10 SKILLS MAX PER CATEGORY): DO NOT dump dozens of keywords into one category. Select, curate, and output ONLY the top 6 to 10 most impactful and specialized skills per category.
-   - STEP 4 (ZERO GENERIC / "OTHER" CATEGORIES): NEVER create generic leftover categories named "Other", "Others", "Miscellaneous", "General", or "Basic Skills".
-   - STEP 5 (LOGICAL ACCURACY): Ensure technologies are placed in their proper specialization (e.g., LangGraph, LlamaIndex, RAG in "Generative AI & LLMs"; PySpark, Kafka in "Data Engineering"; PyTorch, Hugging Face in "Machine Learning & Deep Learning").
-7. For projects: Extract and preserve BOTH the Live Demo URL ('link') and GitHub Repository URL ('github'). Never drop project links.
+1. DO NOT invent, fabricate, or add any skills, tools, degrees, metrics, or years of experience that the candidate does not actually possess. 
+2. Ensure the output remains 100% truthful to the candidate's original background.
 
 =========================
-CRITICAL: ATS SCORE & REPUTATION PRESERVATION
+OPTIMIZATION STRATEGY (HOW TO MAXIMIZE SCORE)
 =========================
-- You MUST preserve all core high-impact skills, technologies, tools, programming languages, frameworks, and domain keywords from the original resume.
-- Include all Human-Verified Ground Truth skills in their respective dynamic categories in the `skills` dictionary.
-
-=========================
-YOU MUST IMPROVE (only these fields)
-=========================
-1. Write a professional headline (`target_role`) matching their specific niche.
-2. Rewrite the Professional Summary to be highly ATS-friendly and incorporate missing keywords without erasing identity.
-3. Populate `skills` as a clean dynamic categorised dictionary (4 to 6 curated categories, 6 to 10 skills per category, 0 "other" categories).
+1. **Keyword Unpacking:** If the candidate lists a broad skill (e.g., "MERN"), explicitly unpack it into the JD's required keywords (e.g., "MongoDB, Express.js, React.js, Node.js") naturally within their experience or summary.
+2. **Semantic Synonyms:** Replace the candidate's casual terminology with the exact professional keywords used in the JD (e.g., change "made an app" to "architected an application").
+3. **STAR Method Rewriting:** You MUST rewrite the `highlights` (bullet points) in the `experience` and `projects` arrays. Convert weak, short sentences into strong, context-rich bullet points using Action Verbs. Focus on the *how* and *what* by weaving in the `strict_missing_keywords`.
+4. **Formatting Internships:** Format internships formally under the `experience` array so ATS parsers recognize them as valid professional experience.
+5. **Skill Categorization:** Group skills into 4 to 6 specialized domains (e.g., "Generative AI", "Backend Development") with exactly 6 to 10 curated skills per category. Include all Human-Verified Ground Truth skills.
 
 =========================
 INPUT DATA
 =========================
-Resume Raw Text:
-{state["resume_text"]}
-
-Job Description:
-{state.get("jd_text", "")}
-
-Required Skills:
-{req_skills_str}
-
-Strict-ATS Missing Keywords:
-{strict_missing_str}
+Resume Raw Text: {sanitized_resume_text}
+Job Description: {state.get("jd_text", "")}
+Required Skills: {req_skills_str}
+Strict-ATS Missing Keywords: {strict_missing_str}
 
 Human-Verified Ground Truth:
 Verified Skills: {ver_skills_str}
 Impact Metrics:
 {imp_metrics_str}
 
-Output ONLY valid JSON matching this schema structure:
+Output ONLY valid JSON matching this exact schema:
 {{
   "contact": {{"full_name": "", "email": "", "phone": "", "location": "", "linkedin": "", "github": "", "portfolio": ""}},
   "target_role": "",
   "summary": "",
   "skills": {{"Category Name": ["skill1", "skill2"]}},
   "experience": [{{"company": "", "role": "", "dates": "", "location": "", "highlights": [""]}}],
-  "projects": [{{"title": "", "link": "", "github": "", "technologies": ["tech1", "tech2"], "dates": "", "highlights": [""]}}],
+  "projects": [{{"title": "", "link": "", "github": "", "technologies": ["tech1"], "dates": "", "highlights": [""]}}],
   "education": [{{"institution": "", "degree": "", "dates": "", "location": "", "details": ""}}],
   "certifications": [""]
 }}
@@ -202,32 +238,34 @@ Output ONLY valid JSON matching this schema structure:
         logger.error("Gemini LLM enhancement failed after retries", error=str(e))
         raise RuntimeError("Unable to enhance the resume using the Gemini AI model.") from e
 
-    # ── Python Bullet Restore ─────────────────────────────────────────────────
-    # The LLM may truncate highlights even with strict prompting.
-    # We forcefully overwrite `highlights` in every experience and project entry
-    # with the exact originals from the parsed resume — the LLM is only trusted
-    # for target_role, summary, and the categorised skills dict.
-    original = state.get("original_parsed_dict") or {}
+    # Restore any masked PII throughout the generated JSON structure
+    enhanced_dict = unmask_pii(enhanced_dict, pii_map)
 
-    orig_experience = original.get("experience") or []
-    llm_experience = enhanced_dict.get("experience") or []
-    for i, llm_exp in enumerate(llm_experience):
-        # Match by index — if the LLM dropped entries the list may be shorter;
-        # only restore where an original entry exists at the same position.
-        if i < len(orig_experience):
-            orig_highlights = orig_experience[i].get("highlights") if isinstance(orig_experience[i], dict) else getattr(orig_experience[i], "highlights", None)
-            if orig_highlights:
-                llm_exp["highlights"] = list(orig_highlights)
-    enhanced_dict["experience"] = llm_experience
+    # Ensure highlights in experience and projects are clean lists
+    for exp in enhanced_dict.get("experience", []):
+        if isinstance(exp, dict) and isinstance(exp.get("highlights"), str):
+            exp["highlights"] = [exp["highlights"]]
+        elif isinstance(exp, dict) and not exp.get("highlights"):
+            exp["highlights"] = []
 
-    orig_projects = original.get("projects") or []
-    llm_projects = enhanced_dict.get("projects") or []
-    for i, llm_proj in enumerate(llm_projects):
-        if i < len(orig_projects):
-            orig_highlights = orig_projects[i].get("highlights") if isinstance(orig_projects[i], dict) else getattr(orig_projects[i], "highlights", None)
-            if orig_highlights:
-                llm_proj["highlights"] = list(orig_highlights)
-    enhanced_dict["projects"] = llm_projects
+    for proj in enhanced_dict.get("projects", []):
+        if isinstance(proj, dict) and isinstance(proj.get("highlights"), str):
+            proj["highlights"] = [proj["highlights"]]
+        elif isinstance(proj, dict) and not proj.get("highlights"):
+            proj["highlights"] = []
+
+    # Deterministically ensure contact details (email, phone) are accurately preserved
+    orig_contact = (state.get("original_parsed_dict") or {}).get("contact") or {}
+    contact = enhanced_dict.get("contact") or {}
+    if not isinstance(contact, dict):
+        contact = dict(contact) if hasattr(contact, "__dict__") else {}
+
+    if orig_contact.get("email") and (not contact.get("email") or "REDACTED" in str(contact.get("email"))):
+        contact["email"] = orig_contact["email"]
+    if orig_contact.get("phone") and (not contact.get("phone") or "REDACTED" in str(contact.get("phone"))):
+        contact["phone"] = orig_contact["phone"]
+
+    enhanced_dict["contact"] = contact
 
     # Deterministic, LLM-free merge of confirmed links
     enhanced_dict = _merge_verified_links(enhanced_dict, verified_links)

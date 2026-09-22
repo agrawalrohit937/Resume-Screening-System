@@ -36,6 +36,7 @@ from services.portfolio_service import (
 )
 from services.email_service import EmailService
 from services.cloudinary_service import upload_profile_picture
+from services.document_parser_service import document_parser
 
 logger = structlog.get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -66,18 +67,23 @@ async def parse_resume_for_portfolio(file: UploadFile = File(...)):
     try:
         content = await file.read()
         
-        # 1. Extract raw text
+        # 1. Extract raw text with Azure Document Intelligence + guardrail fallback
         raw_text = ""
         try:
-            import io
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                for page in pdf.pages:
-                    t = page.extract_text()
-                    if t:
-                        raw_text += t + "\n"
+            parsed_doc = await document_parser.parse_document(content, "pdf")
+            raw_text = parsed_doc.get("raw_text", "")
         except Exception as e_pdf:
-            logger.warning("PDFPlumber error during portfolio parse", error=str(e_pdf))
+            logger.warning("Document parser error during portfolio parse", error=str(e_pdf))
+            try:
+                import io
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    for page in pdf.pages:
+                        t = page.extract_text()
+                        if t:
+                            raw_text += t + "\n"
+            except Exception as e_plumber:
+                logger.warning("PDFPlumber error during portfolio parse", error=str(e_plumber))
 
         # 2. Try Gemini AI Extraction First
         ai_data = {}
@@ -212,8 +218,9 @@ async def enhance_portfolio_content(req: EnhanceRequest):
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
                 "messages": [
+
                     {"role": "system", "content": "You are a professional software engineering portfolio copywriter."},
                     {"role": "user", "content": prompt}
                 ],

@@ -58,37 +58,61 @@ def test_expand_skills():
 
 def test_evaluate_skill_fulfillment_exact():
     cand_skills = ["Python", "FastAPI", "React"]
-    fulfilled, match_type = evaluate_skill_fulfillment("Python", cand_skills)
+    match = evaluate_skill_fulfillment("Python", cand_skills)
+    assert match.credit == 1.00
+    assert match.match_type == "EXACT"
+    assert match.bucket == "matched"
+    assert "Python" in match.evidence
+
+    # Tuple unpacking backward compatibility
+    fulfilled, match_type = match
     assert fulfilled is True
     assert match_type == "EXACT"
 
     # Alias match
-    fulfilled, match_type = evaluate_skill_fulfillment("nodejs", ["Node.js"])
-    assert fulfilled is True
-    assert match_type == "EXACT"
+    match_alias = evaluate_skill_fulfillment("nodejs", ["Node.js"])
+    assert match_alias.credit == 1.00
+    assert match_alias.match_type in ("ALIAS", "EXACT")
+    assert match_alias.bucket == "matched"
+
+
+def test_evaluate_skill_fulfillment_version_variant():
+    # React 17 vs React
+    cand_skills = ["React"]
+    match = evaluate_skill_fulfillment("React 17", cand_skills)
+    assert match.credit == 1.00
+    assert match.match_type == "VERSION_VARIANT"
+    assert match.bucket == "matched"
+    assert "React" in match.evidence
 
 
 def test_evaluate_skill_fulfillment_taxonomy_parent():
     # Job requires broader category "Vector Databases", Candidate has specific tool "Pinecone"
     cand_skills = ["Pinecone", "Python"]
-    fulfilled, match_type = evaluate_skill_fulfillment("Vector Databases", cand_skills)
-    assert fulfilled is True
-    assert match_type == "TAXONOMY_PARENT"
+    match = evaluate_skill_fulfillment("Vector Databases", cand_skills)
+    assert match.credit == 0.90
+    assert match.match_type == "TAXONOMY_PARENT"
+    assert match.bucket == "matched"
+    assert "Pinecone" in match.evidence
 
 
-def test_evaluate_skill_fulfillment_taxonomy_equivalent():
+def test_evaluate_skill_fulfillment_taxonomy_sibling():
     # Job requires "Pinecone", Candidate has sibling vector DB "ChromaDB"
     cand_skills = ["ChromaDB", "Python"]
-    fulfilled, match_type = evaluate_skill_fulfillment("Pinecone", cand_skills)
-    assert fulfilled is True
-    assert match_type == "TAXONOMY_EQUIVALENT"
+    match = evaluate_skill_fulfillment("Pinecone", cand_skills)
+    assert match.credit == 0.40
+    assert match.match_type == "TAXONOMY_SIBLING"
+    assert match.bucket == "transferable"
+    assert "ChromaDB" in match.evidence
 
 
 def test_evaluate_skill_fulfillment_none():
     cand_skills = ["HTML", "CSS"]
-    fulfilled, match_type = evaluate_skill_fulfillment("Kubernetes", cand_skills)
-    assert fulfilled is False
-    assert match_type == "NONE"
+    match = evaluate_skill_fulfillment("Kubernetes", cand_skills)
+    assert match.credit == 0.00
+    assert match.match_type == "NONE"
+    assert match.bucket == "missing"
+    assert len(match.evidence) == 0
 
 
 def test_get_all_known_skills():

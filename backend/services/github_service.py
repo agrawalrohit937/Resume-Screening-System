@@ -57,6 +57,11 @@ class GitHubService:
 
     async def _fetch_user(self, client: httpx.AsyncClient, username: str) -> dict:
         resp = await client.get(f"{self.base_url}/users/{username}", headers=self.headers)
+        if resp.status_code == 401 and "Authorization" in self.headers:
+            logger.warning("Configured GITHUB_TOKEN is invalid or expired. Retrying unauthenticated.", username=username)
+            self.headers.pop("Authorization", None)
+            resp = await client.get(f"{self.base_url}/users/{username}", headers=self.headers)
+
         if resp.status_code == 404:
             raise ValueError(f"GitHub user '{username}' not found.")
         if resp.status_code in (401, 403):
@@ -73,6 +78,14 @@ class GitHubService:
                 headers=self.headers,
                 params={"per_page": 100, "page": page, "sort": "pushed", "type": "owner"},
             )
+            if resp.status_code == 401 and "Authorization" in self.headers:
+                logger.warning("Configured GITHUB_TOKEN is invalid or expired. Retrying repos unauthenticated.", username=username)
+                self.headers.pop("Authorization", None)
+                resp = await client.get(
+                    f"{self.base_url}/users/{username}/repos",
+                    headers=self.headers,
+                    params={"per_page": 100, "page": page, "sort": "pushed", "type": "owner"},
+                )
             if resp.status_code != 200:
                 break
             repos = resp.json()

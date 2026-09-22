@@ -287,7 +287,6 @@ export function useAdvancedDetection({
             if (window.cocoSsd && !cocoModelRef.current) {
               const model = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' })
               cocoModelRef.current = model
-              console.log('📱 [Object Detection] COCO-SSD Mobile / Device model ready')
               if (!isCancelled && mountedRef.current) {
                 setStatus(s => ({ ...s, tfReady: true }))
               }

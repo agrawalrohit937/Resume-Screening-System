@@ -21,6 +21,12 @@ import {
   ChevronDown,
   Crown as LucideCrown,
   Settings,
+  Building2,
+  LayoutGrid,
+  CreditCard,
+  HelpCircle,
+  FolderKanban,
+  User,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
@@ -85,6 +91,13 @@ const Icons = {
   recruiter: <UserSearch {...ICON_PROPS} />,
   admin: <Shield {...ICON_PROPS} />,
   settings: <Settings {...ICON_PROPS} />,
+  briefcase: <Briefcase {...ICON_PROPS} />,
+  building: <Building2 {...ICON_PROPS} />,
+  feed: <LayoutGrid {...ICON_PROPS} />,
+  profile: <UserCircle {...ICON_PROPS} />,
+  billing: <CreditCard {...ICON_PROPS} />,
+  support: <HelpCircle {...ICON_PROPS} />,
+  pipeline: <FolderKanban {...ICON_PROPS} />,
   check: <Check className="w-3 h-3" strokeWidth={3} />,
   logout: <LogOut className="w-4 h-4" strokeWidth={2.2} />,
 }
@@ -104,24 +117,30 @@ const Crown = ({ size = 22, variant = 'gold', className = '' }) => {
   )
 }
 
-const NAV_SECTIONS = [
+const CANDIDATE_NAV_SECTIONS = [
   {
     title: 'Overview',
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: Icons.dashboard },
-      { to: '/profile', label: 'Profile', icon: Icons.dashboard },
+    ],
+  },
+  {
+    title: 'Job Search',
+    items: [
+      { to: '/jobs', label: 'Explore Jobs', badge: 'NEW', icon: Icons.recruiter },
+      { to: '/applications', label: 'My Applications', icon: Icons.ats },
       { to: '/apply-assistant', label: 'AI Apply Assistant', icon: Icons.ats },
     ],
   },
   {
-    title: 'Resume Tools',
+    title: 'Resume & Career',
     items: [
       { to: '/results', label: 'ATS Matcher', icon: Icons.ats },
       { to: '/portfolio-builder', label: 'Portfolio Generator', icon: Icons.ats },
     ],
   },
   {
-    title: 'AI Interview',
+    title: 'Interview Prep',
     items: [
       { to: '/live-interview', label: 'Live Interview', badge: 'NEW', icon: Icons.liveInterview },
       { to: '/interview', label: 'Quick Practice', icon: Icons.interview },
@@ -136,40 +155,134 @@ const NAV_SECTIONS = [
   {
     title: 'Account',
     items: [
+      { to: '/profile', label: 'Profile', icon: Icons.profile },
       { to: '/settings', label: 'Settings', icon: Icons.settings },
-      { to: '/billing', label: 'Billing', icon: Icons.dashboard },
-      { to: '/premium', label: 'Premium', icon: Icons.dashboard },
-      { to: '/support', label: 'Support', icon: Icons.dashboard },
+      { to: '/billing', label: 'Billing', icon: Icons.billing },
+      { to: '/support', label: 'Support', icon: Icons.support },
     ],
   },
 ]
 
 const ADMIN_NAV_SECTIONS = [
   {
-    title: 'Admin',
+    title: 'Admin Management',
     items: [
       { to: '/admin', label: 'Admin Dashboard', icon: Icons.admin },
+      { to: '/recruiter', label: 'Manage Job Postings', icon: Icons.recruiter },
+      { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
+      { to: '/jobs', label: 'Explore Feed', icon: Icons.dashboard },
+    ],
+  },
+  {
+    title: 'Account & Settings',
+    items: [
+      { to: '/profile', label: 'Profile', icon: Icons.profile },
+      { to: '/settings', label: 'Settings', icon: Icons.settings },
+      { to: '/support', label: 'Support', icon: Icons.support },
     ],
   },
 ]
 
-const RECRUITER_NAV_SECTIONS = [
+const EXEC_PRIMARY_SECTIONS = [
   {
-    title: 'Recruiter',
+    title: 'Executive Intelligence',
     items: [
-      { to: '/recruiter', label: 'Shortlist Candidates', icon: Icons.recruiter },
+      { to: '/exec/dashboard', label: 'Talent & Headcount', icon: Icons.dashboard },
+    ],
+  },
+  {
+    title: 'Organization',
+    items: [
+      { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
+      { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
+    ],
+  },
+  {
+    title: 'Pipeline & Jobs',
+    items: [
+      { to: '/recruiter/dashboard', label: 'Recruiter Dashboard', icon: Icons.dashboard },
+      { to: '/recruiter/jobs', label: 'Jobs & Pipelines', badge: 'Active', icon: Icons.briefcase },
     ],
   },
 ]
+
+const HIRING_MANAGER_PRIMARY_SECTIONS = [
+  {
+    title: 'Department Hiring',
+    items: [
+      { to: '/hiring-manager/dashboard', label: 'Requisitions & Pipeline', icon: Icons.briefcase },
+      { to: '/recruiter/jobs', label: 'Department Postings', icon: Icons.recruiter },
+    ],
+  },
+  {
+    title: 'Organization',
+    items: [
+      { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
+    ],
+  },
+]
+
+const RECRUITER_PRIMARY_SECTIONS = [
+  {
+    title: 'Pipeline & Jobs',
+    items: [
+      { to: '/recruiter/dashboard', label: 'Dashboard', icon: Icons.dashboard },
+      { to: '/recruiter/jobs', label: 'Jobs & Pipelines', badge: 'Active', icon: Icons.briefcase },
+    ],
+  },
+  {
+    title: 'Organization',
+    items: [
+      { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
+      { to: '/profile', label: 'Recruiter Profile', icon: Icons.profile },
+    ],
+  },
+]
+
+const INTERVIEWER_PRIMARY_SECTIONS = [
+  {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Assigned Scorecards', icon: Icons.interview },
+      { to: '/live-interview', label: 'Live Session Mock', icon: Icons.liveInterview },
+    ],
+  },
+  {
+    title: 'Organization',
+    items: [
+      { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
+    ],
+  },
+]
+
+const EMPLOYER_ACCOUNT_SECTION = {
+  title: 'Management & Support',
+  items: [
+    { to: '/profile', label: 'Profile', icon: Icons.profile },
+    { to: '/recruiter/settings', label: 'Hiring Settings', icon: Icons.settings },
+    { to: '/billing', label: 'Billing & Plan', icon: Icons.billing },
+    { to: '/support', label: 'Support Tickets', icon: Icons.support },
+  ],
+}
 
 const VIEW_MODES = [
   { key: 'admin', label: 'Admin', icon: Shield, color: '#6366F1', defaultPath: '/admin' },
   { key: 'candidate', label: 'Candidate', icon: UserCircle, color: '#2E9BDA', defaultPath: '/dashboard' },
-  { key: 'recruiter', label: 'Recruiter', icon: UserSearch, color: '#10B981', defaultPath: '/recruiter' },
+  { key: 'recruiter', label: 'Recruiter', icon: UserSearch, color: '#10B981', defaultPath: '/recruiter/dashboard' },
+  { key: 'hiring_manager', label: 'Hiring Mgr', icon: Briefcase, color: '#8B5CF6', defaultPath: '/hiring-manager/dashboard' },
+  { key: 'interviewer', label: 'Interviewer', icon: Check, color: '#3B82F6', defaultPath: '/interviewer/dashboard' },
+  { key: 'exec', label: 'Exec', icon: LucideCrown, color: '#10B981', defaultPath: '/exec/dashboard' },
 ]
 
 const ROUTE_PREFETCH = {
   '/dashboard': () => import('../pages/Dashboard'),
+  '/jobs': () => import('../pages/JobFeed'),
+  '/recruiter': () => import('../pages/recruiter/RecruiterDashboard'),
+  '/recruiter/dashboard': () => import('../pages/recruiter/RecruiterDashboard'),
+  '/recruiter/jobs': () => import('../pages/recruiter/ManageJobs'),
+  '/recruiter/company': () => import('../pages/recruiter/ManageCompany'),
+  '/recruiter/settings': () => import('../pages/recruiter/RecruiterSettings'),
+  '/applications': () => import('../pages/ApplicationTracker'),
   '/profile': () => import('../pages/Profile'),
   '/settings': () => import('../pages/Settings'),
   '/portfolio-builder': () => import('../pages/PortfolioBuilder'),
@@ -271,22 +384,153 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     }
   }
 
-  const isAdmin = user?.role === 'admin'
+  const userRolesArray = Array.isArray(user?.roles) 
+    ? user.roles.map((r) => String(r).toLowerCase().trim()) 
+    : []
+  const userRoles = [
+    ...userRolesArray,
+    user?.role,
+  ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
-  // Compute nav content — must be before early return so JSX can use them,
-  // but these are plain variables (not hooks) so order relative to return is fine.
+  // Strict check: candidate toggle is ONLY permitted if 'candidate' is present in DB user.roles
+  const hasCandidateRole = userRolesArray.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
+  const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
+  const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
+  const isHiringManager = userRoles.includes('hiring_manager')
+  const isRecruiterRole = userRoles.includes('recruiter')
+  const isInterviewerRole = userRoles.includes('interviewer')
+  const isAdmin = user?.role === 'admin' || isPlatformAdmin
+  const hasEmployerRole = isExecutive || isRecruiterRole || isHiringManager || isInterviewerRole || isAdmin
+  const isEmployerUser = hasEmployerRole
+  const isRecruiter = isEmployerUser
+
+  // Only multi-hat users (having BOTH an employer role AND candidate role) can switch views
+  const canSwitchContext = hasEmployerRole && hasCandidateRole && !isAdmin
+
+  // Strict View Context: 'employer' vs 'candidate'
+  // If user has any employer role, default their view to 'employer'
+  const [viewContext, setViewContext] = useState(() => {
+    if (typeof window === 'undefined') return 'candidate'
+    const saved = localStorage.getItem('careerpilot_view_context')
+    if (saved === 'employer' || saved === 'candidate') {
+      if (saved === 'employer' && !hasEmployerRole) return 'candidate'
+      if (saved === 'candidate' && !hasCandidateRole && hasEmployerRole) return 'employer'
+      return saved
+    }
+    return hasEmployerRole ? 'employer' : 'candidate'
+  })
+
+  // Keep viewContext valid if user roles change
+  useEffect(() => {
+    if (!hasEmployerRole && viewContext === 'employer') {
+      setViewContext('candidate')
+      localStorage.setItem('careerpilot_view_context', 'candidate')
+    } else if (!hasCandidateRole && hasEmployerRole && viewContext === 'candidate') {
+      setViewContext('employer')
+      localStorage.setItem('careerpilot_view_context', 'employer')
+    }
+  }, [hasEmployerRole, hasCandidateRole, viewContext])
+
+  const handleSwitchContext = (newContext) => {
+    if (newContext === viewContext) return
+    if (newContext === 'candidate' && !hasCandidateRole) return
+    if (newContext === 'employer' && !hasEmployerRole) return
+    setViewContext(newContext)
+    localStorage.setItem('careerpilot_view_context', newContext)
+    onNavigate?.()
+
+    if (newContext === 'candidate') {
+      const employerPrefixes = ['/recruiter', '/exec', '/hiring-manager', '/interviewer', '/settings/team', '/team', '/admin']
+      if (employerPrefixes.some(p => location.pathname.startsWith(p))) {
+        navigate('/dashboard')
+      }
+    } else {
+      if (isExecutive) navigate('/exec/dashboard')
+      else if (isRecruiterRole) navigate('/recruiter/dashboard')
+      else if (isHiringManager) navigate('/hiring-manager/dashboard')
+      else if (isAdmin) navigate('/admin')
+      else if (isInterviewerRole) navigate('/interviewer/dashboard')
+      else navigate('/recruiter/dashboard')
+    }
+  }
+
+  const getActiveDashboardRoute = () => {
+    if (viewContext === 'candidate') return '/dashboard'
+    if (isExecutive) return '/exec/dashboard'
+    if (isRecruiterRole) return '/recruiter/dashboard'
+    if (isHiringManager) return '/hiring-manager/dashboard'
+    if (isAdmin) return '/admin'
+    if (isInterviewerRole) return '/interviewer/dashboard'
+    return '/recruiter/dashboard'
+  }
+
+  // Compute nav content — strictly isolated by viewContext
   const getNavSections = () => {
-    if (!user) return NAV_SECTIONS
+    if (!user) return CANDIDATE_NAV_SECTIONS
+
+    // Candidate view: strictly candidate routes only
+    if (viewContext === 'candidate' || !hasEmployerRole) {
+      return CANDIDATE_NAV_SECTIONS
+    }
+
+    const canAccessBillingAndSettings = isExecutive || (isAdmin && (adminViewMode === 'admin' || adminViewMode === 'exec'))
+
+    const accountSection = {
+      title: 'Management & Support',
+      items: [
+        { to: '/profile', label: 'Profile', icon: Icons.profile },
+        ...(canAccessBillingAndSettings
+          ? [
+              { to: '/recruiter/settings', label: 'Hiring Settings', icon: Icons.settings },
+              { to: '/billing', label: 'Billing & Plan', icon: Icons.billing },
+            ]
+          : []),
+        { to: '/support', label: 'Support Tickets', icon: Icons.support },
+      ],
+    }
+
+    // Employer view for Admin:
     if (isAdmin) {
-      // Admin sidebar navigation sections based on selected view mode
-      if (adminViewMode === 'candidate') return NAV_SECTIONS
-      if (adminViewMode === 'recruiter') return RECRUITER_NAV_SECTIONS
-      return ADMIN_NAV_SECTIONS // default: admin-only
+      if (adminViewMode === 'candidate') return CANDIDATE_NAV_SECTIONS
+      if (adminViewMode === 'recruiter') return [...RECRUITER_PRIMARY_SECTIONS, accountSection]
+      if (adminViewMode === 'hiring_manager') return [...HIRING_MANAGER_PRIMARY_SECTIONS, accountSection]
+      if (adminViewMode === 'interviewer') return [...INTERVIEWER_PRIMARY_SECTIONS, accountSection]
+      if (adminViewMode === 'exec') return [...EXEC_PRIMARY_SECTIONS, accountSection]
+      return ADMIN_NAV_SECTIONS
     }
-    if (user.role === 'recruiter') {
-      return RECRUITER_NAV_SECTIONS
+
+    // Employer view: strictly employer routes only, deduplicated, single unified Management & Support section
+    const combinedSections = []
+    const seenPaths = new Set()
+
+    const addSection = (section) => {
+      const filteredItems = section.items.filter((item) => {
+        if (seenPaths.has(item.to)) return false
+        seenPaths.add(item.to)
+        return true
+      })
+      if (filteredItems.length > 0) {
+        combinedSections.push({
+          ...section,
+          items: filteredItems,
+        })
+      }
     }
-    return NAV_SECTIONS.filter(section => section.title.toUpperCase() !== 'RECRUITER')
+
+    if (isExecutive) {
+      EXEC_PRIMARY_SECTIONS.forEach(addSection)
+    } else if (isHiringManager) {
+      HIRING_MANAGER_PRIMARY_SECTIONS.forEach(addSection)
+    } else if (isRecruiterRole) {
+      RECRUITER_PRIMARY_SECTIONS.forEach(addSection)
+    } else if (isInterviewerRole) {
+      INTERVIEWER_PRIMARY_SECTIONS.forEach(addSection)
+    }
+
+    // Single unified Management & Support section at the end (no duplicate ACCOUNT headers)
+    addSection(accountSection)
+
+    return combinedSections.length > 0 ? combinedSections : CANDIDATE_NAV_SECTIONS
   }
 
   const visibleSections = getNavSections()
@@ -306,13 +550,13 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       animate={mobile ? { x: 0, opacity: 1 } : { width: collapsed ? 72 : 264 }}
       exit={mobile ? { x: -24, opacity: 0 } : undefined}
       transition={mobile ? { type: 'tween', duration: 0.22, ease: [0.16, 1, 0.3, 1] } : { type: 'spring', stiffness: 350, damping: 32 }}
-      className={`h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none ${mobile ? 'relative z-50 w-[250px] max-w-[65vw] sm:max-w-[250px] shadow-2xl rounded-r-3xl' : 'fixed left-0 top-0 z-40 shadow-sm'}`}
+      className={`h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none shrink-0 ${mobile ? 'relative z-50 w-[250px] max-w-[65vw] sm:max-w-[250px] shadow-2xl rounded-r-3xl' : 'relative z-40 shadow-sm'}`}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile ? 'true' : undefined}
     >
       <div className={`flex items-center py-4 min-h-[64px] shrink-0 border-b border-slate-100 px-4 sm:px-5 ${isCompact ? 'justify-center' : 'justify-between w-full'}`}>
         <div
-          onClick={() => handleItemClick('/dashboard')}
+          onClick={() => handleItemClick(getActiveDashboardRoute())}
           className="flex items-center gap-2.5 cursor-pointer group"
           role="button"
           tabIndex={0}
@@ -471,6 +715,56 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         </div>
       )}
 
+      {/* ── Context Switcher (Candidate vs. Employer) strictly for Multi-Hat Users ─────── */}
+      {canSwitchContext && (
+        <div className={`shrink-0 border-b border-slate-100 bg-slate-50/60 ${isCompact ? 'p-2' : 'px-3 py-2.5'}`}>
+          {isCompact ? (
+            <button
+              type="button"
+              onClick={() => handleSwitchContext(viewContext === 'employer' ? 'candidate' : 'employer')}
+              title={viewContext === 'employer' ? 'Current: Employer View (Click to switch to Candidate)' : 'Current: Candidate View (Click to switch to Employer)'}
+              className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center transition-all hover:scale-105 shadow-2xs border ${
+                viewContext === 'employer'
+                  ? 'bg-blue-600 text-white border-blue-700 shadow-blue-500/20'
+                  : 'bg-emerald-600 text-white border-emerald-700 shadow-emerald-500/20'
+              }`}
+            >
+              {viewContext === 'employer' ? <Briefcase className="w-4 h-4" /> : <User className="w-4 h-4" />}
+            </button>
+          ) : (
+            <div className="bg-slate-200/80 p-1 rounded-xl flex items-center gap-1 shadow-inner border border-slate-200">
+              <button
+                type="button"
+                onClick={() => handleSwitchContext('employer')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                  viewContext === 'employer'
+                    ? 'bg-white text-blue-700 shadow-sm ring-1 ring-black/5'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5 shrink-0 text-blue-600" />
+                <span className="truncate">Employer</span>
+              </button>
+
+              {hasCandidateRole && (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchContext('candidate')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                    viewContext === 'candidate'
+                      ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-black/5'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                  <span className="truncate">Candidate</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <nav className="flex-1 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-6 scrollbar-none">
         {visibleSections.map((section, idx) => (
           <div key={idx} className="space-y-1.5">
@@ -556,6 +850,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
           </div>
         ))}
 
+        {viewContext === 'candidate' && !isAdmin && (
         <div className="pt-2 px-0.5">
           {isCompact ? (
             <div className="flex justify-center">
@@ -689,11 +984,22 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             </motion.div>
           )}
         </div>
+        )}
       </nav>
 
       <div className="border-t border-slate-100 p-3 shrink-0 space-y-2">
         <div 
-          onClick={() => handleItemClick('/profile')}
+          onClick={() => {
+            if (viewContext === 'employer') {
+              if (isExecutive) handleItemClick('/exec/dashboard')
+              else if (isRecruiterRole) handleItemClick('/recruiter/dashboard')
+              else if (isHiringManager) handleItemClick('/hiring-manager/dashboard')
+              else if (isAdmin) handleItemClick('/admin')
+              else handleItemClick('/recruiter/dashboard')
+            } else {
+              handleItemClick('/profile')
+            }
+          }}
           className={`relative flex items-center gap-2.5 p-1.5 rounded-2xl transition-colors cursor-pointer ${
           isCompact ? 'justify-center' : ''
         } ${isPremium ? 'bg-gradient-to-r from-[#F3C24B]/10 to-transparent hover:from-[#F3C24B]/20' : isPro ? 'bg-slate-100/60 hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
@@ -724,18 +1030,46 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                   )}
                 </div>
                 
-                {isPremium ? (
-                  <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-[#8A5A14] bg-gradient-to-r from-[#F3C24B]/30 to-[#F3C24B]/10 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-[#F3C24B]/30 shadow-sm">
-                    Premium
-                  </span>
-                ) : isPro ? (
-                  <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-slate-700 bg-slate-200/80 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-slate-300 shadow-sm">
-                    Pro Member
-                  </span>
+                {viewContext === 'employer' ? (
+                  isAdmin ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-slate-800 bg-slate-200/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-slate-300 shadow-2xs">
+                      ADMINISTRATOR
+                    </span>
+                  ) : isExecutive ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-blue-800 bg-blue-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-blue-200 shadow-2xs">
+                      EXECUTIVE
+                    </span>
+                  ) : isHiringManager ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-purple-800 bg-purple-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-purple-200 shadow-2xs">
+                      HIRING MANAGER
+                    </span>
+                  ) : isRecruiterRole ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-blue-800 bg-blue-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-blue-200 shadow-2xs">
+                      RECRUITER
+                    </span>
+                  ) : isInterviewerRole ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-indigo-800 bg-indigo-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-indigo-200 shadow-2xs">
+                      INTERVIEWER
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-blue-800 bg-blue-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-blue-200 shadow-2xs">
+                      {userRolesArray.find(r => r !== 'candidate')?.replace(/_/g, ' ').toUpperCase() || 'EMPLOYER'}
+                    </span>
+                  )
                 ) : (
-                  <span className="inline-block mt-0.5 text-[9.5px] font-semibold text-[#1d6fa5] bg-[#2E9BDA]/10 px-1.5 py-[1px] rounded-md capitalize leading-none">
-                    {user?.role || 'Candidate'}
-                  </span>
+                  isPremium ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-[#8A5A14] bg-gradient-to-r from-[#F3C24B]/30 to-[#F3C24B]/10 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-[#F3C24B]/30 shadow-sm">
+                      PREMIUM
+                    </span>
+                  ) : isPro ? (
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-bold text-slate-700 bg-slate-200/80 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-slate-300 shadow-sm">
+                      PRO MEMBER
+                    </span>
+                  ) : (
+                    <span className="inline-block mt-0.5 text-[9.5px] font-semibold text-[#1d6fa5] bg-[#2E9BDA]/10 px-1.5 py-[1px] rounded-md uppercase leading-none">
+                      CANDIDATE
+                    </span>
+                  )
                 )}
               </motion.div>
             )}
@@ -745,7 +1079,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         <button
           onClick={() => {
             logout()
-            handleItemClick()
+            navigate('/login', { replace: true })
           }}
           title="Logout"
           aria-label="Log out of account"

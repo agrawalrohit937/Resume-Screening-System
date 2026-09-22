@@ -1,0 +1,125 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>[Support Ticket] {{ ticket_id }} - {{ ticket_subject }}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td, h1, h2, p, a, span { font-family: Arial, sans-serif !important; }
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #111827;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f3f4f6; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+        <![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+          
+          <!-- ── SYSTEM HEADER (DARK) ──────────────────────────────────────── -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #111827;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 16px; font-weight: 700; color: #ffffff; letter-spacing: -0.01em;">
+                      CareerShala <span style="font-weight: 400; color: #9ca3af; font-size: 14px;">| Support Dispatch</span>
+                    </span>
+                  </td>
+                  <td align="right">
+                    <span style="display: inline-block; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 4px; background-color: {{ priority_bg }}; color: {{ priority_color }};">
+                      {{ ticket_priority }}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ── TICKET INFO & DESCRIPTION ──────────────────────────────────── -->
+          <tr>
+            <td style="padding: 32px 32px 24px 32px;">
+              <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 8px;">
+                Ticket #{{ ticket_id }} &bull; {{ ticket_category }}
+              </div>
+              <h1 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 700; color: #111827; line-height: 1.4; letter-spacing: -0.01em;">
+                {{ ticket_subject }}
+              </h1>
+              
+              <!-- User Description Block -->
+              <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 16px 20px; margin-bottom: 24px;">
+                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280; margin-bottom: 8px;">User Description</div>
+                <div style="font-size: 14px; color: #374151; line-height: 1.6; word-break: break-word;">
+                  {{ description | safe }}
+                </div>
+              </div>
+
+              <!-- ── METADATA TABLE ─────────────────────────────────────────── -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb;">
+                <tr>
+                  <td style="padding: 12px 0; font-size: 12px; color: #6b7280; width: 30%; border-bottom: 1px solid #f3f4f6;">User Name</td>
+                  <td style="padding: 12px 0; font-size: 13px; font-weight: 600; color: #111827; border-bottom: 1px solid #f3f4f6;">{{ user_name }}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-size: 12px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">User Email</td>
+                  <td style="padding: 12px 0; font-size: 13px; color: #111827; border-bottom: 1px solid #f3f4f6;">
+                    <a href="mailto:{{ user_email }}" style="color: #2563eb; text-decoration: none;">{{ user_email }}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-size: 12px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Account Tier</td>
+                  <td style="padding: 12px 0; font-size: 13px; font-weight: 600; color: #111827; border-bottom: 1px solid #f3f4f6;">{{ user_plan }}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-size: 12px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Environment</td>
+                  <td style="padding: 12px 0; font-size: 12px; color: #4b5563; border-bottom: 1px solid #f3f4f6;">{{ os_info }} &bull; {{ browser_info }}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-size: 12px; color: #6b7280; border-bottom: 1px solid #f3f4f6;">Page Context</td>
+                  <td style="padding: 12px 0; font-size: 12px; color: #4b5563; border-bottom: 1px solid #f3f4f6; word-break: break-all;">
+                    <a href="{{ page_url }}" target="_blank" style="color: #6b7280; text-decoration: underline;">{{ page_url }}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-size: 12px; color: #6b7280;">Timestamp</td>
+                  <td style="padding: 12px 0; font-size: 12px; color: #4b5563;">{{ created_time }}</td>
+                </tr>
+              </table>
+
+              <!-- ── ATTACHMENTS ────────────────────────────────────────────── -->
+              <div>
+                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280; margin-bottom: 10px;">Submitted Attachments</div>
+                <div style="font-size: 13px; color: #374151;">
+                  {{ attachments_block | safe }}
+                </div>
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- ── FOOTER ─────────────────────────────────────────────────────── -->
+          <tr>
+            <td style="padding: 20px 32px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af; text-align: center; line-height: 1.5;">
+                Automated notification from CareerShala Help Desk System.<br/>
+                Replying to this email will reply directly to <strong>{{ user_email }}</strong>.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
+            </td>
+          </tr>
+        </table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

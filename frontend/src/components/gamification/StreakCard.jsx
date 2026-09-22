@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Flame, Lock, Calendar, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { STREAK_MILESTONES } from './mockConfig'
-import Card from './Card'
+import Card from '../Card'
 
 const WEEKDAY_HEADER = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 

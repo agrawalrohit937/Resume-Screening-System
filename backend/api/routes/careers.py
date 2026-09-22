@@ -17,18 +17,19 @@ FOLDER_CAREER_RESUMES = f"{FOLDER_ROOT}/career_resumes"
 
 
 @router.post("/apply", status_code=status.HTTP_201_CREATED)
-@router.post("/careers/apply", status_code=status.HTTP_201_CREATED)
 async def submit_career_application(
     full_name: str = Form(...),
     email: str = Form(...),
     role: str = Form(...),
+    linkedin_url: Optional[str] = Form(None),
+    github_url: Optional[str] = Form(None),
     portfolio_url: Optional[str] = Form(None),
-    cover_letter: str = Form(...),
+    cover_letter: Optional[str] = Form(None),
     resume_file: Optional[UploadFile] = File(None),
 ):
     """
-    Submit a candidate application with optional PDF resume file upload.
-    Now saves to database AND sends email notification to admin.
+    Submit a candidate application with required PDF resume file upload.
+    Saves to database and sends email notification to hiring team.
     """
     logger.info(
         "Received Job Application via Form",
@@ -68,8 +69,10 @@ async def submit_career_application(
         "applicant_name": full_name.strip(),
         "email": email.strip(),
         "role_title": role.strip(),
+        "linkedin_url": linkedin_url.strip() if linkedin_url else None,
+        "github_url": github_url.strip() if github_url else None,
         "portfolio_url": portfolio_url.strip() if portfolio_url else None,
-        "cover_letter": cover_letter.strip(),
+        "cover_letter": cover_letter.strip() if cover_letter else "",
         "resume_url": resume_url,
         "resume_filename": resume_filename,
         "resume_public_id": resume_public_id,
@@ -95,8 +98,10 @@ async def submit_career_application(
             applicant_name=full_name.strip(),
             applicant_email=email.strip(),
             role_title=role.strip(),
+            linkedin_url=linkedin_url.strip() if linkedin_url else None,
+            github_url=github_url.strip() if github_url else None,
             portfolio_url=portfolio_url.strip() if portfolio_url else None,
-            cover_letter=cover_letter.strip(),
+            cover_letter=cover_letter.strip() if cover_letter else "",
             resume_bytes=resume_bytes,
             resume_filename=resume_filename,
         )

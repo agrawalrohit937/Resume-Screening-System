@@ -77,7 +77,15 @@ def generate_challenge_token(subject: str, purpose: str, expires_minutes: int = 
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-# ─── JWT ──────────────────────────────────────────────────────────────────────
+# ─── JWT & Token Lifecycle ───────────────────────────────────────────────────
+import hashlib
+import uuid
+
+def hash_token(token: str) -> str:
+    """Computes a deterministic SHA-256 hash of a token for secure database indexing."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def create_access_token(
     subject: Union[str, dict],
     expires_delta: Optional[timedelta] = None,
@@ -86,36 +94,85 @@ def create_access_token(
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
+    jti = str(uuid.uuid4())
     payload = {
         "sub": str(subject),
+        "jti": jti,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "access",
     }
     if extra_claims:
         payload.update(extra_claims)
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    headers = {"kid": "v1"}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM, headers=headers)
 
 
-def create_refresh_token(subject: Union[str, dict]) -> str:
+def create_refresh_token(
+    subject: Union[str, dict],
+    family_id: Optional[str] = None,
+    extra_claims: Optional[dict] = None,
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    jti = str(uuid.uuid4())
     payload = {
         "sub": str(subject),
+        "jti": jti,
+        "family_id": family_id or str(uuid.uuid4()),
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "refresh",
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    if extra_claims:
+        payload.update(extra_claims)
+    headers = {"kid": "v1"}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM, headers=headers)
 
 
 def decode_token(token: str) -> Optional[dict]:
+    """
+    Decodes a JWT token using primary SECRET_KEY, falling back to JWT_PREVIOUS_SECRET_KEY
+    if key rotation grace window is active.
+    """
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError as e:
-        logger.warning("JWT decode failed", error=str(e))
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError as primary_err:
+        if settings.JWT_SECRET_ROTATION_ENABLED and settings.JWT_PREVIOUS_SECRET_KEY:
+            try:
+                payload = jwt.decode(token, settings.JWT_PREVIOUS_SECRET_KEY, algorithms=[settings.ALGORITHM])
+                logger.debug("Decoded JWT using rotated previous secret key")
+                return payload
+            except JWTError:
+                pass
+        logger.warning("JWT decode failed", error=str(primary_err))
         return None
 
 
 def verify_token_type(payload: dict, expected_type: str) -> bool:
     return payload.get("type") == expected_type
+
+
+def create_invite_token(
+    email: str,
+    tenant_id: str,
+    role: str,
+    invited_by: str,
+    extra_claims: Optional[dict] = None,
+    expires_days: int = 7,
+) -> str:
+    """Generate a cryptographically signed JWT invite token embedding tenant_id, role, and inviter."""
+    expire = datetime.now(timezone.utc) + timedelta(days=expires_days)
+    jti = str(uuid.uuid4())
+    payload = {
+        "sub": email.lower(),
+        "jti": jti,
+        "tenant_id": tenant_id,
+        "role": role,
+        "invited_by": str(invited_by),
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "type": "team_invite",
+    }
+    if extra_claims:
+        payload.update(extra_claims)
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

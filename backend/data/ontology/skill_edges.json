@@ -1,0 +1,76 @@
+{
+  "edges": [
+    {
+      "source": "React",
+      "target": "Frontend Development",
+      "relation": "part_of",
+      "weight": 0.8
+    },
+    {
+      "source": "Next.js",
+      "target": "React",
+      "relation": "is_a",
+      "weight": 0.95
+    },
+    {
+      "source": "PostgreSQL",
+      "target": "MySQL",
+      "relation": "substitutable_for",
+      "weight": 0.75
+    },
+    {
+      "source": "FastAPI",
+      "target": "Flask",
+      "relation": "substitutable_for",
+      "weight": 0.70
+    },
+    {
+      "source": "PyTorch",
+      "target": "TensorFlow",
+      "relation": "substitutable_for",
+      "weight": 0.80
+    },
+    {
+      "source": "Shielded Metal Arc Welding",
+      "target": "Gas Tungsten Arc Welding",
+      "relation": "substitutable_for",
+      "weight": 0.65
+    },
+    {
+      "source": "Clinical Pharmacology",
+      "target": "Nursing Care",
+      "relation": "prerequisite_of",
+      "weight": 0.85
+    },
+    {
+      "source": "Nursing Care",
+      "target": "State Nursing Council",
+      "relation": "regulated_by",
+      "weight": 1.0
+    },
+    {
+      "source": "Statutory Auditing",
+      "target": "ICAI",
+      "relation": "regulated_by",
+      "weight": 1.0
+    },
+    {
+      "source": "PowerBI",
+      "target": "Tableau",
+      "relation": "substitutable_for",
+      "weight": 0.85
+    },
+    {
+      "source": "Figma",
+      "target": "User Experience Design",
+      "relation": "tool_of",
+      "weight": 0.9
+    },
+    {
+      "source": "Docker",
+      "target": "DevOps",
+      "relation": "tool_of",
+      "weight": 0.85
+    }
+  ]
+}

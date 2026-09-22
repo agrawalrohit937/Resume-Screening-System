@@ -84,15 +84,8 @@ async def _ensure_indexes() -> None:
             ),
         ])
 
-        # analytics
-        await db.analytics.create_indexes([
-            IndexModel([("event_type", ASCENDING)], name="analytics_event_idx"),
-            IndexModel([("user_id", ASCENDING)], name="analytics_user_idx"),
-            IndexModel([("created_at", DESCENDING)], name="analytics_created_idx"),
-        ])
-
-        # interviews
-        await db.interviews.create_indexes([
+        # live_interview_sessions
+        await db.live_interview_sessions.create_indexes([
             IndexModel([("user_id", ASCENDING)], name="interview_user_idx"),
             IndexModel([("resume_id", ASCENDING)], name="interview_resume_idx"),
             IndexModel([("created_at", DESCENDING)], name="interview_created_idx"),
@@ -129,6 +122,40 @@ async def _ensure_indexes() -> None:
             IndexModel([("risk_level", ASCENDING)], name="recovery_risk_idx"),
             IndexModel([("created_at", DESCENDING)], name="recovery_created_idx"),
             IndexModel([("updated_at", DESCENDING)], name="recovery_updated_idx"),
+        ])
+
+        # ─── applications ──────────────────────────────────────────────────
+        await db.applications.create_indexes([
+            IndexModel([("job_id", ASCENDING), ("candidate_id", ASCENDING)], unique=True, name="app_job_candidate_unique"),
+            IndexModel([("job_id", ASCENDING)], name="app_job_idx"),
+            IndexModel([("candidate_id", ASCENDING)], name="app_candidate_idx"),
+            IndexModel([("created_at", DESCENDING)], name="app_created_idx"),
+        ])
+
+        # ─── copilot v2: sessions, messages, memory ───────────────────────
+        await db.copilot_sessions.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("created_at", DESCENDING)], name="copilot_session_tenant_user_created_idx"),
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("pinned", DESCENDING), ("updated_at", DESCENDING)], name="copilot_session_tenant_user_pinned_updated_idx"),
+        ])
+        await db.copilot_messages.create_indexes([
+            IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)], name="copilot_msg_session_created_idx"),
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("created_at", DESCENDING)], name="copilot_msg_tenant_user_created_idx"),
+            IndexModel([("created_at", ASCENDING)], expireAfterSeconds=180 * 86400, name="copilot_msg_ttl_idx"),
+        ])
+        await db.copilot_memory.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("key", ASCENDING)], unique=True, name="copilot_mem_tenant_user_key_unique"),
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("updated_at", DESCENDING)], name="copilot_mem_tenant_user_updated_idx"),
+        ])
+
+        # ─── copilot v3 RAG: chunks & semantic cache ──────────────────────
+        await db.copilot_chunks.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("source_type", ASCENDING), ("source_id", ASCENDING)], name="copilot_chunks_tenant_user_source_idx"),
+            IndexModel([("tenant_id", ASCENDING), ("source_type", ASCENDING), ("created_at", DESCENDING)], name="copilot_chunks_tenant_source_created_idx"),
+            IndexModel([("text", "text"), ("title", "text")], name="copilot_chunks_text_search_idx"),
+        ])
+        await db.copilot_cache.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("context_version", ASCENDING)], name="copilot_cache_tenant_user_ctx_idx"),
+            IndexModel([("created_at", ASCENDING)], expireAfterSeconds=3600, name="copilot_cache_ttl_idx"),
         ])
 
         logger.info("✅ MongoDB indexes ensured")

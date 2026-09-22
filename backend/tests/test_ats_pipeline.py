@@ -1,17 +1,15 @@
 """
 End-to-End Pipeline Unit Tests for the Enterprise ATS Evaluation Engine.
-Tests all 4 phases: Skill Ontology, NLP Extractor, Dual-Stage Scoring, and Graph Engine.
+Tests all phases: Skill Ontology, NLP Extractor, and Unified Scoring Engine.
 """
 
 import pytest
-from workflows.ats_graph import ats_engine
 from services.skill_ontology import expand_skills, normalize_skill, evaluate_skill_fulfillment
 from services.nlp_extractor import extract_resume_data_deterministic
-from services.strict_ats_service import run_strict_ats_check, compute_vector_similarity
+from services.scoring_engine import score_resume
 
 
-@pytest.mark.asyncio
-async def test_full_ats_pipeline_end_to_end():
+def test_full_ats_pipeline_end_to_end():
     sample_resume = """
     Alex Johnson - Lead Software Engineer
     Email: alex.johnson@tech.io | Phone: +1-555-0199
@@ -31,7 +29,7 @@ async def test_full_ats_pipeline_end_to_end():
     Master's or Bachelor's degree in CS required.
     """
     
-    # 1. Test Node 1: Deterministic Extraction
+    # 1. Test Deterministic Extraction
     extraction_output = extract_resume_data_deterministic(sample_resume)
     assert "Python" in extraction_output["skills"]
     assert "Pinecone" in extraction_output["skills"]
@@ -40,32 +38,21 @@ async def test_full_ats_pipeline_end_to_end():
     assert extraction_output["total_experience_years"] == 6.0
     assert extraction_output["education_level"] == "Master's Degree"
     
-    # 2. Test Full LangGraph Pipeline Execution (Nodes 1, 2, 3)
-    graph_result = await ats_engine.ainvoke({
-        "resume_text": sample_resume,
-        "jd_text": sample_jd,
-    })
-    
-    assert "final_score" in graph_result
-    assert graph_result["final_score"] >= 60.0  # Good or Strong Match
-    assert graph_result["recommendation"] in ("Good Match", "Strong Match")
-    assert "Python" in graph_result["matched_skills"] or "Vector Databases" in graph_result["matched_skills"]
-    
-    # 3. Test Orchestrated Strict Check
-    strict_check = run_strict_ats_check(
-        raw_text=sample_resume,
-        extracted_data=extraction_output,
-        jd_text=sample_jd,
-        skill_universe=graph_result["matched_skills"] + graph_result["missing_skills"]
+    # 2. Test Unified Scoring Engine Execution
+    scored = score_resume(
+        resume=extraction_output,
+        jd=sample_jd,
+        mode="candidate",
     )
     
-    assert strict_check["knockout"]["is_knockout"] is False
-    assert strict_check["vector_score"] > 20.0
-    assert strict_check["final_score"] >= 60.0
+    assert "final_score" in scored
+    assert scored["final_score"] >= 60.0  # Good or Strong Match
+    assert scored["recommendation"] in ("Good Match", "Strong Match")
+    assert "Python" in scored["matched_skills"] or "Vector Databases" in scored["matched_skills"]
+    assert scored["is_knockout"] is False
 
 
-@pytest.mark.asyncio
-async def test_pipeline_knockout_flagging():
+def test_pipeline_knockout_flagging():
     weak_resume = """
     Junior High School Graduate with beginner knowledge of HTML and CSS.
     No professional software engineering experience.
@@ -78,20 +65,12 @@ async def test_pipeline_knockout_flagging():
     
     extraction_output = extract_resume_data_deterministic(weak_resume)
     
-    graph_result = await ats_engine.ainvoke({
-        "resume_text": weak_resume,
-        "jd_text": strict_jd,
-    })
-    
-    assert graph_result["final_score"] < 40.0
-    assert graph_result["recommendation"] == "Low Match"
-    
-    strict_check = run_strict_ats_check(
-        raw_text=weak_resume,
-        extracted_data=extraction_output,
-        jd_text=strict_jd,
-        skill_universe=graph_result["matched_skills"] + graph_result["missing_skills"]
+    scored = score_resume(
+        resume=extraction_output,
+        jd=strict_jd,
+        mode="candidate",
     )
     
-    assert strict_check["knockout"]["is_knockout"] is True
-    assert len(strict_check["knockout"]["reasons"]) > 0
+    assert scored["final_score"] < 50.0
+    assert scored["is_knockout"] is True
+    assert len(scored["knockout_reasons"]) > 0

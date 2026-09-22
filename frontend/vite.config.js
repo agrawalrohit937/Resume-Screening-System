@@ -3,6 +3,33 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    dedupe: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@react-oauth/google',
+      'framer-motion',
+      'react-hot-toast',
+      'lucide-react'
+    ],
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react-router-dom',
+      '@react-oauth/google',
+      'framer-motion',
+      'lucide-react',
+      'axios',
+      'react-hot-toast',
+      'recharts',
+      'date-fns',
+      'canvas-confetti',
+    ],
+  },
   build: {
     target: 'es2020',
     cssCodeSplit: true,
@@ -12,29 +39,43 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/scheduler/')) {
-              return 'vendor-react-core';
+            const normalized = id.replace(/\\/g, '/')
+            // Core React ecosystem and router MUST stay in the same chunk to guarantee a single ReactCurrentDispatcher
+            if (
+              normalized.includes('/react/') ||
+              normalized.includes('/react-dom/') ||
+              normalized.includes('/scheduler/') ||
+              normalized.includes('/react-router/') ||
+              normalized.includes('/react-router-dom/') ||
+              normalized.includes('/@react-oauth/') ||
+              normalized.includes('/use-sync-external-store/')
+            ) {
+              return 'vendor-react-core'
             }
-            if (id.includes('react-router') || id.includes('react-router-dom')) {
-              return 'vendor-router';
+            if (normalized.includes('/framer-motion/')) {
+              return 'vendor-framer'
             }
-            if (id.includes('@react-oauth')) {
-              return 'vendor-oauth';
+            if (normalized.includes('/recharts/') || normalized.includes('/d3-')) {
+              return 'vendor-charts'
             }
-            if (id.includes('framer-motion')) {
-              return 'vendor-framer';
+            if (normalized.includes('/lucide-react/') || normalized.includes('/react-icons/')) {
+              return 'vendor-icons'
             }
-            if (id.includes('recharts') || id.includes('d3-')) {
-              return 'vendor-charts';
+            if (
+              normalized.includes('/pdfjs-dist/') ||
+              normalized.includes('/jspdf/') ||
+              normalized.includes('/html2canvas/') ||
+              normalized.includes('/mammoth/')
+            ) {
+              return 'vendor-pdf'
             }
-            if (id.includes('lucide-react') || id.includes('react-icons')) {
-              return 'vendor-icons';
-            }
-            if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas') || id.includes('mammoth')) {
-              return 'vendor-pdf';
-            }
-            if (id.includes('axios') || id.includes('date-fns') || id.includes('react-hot-toast') || id.includes('clsx')) {
-              return 'vendor-utils';
+            if (
+              normalized.includes('/axios/') ||
+              normalized.includes('/date-fns/') ||
+              normalized.includes('/react-hot-toast/') ||
+              normalized.includes('/clsx/')
+            ) {
+              return 'vendor-utils'
             }
           }
         }

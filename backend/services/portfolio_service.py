@@ -645,7 +645,7 @@ async def ai_extract_portfolio_from_resume(raw_text: str, original_parsed: Optio
         result = await enhance_resume_content(state)
         enhanced_data = result.get("enhanced_data") or {}
         if not enhanced_data:
-            print("⚠️ [PORTFOLIO_AI] Empty enhanced_data returned by Gemini AI.")
+            logger.warning("Empty enhanced_data returned by Gemini AI", context="PORTFOLIO_AI")
             return {}
 
         contact = enhanced_data.get("contact") or {}

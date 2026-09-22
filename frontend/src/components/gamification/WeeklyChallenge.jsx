@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Target, Timer, Bot, ArrowRight, Sparkles, Trophy } from 'lucide-react'
-import Card from './Card'
+import Card from '../Card'
 import Button from './Button'
 
 export default function WeeklyChallenge({ progress = 45, target = 100, onStart }) {

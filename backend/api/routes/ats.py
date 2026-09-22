@@ -2,14 +2,15 @@
 # ATS Routes — Single match, bulk match, history
 # """
 
+import json
 import tempfile
 from pathlib import Path
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile
 from typing import Optional
 from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
-    get_user_repo, PaginationParams
+    get_user_repo, PaginationParams, get_database, get_db
 )
 from models.result_model import ATSResultModel
 from models.resume_model import ResumeStatus
@@ -24,8 +25,8 @@ from schemas.ats_schema import (
     BulkATSMatchResponse, BulkATSResultItem
 )
 
-from workflows.ats_graph import ats_engine
-from services.strict_ats_service import run_strict_ats_check
+from services.scoring_engine import score_resume
+from services.skill_ontology import canonicalize_skills
 from utils.validators import validate_object_id
 import time
 
@@ -87,9 +88,9 @@ async def match_resume(
 
         req_skills_raw = form.getlist("required_skills") or form.get("required_skills")
         if isinstance(req_skills_raw, str):
-            required_skills = [s.strip().lower() for s in req_skills_raw.split(",") if s and s.strip()]
+            required_skills = canonicalize_skills([s.strip() for s in req_skills_raw.split(",") if s and s.strip()])
         elif isinstance(req_skills_raw, list):
-            required_skills = [s.strip().lower() for s in req_skills_raw if isinstance(s, str) and s.strip()]
+            required_skills = canonicalize_skills([s.strip() for s in req_skills_raw if isinstance(s, str) and s.strip()])
 
         save_res_raw = form.get("save_result")
         if save_res_raw is not None:
@@ -104,7 +105,7 @@ async def match_resume(
         resume_id = payload.resume_id
         job_title = payload.job_title
         job_description = payload.job_description
-        required_skills = payload.required_skills
+        required_skills = canonicalize_skills(payload.required_skills) if payload.required_skills else []
         save_result = payload.save_result
 
     # ── Handle uploaded JD file text extraction using ParserService ─────────
@@ -161,7 +162,25 @@ async def match_resume(
         str(current_user.id),
     )
 
-    if not resume or resume.status != ResumeStatus.PARSED or not resume.parsed_data:
+    if not resume:
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found.",
+        )
+
+    if resume.status in (ResumeStatus.PENDING, ResumeStatus.PROCESSING) or not resume.parsed_data:
+        raise HTTPException(
+            status_code=409,
+            detail="Resume is currently being parsed and vectorized. Please wait a moment and try again.",
+        )
+
+    if resume.status == ResumeStatus.FAILED:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Resume parsing failed: {resume.parse_error or 'Unknown parsing error'}",
+        )
+
+    if resume.status != ResumeStatus.PARSED:
         raise HTTPException(
             status_code=404,
             detail="Parsed resume not found.",
@@ -189,13 +208,18 @@ async def match_resume(
     t_start = time.perf_counter()
 
     try:
-        graph_result = await ats_engine.ainvoke({
-            "resume_text": raw_text,
-            "jd_text": job_description,
-            "required_skills": required_skills or [],   # Optional skills from UI
-        })
+        resume_payload = resume.parsed_data.model_dump() if hasattr(resume.parsed_data, "model_dump") else (resume.parsed_data or {})
+        if "raw_text" not in resume_payload:
+            resume_payload["raw_text"] = raw_text
+
+        scored = score_resume(
+            resume=resume_payload,
+            jd=job_description,
+            mode="candidate",
+            required_skills=required_skills or [],
+        )
     except Exception as e:
-        logger.exception("ATS graph execution failed", error=str(e))
+        logger.exception("Unified scoring engine execution failed", error=str(e))
         err_detail = str(e).strip() or repr(e)
         raise HTTPException(
             status_code=500,
@@ -204,73 +228,35 @@ async def match_resume(
 
     processing_time_ms = int((time.perf_counter() - t_start) * 1000)
 
-    required_keys = (
-        "final_score",
-        "recommendation",
-        "matched_skills",
-        "missing_skills",
-        "experience_score",
-        "education_score",
-        "feedback_suggestions",
-    )
-
-    missing = [key for key in required_keys if key not in graph_result]
-
-    if missing:
-        logger.error(
-            "ATS graph returned incomplete response",
-            missing_keys=missing,
-        )
-        raise HTTPException(
-            status_code=500,
-            detail="ATS engine returned an invalid response.",
-        )
-
-    extracted_data = graph_result.get("extracted_data", {}) or {}
-
-    # ── Strict / Corporate ATS engine (deterministic, no LLM) ──────────────
-    skill_universe = list(required_skills or []) + list(graph_result.get("matched_skills") or []) + list(graph_result.get("missing_skills") or [])
-
-    try:
-        strict_result = run_strict_ats_check(
-            raw_text=raw_text,
-            extracted_data=extracted_data,
-            jd_text=job_description,
-            skill_universe=skill_universe,
-        )
-    except Exception:
-        logger.exception("Strict ATS check failed; continuing with AI-only result")
-        strict_result = {
-            "parsing_health": {"is_healthy": True, "confidence": 1.0, "warnings": []},
-            "knockout": {"is_knockout": False, "reasons": [], "advisories": []},
-            "keyword_match": {"strict_ats_score": 0.0, "matched_exact": [], "missing_exact": []},
-        }
-
+    extracted_data = scored.get("extracted_data", {}) or {}
     contact_snapshot = _extract_contact_snapshot(extracted_data)
 
     score_data = {
-        "final_score": graph_result["final_score"],
-        "recommendation": graph_result["recommendation"],
-        "matched_skills": graph_result["matched_skills"],
-        "missing_skills": graph_result["missing_skills"],
-        "experience_score": graph_result["experience_score"],
-        "education_score": graph_result["education_score"],
-        "feedback_suggestions": graph_result["feedback_suggestions"],
+        "final_score": scored["final_score"],
+        "recommendation": scored["recommendation"],
+        "matched_skills": scored["matched_skills"],
+        "missing_skills": scored["missing_skills"],
+        "experience_score": scored["experience_score"] / 100.0,
+        "education_score": scored["education_score"] / 100.0,
+        "feedback_suggestions": scored["feedback_suggestions"],
         "processing_time_ms": processing_time_ms,
 
         # ── Strict engine fields ──
-        "is_knockout": strict_result["knockout"]["is_knockout"],
-        "knockout_reasons": strict_result["knockout"]["reasons"],
-        "knockout_advisories": strict_result["knockout"]["advisories"],
-        "strict_ats_score": strict_result["keyword_match"]["strict_ats_score"],
-        "strict_matched_keywords": strict_result["keyword_match"]["matched_exact"],
-        "strict_missing_keywords": strict_result["keyword_match"]["missing_exact"],
-        "parsing_is_healthy": strict_result["parsing_health"]["is_healthy"],
-        "parsing_confidence": strict_result["parsing_health"]["confidence"],
-        "parsing_warnings": strict_result["parsing_health"]["warnings"],
+        "is_knockout": scored["is_knockout"],
+        "knockout_reasons": scored["knockout_reasons"],
+        "knockout_advisories": scored["knockout_advisories"],
+        "strict_ats_score": scored["strict_ats_score"],
+        "strict_matched_keywords": scored["strict_matched_keywords"],
+        "strict_missing_keywords": scored["strict_missing_keywords"],
+        "parsing_is_healthy": scored["parsing_is_healthy"],
+        "parsing_confidence": scored["parsing_confidence"],
+        "parsing_warnings": scored["parsing_warnings"],
 
         # ── HITL wizard support ──
         "contact_snapshot": contact_snapshot,
+
+        # ── Scoring Engine Version ──
+        "scoring_version": scored.get("scoring_version", "1.0.0"),
     }
 
     result = None
@@ -288,6 +274,20 @@ async def match_resume(
                 str(current_user.id),
                 "total_ats_checks",
             )
+
+            # Shadow scoring parallel evaluation (Phase 4.6)
+            try:
+                from services.shadow_scoring import shadow_scoring_service
+                db_inst = getattr(result_repo, "db", None) or getattr(getattr(result_repo, "collection", None), "database", None)
+                shadow_scoring_service.dispatch_shadow_score(
+                    job_id=str(jd.id) if jd and hasattr(jd, "id") else "ats_check",
+                    candidate_id=str(current_user.id),
+                    primary_score=score_data["final_score"],
+                    features_dict=scored.get("features"),
+                    db=db_inst,
+                )
+            except Exception as shadow_err:
+                logger.debug("Shadow scoring dispatch skipped in ATS check", error=str(shadow_err))
         except Exception as e:
             logger.warning("Failed to save ATS result in database", error=str(e))
 
@@ -302,12 +302,14 @@ async def match_resume(
 
     result_id = str(result.id) if result else "unsaved"
 
-    return _build_ats_response(
+    response_payload = _build_ats_response(
         result_id=result_id,
         resume_id=resume_id,
         job_title=job_title,
         data=score_data,
     )
+
+    return response_payload
 
 @router.post("/bulk-match", response_model=BulkATSMatchResponse)
 async def bulk_match(
@@ -354,14 +356,18 @@ async def bulk_match(
             continue
 
         try:
-            graph_result = await ats_engine.ainvoke({
+            resume_payload = resume.parsed_data.model_dump() if hasattr(resume.parsed_data, "model_dump") else (resume.parsed_data or {})
+            if "raw_text" not in resume_payload:
+                resume_payload["raw_text"] = raw_text
 
-                "resume_text": raw_text,
-                "jd_text": payload.job_description,
-            })
+            scored = score_resume(
+                resume=resume_payload,
+                jd=payload.job_description,
+                mode="candidate",
+            )
         except Exception:
             logger.exception(
-                "ATS graph failed",
+                "ATS scoring failed",
                 resume_id=str(resume.id),
             )
             continue
@@ -370,10 +376,10 @@ async def bulk_match(
             BulkATSResultItem(
                 resume_id=str(resume.id),
                 candidate_name=resume.filename,
-                final_score=graph_result["final_score"],
-                recommendation=graph_result["recommendation"],
-                matched_keywords=len(graph_result["matched_skills"]),
-                missing_skills_count=len(graph_result["missing_skills"]),
+                final_score=scored["final_score"],
+                recommendation=scored["recommendation"],
+                matched_keywords=len(scored["matched_skills"]),
+                missing_skills_count=len(scored["missing_skills"]),
                 rank=0,
             )
         )
@@ -429,6 +435,68 @@ async def get_ats_history(
         "items": [_result_summary(r) for r in results],
         **pagination.to_response_meta(total),
     }
+
+
+# ─── POST /match/batch & POST /batch (Async Background Job) ──────────────────
+from pydantic import BaseModel, Field
+from typing import List
+from models.task_job_model import JobType, TaskJobModel
+from repositories.task_job_repo import TaskJobRepository
+from services.tasks import task_manager
+from services.tasks.workers import execute_batch_ats_scoring
+
+class BatchMatchJobPayload(BaseModel):
+    job_id: str
+    resume_ids: List[str]
+    mode: str = Field(default="recruiter", pattern="^(candidate|recruiter)$")
+
+@router.post("/match/batch", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/batch", status_code=status.HTTP_202_ACCEPTED)
+async def queue_batch_match(
+    payload: BatchMatchJobPayload,
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Enqueues async batch ATS matching and returns immediately with a task job ID."""
+    if not payload.resume_ids:
+        raise HTTPException(status_code=422, detail="resume_ids cannot be empty")
+
+    tenant_id = getattr(current_user, "tenant_id", None) or "default"
+    job_record = await task_manager.enqueue_job(
+        job_type=JobType.BATCH_ATS_SCORING,
+        payload={
+            "job_id_target": payload.job_id,
+            "resume_ids": payload.resume_ids,
+            "mode": payload.mode,
+            "tenant_id": tenant_id,
+        },
+        task_coro_func=execute_batch_ats_scoring,
+        tenant_id=tenant_id,
+        user_id=str(current_user.id),
+    )
+
+    return {
+        "status": "queued",
+        "job_id": job_record.job_id if hasattr(job_record, "job_id") else getattr(job_record, "get", lambda k: None)("job_id"),
+        "total_candidates": len(payload.resume_ids),
+        "message": "Batch scoring successfully queued. Poll /api/v1/ats/tasks/{job_id} for live progress.",
+    }
+
+
+# ─── GET /tasks/{task_id} & GET /jobs/{task_id} (Live Polling) ───────────────
+@router.get("/tasks/{task_id}")
+@router.get("/jobs/{task_id}")
+async def get_task_status(
+    task_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    db=Depends(get_database),
+):
+    """Polls live execution status, progress percentage, and results for a background job."""
+    tenant_id = getattr(current_user, "tenant_id", None) or "default"
+    repo = TaskJobRepository(db)
+    job = await repo.get_by_job_id(task_id, tenant_id=tenant_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task job not found.")
+    return job.model_dump()
 
 
 # ─── GET /result/{result_id} ─────────────────────────────────────────────

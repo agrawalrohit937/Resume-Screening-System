@@ -18,7 +18,8 @@ import {
   Crown,
   User,
   Globe,
-  X
+  X,
+  Briefcase
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getGamificationProfile } from '../services/interviewApi'
@@ -37,6 +38,16 @@ const SEARCH_ROUTES = [
   { name: 'Billing & Premium', path: '/billing', icon: Crown, keywords: ['billing', 'upgrade', 'pro'] },
   { name: 'My Profile & Resume', path: '/profile', icon: User, keywords: ['profile', 'resume', 'bio'] },
   { name: 'Account Settings & Password', path: '/settings', icon: Settings, keywords: ['settings', 'password', 'change password', 'security'] },
+]
+
+const RECRUITER_SEARCH_ROUTES = [
+  { name: 'Recruiting Overview', path: '/recruiter/dashboard', icon: LayoutDashboard, keywords: ['overview', 'dashboard', 'analytics', 'funnel', 'kpis'] },
+  { name: 'Jobs & Applicants Pipeline', path: '/recruiter/jobs', icon: Briefcase, keywords: ['jobs', 'postings', 'applicants', 'pipeline', 'kanban'] },
+  { name: 'Marketplace Job Feed', path: '/jobs', icon: Briefcase, keywords: ['market', 'feed', 'jobs', 'browse'] },
+  { name: 'Employer Branding Profile', path: '/recruiter/company', icon: Globe, keywords: ['company', 'brand', 'culture', 'logo', 'benefits'] },
+  { name: 'Recruiter Settings & Alerts', path: '/recruiter/settings', icon: Settings, keywords: ['settings', 'password', 'alerts', 'notifications'] },
+  { name: 'Recruiter Profile', path: '/profile', icon: User, keywords: ['profile', 'user', 'account'] },
+  { name: 'Support & Help Desk', path: '/support', icon: Settings, keywords: ['support', 'help', 'tickets'] },
 ]
 
 function UserAvatar({ user, size = 'sm' }) {
@@ -102,8 +113,11 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
     return () => { isMounted = false }
   }, [userId])
 
+  const isRecruiter = user?.role === 'recruiter'
+  const activeSearchRoutes = isRecruiter ? RECRUITER_SEARCH_ROUTES : SEARCH_ROUTES
+
   // Dynamically get current page name for the breadcrumb
-  const currentRouteName = SEARCH_ROUTES.find(r => r.path === location.pathname)?.name || 'Dashboard'
+  const currentRouteName = activeSearchRoutes.find(r => r.path === location.pathname)?.name || (isRecruiter ? 'Recruiting Overview' : 'Dashboard')
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -113,7 +127,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
     }
     const timer = setTimeout(() => {
       const query = searchQuery.toLowerCase()
-      const results = SEARCH_ROUTES.filter(route => 
+      const results = activeSearchRoutes.filter(route => 
         route.name.toLowerCase().includes(query) || 
         route.keywords.some(kw => kw.includes(query))
       )
@@ -121,7 +135,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
       setSelectedIndex(results.length > 0 ? 0 : -1)
     }, 150)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, activeSearchRoutes])
 
   const handleNavigate = (path) => {
     setIsSearchFocused(false)
@@ -199,7 +213,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   const openCopilot = () => window.dispatchEvent(new Event('careershala:open-copilot'))
 
   return (
-    <header className="h-[72px] sticky top-0 z-50 w-full bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+    <header className="h-[72px] shrink-0 sticky top-0 z-50 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-xs">
       
       {/* 1. Left: Menu Button & Breadcrumb (Fills empty left space) */}
       <div className="flex items-center shrink-0 gap-4">
@@ -350,13 +364,15 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
           <Search size={18} strokeWidth={2.5} />
         </motion.button>
 
-        {/* Gamification Quick Stat Pill */}
-        <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-slate-200 shadow-sm cursor-default" title="Current Daily Practice Streak">
-          <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
-            <Flame size={12} strokeWidth={3} />
+        {/* Gamification Quick Stat Pill — Candidate only */}
+        {!isRecruiter && user?.role !== 'admin' && (
+          <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-slate-200 shadow-sm cursor-default" title="Current Daily Practice Streak">
+            <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
+              <Flame size={12} strokeWidth={3} />
+            </div>
+            <span className="text-xs font-black text-slate-700">{streak} Day{streak === 1 ? '' : 's'}</span>
           </div>
-          <span className="text-xs font-black text-slate-700">{streak} Day{streak === 1 ? '' : 's'}</span>
-        </div>
+        )}
 
         {/* AI Copilot */}
         <motion.button

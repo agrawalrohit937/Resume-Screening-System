@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Crosshair, Zap, BookOpen, Flame, ShieldCheck, Check, Loader, Star, Sparkles, ArrowRight } from 'lucide-react'
 import { getDailyMissions } from '../../services/interviewApi'
-import Card from './Card'
+import Card from '../Card'
 
 // Gamified icons mapped to clean executive slate & brand blue palette
 const ICON_STYLES = {

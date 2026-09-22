@@ -29,8 +29,35 @@ api.interceptors.request.use((config) => {
     }
   }
 
+  // 3. Multi-Tenant Enterprise Header (omit for auth endpoints to prevent stale tenant spoofing checks)
+  const isAuthRoute = Boolean(config.url && (
+    config.url.includes('/auth/') ||
+    config.url.startsWith('auth/') ||
+    config.url.startsWith('/auth')
+  ));
+
+  const tenantId = localStorage.getItem("tenant_id");
+  if (!isAuthRoute && tenantId && tenantId !== "default") {
+    if (config.headers?.set) {
+      config.headers.set('x-tenant-id', tenantId);
+    } else if (config.headers) {
+      config.headers['x-tenant-id'] = tenantId;
+    }
+  } else {
+    if (config.headers?.delete) {
+      config.headers.delete('x-tenant-id');
+    } else if (config.headers) {
+      delete config.headers['x-tenant-id'];
+    }
+  }
+
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers?.set) {
+      config.headers.set('Authorization', `Bearer ${token}`);
+    } else if (config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
   } else {
     // Only warn for requests that expect authentication (exclude public/auth endpoints)
     const isPublic = ['/auth/login', '/auth/signup', '/auth/google', '/auth/github', '/auth/linkedin', '/auth/otp', '/health'].some(path => config.url?.includes(path));
@@ -54,42 +81,31 @@ api.interceptors.response.use(
   async (err) => {
     const originalRequest = err.config;
 
-    // ===== DEBUG LOGS =====
-    if (!originalRequest?.suppressErrorLog) {
-      console.group("[API ERROR]");
-      console.log("URL:", originalRequest?.url);
-      console.log("Method:", originalRequest?.method);
-      console.log("Status:", err.response?.status);
-      console.log(
-        "Response Data:",
-        JSON.stringify(err.response?.data, null, 2)
-      );
-      console.log("Full Error:", err);
-      console.groupEnd();
-    }
+    // List of auth-check / non-refreshable endpoints where 401 is normal (e.g., /auth/me on unauthenticated landing)
+    // and should NEVER trigger token refresh or hard redirects.
+    const isNonRefreshable =
+      originalRequest?.url?.includes('/auth/login') ||
+      originalRequest?.url?.includes('/auth/refresh') ||
+      originalRequest?.url?.includes('/auth/logout') ||
+      originalRequest?.url?.includes('/auth/register') ||
+      originalRequest?.url?.includes('/auth/verify-email') ||
+      originalRequest?.url?.includes('/auth/forgot-password') ||
+      originalRequest?.url?.includes('/auth/reset-password');
 
-    // ===== REFRESH ONLY FOR 401 =====
-    // Endpoints that MUST NOT attempt refresh on 401 (e.g. login, refresh itself, OAuth initiation)
-    const nonRefreshable = ['/auth/login', '/auth/refresh', '/auth/signup', '/auth/otp', '/auth/google', '/auth/github', '/auth/linkedin'];
-    const isNonRefreshable = nonRefreshable.some(path => originalRequest?.url?.includes(path));
-
+    // 🔄 AUTOMATIC REFRESH ON 401 (for all protected data routes)
     if (
       err.response?.status === 401 &&
+      originalRequest &&
       !originalRequest._retry &&
       !isNonRefreshable
     ) {
       originalRequest._retry = true;
 
-      console.log("[API] 401 detected. Refreshing token...");
-
       try {
         const refreshToken = localStorage.getItem("refresh_token");
 
         if (!refreshToken) {
-          console.error("[API] No refresh token found.");
-
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
+          clearLocalAuth();
 
           // CRITICAL FIX: Never execute window.location.href hard reloads for /auth/me
           // or when already on /login or public landing pages! Hard reloads force
@@ -124,22 +140,17 @@ api.interceptors.response.use(
           );
         }
 
-        originalRequest.headers.Authorization =
-          `Bearer ${newAccessToken}`;
-
-        console.log("[API] Token refreshed successfully.");
+        if (originalRequest.headers?.set) {
+          originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
+        } else if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        }
 
         return api(originalRequest);
 
       } catch (refreshError) {
-
-        console.error(
-          "[API] Refresh failed:",
-          refreshError.response?.data || refreshError.message
-        );
-
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        clearLocalAuth();
 
         const isAuthMe = originalRequest?.url?.includes('/auth/me');
         const isAlreadyOnLogin = typeof window !== 'undefined' && window.location.pathname === '/login';
@@ -171,6 +182,7 @@ export const uploadResume = (file, onProgress) => {
 }
 
 export const getResumes = (p, config) => api.get('/resume/', { params: p, ...config })
+export const getResumeById = (id) => api.get(`/resume/${id}`)
 
 export const deleteResume = (id) => api.delete(`/resume/${id}`)
 
@@ -201,27 +213,26 @@ export const getMyAnalytics = (p, config) =>
   api.get('/analytics/me', { params: p, ...config })
 
 
-// Recruiter APIs (NEW)
-export const searchCandidates = (payload) => api.post('/recruiter/search', payload)
-export const getCandidateDetail = (id) => api.get(`/recruiter/candidate/${id}`)
-export const downloadResume = (id) => api.get(`/recruiter/resume/${id}/download`, {
-  responseType: 'blob'
-})
 
-export const matchJD = async (data) => {
-  try {
-    console.log("[Recruiter] Sending JD:", data);
+// ── Job Marketplace APIs ───────────────────────────────────────────────────
+export const getJobs = (params) => api.get('/jobs', { params })
+export const getJobDetail = (jobId) => api.get(`/jobs/${jobId}`)
+export const createJob = (payload) => api.post('/jobs', payload)
+export const updateJob = (jobId, payload) => api.put(`/jobs/${jobId}`, payload)
+export const applyToJob = (jobId, payload, params) => api.post(`/jobs/${jobId}/apply`, payload || null, { params })
+export const matchJobATS = (jobId, params) => api.post(`/jobs/${jobId}/match`, null, { params })
+export const getMyApplications = () => api.get('/jobs/applications/my')
+export const getRecommendedJobs = (params) => api.get('/jobs/recommended', { params })
+export const getMyPostedJobs = () => api.get('/jobs/me')
+export const getRecruiterStats = () => api.get('/jobs/recruiter/stats')
+export const toggleJobStatus = (jobId, status) => api.patch(`/jobs/${jobId}/status`, { status })
+export const getJobsByCompany = (companyName) => api.get(`/jobs/company/${encodeURIComponent(companyName)}`)
+export const saveCompanyProfile = (payload) => api.post('/jobs/company/profile', payload)
+export const getCompanyProfile = () => api.get('/company')
+export const updateCompanyProfile = (payload) => api.patch('/company', payload)
+export const getJobApplications = (jobId, params) => api.get(`/jobs/${jobId}/applications`, { params })
+export const updateApplicationStage = (appId, stage) => api.patch(`/jobs/applications/${appId}/stage`, { stage })
 
-    const res = await api.post("/recruiter/v2/match-jd", data);
-
-    console.log("[Recruiter] Response:", res.data);
-
-    return res.data;
-  } catch (err) {
-    console.error("[Recruiter] ERROR:", err.response?.data || err.message);
-    throw err;
-  }
-};
 
 export const setPrimaryResume = (payload) =>
   api.put('/users/me/set-primary-resume', payload)
@@ -239,8 +250,11 @@ export const chatCopilotStream = async (message, history = [], quickAction = nul
     }
   }
 
+  const tenantId = localStorage.getItem("tenant_id") || "default";
+
   const headers = {
     'Content-Type': 'application/json',
+    'x-tenant-id': tenantId,
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -259,11 +273,25 @@ export const chatCopilotStream = async (message, history = [], quickAction = nul
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(errText || 'Failed to connect to AI Copilot.');
+    let friendlyMessage = 'Failed to connect to AI Copilot.';
+    try {
+      const errJson = JSON.parse(errText);
+      if (errJson.detail) {
+        if (response.status === 401 || String(errJson.detail).toLowerCase().includes('authenticated') || String(errJson.detail).toLowerCase().includes('credential')) {
+          friendlyMessage = 'Please sign in to chat with AI Copilot.';
+        } else {
+          friendlyMessage = errJson.detail;
+        }
+      }
+    } catch {
+      if (errText) friendlyMessage = errText;
+    }
+    throw new Error(friendlyMessage);
   }
 
   return response;
 };
+
 
 // Payment APIs
 export const createCheckout = (plan) => api.post('/payment/checkout', { plan })
@@ -276,4 +304,45 @@ export const reportPaymentFailure = (payload) => api.post('/payment/report-failu
 export const changePassword = (current_password, new_password) =>
   api.post('/auth/change-password', { current_password, new_password })
 
-export default api
+// ── Enterprise Phase 5 APIs ──────────────────────────────────────────────────
+// Requisition Management (Hiring Manager / Exec / Admin)
+export const getRequisitions = (params) => api.get('/requisitions', { params })
+export const createRequisition = (payload) => api.post('/requisitions', payload)
+export const submitRequisition = (id) => api.post(`/requisitions/${id}/submit`)
+export const recordApprovalDecision = (id, payload) => api.post(`/requisitions/${id}/decision`, payload)
+export const linkRequisitionJob = (id, jobId) => api.post(`/requisitions/${id}/link-job`, { job_id: jobId })
+export const getPipelineCandidates = (params) => api.get('/requisitions/pipeline/candidates', { params })
+
+// Interview Kits & Structured Scorecards (Interviewer / Coordinator / Admin)
+export const getInterviewKits = (jobId) => api.get(`/interview-kits`, { params: { job_id: jobId } })
+export const submitScorecard = (payload) => api.post('/interview-kits/scorecards', payload)
+export const getAssignedInterviews = () => api.get('/interview-kits/assigned')
+export const getScorecardsByApplication = (applicationId) => api.get(`/interview-kits/scorecards/${applicationId}`)
+export const getCalibrationReport = (applicationId, stageName) =>
+  api.get(`/interview-kits/calibration`, { params: { application_id: applicationId, stage_name: stageName } })
+
+// Consented Talent Pool (Candidate / Recruiter)
+export const getTalentPoolProfile = () => api.get('/talent-pool/profile')
+export const updateTalentPoolProfile = (payload) => api.post('/talent-pool/profile', payload)
+export const grantTalentPoolConsent = (tier) => api.post('/talent-pool/consent', { visibility_tier: tier })
+export const revokeTalentPoolConsent = () => api.post('/talent-pool/revoke')
+export const getTalentPoolViewHistory = () => api.get('/talent-pool/views')
+export const searchTalentPool = (params) => api.get('/talent-pool/search', { params })
+
+// Exec Analytics (Exec / Admin read-only)
+export const getExecAnalytics = () => api.get('/analytics/enterprise')
+
+// ── Team Management & Invitations (Enterprise B2B SaaS) ──────────────────────
+export const getTeamMembers = () => api.get('/team/members')
+export const inviteTeamMember = (payload) => api.post('/team/invite', payload)
+export const verifyInviteToken = (token) => api.get('/team/verify-invite', { params: { token } })
+export const acceptTeamInvite = (payload) => api.post('/team/accept-invite', payload)
+export const revokeTeamInvite = (inviteId) => api.delete(`/team/invite/${inviteId}`)
+export const removeTeamMember = (userId) => api.delete(`/team/members/${userId}`)
+
+// ── Equal Employment Opportunity (EEO) Isolated Vault ────────────────────────
+export const submitEEOSelfId = (payload) => api.post('/eeo/self-identify', payload)
+export const getEEOAggregateReport = () => api.get('/eeo/aggregate-report')
+export const seedDemoEEOData = () => api.post('/eeo/demo-seed')
+
+export default api
