@@ -15,8 +15,17 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+
+try:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
+    APSCHEDULER_AVAILABLE = True
+except ImportError:
+    AsyncIOScheduler = None
+    CronTrigger = None
+    IntervalTrigger = None
+    APSCHEDULER_AVAILABLE = False
 
 from config.db import get_database
 from models.user_model import UserRole
@@ -27,8 +36,23 @@ from utils.pagination import stream_cursor
 
 logger = structlog.get_logger(__name__)
 
-# Global singleton AsyncIOScheduler instance
-job_alerts_scheduler = AsyncIOScheduler()
+
+class _DummyScheduler:
+    """Fallback dummy scheduler when apscheduler is not installed."""
+    running: bool = False
+
+    def add_job(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def start(self) -> None:
+        pass
+
+    def shutdown(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+
+# Global singleton AsyncIOScheduler instance (or dummy fallback)
+job_alerts_scheduler: Any = AsyncIOScheduler() if APSCHEDULER_AVAILABLE else _DummyScheduler()
 
 
 async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optional[str] = None) -> Dict[str, Any]:
@@ -290,12 +314,15 @@ def start_job_alert_scheduler() -> None:
     Initializes and starts the APScheduler background cron job.
     Schedules nightly job alerts daily at 02:00 AM UTC and periodic stuck-resume sweeps.
     """
+    if not APSCHEDULER_AVAILABLE:
+        logger.info("APScheduler package not installed, running without background cron tasks")
+        return
+
     if job_alerts_scheduler.running:
         logger.info("Job alerts scheduler is already running")
         return
 
     try:
-        from apscheduler.triggers.interval import IntervalTrigger
 
         job_alerts_scheduler.add_job(
             run_nightly_job_alerts,
