@@ -6,10 +6,9 @@ import { isMobileViewport } from '../utils/motionUtils'
 
 import LandingNavbar from '../components/landing/LandingNavbar'
 import LandingHeroSection from '../components/landing/LandingHeroSection'
-import LandingCockpitSection from '../components/landing/LandingCockpitSection'
-import LandingAtsPlayground from '../components/landing/LandingAtsPlayground'
 import LandingFeaturesSection from '../components/landing/LandingFeaturesSection'
 import LandingCertificateSection from '../components/landing/LandingCertificateSection'
+import LandingEnterpriseSection from '../components/landing/LandingEnterpriseSection'
 import LandingWorkflowSection from '../components/landing/LandingWorkflowSection'
 import LandingComparisonSection from '../components/landing/LandingComparisonSection'
 import LandingTestimonialsSection from '../components/landing/LandingTestimonialsSection'
@@ -63,7 +62,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Is the developer portfolio website really 100% free forever?',
-    a: 'Yes, completely free! Connect your GitHub profile in one click, and we generate a personalized developer website (portfolio.careershala.com/yourname) showcasing your repositories, tech stacks, and resume.',
+    a: 'Yes, completely free! Connect your GitHub profile in one click, and we generate a personalized developer website (careershala.tech/dev/yourname) showcasing your repositories, tech stacks, and resume.',
   },
   {
     q: 'How do the AI Live Mock Interviews work?',
@@ -86,21 +85,21 @@ const TESTIMONIALS = [
     name: 'Rohan Sharma',
     role: 'Full-Stack Developer',
     quote: "I couldn't believe the portfolio builder was actually free. It synced my GitHub projects in seconds and looked better than anything I'd built myself.",
-    company: 'Fintech Startup',
+    company: 'Series A FinTech',
   },
   {
     initials: 'PM',
     name: 'Priya Mehta',
     role: 'Frontend Engineer',
     quote: 'Scored 100% in the mock interview and unlocked my verified badge. A recruiter reviewed my application and invited me directly to a final round.',
-    company: 'SaaS Enterprise',
+    company: 'Enterprise SaaS',
   },
   {
     initials: 'AK',
     name: 'Aditya Kumar',
     role: 'Backend Architect',
     quote: 'The AI ATS matcher showed me exactly which system design keywords were missing from my resume. Got 3 interview callbacks in one week!',
-    company: 'Cloud Corp',
+    company: 'Cloud Infrastructure Startup',
   },
 ]
 
@@ -125,11 +124,6 @@ export default function CareerPilotLanding() {
   const [openFaq, setOpenFaq] = useState(null)
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [subscribing, setSubscribing] = useState(false)
-  const [activeCockpitTab, setActiveCockpitTab] = useState('ats')
-  const [playgroundRole, setPlaygroundRole] = useState('Full-Stack Engineer')
-  const [playgroundSkills, setPlaygroundSkills] = useState('React, Python, Docker, Node.js')
-  const [analyzingPlayground, setAnalyzingPlayground] = useState(false)
-  const [playgroundResult, setPlaygroundResult] = useState(null)
   const [activeStep, setActiveStep] = useState(0)
 
   const handleNewsletterSubmit = (e) => {
@@ -143,31 +137,11 @@ export default function CareerPilotLanding() {
     }, 800)
   }
 
-  const handlePlaygroundSubmit = (e) => {
-    e.preventDefault()
-    if (!playgroundSkills.trim()) return
-    setAnalyzingPlayground(true)
-    setTimeout(() => {
-      const skillsArr = playgroundSkills.split(',').map((s) => s.trim().toLowerCase())
-      const hasDocker = skillsArr.includes('docker') || skillsArr.includes('kubernetes')
-      const hasSystemDesign = skillsArr.includes('system design') || skillsArr.includes('redis')
-      const score = 75 + (hasDocker ? 12 : 0) + (hasSystemDesign ? 10 : 0)
-
-      setPlaygroundResult({
-        score: Math.min(score, 96),
-        matched: skillsArr.map((s) => s.charAt(0).toUpperCase() + s.slice(1)),
-        missing: ['System Architecture', 'Redis Caching', 'CI/CD Pipelines', 'Kubernetes'],
-        recommendation: 'Add quantitative impact metrics and include Redis/CI-CD keywords to reach 95%+ match score.',
-      })
-      setAnalyzingPlayground(false)
-    }, 900)
-  }
-
   const isMobile = isMobileViewport()
 
   return (
     <MotionConfig reducedMotion={isMobile ? 'always' : 'user'}>
-      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-x-clip selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA] pt-14 sm:pt-16">
+      <div className="min-h-screen w-full bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA] pt-14 sm:pt-16">
         {/* Background Ambient Lighting & Mesh (Lazy Loaded with Instant Fallback) */}
         <Suspense fallback={<AmbientFallback />}>
           <AmbientMotionBg />
@@ -180,54 +154,37 @@ export default function CareerPilotLanding() {
           setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
-        {/* 2. Hero Section (LCP Optimized with Interactive Layered SaaS Mockup) */}
+        {/* 2. Static Hero Section (LCP Optimized with SaaS Dashboard Showcase) */}
         <LandingHeroSection user={user} />
 
-        {/* 3. Telemetry Cockpit Section */}
-        <LandingCockpitSection
-          activeCockpitTab={activeCockpitTab}
-          setActiveCockpitTab={setActiveCockpitTab}
-          fadeInUp={fadeInUp}
-          scaleUp={scaleUp}
-        />
-
-        {/* 4. Interactive ATS Matcher Playground */}
-        <LandingAtsPlayground
-          playgroundRole={playgroundRole}
-          setPlaygroundRole={setPlaygroundRole}
-          playgroundSkills={playgroundSkills}
-          setPlaygroundSkills={setPlaygroundSkills}
-          analyzingPlayground={analyzingPlayground}
-          playgroundResult={playgroundResult}
-          handlePlaygroundSubmit={handlePlaygroundSubmit}
-          fadeInUp={fadeInUp}
-        />
-
-        {/* 5. Core Feature Suite Section (Asymmetric Bento Grid) */}
+        {/* 3. Core Feature Suite Section (Asymmetric Bento Grid) */}
         <LandingFeaturesSection fadeInUp={fadeInUp} />
 
-        {/* 6. Verifiable Skill Certificate Showcase Section (3D Stacked Pedestal) */}
+        {/* 4. Verifiable Skill Certificate Showcase Section (3D Stacked Pedestal) */}
         <LandingCertificateSection user={user} fadeInUp={fadeInUp} />
 
-        {/* 7. Step-by-Step Workflow Journey Section */}
+        {/* 5. Enterprise Recruiter & Talent Portal Section */}
+        <LandingEnterpriseSection user={user} />
+
+        {/* 6. Step-by-Step Workflow Journey Section */}
         <LandingWorkflowSection activeStep={activeStep} setActiveStep={setActiveStep} />
 
-        {/* 8. Comparison Matrix Table Section */}
+        {/* 6. Comparison Matrix Table Section */}
         <LandingComparisonSection data={COMPARISON_DATA} />
 
-        {/* 9. Developer Testimonials Section */}
+        {/* 7. Developer Testimonials Section */}
         <LandingTestimonialsSection testimonials={TESTIMONIALS} />
 
-        {/* 10. Transparent Pricing Section */}
+        {/* 8. Transparent Pricing Section (with Recruiter ROI Framing) */}
         <LandingPricingSection isAnnual={isAnnual} setIsAnnual={setIsAnnual} />
 
-        {/* 11. FAQ Accordion Section */}
+        {/* 9. FAQ Accordion Section */}
         <LandingFaqSection items={FAQ_ITEMS} openFaq={openFaq} setOpenFaq={setOpenFaq} />
 
-        {/* 12. Final Closing High-Conversion CTA Banner */}
+        {/* 10. Final Closing High-Conversion CTA Banner */}
         <LandingFinalCtaSection user={user} />
 
-        {/* 13. Mega Footer */}
+        {/* 11. Mega Footer */}
         <LandingFooter
           newsletterEmail={newsletterEmail}
           setNewsletterEmail={setNewsletterEmail}

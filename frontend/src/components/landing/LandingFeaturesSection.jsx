@@ -14,101 +14,124 @@ import {
   Sparkles,
   Send,
   Cpu,
+  Brain,
+  Layers,
+  ChevronRight,
 } from 'lucide-react'
 
 export default function LandingFeaturesSection({ fadeInUp }) {
   return (
-    <section id="features" className="py-16 sm:py-24 bg-gradient-to-b from-white via-slate-50/60 to-white relative overflow-hidden">
-      
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[500px] bg-gradient-to-tr from-sky-200/15 via-indigo-200/10 to-amber-200/10 rounded-full blur-[140px] pointer-events-none -z-10" />
+    <section id="features" className="py-16 sm:py-24 relative overflow-hidden bg-gradient-to-b from-white via-slate-50/70 to-white">
+      {/* Dynamic Multi-Color Aurora Mesh Ambient Backgrounds */}
+      <div className="absolute top-1/4 right-1/4 w-[650px] h-[450px] bg-gradient-to-tr from-[#2E9BDA]/15 via-indigo-500/10 to-amber-300/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="absolute top-1/2 left-1/12 w-[500px] h-[350px] bg-gradient-to-br from-sky-200/20 to-purple-200/15 rounded-full blur-[130px] pointer-events-none -z-10" />
+      <div className="absolute bottom-10 right-1/3 w-[450px] h-[300px] bg-gradient-to-tl from-emerald-200/15 to-indigo-200/15 rounded-full blur-[130px] pointer-events-none -z-10" />
+
+      {/* Subtle geometric dot grid pattern with radial fade */}
+      <div
+        className="absolute inset-0 opacity-[0.16] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(46, 155, 218, 0.4) 1px, transparent 0)`,
+          backgroundSize: '32px 32px',
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-sky-200 text-[#2E9BDA] text-[11px] font-black tracking-widest uppercase mb-3.5 shadow-xs backdrop-blur-md">
-            <Sparkles size={13} className="text-amber-500" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-sky-200/80 text-[#2E9BDA] text-[11px] font-extrabold uppercase tracking-wider mb-4 shadow-sm shadow-sky-500/5 backdrop-blur-md">
+            <Cpu size={14} className="text-[#2E9BDA]" />
+            <Sparkles size={12} className="text-amber-500 animate-pulse" />
             <span>MODERN AI CAREER ARCHITECTURE</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-3.5 leading-tight">
+
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.16] mb-3.5">
             Built to Give You an{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-indigo-600 to-[#1d6fa5]">
-              Unfair Advantage
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-sky-600 to-indigo-600">
+              Unfair Advantage.
             </span>
           </h2>
-          <p className="text-sm sm:text-base text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed">
-            Everything you need to bypass ATS filters, ace proctored technical interviews, automate outreach, and land top software offers.
+
+          <p className="text-slate-600 text-sm sm:text-base font-medium leading-relaxed max-w-2xl mx-auto">
+            Everything you need to bypass ATS filters, ace proctored technical interviews, automate outreach, and land top software engineering offers.
           </p>
         </div>
 
-        {/* ── LUXURY BENTO GRID ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* ── LUXURY BENTO GRID WITH VIBRANT COLOR ACCENTS & HOVER EFFECTS ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch">
           
-          {/* Card 1: Large Spotlight (Span 2 cols on LG) - AI Live Interview */}
+          {/* Card 1: Large Featured Spotlight (Span 2 cols on LG) - AI Vision */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -6, transition: { duration: 0.25 } }}
             viewport={{ once: true }}
-            transition={{ duration: 0.4 }}
-            className="lg:col-span-2 bg-gradient-to-br from-white via-white to-sky-50/40 rounded-[2rem] p-7 sm:p-8 border border-slate-200/90 shadow-[0_4px_25px_-4px_rgba(46,155,218,0.08)] hover:shadow-[0_16px_45px_-6px_rgba(46,155,218,0.18)] hover:border-sky-300 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
+            transition={{ duration: 0.5 }}
+            className="lg:col-span-2 relative group"
           >
-            {/* Top Glossy Highlight Line */}
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-sky-400/50 to-transparent pointer-events-none" />
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-[#2E9BDA]/10 via-indigo-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
-            
-            <div>
-              <div className="flex items-center justify-between gap-3 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-sky-500 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                    <Video size={20} />
+            {/* Ambient Multi-Layer Radial Glow */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-sky-400/20 via-indigo-500/15 to-purple-400/15 rounded-[2.5rem] blur-2xl group-hover:blur-3xl group-hover:opacity-100 opacity-70 transition-all duration-500 -z-10" />
+
+            {/* Main Luxury Glassmorphic Card Frame */}
+            <div className="h-full rounded-[2rem] p-7 sm:p-9 bg-gradient-to-br from-white via-indigo-50/20 to-sky-50/30 backdrop-blur-2xl border border-indigo-100/90 shadow-sm group-hover:shadow-[0_20px_60px_-15px_rgba(99,102,241,0.25)] group-hover:border-indigo-400/80 transition-all duration-300 flex flex-col justify-between relative overflow-hidden">
+              
+              {/* Glossy Top Border Accent Line */}
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/80 to-transparent pointer-events-none group-hover:via-sky-400 transition-all duration-500" />
+
+              <div>
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-300/80 text-indigo-600 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
+                      <Video size={22} className="text-indigo-600" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600 font-mono block">
+                        AI VISION &amp; SPEECH PROCTOR
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight group-hover:text-indigo-950 transition-colors">
+                        Live Mock Interview Coaching
+                      </h3>
+                    </div>
                   </div>
-                  <div>
-                    <span className="inline-block text-[11px] font-black uppercase tracking-wider text-indigo-700 font-mono">
-                      AI VISION &amp; PROCTORING
-                    </span>
-                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-                      Live Mock Interview with Computer Vision Coach
-                    </h3>
-                  </div>
+
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-mono font-extrabold text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs shrink-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> 60 FPS WASM
+                  </span>
                 </div>
 
-                <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shrink-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 60 FPS WASM
-                </span>
+                <p className="text-slate-600 text-sm leading-relaxed mb-6 font-medium">
+                  Experience realistic technical assessments with real-time eye gaze tracking, looking-down detection, speech pacing analytics, and instant rubric evaluations.
+                </p>
+
+                {/* Clean 3-Metric Feature Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-2">
+                  <div className="p-3.5 rounded-xl bg-white/90 border border-indigo-100 shadow-2xs group-hover:border-indigo-200 transition-colors">
+                    <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Iris Gaze Tracker</p>
+                    <p className="text-xs font-extrabold text-slate-900 mt-1 flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-emerald-500" /> 98% Eye Focus
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-white/90 border border-indigo-100 shadow-2xs group-hover:border-indigo-200 transition-colors">
+                    <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Speech Cadence</p>
+                    <p className="text-xs font-extrabold text-slate-900 mt-1 flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-indigo-600" /> 142 WPM Pacing
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-white/90 border border-indigo-100 shadow-2xs group-hover:border-indigo-200 transition-colors">
+                    <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Anti-Cheat Monitor</p>
+                    <p className="text-xs font-extrabold text-slate-900 mt-1 flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-emerald-500" /> 0 Flags Detected
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 max-w-2xl font-medium">
-                Experience realistic technical assessments with our friendly AI Alex. Includes real-time eye gaze tracking, looking down detection, and instant speech pacing feedback.
-              </p>
-
-              {/* Simulated Interactive HUD */}
-              <div className="bg-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-inner grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800/80">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gaze Tracking</p>
-                  <p className="text-xs font-extrabold text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Focused (Center)
-                  </p>
-                </div>
-                <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800/80">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Looking Down</p>
-                  <p className="text-xs font-extrabold text-slate-200">3s Anti-Cheat Guard</p>
-                </div>
-                <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800/80">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Speech Clarity</p>
-                  <p className="text-xs font-extrabold text-sky-400">142 WPM • Clear</p>
-                </div>
-                <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800/80">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Warning Counter</p>
-                  <p className="text-xs font-extrabold text-amber-400">0 / 5 (Max Safety)</p>
-                </div>
+              <div className="flex flex-wrap items-center gap-5 text-xs font-bold text-slate-600 pt-5 border-t border-slate-200/80 mt-6">
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Real-time speech guidance</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Lightweight zero-lag WASM</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Instant answer score</span>
               </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500 pt-2 border-t border-slate-100">
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Speech-to-text transcription</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> MediaPipe FaceMesh &amp; Iris</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Instant AI question scoring</span>
             </div>
           </motion.div>
 
@@ -116,40 +139,30 @@ export default function LandingFeaturesSection({ fadeInUp }) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -6, transition: { duration: 0.25 } }}
             viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="bg-gradient-to-br from-white via-white to-sky-50/40 rounded-[2rem] p-7 border border-slate-200/90 shadow-[0_4px_25px_-4px_rgba(46,155,218,0.08)] hover:shadow-[0_16px_45px_-6px_rgba(46,155,218,0.18)] hover:border-sky-300 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="rounded-[2rem] p-7 sm:p-8 bg-gradient-to-br from-white via-sky-50/30 to-white backdrop-blur-md border border-sky-200/80 shadow-xs hover:shadow-[0_20px_50px_-15px_rgba(46,155,218,0.22)] hover:border-sky-400 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
           >
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-sky-400/50 to-transparent pointer-events-none" />
-
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-[#2E9BDA] text-white flex items-center justify-center mb-5 shadow-md shadow-[#2E9BDA]/20 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-300 text-[#2E9BDA] flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <FileText size={22} />
               </div>
-              <span className="inline-block px-3 py-1 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-sky-50 text-[#2E9BDA] border border-sky-200 mb-3">
-                SMART ATS MATCHER
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#2E9BDA] font-mono block mb-1">
+                SMART ATS ENGINE
               </span>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2">
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-[#2E9BDA] transition-colors">
                 Pass Corporate ATS Filters
               </h3>
-              <p className="text-slate-600 text-xs leading-relaxed mb-5 font-medium">
-                Upload your resume alongside any target Job Description. Get instant missing keyword suggestions and formatting fixes.
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-medium">
+                Upload your resume against any target Job Description for instant missing keyword density and formatting fixes.
               </p>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-2 mb-4">
-                <div className="flex justify-between text-xs font-black text-slate-800">
-                  <span>ATS Match Score</span>
-                  <span className="text-emerald-600 font-mono">94% (Exceptional)</span>
-                </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div className="bg-gradient-to-r from-[#2E9BDA] to-emerald-500 h-full w-[94%]" />
-                </div>
-              </div>
             </div>
 
-            <div className="text-xs font-bold text-slate-500 space-y-1.5 pt-3 border-t border-slate-100">
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Workday &amp; Greenhouse parsed</p>
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Actionable bullet suggestions</p>
+            <div className="text-xs font-bold text-slate-600 space-y-2 pt-4 border-t border-slate-200/80">
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Workday &amp; Greenhouse parsed</p>
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Actionable XYZ bullet rewrites</p>
             </div>
           </motion.div>
 
@@ -157,70 +170,61 @@ export default function LandingFeaturesSection({ fadeInUp }) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -6, transition: { duration: 0.25 } }}
             viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.15 }}
-            className="bg-gradient-to-br from-white via-white to-emerald-50/30 rounded-[2rem] p-7 border border-slate-200/90 shadow-[0_4px_25px_-4px_rgba(16,185,129,0.08)] hover:shadow-[0_16px_45px_-6px_rgba(16,185,129,0.18)] hover:border-emerald-300 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="rounded-[2rem] p-7 sm:p-8 bg-gradient-to-br from-white via-emerald-50/30 to-white backdrop-blur-md border border-emerald-200/80 shadow-xs hover:shadow-[0_20px_50px_-15px_rgba(16,185,129,0.22)] hover:border-emerald-400 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
           >
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent pointer-events-none" />
-
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center mb-5 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-300 text-emerald-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <Globe size={22} />
               </div>
-              <span className="inline-block px-3 py-1 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200 mb-3">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 font-mono block mb-1">
                 100% FREE FOREVER
               </span>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2">
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-700 transition-colors">
                 Instant Developer Portfolio
               </h3>
-              <p className="text-slate-600 text-xs leading-relaxed mb-5 font-medium">
-                Connect your GitHub profile in 1-click. Generate a live developer website highlighting your repos, skills, and verified badges.
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-medium">
+                Connect your GitHub profile in 1-click to auto-publish a live developer website at careershala.tech/dev/yourname.
               </p>
-
-              <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200 font-mono text-[11px] font-bold text-emerald-800 truncate">
-                🔗 portfolio.careershala.com/username
-              </div>
             </div>
 
-            <div className="text-xs font-bold text-slate-500 space-y-1.5 pt-4 border-t border-slate-100">
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> 1-Click GitHub repository sync</p>
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Fast CDN global hosting</p>
+            <div className="text-xs font-bold text-slate-600 space-y-2 pt-4 border-t border-slate-200/80">
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> 1-Click GitHub repository sync</p>
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Global ultra-fast CDN hosting</p>
             </div>
           </motion.div>
 
-          {/* Card 4: Verified 100% Club Certificates */}
+          {/* Card 4: Recruiter Shortlist & Candidate Ranker */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -6, transition: { duration: 0.25 } }}
             viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            className="bg-gradient-to-br from-white via-white to-amber-50/30 rounded-[2rem] p-7 border border-slate-200/90 shadow-[0_4px_25px_-4px_rgba(245,158,11,0.08)] hover:shadow-[0_16px_45px_-6px_rgba(245,158,11,0.18)] hover:border-amber-300 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="rounded-[2rem] p-7 sm:p-8 bg-gradient-to-br from-white via-purple-50/30 to-white backdrop-blur-md border border-purple-200/80 shadow-xs hover:shadow-[0_20px_50px_-15px_rgba(168,85,247,0.22)] hover:border-purple-400 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
           >
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent pointer-events-none" />
-
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-purple-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center mb-5 shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
-                <Award size={22} />
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-300 text-purple-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
+                <Users size={22} />
               </div>
-              <span className="inline-block px-3 py-1 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-amber-50 text-amber-900 border border-amber-200 mb-3">
-                VERIFIED BADGES
+              <span className="text-[11px] font-black uppercase tracking-wider text-purple-700 font-mono block mb-1">
+                ENTERPRISE PORTAL
               </span>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2">
-                100% Club QR Certificate
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-purple-700 transition-colors">
+                Talent Shortlist Pipeline
               </h3>
-              <p className="text-slate-600 text-xs leading-relaxed mb-5 font-medium">
-                Score high in proctored mock interviews to unlock verifiable credentials with a scannable QR code for hiring managers.
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-medium">
+                Hiring managers filter pre-screened developers ranked by validated proctor scores, gaze stability, and skill tags.
               </p>
-
-              <div className="flex items-center gap-2 p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-xs font-bold text-amber-900">
-                <ShieldCheck size={16} className="text-amber-600 shrink-0" />
-                <span>Tamper-proof recruiter validation</span>
-              </div>
             </div>
 
-            <div className="text-xs font-bold text-slate-500 space-y-1.5 pt-4 border-t border-slate-100">
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Add badge directly to LinkedIn</p>
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Shareable verification link</p>
+            <div className="text-xs font-bold text-slate-600 space-y-2 pt-4 border-t border-slate-200/80">
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Batch JD-to-resume matching</p>
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Direct interview invite dispatch</p>
             </div>
           </motion.div>
 
@@ -228,30 +232,61 @@ export default function LandingFeaturesSection({ fadeInUp }) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -6, transition: { duration: 0.25 } }}
             viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.25 }}
-            className="bg-gradient-to-br from-white via-white to-cyan-50/30 rounded-[2rem] p-7 border border-slate-200/90 shadow-[0_4px_25px_-4px_rgba(6,182,212,0.08)] hover:shadow-[0_16px_45px_-6px_rgba(6,182,212,0.18)] hover:border-cyan-300 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="rounded-[2rem] p-7 sm:p-8 bg-gradient-to-br from-white via-amber-50/30 to-white backdrop-blur-md border border-amber-200/80 shadow-xs hover:shadow-[0_20px_50px_-15px_rgba(245,158,11,0.22)] hover:border-amber-400 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
           >
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent pointer-events-none" />
-
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center mb-5 shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-300 text-amber-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <Send size={20} />
               </div>
-              <span className="inline-block px-3 py-1 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-cyan-50 text-cyan-800 border border-cyan-200 mb-3">
-                OUTREACH AGENT
+              <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 font-mono block mb-1">
+                AI OUTREACH AGENT
               </span>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2">
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-amber-700 transition-colors">
                 Automated HR Outreach
               </h3>
-              <p className="text-slate-600 text-xs leading-relaxed mb-5 font-medium">
-                Generate high-converting recruiter cold emails, track interview responses, and automate targeted outreach.
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-medium">
+                Generate high-converting personalized recruiter cold emails highlighting your top metrics with direct Gmail dispatch.
               </p>
             </div>
 
-            <div className="text-xs font-bold text-slate-500 space-y-1.5 pt-4 border-t border-slate-100">
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Personalized email generator</p>
-              <p className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> Application pipeline tracker</p>
+            <div className="text-xs font-bold text-slate-600 space-y-2 pt-4 border-t border-slate-200/80">
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Tailored JD metric alignment</p>
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> 1-Click direct Gmail dispatch</p>
+            </div>
+          </motion.div>
+
+          {/* Card 6: CareerQuest Gamification & XP Streaks */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -6, transition: { duration: 0.25 } }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="rounded-[2rem] p-7 sm:p-8 bg-gradient-to-br from-white via-rose-50/30 to-white backdrop-blur-md border border-rose-200/80 shadow-xs hover:shadow-[0_20px_50px_-15px_rgba(244,63,94,0.22)] hover:border-rose-400 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group"
+          >
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-rose-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-300 text-rose-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
+                <Trophy size={22} />
+              </div>
+              <span className="text-[11px] font-black uppercase tracking-wider text-rose-700 font-mono block mb-1">
+                GAMIFIED QUESTS &amp; XP
+              </span>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-rose-700 transition-colors">
+                CareerQuest Rewards Hub
+              </h3>
+              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-medium">
+                Maintain interview practice streaks, complete daily coding challenges, earn XP points, and climb the developer leaderboard.
+              </p>
+            </div>
+
+            <div className="text-xs font-bold text-slate-600 space-y-2 pt-4 border-t border-slate-200/80">
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Daily practice streaks &amp; levels</p>
+              <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Public rank badge verification</p>
             </div>
           </motion.div>
 

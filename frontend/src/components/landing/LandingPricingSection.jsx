@@ -57,10 +57,10 @@ export default function LandingPricingSection() {
       isPopular: false,
       buttonClass: 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm',
       features: [
-        { text: '3 Free ATS Resume Scans / mo', tag: null },
-        { text: '1-Click GitHub Portfolio Website', tag: 'FREE' },
-        { text: 'Basic AI Mock Interview Practice', tag: null },
-        { text: 'Full Access to Community Hub', tag: null },
+        '3 Free ATS Resume Scans / month',
+        '1-Click GitHub Portfolio Website',
+        'Basic AI Mock Interview Practice',
+        'Full Access to Community Hub',
       ],
     },
     {
@@ -75,11 +75,11 @@ export default function LandingPricingSection() {
       isPopular: true,
       buttonClass: 'bg-gradient-to-r from-[#2E9BDA] via-[#2563EB] to-indigo-600 hover:from-[#248bc7] hover:to-indigo-700 text-white shadow-lg shadow-[#2563EB]/25 hover:shadow-xl',
       features: [
-        { text: 'Unlimited ATS Resume Scans & JD Match', tag: 'UNLIMITED' },
-        { text: 'Unlimited AI Live Mock Interviews', tag: '60 FPS' },
-        { text: 'MediaPipe Eye & Speech Proctoring', tag: 'VISION' },
-        { text: '100% Club QR Verified Certificates', tag: 'BADGE' },
-        { text: 'Priority AI Copilot Assistant', tag: '24/7' },
+        'Unlimited ATS Resume Scans & JD Match',
+        'Unlimited AI Live Mock Interviews (60 FPS)',
+        'MediaPipe Eye & Speech Proctoring',
+        '100% Club QR Verified Certificates',
+        '24/7 Priority AI Copilot Assistant',
       ],
     },
     {
@@ -89,42 +89,54 @@ export default function LandingPricingSection() {
       price: '₹1,999',
       period: 'per month',
       desc: 'For hiring managers and tech recruiters sourcing pre-assessed candidates with verified scores.',
+      roiLine: '⚡ Replaces ₹15,000+ per-hire agency fees with verified talent pipelines.',
       buttonText: 'Access Recruiter Portal',
       buttonLink: '/signup',
       isPopular: false,
       buttonClass: 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm',
       features: [
-        { text: 'Access 10,000+ Verified Developer Profiles', tag: 'DATABASE' },
-        { text: 'JD-to-Candidate Batch Match Engine', tag: 'FAST' },
-        { text: 'QR Certificate Authenticator API', tag: null },
-        { text: 'Direct Candidate Outreach Dispatch', tag: null },
+        'Access 10,000+ Verified Developer Profiles',
+        'JD-to-Candidate Batch Match Engine',
+        'QR Certificate Authenticator API',
+        'Direct Candidate Outreach Dispatch',
       ],
     },
   ]
 
   return (
-    <section id="pricing" className="py-16 sm:py-24 bg-gradient-to-b from-white via-blue-50/25 to-slate-50 relative border-t border-slate-200/80 overflow-hidden">
+    <section id="pricing" className="py-16 sm:py-24 bg-gradient-to-b from-white via-slate-50/70 to-white relative border-t border-slate-200/80 overflow-hidden">
       
-      {/* Background ambient lighting glows matching tailwind blue palette */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] bg-gradient-to-tr from-blue-200/20 via-sky-200/20 to-indigo-200/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+      {/* Dynamic Multi-Color Aurora Mesh Ambient Background */}
+      <div className="absolute top-1/3 left-1/4 w-[650px] h-[450px] bg-gradient-to-tr from-[#2E9BDA]/15 via-indigo-500/10 to-amber-300/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="absolute bottom-10 right-1/4 w-[500px] h-[350px] bg-gradient-to-br from-sky-200/20 to-purple-200/15 rounded-full blur-[130px] pointer-events-none -z-10" />
+
+      {/* Subtle geometric dot grid pattern with radial fade */}
+      <div
+        className="absolute inset-0 opacity-[0.16] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(46, 155, 218, 0.4) 1px, transparent 0)`,
+          backgroundSize: '32px 32px',
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-black uppercase tracking-widest mb-3.5 shadow-xs">
-            <Zap size={13} className="text-blue-600" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-sky-200/80 text-[#2E9BDA] text-[11px] font-extrabold uppercase tracking-wider mb-4 shadow-sm shadow-sky-500/5 backdrop-blur-md">
+            <Zap size={14} className="text-[#2E9BDA]" />
+            <Sparkles size={12} className="text-amber-500 animate-pulse" />
             <span>TRANSPARENT INR (₹) PRICING</span>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-3.5 leading-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.16] mb-3.5">
             Start Free.{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-[#2563EB] to-indigo-600">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] via-sky-600 to-indigo-600">
               Upgrade as You Grow.
             </span>
           </h2>
 
-          <p className="text-sm sm:text-base text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-600 text-sm sm:text-base font-medium leading-relaxed max-w-2xl mx-auto">
             Free forever developer portfolio &amp; starter ATS scans. Upgrade for unlimited vision mock interviews and verified distinction badges.
           </p>
         </div>
@@ -177,37 +189,30 @@ export default function LandingPricingSection() {
                   <span className="text-xs text-slate-500 font-bold">/ {plan.period}</span>
                 </div>
 
-                <p className="text-slate-600 text-xs sm:text-sm mb-6 font-medium leading-relaxed min-h-[38px]">
+                <p className="text-slate-600 text-xs sm:text-sm mb-4 font-medium leading-relaxed min-h-[38px]">
                   {plan.desc}
                 </p>
 
-                {/* Feature Checklist */}
-                <div className="space-y-3 border-t border-slate-100 pt-6">
+                {plan.roiLine && (
+                  <div className="mb-5 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11.5px] font-bold leading-snug">
+                    {plan.roiLine}
+                  </div>
+                )}
+
+                {/* Feature Checklist (Clean & Restrained) */}
+                <div className="space-y-3.5 border-t border-slate-100 pt-6">
                   {plan.features.map((feat, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs font-bold text-slate-700">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-                            plan.isPopular ? 'bg-blue-600 text-white' : 'bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          <Check size={11} strokeWidth={3} />
-                        </div>
-                        <span className={plan.isPopular ? 'text-slate-900 font-extrabold' : 'text-slate-700'}>
-                          {feat.text}
-                        </span>
+                    <div key={i} className="flex items-center gap-2.5 text-xs sm:text-[13px] font-bold text-slate-700">
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                          plan.isPopular ? 'bg-blue-600 text-white' : 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        <Check size={11} strokeWidth={3} />
                       </div>
-                      {feat.tag && (
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-black font-mono tracking-wider uppercase ${
-                            plan.isPopular
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {feat.tag}
-                        </span>
-                      )}
+                      <span className={plan.isPopular ? 'text-slate-900 font-extrabold' : 'text-slate-700'}>
+                        {feat}
+                      </span>
                     </div>
                   ))}
                 </div>

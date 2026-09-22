@@ -29,7 +29,7 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
         <Link to="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center group-hover:shadow-sm group-hover:scale-105 transition-all duration-300 p-1">
             <img
-              src="/logo_t.webp"
+              src="/logo.png"
               alt="CareerShala Logo"
               width={32}
               height={32}
@@ -45,21 +45,15 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
         </Link>
 
         {/* Desktop Nav Links */}
-        <nav className="hidden lg:flex items-center gap-6 text-[13px] font-bold text-slate-600">
-          <a href="#cockpit" className="hover:text-[#2E9BDA] transition-colors">
-            Cockpit
-          </a>
-          <a href="#playground" className="hover:text-[#2E9BDA] transition-colors">
-            ATS Scanner
-          </a>
+        <nav className="hidden lg:flex items-center gap-6 text-[13.5px] font-bold text-slate-600">
           <a href="#features" className="hover:text-[#2E9BDA] transition-colors">
             Features
           </a>
           <a href="#certificates" className="hover:text-[#2E9BDA] transition-colors">
             Certificates
           </a>
-          <a href="#how-it-works" className="hover:text-[#2E9BDA] transition-colors">
-            Workflow
+          <a href="#enterprise" className="hover:text-[#2E9BDA] transition-colors">
+            Enterprise
           </a>
           <a href="#pricing" className="hover:text-[#2E9BDA] transition-colors">
             Pricing
@@ -107,82 +101,68 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
 
         {/* Mobile Hamburger Toggle */}
         <button
-          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-          className="lg:hidden p-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          aria-label="Toggle Navigation Menu"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none"
+          aria-label="Toggle Menu"
         >
-          {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
-      {/* Mobile Drawer Navigation Overlay */}
+      {/* Mobile Drawer Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.2 }}
             className="lg:hidden pointer-events-auto max-w-6xl mx-auto mt-2 bg-white/95 backdrop-blur-2xl border border-slate-200/90 rounded-3xl p-5 shadow-2xl flex flex-col gap-3"
           >
             <nav className="flex flex-col gap-1.5 font-bold text-slate-700 text-sm">
-              <Link
-                to="/careers"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="inline-flex items-center gap-2 py-2 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-extrabold"
-              >
-                <Flame size={14} className="text-amber-500 fill-amber-500 animate-pulse" />
-                <span>Careers (We're Hiring!)</span>
-              </Link>
-              <a
-                href="#cockpit"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
-              >
-                Cockpit
-              </a>
-              <a
-                href="#playground"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
-              >
-                ATS Scanner
-              </a>
               <a
                 href="#features"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
+                className="py-2.5 px-3 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 Features
               </a>
               <a
                 href="#certificates"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
+                className="py-2.5 px-3 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 Certificates
               </a>
               <a
-                href="#how-it-works"
+                href="#enterprise"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
+                className="py-2.5 px-3 rounded-xl hover:bg-slate-100 transition-colors"
               >
-                Workflow
+                Enterprise
               </a>
               <a
                 href="#pricing"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
+                className="py-2.5 px-3 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 Pricing
               </a>
               <a
                 href="#faq"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="py-2 px-3 rounded-xl hover:bg-slate-100 transition-colors"
+                className="py-2.5 px-3 rounded-xl hover:bg-slate-100 transition-colors"
               >
                 FAQ
               </a>
+              <Link
+                to="/careers"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="inline-flex items-center gap-2 py-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-extrabold"
+              >
+                <Flame size={14} className="text-amber-500 fill-amber-500 animate-pulse" />
+                <span>Careers (We're Hiring!)</span>
+              </Link>
             </nav>
 
             <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
