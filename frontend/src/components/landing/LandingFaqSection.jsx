@@ -43,50 +43,59 @@ export default function LandingFaqSection({ items, openFaq, setOpenFaq }) {
         </div>
 
         {/* Accordion List */}
-        <div className="space-y-3.5">
-          {items.map((item, idx) => (
-            <div
-              key={idx}
-              className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
-                openFaq === idx
-                  ? 'bg-white border-[#2E9BDA]/40 shadow-lg ring-2 ring-[#2E9BDA]/10'
-                  : 'bg-white/90 backdrop-blur-sm border-slate-200/90 hover:border-slate-300 shadow-xs'
-              }`}
-            >
-              <button
-                onClick={() => toggleFaq(idx)}
-                className="w-full p-4.5 sm:p-5 text-left flex items-center justify-between gap-4 focus:outline-none cursor-pointer"
+        <div className="space-y-3 sm:space-y-3.5">
+          {items.map((item, idx) => {
+            const isOpen = openFaq === idx
+            return (
+              <div
+                key={idx}
+                className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
+                  isOpen
+                    ? 'bg-white border-[#2E9BDA]/40 shadow-lg shadow-sky-500/5 ring-1 sm:ring-2 ring-[#2E9BDA]/20'
+                    : 'bg-white/95 backdrop-blur-sm border-slate-200/90 hover:border-slate-300/90 hover:shadow-xs'
+                }`}
               >
-                <span className="font-extrabold text-slate-900 text-sm sm:text-base">
-                  {item.q}
-                </span>
-                <div
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 ${
-                    openFaq === idx
-                      ? 'rotate-180 bg-sky-50 text-[#2E9BDA]'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => toggleFaq(idx)}
+                  aria-expanded={isOpen}
+                  className="w-full text-left p-4 sm:p-5 flex items-start sm:items-center justify-between gap-3 sm:gap-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2E9BDA] cursor-pointer group select-none"
                 >
-                  <ChevronDown size={16} />
-                </div>
-              </button>
-
-              <AnimatePresence>
-                {openFaq === idx && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
+                  <span
+                    className={`font-bold sm:font-extrabold text-sm sm:text-base leading-snug sm:leading-normal transition-colors duration-200 flex-1 ${
+                      isOpen ? 'text-[#2E9BDA]' : 'text-slate-900 group-hover:text-[#2E9BDA]'
+                    }`}
                   >
-                    <div className="px-4.5 sm:px-5 pb-5 pt-1 text-slate-600 text-xs sm:text-sm font-medium leading-relaxed border-t border-slate-100">
-                      {item.a}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          ))}
+                    {item.q}
+                  </span>
+                  <div
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 transition-all duration-300 ${
+                      isOpen
+                        ? 'rotate-180 bg-sky-100 text-[#2E9BDA] shadow-xs'
+                        : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200/80 group-hover:text-slate-700'
+                    }`}
+                  >
+                    <ChevronDown size={16} />
+                  </div>
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    >
+                      <div className="px-4 sm:px-5 pb-4.5 sm:pb-5 pt-2 text-slate-600 text-xs sm:text-sm font-normal sm:font-medium leading-relaxed border-t border-slate-100">
+                        {item.a}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          })}
         </div>
       </div>
     </section>

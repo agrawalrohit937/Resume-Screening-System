@@ -29,6 +29,9 @@ export default {
         sans: ['"Inter"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
+      spacing: {
+        '4.5': '1.125rem',
+      },
       fontSize: {
         '2xs': '0.625rem',
       },
