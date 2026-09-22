@@ -46,9 +46,10 @@ requests==2.31.0
 fastapi-cache2==0.2.2
 slowapi>=0.1.9
 
-# ─── Environment & Logging ────────────────────────────────────
+# ─── Environment, Logging & Observability ─────────────────────
 python-dotenv==1.0.1
 structlog==24.1.0
+prometheus-client>=0.20.0
 
 # ─── Media, QR & Payment Services ─────────────────────────────
 pillow>=10.3.0
