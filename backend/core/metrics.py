@@ -13,15 +13,38 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Dict, Optional
 
-import prometheus_client
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, REGISTRY
+try:
+    import prometheus_client
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, REGISTRY
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    prometheus_client = None
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
+    REGISTRY = None
+    PROMETHEUS_AVAILABLE = False
+
+    class _DummyMetric:
+        def __init__(self, *args, **kwargs):
+            pass
+        def labels(self, *args, **kwargs):
+            return self
+        def inc(self, *args, **kwargs):
+            pass
+        def observe(self, *args, **kwargs):
+            pass
+
+    Counter = _DummyMetric
+    Histogram = _DummyMetric
+
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-def _get_or_create_counter(name: str, documentation: str, labelnames: list[str]) -> Counter:
+def _get_or_create_counter(name: str, documentation: str, labelnames: list[str]) -> Any:
     """Retrieve existing counter from registry or create a new one to avoid duplicate registration."""
+    if not PROMETHEUS_AVAILABLE:
+        return _DummyMetric()
     if name in REGISTRY._names_to_collectors:
         collector = REGISTRY._names_to_collectors[name]
         if isinstance(collector, Counter):
@@ -33,9 +56,11 @@ def _get_or_create_histogram(
     name: str,
     documentation: str,
     labelnames: list[str],
-    buckets: tuple[float, ...] = Histogram.DEFAULT_BUCKETS,
-) -> Histogram:
+    buckets: tuple[float, ...] = getattr(Histogram, "DEFAULT_BUCKETS", (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)),
+) -> Any:
     """Retrieve existing histogram from registry or create a new one."""
+    if not PROMETHEUS_AVAILABLE:
+        return _DummyMetric()
     if name in REGISTRY._names_to_collectors:
         collector = REGISTRY._names_to_collectors[name]
         if isinstance(collector, Histogram):
@@ -158,6 +183,8 @@ def record_http_request_metrics(
 
 def generate_prometheus_metrics() -> bytes:
     """Generate Prometheus metric representation in latest text exposition format."""
+    if not PROMETHEUS_AVAILABLE or prometheus_client is None:
+        return b"# Prometheus metrics disabled or client not installed\n"
     return prometheus_client.generate_latest(REGISTRY)
 
 
