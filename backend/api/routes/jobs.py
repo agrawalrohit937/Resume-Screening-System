@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks, status
 from fastapi.responses import FileResponse, RedirectResponse
@@ -57,6 +58,7 @@ from services.jd_parser_service import (
     map_job_title_to_occupation,
     JobQualityReport,
 )
+from services.multi_tenancy.tenant_context import get_current_tenant_id
 
 logger = structlog.get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -168,6 +170,9 @@ async def create_job(
         "company_website": company_website,
         "company_about": company_about,
         "company_size": company_size,
+        "is_external": False,
+        "external_apply_url": None,
+        "external_job_id": None,
         "company_industry": company_industry,
         "education_requirement_mode": payload.education_requirement_mode,
         "required_credentials": payload.required_credentials,
@@ -248,23 +253,30 @@ async def list_jobs(
     db: Any = Depends(get_database),
 ):
     """
-    Fetches open jobs for the candidate marketplace feed.
-    Zero dummy seeding: returns clean empty array [] if no jobs exist in DB.
-    Strictly injects has_applied boolean calculated by querying db.applications:
-    only True if a document exists where job_id == job._id AND candidate_id == current_user.id.
-    Never flags as applied merely because user is creator (created_by) or belongs to the same tenant.
+    Fetches open/published jobs for the candidate and recruiter marketplace feed (Explore Jobs).
+    Merges both internal employer postings and external scraped jobs:
+    - Internal jobs: Active platform postings where status != 'closed' (open, published, active).
+    - External jobs: Scraped jobs (is_external: true) where status != 'closed'.
+    - Sorting: Prioritizes internal platform jobs slightly higher, followed by external jobs, sorted by latest created_at.
+    - Application status: Strictly injects has_applied boolean calculated by querying db.applications.
     """
-    query: Dict[str, Any] = {"status": "open"}
+    query: Dict[str, Any] = {
+        "status": {"$in": ["open", "published", "active", "Open", "Published", "Active"]},
+        "$and": [],
+    }
 
-    # Search filter
+    # Search filter (title, company, description, skills)
     if search and search.strip():
         term = re.escape(search.strip())
-        query["$or"] = [
-            {"title": {"$regex": term, "$options": "i"}},
-            {"company_name": {"$regex": term, "$options": "i"}},
-            {"jd_text_raw": {"$regex": term, "$options": "i"}},
-            {"required_skills": {"$regex": term, "$options": "i"}},
-        ]
+        query["$and"].append({
+            "$or": [
+                {"title": {"$regex": term, "$options": "i"}},
+                {"company_name": {"$regex": term, "$options": "i"}},
+                {"jd_text_raw": {"$regex": term, "$options": "i"}},
+                {"jd_text": {"$regex": term, "$options": "i"}},
+                {"required_skills": {"$regex": term, "$options": "i"}},
+            ]
+        })
 
     # Work mode filter
     if work_mode and work_mode.lower() != "all":
@@ -278,23 +290,54 @@ async def list_jobs(
     if min_years is not None:
         query["min_years"] = {"$lte": min_years}
 
-    # Skill filter
+    # Skill filter (lenient across required_skills, title, and jd_text_raw)
     if skill and skill.strip():
-        query["required_skills"] = {"$regex": re.escape(skill.strip()), "$options": "i"}
+        skill_term = re.escape(skill.strip())
+        query["$and"].append({
+            "$or": [
+                {"required_skills": {"$regex": skill_term, "$options": "i"}},
+                {"title": {"$regex": skill_term, "$options": "i"}},
+                {"jd_text_raw": {"$regex": skill_term, "$options": "i"}},
+                {"jd_text": {"$regex": skill_term, "$options": "i"}},
+            ]
+        })
+
+    if not query["$and"]:
+        del query["$and"]
 
     raw_db = getattr(db, "raw_db", db)
     total = await raw_db.jobs.count_documents(query)
 
+    # Sort: Internal jobs first (is_external: false/None/missing), then external jobs, each newest first
     cursor = (
-        raw_db.jobs.find(query, {"jd_embedding": 0})
-        .sort("created_at", -1)
+        raw_db.jobs.find(query, {"jd_embedding": 0, "jd_embedding_bge": 0})
+        .sort([("is_external", 1), ("created_at", -1)])
         .skip(skip)
         .limit(limit)
     )
     docs = await stream_cursor(cursor)
 
+    # Fallback if query returns nothing but jobs exist and no user search was applied
+    has_user_filters = bool(
+        (search and search.strip()) or
+        (location and location.strip() and location.lower() != "all") or
+        (skill and skill.strip()) or
+        (min_years is not None) or
+        (work_mode and work_mode.strip() and work_mode.lower() != "all")
+    )
+    if not docs and not has_user_filters:
+        raw_count = await raw_db.jobs.count_documents({})
+        if raw_count > 0:
+            fallback_cursor = (
+                raw_db.jobs.find({"status": {"$ne": "closed"}}, {"jd_embedding": 0, "jd_embedding_bge": 0})
+                .sort([("is_external", 1), ("created_at", -1)])
+                .skip(skip)
+                .limit(limit)
+            )
+            docs = await stream_cursor(fallback_cursor)
+            total = len(docs)
+
     # Strictly calculate has_applied by querying db.applications
-    # Only True if application exists with job_id == job._id AND candidate_id == current_user.id
     applied_job_ids = set()
     if current_user and docs:
         candidate_id_str = str(current_user.id)
@@ -332,26 +375,47 @@ async def list_jobs(
     for d in docs:
         job_id_str = str(d["_id"])
         has_applied = job_id_str in applied_job_ids
+        is_ext = bool(d.get("is_external") in [True, "true", "True", 1])
+
+        # Safe handling of required_skills
+        raw_skills = d.get("required_skills")
+        if isinstance(raw_skills, list):
+            safe_skills = [str(s).strip() for s in raw_skills if s is not None and str(s).strip()]
+        elif isinstance(raw_skills, str) and raw_skills.strip():
+            safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
+        else:
+            safe_skills = []
+
+        comp_logo = d.get("company_logo") or d.get("company_logo_url") or d.get("logo_url") or d.get("logo")
+        comp_site = d.get("company_website") or d.get("website")
+
         jobs.append({
             "id": job_id_str,
-            "company_name": d.get("company_name", ""),
-            "title": d.get("title", ""),
-            "jd_text_raw": d.get("jd_text_raw", ""),
-            "required_skills": d.get("required_skills", []),
-            "min_years": float(d.get("min_years", 0.0)),
-            "location": d.get("location", "Remote"),
-            "work_mode": d.get("work_mode", "Remote"),
-            "salary_range": d.get("salary_range"),
-            "status": d.get("status", "open"),
-            "department": d.get("department"),
-            "company_logo": d.get("company_logo"),
-            "company_website": d.get("company_website"),
-            "company_about": d.get("company_about"),
-            "company_size": d.get("company_size"),
-            "company_industry": d.get("company_industry"),
-            "applicant_count": int(d.get("applicant_count", 0)),
-            "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at", "")),
+            "company_name": d.get("company_name") or "Leading Employer",
+            "title": d.get("title") or "Software Engineer",
+            "jd_text_raw": d.get("jd_text_raw") or d.get("jd_text") or "",
+            "required_skills": safe_skills,
+            "min_years": float(d.get("min_years") or 0.0),
+            "location": d.get("location") or "Remote",
+            "work_mode": d.get("work_mode") or "Remote",
+            "salary_range": d.get("salary_range") or None,
+            "status": d.get("status") or "open",
+            "department": d.get("department") or None,
+            "company_logo": comp_logo or None,
+            "company_logo_url": comp_logo or None,
+            "logo_url": comp_logo or None,
+            "company_website": comp_site or None,
+            "company_about": d.get("company_about") or None,
+            "company_size": d.get("company_size") or None,
+            "is_external": is_ext,
+            "publisher_source": d.get("publisher_source") or ("Direct Employer" if not is_ext else "Corporate"),
+            "external_apply_url": d.get("external_apply_url") or d.get("apply_url") or None,
+            "external_job_id": d.get("external_job_id") or None,
+            "company_industry": d.get("company_industry") or None,
+            "applicant_count": int(d.get("applicant_count") or 0),
+            "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or ""),
             "has_applied": has_applied,
+            "tenant_id": d.get("tenant_id") or "default",
         })
 
     return {
@@ -464,11 +528,14 @@ async def get_recommended_jobs(
     """
     from fastapi.responses import JSONResponse as _JSONResponse
 
+    user_role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
+
     result = await find_jobs_for_candidate(
         candidate_id=str(current_user.id),
         limit=limit,
         db=db,
         resume_repo=resume_repo,
+        include_external=str(user_role or "").lower() == UserRole.CANDIDATE.value,
     )
 
     response = _JSONResponse(content=result)
@@ -509,6 +576,7 @@ async def get_my_posted_jobs(
         query = {}
     else:
         query = {"tenant_id": current_tenant}
+    query["is_external"] = {"$ne": True}
 
     cursor = db.jobs.find(query, {"jd_embedding": 0}).sort("created_at", -1)
     docs = await stream_cursor(cursor)
@@ -1424,6 +1492,7 @@ async def trigger_job_alerts_manually(
 @router.get("/company/{company_name}")
 async def get_jobs_by_company(
     company_name: str,
+    current_user: Optional[UserModel] = Depends(get_optional_current_user),
     db: Any = Depends(get_database),
 ):
     """
@@ -1441,12 +1510,14 @@ async def get_jobs_by_company(
         {"company_name": {"$regex": pattern, "$options": "i"}}
     )
 
-    # 2. Fetch all open jobs for this company
+    company_jobs_query: Dict[str, Any] = {
+        "company_name": {"$regex": pattern, "$options": "i"},
+        "status": {"$regex": "^(open|published)$", "$options": "i"},
+    }
+
+    # 2. Fetch all open or published jobs for this company
     cursor = db.jobs.find(
-        {
-            "company_name": {"$regex": pattern, "$options": "i"},
-            "status": "open",
-        },
+        company_jobs_query,
         {"jd_embedding": 0}
     ).sort("created_at", -1)
 
@@ -1458,28 +1529,41 @@ async def get_jobs_by_company(
         else (docs[0].get("company_name", cleaned_name) if docs else cleaned_name)
     )
 
-    jobs = [
-        {
+    jobs = []
+    for d in docs:
+        raw_skills = d.get("required_skills")
+        if isinstance(raw_skills, list):
+            safe_skills = [str(s) for s in raw_skills if s is not None]
+        elif isinstance(raw_skills, str) and raw_skills.strip():
+            safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
+        else:
+            safe_skills = []
+
+        jobs.append({
             "id": str(d["_id"]),
             "company_name": d.get("company_name", canonical_name),
-            "title": d.get("title", ""),
-            "jd_text_raw": d.get("jd_text_raw", ""),
-            "required_skills": d.get("required_skills", []),
-            "min_years": float(d.get("min_years", 0.0)),
-            "location": d.get("location", "Remote"),
-            "work_mode": d.get("work_mode", "Remote"),
-            "salary_range": d.get("salary_range"),
-            "status": d.get("status", "open"),
-            "department": d.get("department"),
+            "title": d.get("title") or "Untitled Role",
+            "jd_text_raw": d.get("jd_text_raw") or "",
+            "required_skills": safe_skills,
+            "min_years": float(d.get("min_years") or 0.0),
+            "location": d.get("location") or "Remote",
+            "work_mode": d.get("work_mode") or "Remote",
+            "salary_range": d.get("salary_range") or None,
+            "status": d.get("status") or "open",
+            "department": d.get("department") or None,
             "company_logo": d.get("company_logo") or (company_doc.get("logo_url") if company_doc else None),
             "company_website": d.get("company_website") or (company_doc.get("website") if company_doc else None),
-            "applicant_count": int(d.get("applicant_count", 0)),
+            "company_about": d.get("company_about") or (company_doc.get("about") if company_doc else None),
+            "company_size": d.get("company_size") or (company_doc.get("team_size") if company_doc else None),
+            "is_external": bool(d.get("is_external") in [True, "true", "True", 1]),
+            "external_apply_url": d.get("external_apply_url") or None,
+            "external_job_id": d.get("external_job_id") or None,
+            "company_industry": d.get("company_industry") or None,
+            "applicant_count": int(d.get("applicant_count") or 0),
             "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat()
             if hasattr(d.get("created_at"), "isoformat")
-            else str(d.get("created_at", "")),
-        }
-        for d in docs
-    ]
+            else str(d.get("created_at") or ""),
+        })
 
     # Synthesize rich company profile
     default_about = (
@@ -1619,6 +1703,8 @@ async def get_job_detail(
     if not doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
+    user_role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
+    # External scraped jobs are globally accessible; internal jobs are accessible to all authenticated or public viewers of the posting
     company_name = doc.get("company_name", "")
 
     # Look up company profile if company fields missing on the job doc
@@ -1653,25 +1739,36 @@ async def get_job_detail(
         if existing_app:
             has_applied = True
 
+    raw_skills = doc.get("required_skills")
+    if isinstance(raw_skills, list):
+        safe_skills = [str(s) for s in raw_skills if s is not None]
+    elif isinstance(raw_skills, str) and raw_skills.strip():
+        safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
+    else:
+        safe_skills = []
+
     return {
         "id": str(doc["_id"]),
-        "company_name": company_name,
-        "title": doc.get("title", ""),
-        "jd_text_raw": doc.get("jd_text_raw", ""),
-        "required_skills": doc.get("required_skills", []),
-        "min_years": float(doc.get("min_years", 0.0)),
-        "location": doc.get("location", "Remote"),
-        "work_mode": doc.get("work_mode", "Remote"),
-        "salary_range": doc.get("salary_range"),
-        "status": doc.get("status", "open"),
-        "department": doc.get("department"),
-        "company_logo": company_logo,
-        "company_website": company_website,
-        "company_about": company_about,
-        "company_size": company_size,
-        "company_industry": company_industry,
-        "applicant_count": int(doc.get("applicant_count", 0)),
-        "created_at": doc.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(doc.get("created_at"), "isoformat") else str(doc.get("created_at", "")),
+        "company_name": company_name or "Unknown Company",
+        "title": doc.get("title") or "Untitled Role",
+        "jd_text_raw": doc.get("jd_text_raw") or "",
+        "required_skills": safe_skills,
+        "min_years": float(doc.get("min_years") or 0.0),
+        "location": doc.get("location") or "Remote",
+        "work_mode": doc.get("work_mode") or "Remote",
+        "salary_range": doc.get("salary_range") or None,
+        "status": doc.get("status") or "open",
+        "department": doc.get("department") or None,
+        "company_logo": company_logo or None,
+        "company_website": company_website or None,
+        "company_about": company_about or None,
+        "company_size": company_size or None,
+        "is_external": bool(doc.get("is_external") in [True, "true", "True", 1]),
+        "external_apply_url": doc.get("external_apply_url") or None,
+        "external_job_id": doc.get("external_job_id") or None,
+        "company_industry": company_industry or None,
+        "applicant_count": int(doc.get("applicant_count") or 0),
+        "created_at": doc.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(doc.get("created_at"), "isoformat") else str(doc.get("created_at") or ""),
         "has_applied": has_applied,
     }
 
@@ -1709,6 +1806,10 @@ async def match_job_ats(
 
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
+
+    if bool(job_doc.get("is_external", False)):
+        from services.jd_extractor import ensure_external_job_jd
+        await ensure_external_job_jd(job_doc, raw_db)
 
     # Ensure the job status is open, published, or active
     job_status = str(job_doc.get("status", "open")).lower()
@@ -1768,9 +1869,14 @@ async def match_job_ats(
         elif isinstance(raw_parsed, dict):
             resume_payload["raw_text"] = raw_parsed.get("raw_text", "")
 
+    jd_content = (job_doc.get("jd_text_raw") or job_doc.get("jd_text") or "").strip()
+    if not jd_content:
+        from services.jd_extractor import ensure_external_job_jd
+        jd_content = await ensure_external_job_jd(job_doc, raw_db)
+
     scored = score_resume(
         resume=resume_payload,
-        jd=job_doc["jd_text_raw"],
+        jd=jd_content,
         mode="candidate",
         required_skills=job_doc.get("required_skills", []),
         min_years=job_doc.get("min_years"),
@@ -1826,6 +1932,9 @@ async def apply_to_job(
     job_doc = await raw_db.jobs.find_one({"_id": oid})
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
+
+    if bool(job_doc.get("is_external", False)):
+        raise HTTPException(status_code=400, detail="External jobs do not support internal applications.")
 
     target_tenant_id = job_doc.get("tenant_id", "default") or "default"
 

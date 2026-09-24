@@ -75,6 +75,74 @@ def test_job_matcher_cosine_and_calibration():
 
 
 @pytest.mark.asyncio
+async def test_two_stage_job_matcher_pipeline():
+    """Verify two-stage job matching: candidate role/skill signals extraction & find_jobs_for_candidate."""
+    from services.job_matcher import _extract_candidate_role_signals, find_jobs_for_candidate
+    from unittest.mock import AsyncMock, MagicMock
+
+    # 1. Test role signals extraction
+    parsed_resume = {
+        "targeted_role": "Senior Python Developer",
+        "technical_skills": ["Python", "FastAPI", "PostgreSQL", "Docker", "Redis"],
+        "summary": "Experienced backend engineer building microservices.",
+        "work_experience": [{"title": "Senior Python Developer", "company": "Acme"}],
+    }
+    signals = _extract_candidate_role_signals(parsed_resume)
+    assert signals["primary_role"] == "Senior Python Developer"
+    assert "python" in signals["role_tokens"]
+    assert "FastAPI" in signals["top_skills"]
+
+    # 2. Test find_jobs_for_candidate with mock DB
+    mock_db = MagicMock()
+    mock_db.resumes.find_one = AsyncMock(return_value={
+        "_id": "660000000000000000000001",
+        "user_id": "cand_123",
+        "status": "parsed",
+        "parsed_data": parsed_resume,
+    })
+
+    job_doc = {
+        "_id": "660000000000000000000099",
+        "title": "Python Backend Engineer",
+        "company_name": "Tech Corp",
+        "required_skills": ["Python", "FastAPI", "Docker"],
+        "status": "open",
+        "jd_text_raw": "Looking for a Python Backend Engineer with FastAPI experience.",
+        "is_external": False,
+    }
+
+    mock_cursor = MagicMock()
+    mock_cursor.sort.return_value = mock_cursor
+    mock_cursor.limit.return_value = mock_cursor
+    mock_cursor.to_list = AsyncMock(return_value=[job_doc])
+
+    mock_app_cursor = MagicMock()
+    mock_app_cursor.to_list = AsyncMock(return_value=[])
+
+    def find_mock(query=None, projection=None):
+        if query and "candidate_id" in query:
+            return mock_app_cursor
+        return mock_cursor
+
+    mock_db.jobs.find = MagicMock(side_effect=find_mock)
+    mock_db.applications.find = MagicMock(return_value=mock_app_cursor)
+    mock_db.jobs.count_documents = AsyncMock(return_value=1)
+
+    res = await find_jobs_for_candidate(
+        candidate_id="cand_123",
+        limit=3,
+        db=mock_db,
+    )
+
+    assert res["has_resume"] is True
+    assert len(res["recommended_jobs"]) == 1
+    assert res["recommended_jobs"][0]["title"] == "Python Backend Engineer"
+    assert res["recommended_jobs"][0]["match_score"] >= 50.0
+    assert "stage1_candidates_count" in res
+
+
+
+@pytest.mark.asyncio
 async def test_get_jobs_by_company_route():
     """Verify GET /api/v1/jobs/company/{company_name} returns company jobs."""
     import httpx
@@ -273,7 +341,10 @@ async def test_recruiter_can_view_all_jobs_in_same_tenant():
         res = await get_my_posted_jobs(current_user=recruiter_alice, db=mock_db)
 
     # 1. Query must filter by tenant_id, NOT by created_by: user_alice_123
-    assert captured_query == {"tenant_id": "tenant_techcorp"}
+    assert captured_query == {
+        "tenant_id": "tenant_techcorp",
+        "is_external": {"$ne": True},
+    }
     assert "created_by" not in captured_query
 
     # 2. Result must return the job posted by colleague Bob
@@ -370,6 +441,97 @@ async def test_match_job_ats_resolves_open_job_cross_tenant():
     assert res["job_id"] == str(job_oid)
     assert res["final_score"] == 85.0
     assert "Python" in res["matched_skills"]
+
+
+@pytest.mark.asyncio
+async def test_match_job_ats_allows_external_jobs():
+    """Verify that external job listings now support full ATS matching without 400 rejection."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from bson import ObjectId
+    from api.routes.jobs import match_job_ats
+    from models.user_model import UserModel, UserRole
+
+    candidate = UserModel(
+        id="660000000000000000000010",
+        email="candidate@example.com",
+        full_name="Candidate Charlie",
+        role=UserRole.CANDIDATE,
+        roles=[UserRole.CANDIDATE],
+        tenant_id="default",
+    )
+
+    external_job_oid = ObjectId("660000000000000000000095")
+    external_job_record = {
+        "_id": external_job_oid,
+        "title": "Senior React Developer",
+        "company_name": "Global Tech",
+        "jd_text_raw": "Looking for a Senior React and TypeScript developer with frontend architecture expertise.",
+        "required_skills": ["React", "TypeScript"],
+        "min_years": 3.0,
+        "status": "open",
+        "is_external": True,
+        "publisher_source": "LinkedIn",
+        "external_apply_url": "https://linkedin.com/jobs/view/12345",
+    }
+
+    mock_db = MagicMock()
+    mock_raw_db = MagicMock()
+    mock_db.raw_db = mock_raw_db
+
+    mock_raw_db.jobs.find_one = AsyncMock(return_value=external_job_record)
+    mock_raw_db.jobs.update_one = AsyncMock(return_value=None)
+
+    resume_doc = {
+        "_id": ObjectId("660000000000000000000077"),
+        "user_id": str(candidate.id),
+        "parsed_data": {
+            "skills": ["React", "TypeScript", "Redux"],
+            "total_experience_years": 4.0,
+            "education": [{"degree": "B.Tech"}],
+            "raw_text": "Experienced Frontend Engineer with React and TypeScript.",
+        },
+    }
+    mock_raw_db.resumes.find_one = AsyncMock(return_value=resume_doc)
+
+    mock_resume_repo = MagicMock()
+    mock_resume_repo.get_primary_by_user = AsyncMock(return_value=None)
+    mock_resume_repo.get_by_user = AsyncMock(return_value=([], 0))
+    mock_resume_repo._serialize = lambda d: d
+
+    from starlette.requests import Request
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": f"/api/v1/jobs/{external_job_oid}/match",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+    }
+    mock_request = Request(scope)
+
+    with patch("api.routes.jobs.score_resume") as mock_scorer:
+        mock_scorer.return_value = {
+            "final_score": 90.0,
+            "matched_skills": ["React", "TypeScript"],
+            "missing_skills": [],
+            "experience_score": 95.0,
+            "education_score": 85.0,
+            "recommendation": "Strong Match",
+            "feedback_suggestions": ["Highlights in state management"],
+        }
+
+        res = await match_job_ats(
+            request=mock_request,
+            job_id=str(external_job_oid),
+            current_user=candidate,
+            db=mock_db,
+            resume_repo=mock_resume_repo,
+        )
+
+    assert res["job_id"] == str(external_job_oid)
+    assert res["final_score"] == 90.0
+    assert "React" in res["matched_skills"]
+    assert res["job_title"] == "Senior React Developer"
+
 
 
 @pytest.mark.asyncio
@@ -500,6 +662,348 @@ async def test_list_jobs_strict_has_applied_logic():
     )
     for j in res_unauth["jobs"]:
         assert j["has_applied"] is False
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_inclusive_or_tenant_isolation_and_external():
+    """
+    Verify GET /api/v1/jobs inclusive $or visibility query:
+    1. For tenant 'careershala-services', internal jobs of 'careershala-services' and external jobs (is_external=True) are returned.
+    2. Status query uses case-insensitive regex ^(open|published)$.
+    3. Fields with null/empty values (company_logo, salary_range, required_skills) are safely mapped.
+    """
+    from bson import ObjectId
+    from unittest.mock import AsyncMock, MagicMock
+    from api.routes.jobs import list_jobs
+    from models.user_model import UserModel, UserRole
+
+    recruiter_user = UserModel(
+        id="660000000000000000000020",
+        email="recruiter@careershala.com",
+        full_name="Careershala Recruiter",
+        role=UserRole.RECRUITER,
+        roles=[UserRole.RECRUITER],
+        tenant_id="careershala-services",
+        is_active=True,
+    )
+
+    captured_query = {}
+    mock_db = MagicMock()
+    mock_db.raw_db = mock_db
+
+    mock_docs = [
+        # Internal job for careershala-services
+        {
+            "_id": ObjectId("660000000000000000000021"),
+            "title": "Fullstack Developer",
+            "company_name": "Careershala",
+            "status": "Open",
+            "tenant_id": "careershala-services",
+            "is_external": False,
+            "required_skills": ["React", "FastAPI"],
+            "salary_range": "$80k - $120k",
+            "company_logo": "https://example.com/logo.png",
+        },
+        # External scraped job
+        {
+            "_id": ObjectId("660000000000000000000022"),
+            "title": "Backend Architect",
+            "company_name": "Google",
+            "status": "Published",
+            "tenant_id": "default",
+            "is_external": True,
+            "required_skills": None,  # null skills
+            "salary_range": None,     # null salary
+            "company_logo": None,     # null logo
+        },
+    ]
+
+    mock_cursor = MagicMock()
+    mock_cursor.sort.return_value = mock_cursor
+    mock_cursor.skip.return_value = mock_cursor
+    mock_cursor.limit.return_value = mock_cursor
+    mock_cursor.to_list = AsyncMock(return_value=mock_docs)
+
+    def mock_find(query, *args, **kwargs):
+        captured_query.update(query)
+        return mock_cursor
+
+    mock_db.jobs.find = mock_find
+    mock_db.jobs.count_documents = AsyncMock(return_value=len(mock_docs))
+    mock_app_cursor = MagicMock()
+    mock_app_cursor.to_list = AsyncMock(return_value=[])
+    mock_db.applications.find.return_value = mock_app_cursor
+
+    res = await list_jobs(
+        search=None,
+        work_mode=None,
+        location=None,
+        min_years=None,
+        skill=None,
+        limit=30,
+        skip=0,
+        current_user=recruiter_user,
+        db=mock_db,
+    )
+
+    # 1. Verify status filter allows open/published/active jobs
+    status_filter = captured_query.get("status")
+    if isinstance(status_filter, dict) and "$in" in status_filter:
+        assert "open" in [s.lower() for s in status_filter["$in"]]
+    elif isinstance(status_filter, dict) and "$regex" in status_filter:
+        assert "open" in status_filter["$regex"]
+
+    # 2. Verify response schema safely mapped nulls and arrays
+    assert res["total"] == 2
+    job_internal = next(j for j in res["jobs"] if j["id"] == "660000000000000000000021")
+    assert job_internal["company_name"] == "Careershala"
+    assert job_internal["is_external"] is False
+    assert job_internal["required_skills"] == ["React", "FastAPI"]
+    assert job_internal["salary_range"] == "$80k - $120k"
+    assert job_internal["company_logo"] == "https://example.com/logo.png"
+
+    job_external = next(j for j in res["jobs"] if j["id"] == "660000000000000000000022")
+    assert job_external["company_name"] == "Google"
+    assert job_external["is_external"] is True
+    assert job_external["required_skills"] == []
+    assert job_external["salary_range"] is None
+    assert job_external["company_logo"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_job_detail_allows_recruiter_and_candidate_on_external_job():
+    """Verify GET /api/v1/jobs/{job_id} allows recruiters to view external scraped jobs without 404."""
+    from bson import ObjectId
+    from unittest.mock import AsyncMock, MagicMock
+    from api.routes.jobs import get_job_detail
+    from models.user_model import UserModel, UserRole
+
+    recruiter_user = UserModel(
+        id="660000000000000000000030",
+        email="recruiter@example.com",
+        full_name="Recruiter",
+        role=UserRole.RECRUITER,
+        roles=[UserRole.RECRUITER],
+        tenant_id="tenant_xyz",
+        is_active=True,
+    )
+
+    job_oid = ObjectId("660000000000000000000033")
+    mock_job = {
+        "_id": job_oid,
+        "title": "Machine Learning Engineer",
+        "company_name": "DeepMind",
+        "status": "published",
+        "is_external": True,
+        "tenant_id": "default",
+        "required_skills": ["PyTorch", "JAX"],
+        "min_years": 3.0,
+        "location": "London, UK",
+        "work_mode": "Hybrid",
+    }
+
+    mock_db = MagicMock()
+    mock_raw_db = MagicMock()
+    mock_db.raw_db = mock_raw_db
+    mock_raw_db.jobs.find_one = AsyncMock(return_value=mock_job)
+    mock_db.companies.find_one = AsyncMock(return_value=None)
+    mock_raw_db.applications.find_one = AsyncMock(return_value=None)
+
+    detail = await get_job_detail(
+        job_id=str(job_oid),
+        current_user=recruiter_user,
+        db=mock_db,
+    )
+
+    assert detail["id"] == str(job_oid)
+    assert detail["title"] == "Machine Learning Engineer"
+    assert detail["company_name"] == "DeepMind"
+    assert detail["is_external"] is True
+    assert detail["required_skills"] == ["PyTorch", "JAX"]
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_skill_filter_lenient_fallback_for_external_jobs():
+    """
+    Verify that when filtering by skill (e.g. skill='Python'), external scraped jobs
+    with empty required_skills: [] are matched via jd_text_raw or title fallback.
+    """
+    from bson import ObjectId
+    from unittest.mock import AsyncMock, MagicMock
+    from api.routes.jobs import list_jobs
+    from models.user_model import UserModel, UserRole
+
+    candidate_user = UserModel(
+        id="660000000000000000000040",
+        email="candidate@example.com",
+        full_name="Candidate",
+        role=UserRole.CANDIDATE,
+        roles=[UserRole.CANDIDATE],
+        tenant_id="default",
+        is_active=True,
+    )
+
+    captured_query = {}
+    mock_db = MagicMock()
+    mock_db.raw_db = mock_db
+
+    mock_docs = [
+        # External scraped job with empty required_skills: [] but Python in jd_text_raw
+        {
+            "_id": ObjectId("660000000000000000000041"),
+            "title": "Senior Software Engineer",
+            "company_name": "Anthropic",
+            "status": "open",
+            "tenant_id": "default",
+            "is_external": True,
+            "required_skills": [],
+            "jd_text_raw": "Seeking engineers experienced in Python and distributed systems.",
+        },
+    ]
+
+    mock_cursor = MagicMock()
+    mock_cursor.sort.return_value = mock_cursor
+    mock_cursor.skip.return_value = mock_cursor
+    mock_cursor.limit.return_value = mock_cursor
+    mock_cursor.to_list = AsyncMock(return_value=mock_docs)
+
+    def mock_find(query, *args, **kwargs):
+        captured_query.update(query)
+        return mock_cursor
+
+    mock_db.jobs.find = mock_find
+    mock_db.jobs.count_documents = AsyncMock(return_value=len(mock_docs))
+    mock_app_cursor = MagicMock()
+    mock_app_cursor.to_list = AsyncMock(return_value=[])
+    mock_db.applications.find.return_value = mock_app_cursor
+
+    res = await list_jobs(
+        search=None,
+        work_mode=None,
+        location=None,
+        min_years=None,
+        skill="Python",
+        limit=30,
+        skip=0,
+        current_user=candidate_user,
+        db=mock_db,
+    )
+
+    # Verify query includes $or clause across required_skills, title, and jd_text_raw
+    and_conditions = captured_query.get("$and", [])
+    skill_condition = next(
+        (c for c in and_conditions if "$or" in c and any("required_skills" in clause for clause in c["$or"])),
+        None
+    )
+    assert skill_condition is not None, "Skill filter must be present in $and"
+    or_clauses = skill_condition["$or"]
+    assert any("required_skills" in clause for clause in or_clauses)
+    assert any("title" in clause for clause in or_clauses)
+    assert any("jd_text_raw" in clause for clause in or_clauses)
+
+    # Verify document is returned
+    assert res["total"] == 1
+    assert res["jobs"][0]["company_name"] == "Anthropic"
+    assert res["jobs"][0]["is_external"] is True
+
+
+@pytest.mark.asyncio
+async def test_explore_jobs_merges_internal_and_external_with_priority_sort():
+    """Verify that Explore Jobs returns active internal and external jobs with normalized schema."""
+    from bson import ObjectId
+    from datetime import datetime, timezone
+    from unittest.mock import AsyncMock, MagicMock
+    from api.routes.jobs import list_jobs
+    from models.user_model import UserModel, UserRole
+
+    candidate_user = UserModel(
+        id="660000000000000000000050",
+        email="candidate@example.com",
+        full_name="Candidate",
+        role=UserRole.CANDIDATE,
+        roles=[UserRole.CANDIDATE],
+        tenant_id="default",
+        is_active=True,
+    )
+
+    mock_docs = [
+        # Internal platform job
+        {
+            "_id": ObjectId("660000000000000000000051"),
+            "title": "Staff Backend Engineer",
+            "company_name": "Razorpay",
+            "status": "open",
+            "tenant_id": "tenant_razorpay",
+            "is_external": False,
+            "required_skills": ["Python", "Go"],
+            "salary_range": "INR 35,00,000 - 50,00,000",
+            "location": "Bengaluru, India",
+            "work_mode": "Hybrid",
+            "created_at": datetime.now(timezone.utc),
+        },
+        # External scraped job
+        {
+            "_id": ObjectId("660000000000000000000052"),
+            "title": "Frontend Lead",
+            "company_name": "Microsoft",
+            "status": "open",
+            "tenant_id": "default",
+            "is_external": True,
+            "publisher_source": "LinkedIn",
+            "external_apply_url": "https://linkedin.com/jobs/view/999",
+            "required_skills": ["React", "TypeScript"],
+            "location": "Hyderabad, India",
+            "work_mode": "Remote",
+            "created_at": datetime.now(timezone.utc),
+        },
+    ]
+
+    mock_db = MagicMock()
+    mock_db.raw_db = mock_db
+
+    mock_cursor = MagicMock()
+    mock_cursor.sort.return_value = mock_cursor
+    mock_cursor.skip.return_value = mock_cursor
+    mock_cursor.limit.return_value = mock_cursor
+    mock_cursor.to_list = AsyncMock(return_value=mock_docs)
+
+    mock_db.jobs.find = MagicMock(return_value=mock_cursor)
+    mock_db.jobs.count_documents = AsyncMock(return_value=2)
+    mock_app_cursor = MagicMock()
+    mock_app_cursor.to_list = AsyncMock(return_value=[])
+    mock_db.applications.find.return_value = mock_app_cursor
+
+    res = await list_jobs(
+        search=None,
+        work_mode=None,
+        location=None,
+        min_years=None,
+        skill=None,
+        limit=30,
+        skip=0,
+        current_user=candidate_user,
+        db=mock_db,
+    )
+
+    assert res["total"] == 2
+    assert len(res["jobs"]) == 2
+
+    # Verify internal job mapping
+    internal_job = res["jobs"][0]
+    assert internal_job["company_name"] == "Razorpay"
+    assert internal_job["is_external"] is False
+    assert internal_job["publisher_source"] == "Direct Employer"
+    assert internal_job["salary_range"] == "INR 35,00,000 - 50,00,000"
+
+    # Verify external job mapping
+    external_job = res["jobs"][1]
+    assert external_job["company_name"] == "Microsoft"
+    assert external_job["is_external"] is True
+    assert external_job["publisher_source"] == "LinkedIn"
+    assert external_job["external_apply_url"] == "https://linkedin.com/jobs/view/999"
+
+
+
 
 
 

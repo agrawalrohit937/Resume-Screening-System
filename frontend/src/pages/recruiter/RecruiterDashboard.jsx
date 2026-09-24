@@ -43,10 +43,26 @@ export default function RecruiterDashboard() {
       setLoading(true)
       try {
         const [jobsRes, statsRes] = await Promise.all([
-          getMyPostedJobs().catch(() => ({ data: { jobs: [] } })),
-          getRecruiterStats().catch(() => ({ data: null })),
+          getMyPostedJobs().catch((err) => {
+            console.error('Failed to load recruiter posted jobs:', err)
+            return { data: { jobs: [] } }
+          }),
+          getRecruiterStats().catch((err) => {
+            console.error('Failed to load recruiter stats:', err)
+            return { data: null }
+          }),
         ])
-        const loadedJobs = jobsRes.data?.jobs || []
+        console.log("Fetched jobs state:", jobsRes)
+        const payload = jobsRes?.data && typeof jobsRes.data === 'object' ? jobsRes.data : jobsRes
+        const loadedJobs = Array.isArray(jobsRes)
+          ? jobsRes
+          : Array.isArray(jobsRes?.data)
+          ? jobsRes.data
+          : Array.isArray(payload?.jobs)
+          ? payload.jobs
+          : Array.isArray(payload?.results)
+          ? payload.results
+          : []
         setJobs(loadedJobs)
         if (statsRes.data) {
           setStats(statsRes.data)

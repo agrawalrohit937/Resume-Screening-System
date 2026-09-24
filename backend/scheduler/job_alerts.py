@@ -31,6 +31,7 @@ from config.db import get_database
 from models.user_model import UserRole
 from services.email_service import send_job_alert_email
 from services.job_matcher import find_jobs_for_candidate
+from services.job_scraper import scrape_external_jobs
 from services.locking import distributed_lock
 from utils.pagination import stream_cursor
 
@@ -53,6 +54,15 @@ class _DummyScheduler:
 
 # Global singleton AsyncIOScheduler instance (or dummy fallback)
 job_alerts_scheduler: Any = AsyncIOScheduler() if APSCHEDULER_AVAILABLE else _DummyScheduler()
+
+
+async def run_external_job_scrape() -> Dict[str, int]:
+    """Run the JSearch import against the active MongoDB connection."""
+    try:
+        return await scrape_external_jobs(get_database())
+    except Exception as exc:
+        logger.error("External job scrape failed", error=str(exc))
+        return {"fetched": 0, "upserted": 0, "skipped": 0}
 
 
 async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optional[str] = None) -> Dict[str, Any]:
@@ -340,6 +350,15 @@ def start_job_alert_scheduler() -> None:
             name="Sweep Stuck Pending Resumes",
             replace_existing=True,
             misfire_grace_time=300,
+        )
+
+        job_alerts_scheduler.add_job(
+            run_external_job_scrape,
+            trigger=IntervalTrigger(days=1),
+            id="external_job_scrape",
+            name="Daily JSearch External Job Scrape",
+            replace_existing=True,
+            misfire_grace_time=3600,
         )
 
         job_alerts_scheduler.start()

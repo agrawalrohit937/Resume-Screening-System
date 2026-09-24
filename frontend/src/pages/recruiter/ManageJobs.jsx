@@ -144,12 +144,26 @@ Requirements & Qualifications:
   const fetchJobs = async () => {
     setLoading(true)
     try {
-      const res = await getMyPostedJobs()
-      setJobs(res.data?.jobs || [])
+      const response = await getMyPostedJobs()
+      console.log("Fetched jobs state:", response)
+      const payload = response?.data && typeof response.data === 'object' ? response.data : response
+      const rawList = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(payload?.jobs)
+        ? payload.jobs
+        : Array.isArray(payload?.results)
+        ? payload.results
+        : Array.isArray(payload?.data)
+        ? payload.data
+        : []
+      setJobs(rawList)
     } catch (err) {
       console.error('Failed to load recruiter jobs:', err)
       const msg = err.response?.data?.detail || 'Failed to fetch job postings.'
       toast.error(msg)
+      setJobs([])
     } finally {
       setLoading(false)
     }

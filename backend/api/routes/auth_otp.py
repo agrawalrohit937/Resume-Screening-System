@@ -17,7 +17,9 @@ from core.config import settings
 from core.security import (
     decode_token,
     verify_password,
+    verify_password_async,
     hash_password,
+    hash_password_async,
     generate_device_id,
     hash_device_id,
     verify_device_id,
@@ -115,8 +117,9 @@ async def signup(
 
     if existing and not existing.email_verified:
         # Re-signup attempt with an unverified account — refresh password & resend OTP
+        hashed_pwd = await hash_password_async(payload.password)
         await user_repo.update(str(existing.id), {
-            "hashed_password": hash_password(payload.password),
+            "hashed_password": hashed_pwd,
             "full_name": payload.full_name,
             "role": primary_role,
             "roles": roles_list,
@@ -129,9 +132,10 @@ async def signup(
         return OtpMessageResponse(message="Verification code sent to your email.", email=email)
 
     now = datetime.now(timezone.utc)
+    hashed_pwd = await hash_password_async(payload.password)
     user_data = {
         "email": email,
-        "hashed_password": hash_password(payload.password),
+        "hashed_password": hashed_pwd,
         "full_name": payload.full_name,
         "role": primary_role,
         "roles": roles_list,
@@ -255,7 +259,7 @@ async def login(
     Complete the login via POST /auth/verify-login-otp.
     """
     user = await user_repo.get_by_email(payload.email.lower())
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user or not (await verify_password_async(payload.password, user.hashed_password)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
@@ -405,7 +409,7 @@ async def reset_password(
     if not user:
         raise HTTPException(status_code=404, detail="Account not found.")
 
-    new_hash = hash_password(payload.new_password)
+    new_hash = await hash_password_async(payload.new_password)
     await user_repo.update(str(user.id), {"hashed_password": new_hash})
     await otp_repo.delete_all_for(email, OTPPurpose.PASSWORD_RESET)
 
