@@ -100,6 +100,8 @@ def set_trusted_device_cookie(response: JSONResponse, device_id_plain: str) -> N
     )
 
 
+import asyncio
+import uuid
 from services.token_service import TokenService
 from core.security import decode_token
 
@@ -108,19 +110,36 @@ async def build_and_persist_tokens(
     user_repo: UserRepository,
     trusted_device_id_plain: str | None = None,
 ) -> JSONResponse:
-    """Builds tokens, persists the refresh token for rotation, registers with TokenService,
+    """Builds tokens, persists the refresh token for rotation, registers with TokenService concurrently,
     and returns a JSONResponse with auth cookies already set."""
-    token_data = build_token_response(user)
-    await user_repo.update(str(user.id), {"refresh_token": token_data.refresh_token})
+    user_roles = [r.value if hasattr(r, "value") else str(r) for r in (user.roles or [user.role])]
+    extra = {
+        "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+        "roles": user_roles,
+        "tenant_id": user.tenant_id,
+        "email": user.email,
+    }
+    access_token = create_access_token(str(user.id), extra_claims=extra)
+    family_id = str(uuid.uuid4())
+    refresh_token = create_refresh_token(str(user.id), family_id=family_id)
 
-    # Register in TokenService collection
-    refresh_payload = decode_token(token_data.refresh_token) or {}
-    await TokenService.store_refresh_token(
-        raw_token=token_data.refresh_token,
-        user_id=str(user.id),
-        tenant_id=user.tenant_id or "default",
-        family_id=refresh_payload.get("family_id", str(user.id)),
-        jti=refresh_payload.get("jti", ""),
+    token_data = TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=user_to_public(user),
+    )
+
+    # Persist refresh token to user document and token service concurrently
+    await asyncio.gather(
+        user_repo.update(str(user.id), {"refresh_token": token_data.refresh_token}),
+        TokenService.store_refresh_token(
+            raw_token=token_data.refresh_token,
+            user_id=str(user.id),
+            tenant_id=user.tenant_id or "default",
+            family_id=family_id,
+            jti="",
+        ),
     )
 
     response = JSONResponse(content=jsonable_encoder(token_data))

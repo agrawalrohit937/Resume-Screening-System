@@ -46,6 +46,9 @@ class JobModel(BaseModel):
     company_website: Optional[str] = None
     company_about: Optional[str] = None
     company_size: Optional[str] = None
+    is_external: bool = False
+    external_apply_url: Optional[str] = None
+    external_job_id: Optional[str] = None
     created_by: Optional[str] = None  # Recruiter / Admin user_id
     tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
     applicant_count: int = 0
@@ -112,6 +115,9 @@ class JobResponse(BaseModel):
     company_website: Optional[str] = None
     company_about: Optional[str] = None
     company_size: Optional[str] = None
+    is_external: bool = False
+    external_apply_url: Optional[str] = None
+    external_job_id: Optional[str] = None
     company_industry: Optional[str] = None
     created_by: Optional[str] = None
     tenant_id: Optional[str] = "default"

@@ -65,7 +65,8 @@ class TenantScopedCollection:
     def _scope_query(self, query: Optional[Dict[str, Any]] = None, tenant_override: Optional[str] = None) -> Dict[str, Any]:
         """
         Injects the current tenant boundary condition into the query dictionary.
-        Bypassed only if the active execution context is PLATFORM_ADMIN.
+        Bypassed only if the active execution context is PLATFORM_ADMIN or if
+        the query is against the 'jobs' collection with explicit multi-tenant / external visibility filters.
         """
         scoped = dict(query) if query else {}
 
@@ -74,6 +75,25 @@ class TenantScopedCollection:
             return scoped
 
         tid = tenant_override or self.tenant_id
+        coll_name = getattr(self._collection, "name", "")
+
+        # Exemption for 'jobs' collection queries involving external jobs or custom multi-tenant visibility
+        if coll_name == "jobs" and not tenant_override:
+            has_external = "is_external" in scoped
+            has_or = "$or" in scoped
+            has_and = "$and" in scoped
+            if has_and:
+                has_external = has_external or any(
+                    isinstance(c, dict) and ("is_external" in c or "$or" in c or "tenant_id" in c)
+                    for c in scoped["$and"]
+                )
+            if has_or:
+                has_external = has_external or any(
+                    isinstance(c, dict) and ("is_external" in c or "tenant_id" in c)
+                    for c in scoped["$or"]
+                )
+            if has_external or has_or:
+                return scoped
 
         # If tenant_id is already in query and does not match the active tenant, deny access!
         if "tenant_id" in scoped and scoped["tenant_id"] != tid:

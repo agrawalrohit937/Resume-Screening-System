@@ -132,6 +132,11 @@ async def _ensure_indexes() -> None:
             IndexModel([("created_at", DESCENDING)], name="app_created_idx"),
         ])
 
+        await db.jobs.create_indexes([
+            IndexModel([("external_job_id", ASCENDING)], unique=True, sparse=True, name="jobs_external_id_unique"),
+            IndexModel([("is_external", ASCENDING), ("status", ASCENDING)], name="jobs_external_status_idx"),
+        ])
+
         # ─── copilot v2: sessions, messages, memory ───────────────────────
         await db.copilot_sessions.create_indexes([
             IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("created_at", DESCENDING)], name="copilot_session_tenant_user_created_idx"),
@@ -153,11 +158,21 @@ async def _ensure_indexes() -> None:
             IndexModel([("tenant_id", ASCENDING), ("source_type", ASCENDING), ("created_at", DESCENDING)], name="copilot_chunks_tenant_source_created_idx"),
             IndexModel([("text", "text"), ("title", "text")], name="copilot_chunks_text_search_idx"),
         ])
-        await db.copilot_cache.create_indexes([
-            IndexModel([("tenant_id", ASCENDING), ("user_id", ASCENDING), ("context_version", ASCENDING)], name="copilot_cache_tenant_user_ctx_idx"),
-            IndexModel([("created_at", ASCENDING)], expireAfterSeconds=3600, name="copilot_cache_ttl_idx"),
+        # ─── auth: otps, refresh_tokens, revoked_tokens ──────────────────
+        await db.otps.create_indexes([
+            IndexModel([("email", ASCENDING), ("purpose", ASCENDING), ("consumed", ASCENDING), ("created_at", DESCENDING)], name="otp_lookup_idx"),
+            IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0, name="otp_ttl_idx"),
+        ])
+        await db.refresh_tokens.create_indexes([
+            IndexModel([("token_hash", ASCENDING)], unique=True, name="refresh_token_hash_unique"),
+            IndexModel([("user_id", ASCENDING)], name="refresh_token_user_idx"),
+            IndexModel([("family_id", ASCENDING)], name="refresh_token_family_idx"),
+        ])
+        await db.revoked_tokens.create_indexes([
+            IndexModel([("jti", ASCENDING)], unique=True, name="revoked_jti_unique"),
+            IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0, name="revoked_tokens_ttl_idx"),
         ])
 
         logger.info("✅ MongoDB indexes ensured")
     except Exception as e:
-        logger.warning("MongoDB index creation warning", error=str(e))
+        logger.warning("MongoDB index creation warning", error=str(e))

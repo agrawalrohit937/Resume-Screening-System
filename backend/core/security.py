@@ -14,10 +14,15 @@ from core.config import settings
 
 logger = structlog.get_logger(__name__)
 
+import asyncio
+import hashlib
+import hmac
+import uuid
+
 # ─── Password Context ─────────────────────────────────────────────────────────
-# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context uses argon2 for secure password hashing
 pwd_context = CryptContext(
-    schemes=["argon2"],
+    schemes=["argon2", "bcrypt"],
     deprecated="auto"
 )
 
@@ -26,24 +31,48 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 
-# ─── OTP (reuses the same hashing context — no new dependency) ───────────────
+async def hash_password_async(password: str) -> str:
+    """Non-blocking password hashing offloaded to thread pool."""
+    return await asyncio.to_thread(pwd_context.hash, password)
+
+
+async def verify_password_async(plain_password: str, hashed_password: str) -> bool:
+    """Non-blocking password verification offloaded to thread pool to prevent event-loop stalls."""
+    try:
+        return await asyncio.to_thread(pwd_context.verify, plain_password, hashed_password)
+    except Exception:
+        return False
+
+
+# ─── OTP (High-performance HMAC-SHA256 with fallback) ─────────────────────────
 def generate_otp(length: int = 6) -> str:
     """Cryptographically-secure numeric OTP, e.g. '483921'. Never logged or stored raw."""
     return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
 
 def hash_otp(otp: str) -> str:
-    return pwd_context.hash(otp)
+    """Fast, secure HMAC-SHA256 digest for short-lived 6-digit numeric OTPs."""
+    secret = (settings.SECRET_KEY or "careershala_secret").encode("utf-8")
+    return hmac.new(secret, str(otp).strip().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def verify_otp_hash(plain_otp: str, hashed_otp: str) -> bool:
-    try:
-        return pwd_context.verify(plain_otp, hashed_otp)
-    except Exception:
+    """Verifies OTP in constant time with backward-compatible fallback for legacy passlib hashes."""
+    if not hashed_otp or not plain_otp:
         return False
+    if hashed_otp.startswith(("$argon2", "$2b$", "$2a$", "$bcrypt")):
+        try:
+            return pwd_context.verify(plain_otp, hashed_otp)
+        except Exception:
+            return False
+    expected = hash_otp(plain_otp)
+    return secrets.compare_digest(expected, hashed_otp)
 
 
 def generate_device_id() -> str:
@@ -52,15 +81,22 @@ def generate_device_id() -> str:
 
 
 def hash_device_id(device_id: str) -> str:
-    """We store only a hash of the device id server-side, same as we would a token."""
-    return pwd_context.hash(device_id)
+    """Fast, secure HMAC-SHA256 digest for 256-bit random high-entropy device tokens."""
+    secret = (settings.SECRET_KEY or "careershala_secret").encode("utf-8")
+    return hmac.new(secret, device_id.strip().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def verify_device_id(plain_device_id: str, hashed_device_id: str) -> bool:
-    try:
-        return pwd_context.verify(plain_device_id, hashed_device_id)
-    except Exception:
+    """Verifies device ID in constant time with backward-compatible fallback for legacy passlib hashes."""
+    if not hashed_device_id or not plain_device_id:
         return False
+    if hashed_device_id.startswith(("$argon2", "$2b$", "$2a$", "$bcrypt")):
+        try:
+            return pwd_context.verify(plain_device_id, hashed_device_id)
+        except Exception:
+            return False
+    expected = hash_device_id(plain_device_id)
+    return secrets.compare_digest(expected, hashed_device_id)
 
 
 def generate_challenge_token(subject: str, purpose: str, expires_minutes: int = 10) -> str:

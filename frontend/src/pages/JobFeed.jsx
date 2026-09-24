@@ -36,7 +36,7 @@ import {
 import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getJobs, createJob, applyToJob, matchJobATS, getMyApplications } from '../services/api'
+import { getJobs, getJobDetail, createJob, applyToJob, matchJobATS, getMyApplications } from '../services/api'
 import CompanyLogo from '../components/common/CompanyLogo'
 import CustomDropdown from '../components/common/CustomDropdown'
 import EEOSurveyModal from '../components/common/EEOSurveyModal'
@@ -54,6 +54,28 @@ export const resolveJobLogo = (job) => {
     job.company_profile?.logo ||
     null
   )
+}
+
+const normalizeJob = (job) => {
+  const source = job || {}
+  const rawId = source.id || source._id || `job_${Math.random().toString(36).substr(2, 9)}`
+  return {
+    ...source,
+    id: typeof rawId === 'object' && rawId.$oid ? rawId.$oid : String(rawId),
+    title: source.title || source.job_title || 'Untitled role',
+    company_name: source.company_name || source.employer_name || 'Unknown company',
+    location: source.location || source.job_city || 'Remote',
+    work_mode: source.work_mode || 'Remote',
+    company_logo: resolveJobLogo(source),
+    salary_range: source.salary_range || null,
+    external_apply_url: source.external_apply_url || source.job_apply_link || null,
+    is_external: source.is_external === true || ['true', 'True', 1].includes(source.is_external),
+    publisher_source: source.publisher_source || (source.external_apply_url?.includes('linkedin.com') ? 'LinkedIn' : source.external_apply_url?.includes('naukri.com') ? 'Naukri' : 'Direct'),
+    required_skills: Array.isArray(source.required_skills) ? source.required_skills : [],
+    applicant_count: Number(source.applicant_count || 0),
+    min_years: Number(source.min_years || 0),
+    status: source.status || 'open',
+  }
 }
 
 /**
@@ -214,27 +236,62 @@ export default function JobFeed() {
     })
   }
 
-  const handleShareJob = (job) => {
+  const handleShareJob = async (job) => {
     if (!job) return
-    const shareUrl = `${window.location.origin}/jobs?jobId=${job.id}`
-    if (navigator.clipboard) {
+    const jobId = job.id || job._id
+    const shareUrl = `${window.location.origin}/jobs?jobId=${jobId}`
+    const jobTitle = job.title || 'Career Opportunity'
+    const companyName = job.company_name || 'CareerShala'
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${jobTitle} at ${companyName} | CareerShala`,
+          text: `Check out this opportunity for ${jobTitle} at ${companyName}!`,
+          url: shareUrl,
+        })
+        return
+      } catch (err) {
+        if (err.name === 'AbortError') return
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(shareUrl)
-      toast.success('Job link copied to clipboard!')
+        .then(() => toast.success('Job link copied to clipboard! 📋'))
+        .catch(() => toast.success('Job link: ' + shareUrl))
     } else {
       toast.success('Job link: ' + shareUrl)
     }
   }
 
-  // Auto-select job from URL query parameter if present
+  // Auto-select job from URL query parameter (?jobId=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const jobIdParam = params.get('jobId')
-    if (jobIdParam && jobs.length > 0) {
-      const match = jobs.find((j) => j.id === jobIdParam)
+    if (!jobIdParam) return
+
+    // 1. Locate in current jobs list
+    if (jobs && jobs.length > 0) {
+      const match = jobs.find((j) => String(j.id) === String(jobIdParam) || String(j._id) === String(jobIdParam))
       if (match) {
         setActiveJobDetail(match)
+        return
       }
     }
+
+    // 2. Fallback: Fetch single job document from backend
+    getJobDetail(jobIdParam)
+      .then((res) => {
+        const jobData = res.data?.job || res.data
+        if (jobData) {
+          const normalized = normalizeJob(jobData)
+          setActiveJobDetail(normalized)
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not retrieve deep-linked job:', err)
+      })
   }, [jobs])
 
   // Fetch candidate's applied jobs from database on load so "Applied" state persists across page refresh
@@ -330,22 +387,62 @@ What We Are Looking For:
     toast.success('AI-crafted Job Description generated! ✨')
   }
 
-  // Fetch jobs
-  const fetchJobListings = async () => {
+  // Helper to extract jobs array from diverse response shapes
+  const extractJobsArray = (response) => {
+    console.log("Full response.data payload:", response?.data)
+    if (!response) return []
+
+    // 1. Direct array at response or response.data
+    if (Array.isArray(response)) return response
+    if (Array.isArray(response?.data)) return response.data
+
+    // 2. Nested keys in response.data
+    if (Array.isArray(response?.data?.jobs)) return response.data.jobs
+    if (Array.isArray(response?.data?.results)) return response.data.results
+    if (Array.isArray(response?.data?.data)) return response.data.data
+    if (Array.isArray(response?.data?.items)) return response.data.items
+
+    // 3. Fallback to unwrapped root-level keys
+    if (Array.isArray(response?.jobs)) return response.jobs
+    if (Array.isArray(response?.results)) return response.results
+    if (Array.isArray(response?.items)) return response.items
+
+    return []
+  }
+
+  // Fetch jobs with optional override parameters
+  const fetchJobListings = async (overrideParams = null) => {
     setLoading(true)
     try {
-      const maxYearsVal = EXP_LEVELS.find(e => e.id === selectedExp)?.maxYears
-      const params = {
-        search: searchQuery.trim() || undefined,
-        work_mode: selectedMode !== 'all' ? selectedMode : undefined,
-        location: locationQuery.trim() || undefined,
-        min_years: maxYearsVal !== null ? maxYearsVal : undefined,
-        skill: selectedSkill || undefined,
+      let params = {}
+      if (overrideParams !== null) {
+        params = overrideParams
+      } else {
+        const maxYearsVal = EXP_LEVELS.find(e => e.id === selectedExp)?.maxYears
+        const modeVal = selectedMode && selectedMode.toLowerCase() !== 'all' ? selectedMode : undefined
+        params = {
+          search: searchQuery.trim() || undefined,
+          work_mode: modeVal,
+          location: locationQuery.trim() || undefined,
+          min_years: maxYearsVal !== null && maxYearsVal !== undefined ? maxYearsVal : undefined,
+          skill: selectedSkill || undefined,
+        }
       }
-      const res = await getJobs(params)
-      const fetchedJobs = res.data?.jobs || []
+
+      console.log("[JobFeed] Fetching jobs with params:", params)
+      const response = await getJobs(params)
+      console.log("Raw API Response:", response)
+
+      const rawList = extractJobsArray(response)
+      console.log("Extracted raw array (before normalize):", rawList)
+
+      const fetchedJobs = rawList.map(normalizeJob)
+      console.log("Final normalized jobs (after normalize):", fetchedJobs)
+
+      const totalCount = response?.data?.total ?? response?.total ?? fetchedJobs.length
+
       setJobs(fetchedJobs)
-      setTotal(res.data?.total || 0)
+      setTotal(totalCount)
 
       const serverAppliedIds = fetchedJobs.filter((j) => Boolean(j.has_applied)).map((j) => j.id)
       if (serverAppliedIds.length > 0) {
@@ -358,6 +455,8 @@ What We Are Looking For:
     } catch (err) {
       console.error('Failed to load job listings:', err)
       toast.error('Unable to fetch jobs. Please try refreshing.')
+      setJobs([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
@@ -366,7 +465,19 @@ What We Are Looking For:
   // Reload when non-debounced filters change
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchJobListings()
+      // Check if all filters are in default state; if so, pass empty object {}
+      const isDefault =
+        !searchQuery.trim() &&
+        (selectedMode === 'all' || !selectedMode) &&
+        (selectedExp === 'all' || !selectedExp) &&
+        !selectedSkill &&
+        !locationQuery.trim()
+
+      if (isDefault) {
+        fetchJobListings({})
+      } else {
+        fetchJobListings()
+      }
     }, 250)
     return () => clearTimeout(timer)
   }, [searchQuery, selectedMode, selectedExp, selectedSkill, locationQuery])
@@ -413,6 +524,17 @@ What We Are Looking For:
   // Quick Apply with immediate caching & state lock
   const handleApply = async (job) => {
     if (!job?.id) return
+
+    const safeJob = normalizeJob(job)
+    if (safeJob.is_external) {
+      if (safeJob.external_apply_url) {
+        window.open(safeJob.external_apply_url, '_blank', 'noopener,noreferrer')
+      } else {
+        toast.error('This external listing does not have an application link.')
+      }
+      return
+    }
+
     if (job.has_applied || appliedJobs.has(job.id)) {
       toast.error('You have already applied to this job.')
       return
@@ -716,38 +838,66 @@ What We Are Looking For:
                     onCalculateMatch={() => handleCalculateMatch(job)}
                     onApply={() => handleApply(job)}
                     onViewDetail={() => setActiveJobDetail(job)}
+                    onShare={() => handleShareJob(job)}
                   />
                 ))}
               </div>
             ) : (
-              /* Empty State */
-              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm max-w-lg mx-auto my-8">
-                <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4 shadow-2xs">
-                  <Briefcase size={28} />
-                </div>
-                <h3 className="text-lg font-extrabold text-slate-900 font-poppins mb-1">
-                  No matching opportunities found
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-500 mb-6 max-w-sm mx-auto leading-relaxed">
-                  We couldn't find roles matching your current search parameters. Try clearing filters or searching for alternative tech keywords.
-                </p>
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleResetFilters}
-                    className="px-4.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Clear All Filters
-                  </button>
-                  {isRecruiterOrAdmin && (
+              /* Fallback Card & Empty State */
+              <div className="space-y-4">
+                {/* Fallback diagnostic card verifying component mounting */}
+                <div className="bg-amber-50/90 border border-amber-200/90 rounded-3xl p-5 shadow-2xs mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-black text-xs shrink-0">
+                        FEED
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-amber-900">JobFeed Component Mounted & Active</h4>
+                        <p className="text-[11px] text-amber-700 mt-0.5">
+                          Query returned 0 records. Check browser console for <code>Raw API Response</code> payload.
+                        </p>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setIsPostModalOpen(true)}
-                      className="px-4.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer"
+                      onClick={() => fetchJobListings({})}
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
                     >
-                      Post First Position
+                      <RotateCcw size={13} />
+                      Force Fetch (Empty Params)
                     </button>
-                  )}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm max-w-lg mx-auto my-4">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4 shadow-2xs">
+                    <Briefcase size={28} />
+                  </div>
+                  <h3 className="text-lg font-extrabold text-slate-900 font-poppins mb-1">
+                    No matching opportunities found
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 mb-6 max-w-sm mx-auto leading-relaxed">
+                    We couldn't find roles matching your current search parameters. Try clearing filters or searching for alternative tech keywords.
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="px-4.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Clear All Filters
+                    </button>
+                    {isRecruiterOrAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setIsPostModalOpen(true)}
+                        className="px-4.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer"
+                      >
+                        Post First Position
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -816,6 +966,12 @@ What We Are Looking For:
                                 <ShieldCheck size={10} className="text-emerald-700" />
                                 Verified
                               </span>
+                              {activeJobDetail.is_external && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                                  <ExternalLink size={10} />
+                                  External Listing
+                                </span>
+                              )}
                             </div>
                           </div>
                         </>
@@ -841,7 +997,9 @@ What We Are Looking For:
                           'Applying...'
                         ) : (
                           <>
-                            Apply Now
+                            {activeJobDetail.is_external 
+                              ? `Apply on ${activeJobDetail.publisher_source || 'Corporate Site'}` 
+                              : 'Apply Now'}
                             <ArrowUpRight size={13} />
                           </>
                         )}
@@ -1404,12 +1562,16 @@ export function JobCard({
   isApplying,
   onCalculateMatch,
   onApply,
-  onViewDetail
+  onViewDetail,
+  onShare,
 }) {
-  const isFresher = job.min_years === 0 || job.min_years <= 1
-  const logoUrl = resolveJobLogo(job)
-  const companySite = getCompanyWebsiteUrl(job)
+  const safeJob = normalizeJob(job)
+  const isFresher = safeJob.min_years === 0 || safeJob.min_years <= 1
+  const logoUrl = resolveJobLogo(safeJob)
+  const companySite = getCompanyWebsiteUrl(safeJob)
   const hasApplied = Boolean(job?.has_applied ?? isApplied)
+  const jobTitle = safeJob.title
+  const companyName = safeJob.company_name
 
   return (
     <motion.div
@@ -1432,10 +1594,10 @@ export function JobCard({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="shrink-0 transition-transform duration-200 hover:scale-105"
-              title={`Visit ${job.company_name} official website`}
+              title={`Visit ${companyName} official website`}
             >
               <CompanyLogo
-                companyName={job.company_name}
+                companyName={companyName}
                 logoUrl={logoUrl}
                 website={companySite}
                 size="md"
@@ -1445,10 +1607,10 @@ export function JobCard({
           ) : (
             <div
               className="shrink-0"
-              title={job.company_name}
+              title={companyName}
             >
               <CompanyLogo
-                companyName={job.company_name}
+                companyName={companyName}
                 logoUrl={logoUrl}
                 size="md"
                 showVerified={true}
@@ -1465,14 +1627,26 @@ export function JobCard({
                   onViewDetail()
                 }}
                 className="text-base sm:text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins truncate min-w-0 flex-1"
-                title={job.title}
+                title={jobTitle}
               >
-                {job.title}
+                {jobTitle}
               </h3>
               {isFresher && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-1 shrink-0">
                   <Sparkles size={10} className="text-emerald-600" />
                   Fresher Friendly
+                </span>
+              )}
+              {safeJob.is_external && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black inline-flex items-center gap-1 shrink-0 ${
+                  safeJob.publisher_source === 'LinkedIn'
+                    ? 'bg-[#0A66C2]/10 text-[#0A66C2] border border-[#0A66C2]/30'
+                    : safeJob.publisher_source === 'Naukri'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                }`}>
+                  <ExternalLink size={10} />
+                  {safeJob.publisher_source ? `${safeJob.publisher_source} Verified` : 'External Listing'}
                 </span>
               )}
             </div>
@@ -1487,14 +1661,14 @@ export function JobCard({
                   rel="noopener noreferrer"
                   className="text-slate-700 hover:text-indigo-600 hover:underline transition font-bold truncate inline-flex items-center gap-1"
                   onClick={(e) => e.stopPropagation()}
-                  title={`Visit ${job.company_name} official website`}
+                  title={`Visit ${companyName} official website`}
                 >
-                  <span>{job.company_name}</span>
+                  <span>{companyName}</span>
                   <ExternalLink size={11} className="text-slate-400 shrink-0" />
                 </a>
               ) : (
                 <span className="text-slate-700 font-bold truncate">
-                  {job.company_name}
+                  {companyName}
                 </span>
               )}
               {job.department && (
@@ -1527,19 +1701,19 @@ export function JobCard({
                 <span>
                   {job.work_mode === 'Remote'
                     ? 'Remote'
-                    : job.location && job.location.toLowerCase() !== 'remote'
-                      ? `${job.location}${job.work_mode ? ` (${job.work_mode})` : ''}`
-                      : job.work_mode || job.location || 'Remote'}
+                    : safeJob.location && safeJob.location.toLowerCase() !== 'remote'
+                      ? `${safeJob.location}${safeJob.work_mode ? ` (${safeJob.work_mode})` : ''}`
+                      : safeJob.work_mode || safeJob.location || 'Remote'}
                 </span>
               </span>
 
               {/* Salary Range */}
-              {job.salary_range && (
+              {safeJob.salary_range && (
                 <>
                   <span className="text-slate-300">•</span>
                   <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70 shrink-0">
                     <DollarSign size={11} className="text-emerald-600" />
-                    <span>{job.salary_range}</span>
+                    <span>{safeJob.salary_range}</span>
                   </span>
                 </>
               )}
@@ -1584,14 +1758,55 @@ export function JobCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={async (e) => {
+              e.stopPropagation()
+              if (onShare) {
+                onShare()
+              } else {
+                const jobId = job.id || job._id
+                const shareUrl = `${window.location.origin}/jobs?jobId=${jobId}`
+                const jobTitle = job.title || 'Career Opportunity'
+                const companyName = job.company_name || 'CareerShala'
+
+                if (navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: `${jobTitle} at ${companyName} | CareerShala`,
+                      text: `Check out this opportunity for ${jobTitle} at ${companyName}!`,
+                      url: shareUrl,
+                    })
+                    return
+                  } catch (err) {
+                    if (err.name === 'AbortError') return
+                  }
+                }
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  navigator.clipboard.writeText(shareUrl)
+                    .then(() => toast.success('Job link copied to clipboard! 📋'))
+                    .catch(() => toast.success('Job link: ' + shareUrl))
+                } else {
+                  toast.success('Job link: ' + shareUrl)
+                }
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+            title="Share job link"
+          >
+            <Share2 size={15} />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               onViewDetail()
             }}
-            className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition cursor-pointer px-2 py-1.5"
+            className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 transition cursor-pointer px-2 py-1.5"
           >
             View Details
           </button>

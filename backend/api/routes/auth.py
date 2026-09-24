@@ -18,7 +18,7 @@ from api.deps import get_current_user, get_user_repo, get_database
 
 logger = structlog.get_logger(__name__)
 from core.config import settings
-from core.security import decode_token, verify_password, verify_token_type, hash_password
+from core.security import decode_token, verify_password, verify_password_async, verify_token_type, hash_password, hash_password_async
 from models.user_model import UserModel, UserStatus
 from repositories.user_repo import UserRepository
 from schemas.user_schema import (
@@ -111,7 +111,7 @@ async def change_password(
             detail="Your account is connected via social login (Google/GitHub/LinkedIn) and does not use a direct password.",
         )
 
-    if not verify_password(payload.current_password, current_user.hashed_password):
+    if not (await verify_password_async(payload.current_password, current_user.hashed_password)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect.",
@@ -123,7 +123,7 @@ async def change_password(
             detail="New password must be different from your current password.",
         )
 
-    new_hash = hash_password(payload.new_password)
+    new_hash = await hash_password_async(payload.new_password)
     await user_repo.update(str(current_user.id), {"hashed_password": new_hash})
     await TokenService.revoke_all_user_tokens(str(current_user.id), reason="password_change")
     logger.info("Password changed successfully", user_id=str(current_user.id))

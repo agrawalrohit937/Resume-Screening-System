@@ -1,25 +1,28 @@
 """
 Job Matcher Service — Bidirectional AI Recommendation Engine.
 
-Phase C & Task 0.4: "Jobs For You" Matching Engine:
-- Extracts candidate primary resume summary and core skills.
-- Encodes candidate profile into 768-dim normalized vector via local SentenceTransformer ("BAAI/bge-base-en-v1.5").
-- Vector Retrieval Strategy:
-  * Atlas Vector Search (FEATURE_ATLAS_VECTOR_SEARCH = True):
-    - Uses Atlas `$vectorSearch` with HNSW graph indexing.
-    - Time Complexity: O(log(N_jobs) * D) where N_jobs is corpus size and D = 768.
-    - Network / IO: Fetches only top candidate documents, minimizing transport and memory overhead.
-  * In-Memory Scan Fallback (FEATURE_ATLAS_VECTOR_SEARCH = False or local Mongo fallback):
-    - Brute-force linear scan over open jobs in MongoDB.
-    - Time Complexity: O(N_jobs * D).
-- Applies candidate application history: already-applied jobs are excluded from recommendations.
-- Zero OpenAI dependencies; 100% local CPU vector encoding.
+Strict Two-Stage Matching Pipeline:
+1. Stage 1 (Fast Role/Keyword Filter):
+   - Extracts primary role, domain signals, and top technical skills from candidate resume.
+   - Performs a lightweight MongoDB query/regex pre-filter to narrow the open job pool
+     down to a highly relevant subset (~50-100 jobs), with graceful fallback to recent jobs.
+2. Stage 2 (Deep Semantic Match):
+   - Runs full BAAI/bge-base-en-v1.5 768-dim dense vector similarity and ATS scoring on
+     the filtered candidate job pool.
+   - Dynamically generates JD vector embeddings if absent.
+3. Selection & Ranking:
+   - Excludes already-applied jobs.
+   - Calibrates raw cosine similarity into transparent ATS match percentages (50% - 98%).
+   - Selects top candidate matches meeting quality threshold (>= 50% match score).
+
+100% Local CPU Vector Encoding via SentenceTransformer (Zero OpenAI dependencies).
 """
 
 from __future__ import annotations
 
+import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import structlog
 from bson import ObjectId
@@ -29,6 +32,13 @@ from services.embedding_service import embedding_model, EMBEDDING_DIMENSIONS
 from utils.pagination import stream_cursor
 
 logger = structlog.get_logger(__name__)
+
+# Stopwords to filter out generic seniority/level modifiers when extracting core role tokens
+ROLE_STOPWORDS = {
+    "senior", "sr", "junior", "jr", "mid", "lead", "staff", "principal",
+    "intern", "trainee", "associate", "head", "director", "vp", "manager",
+    "specialist", "consultant", "analyst", "at", "in", "for", "and", "of", "the",
+}
 
 
 def _calculate_cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
@@ -45,7 +55,7 @@ def _calculate_cosine_similarity(vec_a: List[float], vec_b: List[float]) -> floa
 
 def _calibrate_match_score(raw_cosine: float) -> float:
     """
-    Calibrates raw BGE cosine similarity (typically 0.40 - 0.85) into a transparent 
+    Calibrates raw BGE cosine similarity (typically 0.35 - 0.85) into a transparent 
     and motivating ATS match percentage (50% - 98%).
     """
     if raw_cosine <= 0.0:
@@ -56,24 +66,173 @@ def _calibrate_match_score(raw_cosine: float) -> float:
     return round(min(98.0, max(45.0, scaled)), 1)
 
 
+def _extract_candidate_role_signals(parsed_dict: Dict[str, Any], raw_text: str = "") -> Dict[str, Any]:
+    """
+    Extracts primary role, domain keywords, and top technical skills from candidate resume
+    to power Stage 1 MongoDB pre-filtering.
+    """
+    primary_role = ""
+    role_tokens: List[str] = []
+
+    # 1. Check explicit role / designation fields
+    for field in ["targeted_role", "desired_role", "role", "designation", "current_title"]:
+        val = parsed_dict.get(field)
+        if val and isinstance(val, str) and val.strip():
+            primary_role = val.strip()
+            break
+
+    # 2. Check most recent work experience
+    if not primary_role:
+        work_exp = parsed_dict.get("work_experience") or []
+        if isinstance(work_exp, list) and work_exp:
+            first_exp = work_exp[0]
+            if isinstance(first_exp, dict):
+                primary_role = first_exp.get("title") or first_exp.get("role") or first_exp.get("designation") or ""
+            elif hasattr(first_exp, "title"):
+                primary_role = getattr(first_exp, "title", "") or ""
+
+    # 3. Extract technical skills
+    tech_skills = (
+        parsed_dict.get("technical_skills")
+        or parsed_dict.get("skills")
+        or []
+    )
+    if isinstance(tech_skills, list):
+        cleaned_skills = [str(s).strip() for s in tech_skills if str(s).strip()]
+    else:
+        cleaned_skills = []
+
+    # 4. Tokenize primary role to extract core domain terms
+    if primary_role:
+        raw_tokens = re.findall(r"[A-Za-z0-9+#\.]+", primary_role)
+        role_tokens = [
+            t.lower() for t in raw_tokens
+            if len(t) > 1 and t.lower() not in ROLE_STOPWORDS
+        ]
+
+    return {
+        "primary_role": primary_role,
+        "role_tokens": role_tokens,
+        "top_skills": cleaned_skills[:10],
+        "all_skills": cleaned_skills,
+    }
+
+
+async def _stage_1_prefilter_jobs(
+    db: Any,
+    role_signals: Dict[str, Any],
+    include_external: bool = True,
+    max_candidates: int = 100,
+) -> List[Dict[str, Any]]:
+    """
+    Stage 1: Fast Role & Keyword MongoDB Filter.
+    Filters the open job pool down to ~50-100 jobs using indexed fields ($or regex).
+    Falls back gracefully to the latest open jobs if the filter is too restrictive.
+    """
+    base_match: Dict[str, Any] = {"status": {"$in": ["open", "published"]}}
+    if not include_external:
+        base_match["is_external"] = {"$ne": True}
+
+    or_clauses: List[Dict[str, Any]] = []
+
+    # A. Match on primary role phrase or role tokens
+    primary_role = role_signals.get("primary_role", "").strip()
+    if primary_role and len(primary_role) >= 3:
+        escaped_role = re.escape(primary_role)
+        or_clauses.append({"title": {"$regex": escaped_role, "$options": "i"}})
+
+    role_tokens = role_signals.get("role_tokens", [])
+    for token in role_tokens:
+        if len(token) >= 3:
+            or_clauses.append({"title": {"$regex": re.escape(token), "$options": "i"}})
+            or_clauses.append({"department": {"$regex": re.escape(token), "$options": "i"}})
+
+    # B. Match on top candidate technical skills in required_skills
+    top_skills = role_signals.get("top_skills", [])
+    for skill in top_skills[:5]:
+        if len(skill) >= 2:
+            or_clauses.append({"required_skills": {"$regex": f"^{re.escape(skill)}$", "$options": "i"}})
+            or_clauses.append({"title": {"$regex": re.escape(skill), "$options": "i"}})
+
+    projection = {
+        "_id": 1,
+        "title": 1,
+        "company_name": 1,
+        "company_logo": 1,
+        "company_logo_url": 1,
+        "logo_url": 1,
+        "logo": 1,
+        "location": 1,
+        "work_mode": 1,
+        "salary_range": 1,
+        "required_skills": 1,
+        "min_years": 1,
+        "jd_text_raw": 1,
+        "department": 1,
+        "jd_embedding": 1,
+        "jd_embedding_bge": 1,
+        "created_at": 1,
+        "is_external": 1,
+        "external_apply_url": 1,
+        "apply_url": 1,
+        "tenant_id": 1,
+    }
+
+    filtered_jobs: List[Dict[str, Any]] = []
+
+    if or_clauses:
+        stage1_query = {
+            "$and": [
+                base_match,
+                {"$or": or_clauses},
+            ]
+        }
+        cursor = db.jobs.find(stage1_query, projection).sort("created_at", -1).limit(max_candidates)
+        filtered_jobs = await stream_cursor(cursor)
+
+    # Graceful Fallback: If Stage 1 yields fewer than 10 jobs, backfill with the freshest open jobs
+    if len(filtered_jobs) < 10:
+        logger.info(
+            "Stage 1 filter yielded sparse results; widening query to recent open jobs",
+            initial_count=len(filtered_jobs),
+            primary_role=primary_role,
+        )
+        existing_ids = {str(j["_id"]) for j in filtered_jobs}
+        remaining_limit = max_candidates - len(filtered_jobs)
+
+        fallback_query = dict(base_match)
+        if existing_ids:
+            try:
+                fallback_query["_id"] = {"$nin": [ObjectId(jid) for jid in existing_ids if ObjectId.is_valid(jid)]}
+            except Exception:
+                pass
+
+        fallback_cursor = db.jobs.find(fallback_query, projection).sort("created_at", -1).limit(remaining_limit)
+        fallback_jobs = await stream_cursor(fallback_cursor)
+        filtered_jobs.extend(fallback_jobs)
+
+    return filtered_jobs
+
+
 async def find_jobs_for_candidate(
     candidate_id: str,
     limit: int = 5,
     db: Any = None,
     resume_repo: Any = None,
+    include_external: bool = True,
 ) -> Dict[str, Any]:
     """
-    Bidirectional AI matcher finding top recommended open jobs for a candidate.
-
-    Algorithmic Complexity:
-    - With Atlas Vector Search ($vectorSearch): O(log(N_jobs) * D) ANN retrieval via HNSW graph.
-    - Fallback: O(N_jobs * D) full linear in-memory scan.
+    Two-Stage Job Recommendation Engine for candidates:
+    - Stage 1: Fast Role/Keyword MongoDB pre-filtering to 50-100 jobs.
+    - Stage 2: Deep Semantic Match via bge-base-en-v1.5 dense vector scoring.
+    - Selection: Top scoring (>= 50% match) unapplied jobs.
 
     Args:
         candidate_id: MongoDB user ID of candidate.
         limit: Max recommended jobs to return (default 5).
         db: Motor async database client.
-        resume_repo: ResumeRepository instance.
+        resume_repo: ResumeRepository instance (optional).
+        include_external: Whether to include external scraped jobs.
 
     Returns:
         Dict: {
@@ -81,13 +240,18 @@ async def find_jobs_for_candidate(
             "total_open_jobs": int,
             "has_resume": bool,
             "resume_id": str | None,
-            "processing_time_ms": int
+            "processing_time_ms": int,
+            "stage1_candidates_count": int,
         }
     """
     t0 = time.perf_counter()
 
     if db is None:
         raise ValueError("Database instance must be provided to find_jobs_for_candidate.")
+
+    jobs_query = {"status": {"$in": ["open", "published"]}}
+    if not include_external:
+        jobs_query["is_external"] = {"$ne": True}
 
     # 1. Retrieve candidate's primary or latest parsed resume
     target_resume = None
@@ -117,10 +281,11 @@ async def find_jobs_for_candidate(
         logger.info("No parsed resume found for candidate", candidate_id=candidate_id)
         return {
             "recommended_jobs": [],
-            "total_open_jobs": await db.jobs.count_documents({"status": "open"}),
+            "total_open_jobs": await db.jobs.count_documents(jobs_query),
             "has_resume": False,
             "resume_id": None,
             "processing_time_ms": int((time.perf_counter() - t0) * 1000),
+            "stage1_candidates_count": 0,
             "message": "Upload your resume to activate AI-tailored job recommendations.",
         }
 
@@ -134,19 +299,24 @@ async def find_jobs_for_candidate(
         parsed_dict = {}
 
     summary_text = parsed_dict.get("summary") or ""
-    skills = parsed_dict.get("technical_skills") or parsed_dict.get("skills") or []
-    skills_text = ", ".join(skills[:25])
     raw_text = parsed_dict.get("raw_text") or getattr(target_resume, "raw_text", "") or ""
-
+    candidate_skills = (
+        parsed_dict.get("technical_skills")
+        or parsed_dict.get("skills")
+        or []
+    )
+    skills_text = ", ".join(candidate_skills[:25])
     candidate_summary = summary_text or (raw_text[:300] if raw_text else "")
-    candidate_skills = skills or []
 
-    # Synthesize candidate profile representation for embedding
+    # Extract role & skill signals for Stage 1
+    role_signals = _extract_candidate_role_signals(parsed_dict, raw_text)
+
+    # Synthesize candidate profile representation for dense vector embedding
     candidate_profile_text = f"Skills: {skills_text}. Professional Summary: {summary_text}. Highlights: {raw_text[:1200]}"
     if not candidate_profile_text.strip():
         candidate_profile_text = raw_text[:1500]
 
-    # 2. Encode candidate profile into 768-dim normalized vector via local SentenceTransformer
+    # Encode candidate profile into 768-dim normalized vector via local SentenceTransformer
     try:
         vectors = embedding_model.encode([candidate_profile_text])
         candidate_vec = vectors[0] if vectors else [0.0] * EMBEDDING_DIMENSIONS
@@ -154,8 +324,8 @@ async def find_jobs_for_candidate(
         logger.error("Failed to generate candidate embedding vector", error=str(e))
         candidate_vec = [0.0] * EMBEDDING_DIMENSIONS
 
-    # 3. Retrieve candidate's applied jobs to exclude them from recommendation slots
-    applied_job_ids = set()
+    # Retrieve candidate's applied jobs to exclude from recommendations
+    applied_job_ids: Set[str] = set()
     try:
         app_cursor = db.applications.find({"candidate_id": str(candidate_id)}, {"job_id": 1})
         applied_docs = await stream_cursor(app_cursor)
@@ -165,225 +335,117 @@ async def find_jobs_for_candidate(
     except Exception as e:
         logger.warning("Failed to fetch candidate applied jobs", error=str(e))
 
-    candidate_skills_set = {s.lower() for s in skills}
+    candidate_skills_set = {s.lower() for s in candidate_skills}
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 1: Fast Role / Keyword Pre-Filtering (MongoDB Query)
+    # ══════════════════════════════════════════════════════════════════════════
+    max_stage1_candidates = max(50, min(100, limit * 20))
+    stage1_jobs = await _stage_1_prefilter_jobs(
+        db=db,
+        role_signals=role_signals,
+        include_external=include_external,
+        max_candidates=max_stage1_candidates,
+    )
+
+    if not stage1_jobs:
+        return {
+            "recommended_jobs": [],
+            "total_open_jobs": 0,
+            "has_resume": True,
+            "resume_id": str(getattr(target_resume, "id", None) or getattr(target_resume, "_id", "")),
+            "processing_time_ms": int((time.perf_counter() - t0) * 1000),
+            "stage1_candidates_count": 0,
+            "message": "No open jobs currently available in the marketplace.",
+        }
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 2: Deep Semantic Match (Dense BGE-base-en-v1.5 & ATS Scoring)
+    # ══════════════════════════════════════════════════════════════════════════
     ranked_jobs: List[Dict[str, Any]] = []
-    vector_search_used = False
 
-    # 4. Strategy A: MongoDB Atlas $vectorSearch (if enabled)
-    if FEATURE_ATLAS_VECTOR_SEARCH:
+    # Batch compute missing job embeddings if needed
+    jobs_needing_embedding = []
+    texts_to_embed = []
+    for idx, job in enumerate(stage1_jobs):
+        jd_emb = job.get("jd_embedding_bge") or job.get("jd_embedding") or []
+        if not jd_emb or len(jd_emb) != EMBEDDING_DIMENSIONS:
+            jobs_needing_embedding.append(idx)
+            job_req_skills = ", ".join(job.get("required_skills") or [])
+            jd_sample = f"{job.get('title', '')}. Skills: {job_req_skills}. {job.get('jd_text_raw', '')[:1000]}"
+            texts_to_embed.append(jd_sample)
+
+    if texts_to_embed:
         try:
-            num_candidates = max(200, 20 * limit)
-            pipeline = [
-                {
-                    "$vectorSearch": {
-                        "index": "jd_vector_index",
-                        "path": "jd_embedding_bge",
-                        "queryVector": candidate_vec,
-                        "numCandidates": num_candidates,
-                        "limit": max(20, limit * 3),
-                        "filter": {
-                            "status": {"$eq": "open"}
-                        },
-                    }
-                },
-                {
-                    "$project": {
-                        "_id": 1,
-                        "title": 1,
-                        "company_name": 1,
-                        "company_logo": 1,
-                        "company_logo_url": 1,
-                        "logo_url": 1,
-                        "location": 1,
-                        "work_mode": 1,
-                        "salary_range": 1,
-                        "required_skills": 1,
-                        "min_years": 1,
-                        "department": 1,
-                        "created_at": 1,
-                        "vector_score": {"$meta": "vectorSearchScore"},
-                    }
-                },
-            ]
-            cursor = db.jobs.aggregate(pipeline)
-            vector_docs = await cursor.to_list(length=max(20, limit * 3))
+            generated_vectors = embedding_model.encode(texts_to_embed)
+            for idx_in_list, job_idx in enumerate(jobs_needing_embedding):
+                stage1_jobs[job_idx]["jd_embedding_bge"] = generated_vectors[idx_in_list]
+        except Exception as emb_err:
+            logger.warning("Failed to generate on-the-fly JD embeddings", error=str(emb_err))
 
-            for doc in vector_docs:
-                job_id_str = str(doc["_id"])
-                raw_similarity = float(doc.get("vector_score", 0.5))
-                match_score = _calibrate_match_score(raw_similarity)
-                req_skills = doc.get("required_skills") or []
-                matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
+    # Score each candidate job against candidate profile vector
+    for job in stage1_jobs:
+        job_id_str = str(job["_id"])
+        jd_embedding = job.get("jd_embedding_bge") or job.get("jd_embedding") or []
 
-                ranked_jobs.append({
-                    "id": job_id_str,
-                    "title": doc.get("title", "Software Engineer"),
-                    "company_name": doc.get("company_name", "Technology Corp"),
-                    "company_logo": doc.get("company_logo") or doc.get("company_logo_url") or doc.get("logo_url") or doc.get("logo"),
-                    "company_logo_url": doc.get("company_logo_url") or doc.get("company_logo") or doc.get("logo_url") or doc.get("logo"),
-                    "location": doc.get("location", "Remote"),
-                    "work_mode": doc.get("work_mode", "Remote"),
-                    "salary_range": doc.get("salary_range"),
-                    "department": doc.get("department"),
-                    "min_years": float(doc.get("min_years", 0.0)),
-                    "required_skills": req_skills[:6],
-                    "matched_skills": matched_skills[:4],
-                    "match_score": match_score,
-                    "raw_similarity": round(raw_similarity, 4),
-                    "is_applied": job_id_str in applied_job_ids,
-                    "created_at": doc.get("created_at"),
-                })
+        if jd_embedding and len(jd_embedding) == EMBEDDING_DIMENSIONS:
+            raw_cosine = _calculate_cosine_similarity(candidate_vec, jd_embedding)
+        else:
+            raw_cosine = 0.0
 
-            vector_search_used = True
-            logger.info(
-                "Atlas vector search executed successfully",
-                candidate_id=candidate_id,
-                retrieved_count=len(ranked_jobs),
-            )
-        except Exception as vs_err:
-            logger.warning(
-                "Atlas vector search failed or unsupported on this deployment; falling back to in-memory scan",
-                error=str(vs_err),
-            )
-            ranked_jobs = []
-            vector_search_used = False
+        match_score = _calibrate_match_score(raw_cosine)
+        req_skills = job.get("required_skills") or []
+        matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
 
-    # 5. Strategy B: In-Memory Cosine Fallback (O(N_jobs * D))
-    total_open_count = 0
-    if not vector_search_used:
-        cursor = db.jobs.find(
-            {"status": "open"},
-            {
-                "_id": 1,
-                "title": 1,
-                "company_name": 1,
-                "company_logo": 1,
-                "company_logo_url": 1,
-                "logo_url": 1,
-                "location": 1,
-                "work_mode": 1,
-                "salary_range": 1,
-                "required_skills": 1,
-                "min_years": 1,
-                "jd_text_raw": 1,
-                "department": 1,
-                "jd_embedding": 1,
-                "jd_embedding_bge": 1,
-                "created_at": 1,
-            },
-        )
-        open_jobs = await stream_cursor(cursor)
-        total_open_count = len(open_jobs)
+        ranked_jobs.append({
+            "id": job_id_str,
+            "title": job.get("title", "Software Engineer"),
+            "company_name": job.get("company_name", "Technology Corp"),
+            "company_logo": job.get("company_logo") or job.get("company_logo_url") or job.get("logo_url") or job.get("logo"),
+            "company_logo_url": job.get("company_logo_url") or job.get("company_logo") or job.get("logo_url") or job.get("logo"),
+            "location": job.get("location", "Remote"),
+            "work_mode": job.get("work_mode", "Remote"),
+            "salary_range": job.get("salary_range"),
+            "department": job.get("department"),
+            "min_years": float(job.get("min_years", 0.0)),
+            "required_skills": req_skills[:6],
+            "matched_skills": matched_skills[:4],
+            "match_score": match_score,
+            "raw_similarity": round(raw_cosine, 4),
+            "is_applied": job_id_str in applied_job_ids,
+            "created_at": job.get("created_at"),
+            "is_external": bool(job.get("is_external", False)),
+            "external_apply_url": job.get("external_apply_url") or job.get("apply_url"),
+        })
 
-        if not open_jobs:
-            return {
-                "recommended_jobs": [],
-                "total_open_jobs": 0,
-                "has_resume": True,
-                "resume_id": str(getattr(target_resume, "id", None) or getattr(target_resume, "_id", "")),
-                "processing_time_ms": int((time.perf_counter() - t0) * 1000),
-                "message": "No open jobs currently available in the marketplace.",
-            }
-
-        if FEATURE_HYBRID_RETRIEVAL:
-            try:
-                from services.retrieval.hybrid_pipeline import HybridRetrievalPipeline
-                pipeline = HybridRetrievalPipeline(
-                    corpus=open_jobs,
-                    text_field="jd_text_raw",
-                    vector_field="jd_embedding",
-                    id_field="_id",
-                    rrf_k=60,
-                )
-                query_text = f"{candidate_summary} {' '.join(candidate_skills)}".strip() or (raw_text[:500] if raw_text else "Software Engineer")
-                fused_candidates = pipeline.retrieve(
-                    query_text=query_text,
-                    query_vector=candidate_vec,
-                    top_k=max(20, limit * 3),
-                    excluded_ids=applied_job_ids,
-                    recall_budget=100,
-                )
-                for doc in fused_candidates:
-                    job_id_str = str(doc.get("_id", "") or doc.get("id", ""))
-                    raw_similarity = float(doc.get("dense_score", 0.50))
-                    match_score = _calibrate_match_score(raw_similarity)
-                    req_skills = doc.get("required_skills") or []
-                    matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
-                    ranked_jobs.append({
-                        "id": job_id_str,
-                        "title": doc.get("title", "Software Engineer"),
-                        "company_name": doc.get("company_name", "Technology Corp"),
-                        "company_logo": doc.get("company_logo") or doc.get("company_logo_url") or doc.get("logo_url") or doc.get("logo"),
-                        "company_logo_url": doc.get("company_logo_url") or doc.get("company_logo") or doc.get("logo_url") or doc.get("logo"),
-                        "location": doc.get("location", "Remote"),
-                        "work_mode": doc.get("work_mode", "Remote"),
-                        "salary_range": doc.get("salary_range"),
-                        "department": doc.get("department"),
-                        "min_years": float(doc.get("min_years", 0.0)),
-                        "required_skills": req_skills[:6],
-                        "matched_skills": matched_skills[:4],
-                        "match_score": match_score,
-                        "raw_similarity": round(raw_similarity, 4),
-                        "rrf_score": doc.get("rrf_score"),
-                        "is_applied": job_id_str in applied_job_ids,
-                        "created_at": doc.get("created_at"),
-                    })
-            except Exception as e:
-                logger.warning("Hybrid retrieval pipeline failed, falling back to linear scan", error=str(e))
-                ranked_jobs = []
-
-        if not ranked_jobs:
-            for job in open_jobs:
-                job_id_str = str(job["_id"])
-                jd_embedding = job.get("jd_embedding_bge") or job.get("jd_embedding") or []
-
-                # Calculate vector similarity
-                if jd_embedding and len(jd_embedding) == EMBEDDING_DIMENSIONS:
-                    raw_cosine = _calculate_cosine_similarity(candidate_vec, jd_embedding)
-                else:
-                    raw_cosine = 0.50
-
-                req_skills = job.get("required_skills") or []
-                matched_skills = [s for s in req_skills if s.lower() in candidate_skills_set]
-                match_score = _calibrate_match_score(raw_cosine)
-
-                ranked_jobs.append({
-                    "id": job_id_str,
-                    "title": job.get("title", "Software Engineer"),
-                    "company_name": job.get("company_name", "Technology Corp"),
-                    "company_logo": job.get("company_logo") or job.get("company_logo_url") or job.get("logo_url") or job.get("logo"),
-                    "company_logo_url": job.get("company_logo_url") or job.get("company_logo") or job.get("logo_url") or job.get("logo"),
-                    "location": job.get("location", "Remote"),
-                    "work_mode": job.get("work_mode", "Remote"),
-                    "salary_range": job.get("salary_range"),
-                    "department": job.get("department"),
-                    "min_years": float(job.get("min_years", 0.0)),
-                    "required_skills": req_skills[:6],
-                    "matched_skills": matched_skills[:4],
-                    "match_score": match_score,
-                    "raw_similarity": round(raw_cosine, 4),
-                    "is_applied": job_id_str in applied_job_ids,
-                    "created_at": job.get("created_at"),
-                })
-    else:
-        try:
-            total_open_count = await db.jobs.count_documents({"status": "open"})
-        except Exception:
-            total_open_count = len(ranked_jobs)
-
-    # 6. Exclude applied jobs from recommendation slots
+    # ══════════════════════════════════════════════════════════════════════════
+    # SELECTION & RANKING: Exclude applied & pick Top matches >= 50%
+    # ══════════════════════════════════════════════════════════════════════════
+    # Separate unapplied jobs
     unapplied_jobs = [j for j in ranked_jobs if not j["is_applied"]]
-    # Fallback to all ranked if user has applied to everything
     candidate_matches = unapplied_jobs if unapplied_jobs else ranked_jobs
-    candidate_matches.sort(key=lambda j: j["match_score"], reverse=True)
-    top_matches = candidate_matches[:limit]
+
+    # Sort by calibrated ATS match score descending
+    candidate_matches.sort(key=lambda j: (j["match_score"], j.get("raw_similarity", 0)), reverse=True)
+
+    # Filter to quality threshold (>= 50%) if available, else best available
+    qualifying_matches = [j for j in candidate_matches if j["match_score"] >= 50.0]
+    final_matches = qualifying_matches if qualifying_matches else candidate_matches
+
+    top_matches = final_matches[:limit]
+
+    # Total open jobs count for marketplace metrics
+    try:
+        total_open_count = await db.jobs.count_documents(jobs_query)
+    except Exception:
+        total_open_count = len(stage1_jobs)
 
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
     logger.info(
-        "Jobs for you recommendation computed",
+        "Two-stage job matching computed",
         candidate_id=candidate_id,
+        stage1_count=len(stage1_jobs),
         matched_count=len(top_matches),
-        vector_search_used=vector_search_used,
         elapsed_ms=elapsed_ms,
     )
 
@@ -393,5 +455,5 @@ async def find_jobs_for_candidate(
         "has_resume": True,
         "resume_id": str(getattr(target_resume, "id", None) or getattr(target_resume, "_id", "")),
         "processing_time_ms": elapsed_ms,
+        "stage1_candidates_count": len(stage1_jobs),
     }
-
