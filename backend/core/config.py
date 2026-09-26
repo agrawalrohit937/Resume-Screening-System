@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_PREVIOUS_SECRET_KEY: Optional[str] = None
     JWT_SECRET_ROTATION_ENABLED: bool = True
+    CRON_SECRET: Optional[str] = None
 
     # ── 4. CORS ───────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: List[str] = Field(default_factory=list)

@@ -10,6 +10,13 @@ from pymongo import ASCENDING, DESCENDING, TEXT, IndexModel
 
 from core.config import settings
 
+try:
+    import dns.resolver
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=True)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8", "1.1.1.1", "8.8.4.4"]
+except Exception:
+    pass
+
 logger = structlog.get_logger(__name__)
 
 # ─── Global State ─────────────────────────────────────────────────────────────
