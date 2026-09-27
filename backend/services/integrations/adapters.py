@@ -1,5 +1,5 @@
 """Enterprise ATS Adapters (Greenhouse, Lever, Workday).
-CareerPilot ATS v2.0.0 - Enterprise ATS Ecosystem.
+CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 from abc import ABC, abstractmethod
@@ -118,7 +118,7 @@ class LeverAdapter(ATSAdapter):
             "remote_opportunity_id": opportunity_id,
             "remote_application_id": opportunity_id,
             "stage": "lead",
-            "tags": ["careerpilot_ats", f"score_{int(application_data.get('score', 0))}"],
+            "tags": ["careershala_ats", f"score_{int(application_data.get('score', 0))}"],
             "synced_at": datetime.utcnow().isoformat()
         }
 

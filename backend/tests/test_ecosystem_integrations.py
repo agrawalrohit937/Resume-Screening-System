@@ -1,5 +1,5 @@
 """Unit and Integration Tests for Ecosystem Integrations (Task 5.4).
-CareerPilot ATS v2.0.0.
+CareerShala ATS v2.0.0.
 """
 
 import pytest

@@ -1,5 +1,5 @@
 """
-PII Redaction and Blind Scoring Security Module for CareerPilot ATS.
+PII Redaction and Blind Scoring Security Module for CareerShala ATS.
 Implements blind scoring mode (FEATURE_BLIND_SCORING) by masking:
 - Candidate Name, Emails, Phone Numbers
 - Indian Context demographics: Caste, Category (SC/ST/OBC/EWS), Religion, Marital Status, DOB/Age

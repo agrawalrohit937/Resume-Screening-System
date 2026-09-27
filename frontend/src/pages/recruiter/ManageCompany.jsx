@@ -58,17 +58,17 @@ export default function ManageCompany() {
       try { return JSON.parse(saved) } catch (e) {}
     }
     return {
-      company_name: user?.company_name || 'CareerPilot Technologies',
+      company_name: user?.company_name || 'CareerShala Technologies',
       tagline: 'Empowering careers with AI',
       logo_url: '',
-      website: 'https://www.careerpilot.com',
+      website: 'https://careershala.tech',
       location: 'Bengaluru, India',
       industry: 'Technology',
       team_size: '51-200 employees',
       about:
-        'At CareerPilot, we are building the next generation AI-powered career platform to connect talent with opportunities. Our mission is to empower individuals and organizations to achieve their full potential through technology, transparency, and trust.',
-      linkedin: 'https://www.linkedin.com/company/careerpilot',
-      github: 'https://github.com/careerpilot',
+        'At CareerShala, we are building the next generation AI-powered career platform to connect talent with opportunities. Our mission is to empower individuals and organizations to achieve their full potential through technology, transparency, and trust.',
+      linkedin: 'https://www.linkedin.com/company/careershala',
+      github: 'https://github.com/careershala',
       perks: [],
     }
   })
@@ -320,7 +320,7 @@ export default function ManageCompany() {
             </h1>
 
             <p className="text-sm text-slate-600 max-w-md leading-relaxed">
-              Showcase your company's culture, mission, and key information to attract the right talent across CareerPilot.
+              Showcase your company's culture, mission, and key information to attract the right talent across CareerShala.
             </p>
           </div>
         </div>
@@ -477,7 +477,7 @@ export default function ManageCompany() {
                       required
                       disabled={isReadOnly}
                       readOnly={isReadOnly}
-                      placeholder="e.g. CareerPilot Technologies"
+                      placeholder="e.g. CareerShala Technologies"
                       value={formData.company_name}
                       onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
                       className={`w-full pl-10 pr-3.5 py-2.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 transition ${
@@ -494,7 +494,7 @@ export default function ManageCompany() {
                     <input
                       type="text"
                       disabled={isReadOnly}
-                      placeholder="e.g. https://www.careerpilot.com"
+                      placeholder="e.g. https://careershala.tech"
                       value={formData.website}
                       onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                       className={`w-full pl-10 pr-3.5 py-2.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 transition ${
@@ -541,7 +541,7 @@ export default function ManageCompany() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Headquarters</label>
               <div className="relative">
@@ -744,7 +744,7 @@ export default function ManageCompany() {
                 <input
                   type="url"
                   disabled={isReadOnly}
-                  placeholder="https://www.linkedin.com/company/careerpilot"
+                  placeholder="https://www.linkedin.com/company/careershala"
                   value={formData.linkedin}
                   onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
                   className={`w-full pl-10 pr-3.5 py-2.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 transition ${
@@ -761,7 +761,7 @@ export default function ManageCompany() {
                 <input
                   type="url"
                   disabled={isReadOnly}
-                  placeholder="https://github.com/careerpilot"
+                  placeholder="https://github.com/careershala"
                   value={formData.github}
                   onChange={(e) => setFormData({ ...formData, github: e.target.value })}
                   className={`w-full pl-10 pr-3.5 py-2.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 transition ${

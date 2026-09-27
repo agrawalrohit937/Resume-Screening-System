@@ -1,4 +1,4 @@
-# CareerPilot Architecture Decision Records (ADRs)
+# CareerShala Architecture Decision Records (ADRs)
 
 ## ADR 001: Graded Skill Credit and Mutual Exclusion Bucket Partitioning
 - **Date**: 2026-09-18
@@ -121,7 +121,7 @@
 - **Date**: 2026-09-18
 - **Status**: Accepted
 - **Context**:
-  CareerPilot was historically confined to an engineering-recruiting tool with a hardcoded tech taxonomy. Evaluating nurses, lawyers, chartered accountants, welders, teachers, or sales executives produced meaningless scores due to missing domain signals and single-formula scoring.
+  CareerShala was historically confined to an engineering-recruiting tool with a hardcoded tech taxonomy. Evaluating nurses, lawyers, chartered accountants, welders, teachers, or sales executives produced meaningless scores due to missing domain signals and single-formula scoring.
 - **Decision**:
   1. Built multi-relational in-memory knowledge graph `OccupationSkillGraph` (`services.ontology.graph`) with `ONTOLOGY_VERSION = "2.0.0"` ingesting ESCO (~13k skills), O*NET / SOC (US taxonomy), and NCO-2015 (National Classification of Occupations India).
   2. Preserved the high-priority tech taxonomy overlay (`services.ontology.tech_overlay`) intact for modern frameworks (LangGraph, Qdrant, FastAPI, Docker).
@@ -202,7 +202,7 @@
 
 - **Status**: Accepted (Implemented in Phase 4)
 - **Context**:
-  CareerPilot ATS v2.0.0 required enterprise-grade scalability, resilient asynchronous background task execution, distributed deduplication across multi-replica cloud environments, CPU-sparing embedding caching, cursor pagination to avoid memory bloat, structured observability, and parallel shadow scoring for safe model rollout.
+  CareerShala ATS v2.0.0 required enterprise-grade scalability, resilient asynchronous background task execution, distributed deduplication across multi-replica cloud environments, CPU-sparing embedding caching, cursor pagination to avoid memory bloat, structured observability, and parallel shadow scoring for safe model rollout.
 - **Decisions**:
   1. **Asynchronous Task Workers (Celery & Redis Broker)**:
      - Built `backend/services/tasks/` architecture with Celery task queues (`parsing`, `scoring`, `dlq`).
@@ -230,13 +230,13 @@
 - **Date**: 2026-09-19
 - **Status**: Accepted (Implemented in Phase 5)
 - **Context**:
-  Transforming CareerPilot ATS into a multi-tenant B2B SaaS platform requires:
+  Transforming CareerShala ATS into a multi-tenant B2B SaaS platform requires:
   1. Complete data isolation across enterprise clients (`tenant_id`) enforced mathematically at the repository boundary so cross-tenant data leaks are impossible.
   2. Enterprise role-based access control (RBAC) extending beyond basic roles to: `recruiter`, `hiring_manager`, `coordinator`, `interviewer`, `admin`, `exec` (read-only audit/reporting), and `candidate`.
   3. Enterprise identity and lifecycle management: SAML 2.0 / OIDC SSO and SCIM 2.0 provisioning (`/scim/v2/Users`).
   4. Statutory EEO (Equal Employment Opportunity) self-identification data collection completely segregated into an isolated vault (`db.eeo_responses`), mathematically disconnected from resume scoring pipelines to guarantee unbiased ranking.
   5. Core enterprise ATS workflows: Multi-step requisition and headcount budget approval chains, structured competency interview kits with scorecards and inter-rater calibration outlier detection, and Talent CRM silver medalist tracking for candidate re-engagement.
-  6. Ecosystem integrations: Outbound webhooks signed with HMAC-SHA256 (`X-CareerPilot-Signature`), ATS adapters for Greenhouse Harvest API, Lever Postings/Opportunities, and Workday RaaS, plus automated job syndication (Indeed XML feeds and Google for Jobs schema.org JSON-LD).
+  6. Ecosystem integrations: Outbound webhooks signed with HMAC-SHA256 (`X-CareerShala-Signature`), ATS adapters for Greenhouse Harvest API, Lever Postings/Opportunities, and Workday RaaS, plus automated job syndication (Indeed XML feeds and Google for Jobs schema.org JSON-LD).
   7. Consented Talent Pools: Privacy-preserving talent marketplace where candidates opt-in per visibility tier (`anonymized`, `full`, default `hidden`), maintain employer exclusion blocklists, and receive full transparency audit logs of recruiter profile views.
 - **Decisions**:
   1. **Multi-Tenancy**: Built `backend/services/multi_tenancy/tenant_context.py` using Python `contextvars` to propagate `tenant_id` seamlessly across async tasks. Built `TenantScopedRepository` wrapping PyMongo/Motor collections and automatically enforcing `{"tenant_id": current_tenant_id}` across all queries, mutations, and counts. Added `tenant_id` to `JobModel`, `ApplicationModel`, `ResumeModel`, `ATSResultModel`, and `ShadowScoreRecord`.
@@ -255,5 +255,5 @@
      - Built `backend/models/talent_pool.py` and `backend/services/talent_pool_service.py`. Candidate opt-in defaults to OFF (`hidden`). Candidates choose `anonymized` (redacting contact details and current employer) or `full` visibility, maintain employer exclusion blocklists, and can immediately revoke consent at any time.
      - Built transparency logging via `TalentPoolViewAudit` letting candidates see every recruiter and company that viewed their profile.
 - **Consequences**:
-  - Transforms CareerPilot into a turnkey B2B SaaS platform ready for enterprise enterprise procurement, security reviews, and HR tech integrations.
+  - Transforms CareerShala into a turnkey B2B SaaS platform ready for enterprise enterprise procurement, security reviews, and HR tech integrations.
   - Complete statutory compliance and mathematical bias prevention.

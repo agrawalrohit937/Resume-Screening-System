@@ -122,94 +122,92 @@ export default function ApplicationTracker() {
   }, [applications, searchQuery, stageFilter])
 
   return (
-    <div className="min-h-screen bg-slate-50/60 font-sans text-slate-800 antialiased pb-20">
+    <div className="w-full space-y-6 font-sans text-slate-800 antialiased pb-20">
       
       {/* ── 1. Top Header (Strictly Light Mode) ──────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200/90 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
-                  <Briefcase size={12} className="text-indigo-600" />
-                  Candidate Dashboard
-                </span>
-                <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  Real-Time Pipeline
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-poppins tracking-tight">
-                Application Tracker
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Monitor your interview stages, review feedback, and track ATS scores for roles you've applied for.
-              </p>
+      <div className="w-full bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 sm:p-7">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                <Briefcase size={12} className="text-indigo-600" />
+                Candidate Dashboard
+              </span>
+              <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                Real-Time Pipeline
+              </span>
             </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={fetchApplications}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs hover:bg-slate-50 transition cursor-pointer"
-                title="Refresh application status"
-              >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-
-              <Link
-                to="/jobs"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition cursor-pointer"
-              >
-                Explore More Jobs
-                <ArrowRight size={15} />
-              </Link>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-poppins tracking-tight">
+              Application Tracker
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Monitor your interview stages, review feedback, and track ATS scores for roles you've applied for.
+            </p>
           </div>
 
-          {/* ── 2. Pipeline Summary Bento Cards ─────────────────────────────── */}
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                Total Applied
-              </span>
-              <p className="text-2xl sm:text-3xl font-black text-slate-900 font-poppins mt-1">
-                {stats.total}
-              </p>
-            </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={fetchApplications}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+              title="Refresh application status"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
 
-            <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/70">
-              <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
-                Under Review
-              </span>
-              <p className="text-2xl sm:text-3xl font-black text-amber-700 font-poppins mt-1">
-                {stats.underReview}
-              </p>
-            </div>
+            <Link
+              to="/jobs"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition cursor-pointer"
+            >
+              Explore More Jobs
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+        </div>
 
-            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/70">
-              <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
-                Shortlisted
-              </span>
-              <p className="text-2xl sm:text-3xl font-black text-emerald-700 font-poppins mt-1">
-                {stats.shortlisted}
-              </p>
-            </div>
+        {/* ── 2. Pipeline Summary Bento Cards ─────────────────────────────── */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Total Applied
+            </span>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 font-poppins mt-1">
+              {stats.total}
+            </p>
+          </div>
 
-            <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-200/70">
-              <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider block">
-                Interviews
-              </span>
-              <p className="text-2xl sm:text-3xl font-black text-purple-700 font-poppins mt-1">
-                {stats.interview}
-              </p>
-            </div>
+          <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/70">
+            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
+              Under Review
+            </span>
+            <p className="text-2xl sm:text-3xl font-black text-amber-700 font-poppins mt-1">
+              {stats.underReview}
+            </p>
+          </div>
+
+          <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/70">
+            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+              Shortlisted
+            </span>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-700 font-poppins mt-1">
+              {stats.shortlisted}
+            </p>
+          </div>
+
+          <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-200/70">
+            <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider block">
+              Interviews
+            </span>
+            <p className="text-2xl sm:text-3xl font-black text-purple-700 font-poppins mt-1">
+              {stats.interview}
+            </p>
           </div>
         </div>
       </div>
 
       {/* ── 3. Controls & Filter Tabs ────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-7">
+      <div className="w-full space-y-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           
           {/* Stage Filter Buttons */}

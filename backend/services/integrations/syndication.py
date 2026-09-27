@@ -1,5 +1,5 @@
 """Job-Board Syndication: Indeed XML Feed & Google for Jobs Schema.org.
-CareerPilot ATS v2.0.0 - Enterprise ATS Ecosystem.
+CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 from datetime import datetime, timezone
@@ -12,8 +12,8 @@ from models.job import JobModel, WorkMode
 
 def generate_indeed_xml_feed(
     jobs: List[JobModel],
-    publisher_name: str = "CareerPilot ATS",
-    base_url: str = "https://careerpilot.ai"
+    publisher_name: str = "CareerShala ATS",
+    base_url: str = "https://careershala.tech"
 ) -> str:
     """Generates an Indeed-compliant XML feed for active jobs.
     
@@ -81,7 +81,7 @@ def generate_indeed_xml_feed(
 
 def generate_google_job_posting_ld_json(
     job: JobModel,
-    base_url: str = "https://careerpilot.ai"
+    base_url: str = "https://careershala.tech"
 ) -> Dict[str, Any]:
     """Generates schema.org/JobPosting JSON-LD metadata for Google for Jobs indexing.
     

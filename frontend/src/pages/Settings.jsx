@@ -196,8 +196,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans antialiased">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="w-full space-y-6 sm:space-y-8 font-sans antialiased">
+      <div className="w-full space-y-8">
 
         {/* ── Top Hero / Header Section ─────────────────────────────────── */}
         <motion.div
@@ -782,7 +782,7 @@ export default function Settings() {
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed">
-              In accordance with CareerPilot's strict transparency covenant, every search query and recruiter view of your profile is permanently audited.
+              In accordance with CareerShala's strict transparency covenant, every search query and recruiter view of your profile is permanently audited.
             </p>
 
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">

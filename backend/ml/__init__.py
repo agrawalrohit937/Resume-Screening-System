@@ -1,5 +1,5 @@
 """
-Machine Learning & Learning-to-Rank (LTR) Package for CareerPilot ATS.
+Machine Learning & Learning-to-Rank (LTR) Package for CareerShala ATS.
 """
 
 from ml.train_ranker import (

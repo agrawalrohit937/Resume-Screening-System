@@ -89,7 +89,7 @@ async def get_company_profile(
     # 3. Fallback placeholder if no profile created yet
     if not company_doc:
         default_name = getattr(current_user, "company_name", None) or (
-            tenant_id.replace("-", " ").title() if tenant_id != "default" else "CareerPilot Technologies"
+            tenant_id.replace("-", " ").title() if tenant_id != "default" else "CareerShala Technologies"
         )
         company_doc = {
             "tenant_id": tenant_id,

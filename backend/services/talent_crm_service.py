@@ -1,5 +1,5 @@
 """Talent CRM Fundamentals - Silver Medalists & Candidate Re-engagement.
-CareerPilot ATS v2.0.0 - Enterprise ATS Workflows.
+CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from datetime import datetime

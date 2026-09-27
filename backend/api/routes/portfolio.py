@@ -491,6 +491,8 @@ async def get_my_portfolio(
     # Only filter TRUE static placeholder dummies from early development, NEVER candidate projects
     LEGACY_DUMMIES = [
         "careerpilotai demo",
+        "careershala demo",
+        "careershalaai demo",
         "sentiment & emotion analysis system",
         "sentiment and emotion analysis system",
         "diabetes prediction & clinical risk assessment",

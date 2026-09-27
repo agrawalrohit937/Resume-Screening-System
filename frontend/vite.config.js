@@ -30,6 +30,10 @@ export default defineConfig({
       'canvas-confetti',
     ],
   },
+  esbuild: {
+    pure: ['console.log', 'console.debug'],
+    drop: ['debugger'],
+  },
   build: {
     target: 'es2020',
     cssCodeSplit: true,

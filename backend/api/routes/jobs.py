@@ -444,40 +444,66 @@ async def get_my_applications(
     cursor = raw_db.applications.find({"candidate_id": str(current_user.id)}).sort("created_at", -1)
     app_docs = await stream_cursor(cursor)
 
+    # Batch fetch jobs to eliminate N+1 round trips
+    job_ids_set = set()
+    for app in app_docs:
+        jid = app.get("job_id")
+        if jid and ObjectId.is_valid(jid):
+            job_ids_set.add(ObjectId(jid))
+
+    jobs_map = {}
+    if job_ids_set:
+        job_cursor = raw_db.jobs.find(
+            {"_id": {"$in": list(job_ids_set)}},
+            {"jd_embedding": 0}
+        )
+        fetched_jobs = await stream_cursor(job_cursor)
+        jobs_map = {str(j["_id"]): j for j in fetched_jobs}
+
+    # Batch fetch missing company logos
+    company_names = set()
+    for j in jobs_map.values():
+        cname = (j.get("company_name") or "").strip()
+        if cname and cname != "Unknown Company" and not j.get("company_logo"):
+            company_names.add(cname)
+
+    company_map = {}
+    if company_names:
+        comp_regex_list = [re.compile(f"^{re.escape(c)}$", re.IGNORECASE) for c in company_names]
+        comp_cursor = db.companies.find({"company_name": {"$in": comp_regex_list}})
+        fetched_comps = await stream_cursor(comp_cursor)
+        for c in fetched_comps:
+            cname = (c.get("company_name") or "").strip().lower()
+            company_map[cname] = c
+
     results = []
     for app in app_docs:
         job_id = app.get("job_id")
         job_info = None
-        if job_id:
-            try:
-                job_doc = await raw_db.jobs.find_one({"_id": ObjectId(job_id)}, {"jd_embedding": 0})
-                if job_doc:
-                    comp_name = job_doc.get("company_name", "Unknown Company")
-                    logo = job_doc.get("company_logo")
-                    website = job_doc.get("company_website")
-                    if not logo and comp_name and comp_name != "Unknown Company":
-                        comp_doc = await db.companies.find_one(
-                            {"company_name": {"$regex": f"^{re.escape(comp_name.strip())}$", "$options": "i"}}
-                        )
-                        if comp_doc:
-                            logo = comp_doc.get("logo_url")
-                            if not website:
-                                website = comp_doc.get("website")
+        if job_id and job_id in jobs_map:
+            job_doc = jobs_map[job_id]
+            comp_name = job_doc.get("company_name", "Unknown Company")
+            logo = job_doc.get("company_logo")
+            website = job_doc.get("company_website")
+            if not logo and comp_name and comp_name != "Unknown Company":
+                comp_doc = company_map.get(comp_name.strip().lower())
+                if comp_doc:
+                    logo = comp_doc.get("logo_url")
+                    if not website:
+                        website = comp_doc.get("website")
 
-                    job_info = {
-                        "id": str(job_doc["_id"]),
-                        "title": job_doc.get("title", "Unknown Role"),
-                        "company_name": comp_name,
-                        "location": job_doc.get("location", "Remote"),
-                        "work_mode": job_doc.get("work_mode", "Remote"),
-                        "salary_range": job_doc.get("salary_range"),
-                        "status": job_doc.get("status", "open"),
-                        "company_logo": logo,
-                        "company_website": website,
-                        "department": job_doc.get("department"),
-                    }
-            except Exception:
-                pass
+            job_info = {
+                "id": str(job_doc["_id"]),
+                "title": job_doc.get("title", "Unknown Role"),
+                "company_name": comp_name,
+                "location": job_doc.get("location", "Remote"),
+                "work_mode": job_doc.get("work_mode", "Remote"),
+                "salary_range": job_doc.get("salary_range"),
+                "status": job_doc.get("status", "open"),
+                "company_logo": logo,
+                "company_website": website,
+                "department": job_doc.get("department"),
+            }
 
         results.append({
             "id": str(app["_id"]),
@@ -733,6 +759,31 @@ async def get_job_applications(
     cursor = db.applications.find(query).sort([("recruiter_score", -1), ("match_score", -1)])
     app_docs = await stream_cursor(cursor)
 
+    # Pre-fetch fallback resumes for any legacy applications without snapshot
+    missing_resume_ids = set()
+    for app in app_docs:
+        resume_snapshot = app.get("resume_snapshot") or {}
+        has_snapshot = resume_snapshot and isinstance(resume_snapshot, dict) and (resume_snapshot.get("parsed_data") or resume_snapshot.get("file_url"))
+        if not has_snapshot:
+            rid = app.get("resume_id")
+            if rid:
+                missing_resume_ids.add(str(rid))
+
+    fallback_resumes_map = {}
+    if missing_resume_ids:
+        query_ids = []
+        for rid in missing_resume_ids:
+            query_ids.append(rid)
+            if ObjectId.is_valid(rid):
+                query_ids.append(ObjectId(rid))
+        res_cursor = db.resumes.find(
+            {"_id": {"$in": query_ids}},
+            {"raw_text": 0, "embedding": 0}
+        )
+        fetched_resumes = await stream_cursor(res_cursor)
+        for r in fetched_resumes:
+            fallback_resumes_map[str(r["_id"])] = r
+
     enriched_applications = []
     for app in app_docs:
         resume_id = app.get("resume_id")
@@ -750,13 +801,8 @@ async def get_job_applications(
             elif isinstance(raw_parsed, dict):
                 parsed_data = raw_parsed
         else:
-            # 2. Fallback to live db.resumes lookup for older applications created before snapshotting
-            resume_doc = None
-            if resume_id:
-                try:
-                    resume_doc = await db.resumes.find_one({"_id": ObjectId(resume_id)})
-                except Exception:
-                    resume_doc = await db.resumes.find_one({"_id": str(resume_id)})
+            # 2. Fallback to batched live db.resumes lookup for older applications
+            resume_doc = fallback_resumes_map.get(str(resume_id)) if resume_id else None
 
             if resume_doc:
                 file_url = resume_doc.get("file_url")

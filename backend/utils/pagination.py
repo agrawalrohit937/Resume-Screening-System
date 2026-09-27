@@ -1,5 +1,5 @@
 """
-Cursor Pagination & Large Dataset Streaming Utilities for CareerPilot ATS.
+Cursor Pagination & Large Dataset Streaming Utilities for CareerShala ATS.
 Eliminates silent truncations (.to_list(100/200/500)) and provides standardized
 cursor pagination across large collections.
 """

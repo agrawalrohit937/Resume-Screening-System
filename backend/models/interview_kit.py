@@ -1,5 +1,5 @@
 """Structured Interview Kits and Scorecard Models.
-CareerPilot ATS v2.0.0 - Enterprise ATS Workflows.
+CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from datetime import datetime

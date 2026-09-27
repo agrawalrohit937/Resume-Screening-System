@@ -1,9 +1,9 @@
-# CareerPilot ATS v2.0.0 — Data Retention & Telemetry Policy
+# CareerShala ATS v2.0.0 — Data Retention & Telemetry Policy
 
 ## 1. Scope & Principles
 This document outlines data retention schedules and lawful bases under **GDPR Art. 5(1)(e)**, **India DPDP Act 2023**, and **EEOC Recordkeeping Requirements**.
 
-CareerPilot operates under three core principles:
+CareerShala operates under three core principles:
 1. **Purpose Limitation**: Candidate data is processed strictly for job matching, qualification evaluation, and audit compliance.
 2. **Storage Minimization**: Unnecessary personal identifiers are stripped prior to model telemetry storage.
 3. **Audit Integrity**: Compliance logs required by law are maintained in immutable, append-only stores.

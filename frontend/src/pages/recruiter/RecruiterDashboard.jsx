@@ -442,7 +442,7 @@ export default function RecruiterDashboard() {
             </div>
             <h3 className="text-sm font-extrabold text-slate-900 font-poppins mb-1">Employer Brand Profile</h3>
             <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-              Showcase your company culture, perks, and open positions to attract top-tier talent across CareerPilot.
+              Showcase your company culture, perks, and open positions to attract top-tier talent across CareerShala.
             </p>
             <button
               onClick={() => navigate('/recruiter/company')}

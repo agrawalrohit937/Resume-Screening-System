@@ -1,5 +1,5 @@
 """Equal Employment Opportunity (EEO) Vault API Routes.
-CareerPilot ATS v2.0.0 - Enterprise Surface.
+CareerShala ATS v2.0.0 - Enterprise Surface.
 """
 
 from typing import Any, Dict

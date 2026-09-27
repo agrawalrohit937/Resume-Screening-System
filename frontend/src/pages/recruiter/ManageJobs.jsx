@@ -205,7 +205,7 @@ Requirements & Qualifications:
       const p = JSON.parse(localStorage.getItem('recruiter_preferences') || '{}')
       if (p.company?.trim()) return p.company.trim()
     } catch {}
-    return 'CareerPilot Technologies'
+    return 'CareerShala Technologies'
   }
 
   // Create New Job (Draft vs Publish)
@@ -518,7 +518,7 @@ Requirements & Qualifications:
         </div>
 
         {/* ── 3. Postings Table / List View ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-visible">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
           {loading ? (
             <div className="p-8 space-y-4">
               {[1, 2, 3, 4].map(n => (
@@ -534,8 +534,8 @@ Requirements & Qualifications:
               ))}
             </div>
           ) : filteredJobs.length > 0 ? (
-            <div className="overflow-visible">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto custom-scrollbar w-full">
+              <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     <th className="py-3.5 px-5">Job Details</th>

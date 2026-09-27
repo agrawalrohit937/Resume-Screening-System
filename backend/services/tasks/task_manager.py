@@ -1,5 +1,5 @@
 """
-Unified Asynchronous Task Manager for CareerPilot ATS.
+Unified Asynchronous Task Manager for CareerShala ATS.
 Provides:
   - Idempotent task dispatching keyed on (resume_id, file_hash) or custom keys.
   - Exponential backoff retry execution.
@@ -334,7 +334,7 @@ class TaskManager:
         if FEATURE_ASYNC_WORKERS and celery_app is not None:
             try:
                 celery_task = celery_app.send_task(
-                    f"careerpilot.{task_name}",
+                    f"careershala.{task_name}",
                     kwargs={"payload": payload, "idempotency_key": key},
                 )
                 logger.info("Dispatched task to Celery worker", task_id=celery_task.id, task_name=task_name)

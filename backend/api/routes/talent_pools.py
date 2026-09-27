@@ -1,5 +1,5 @@
 """Consented Talent Pool API Routes (Privacy-Preserving Search).
-CareerPilot ATS v2.0.0 - Enterprise ATS Marketplace.
+CareerShala ATS v2.0.0 - Enterprise ATS Marketplace.
 """
 
 from typing import Any, Dict, List, Optional

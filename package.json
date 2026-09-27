@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "mammoth": "^1.12.0",
-    "pdfjs-dist": "^6.1.200"
-  }
-}

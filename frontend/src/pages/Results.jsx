@@ -1,5 +1,5 @@
 /**
- * Results.jsx — CareerPilot / CareerShala AI ATS Matcher & Readiness Portal
+ * Results.jsx — CareerShala AI ATS Matcher & Readiness Portal
  * UX Update: Premium Step-by-Step View. Balanced cards, larger inputs, 
  * modern glassmorphism UI, and improved CTA design.
  */
@@ -416,45 +416,45 @@ export default function Results() {
               </div>
 
               {/* Dual Workstation Cards (Balanced Heights) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch min-h-[480px]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch min-h-[480px]">
                 
                 {/* 1. Resume Card */}
-                <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-5 sm:p-7 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/5 rounded-bl-full -z-10" />
                   
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
-                      <FileText size={22} />
+                  <div className="flex items-center gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
+                      <FileText size={20} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 tracking-tight">1. Candidate Resume</h3>
-                      <p className="text-sm text-slate-500 font-medium">Upload PDF or DOCX (Max 10MB)</p>
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">1. Candidate Resume</h3>
+                      <p className="text-xs sm:text-sm text-slate-500 font-medium">Upload PDF or DOCX (Max 10MB)</p>
                     </div>
                   </div>
 
                   <div className="flex-1 flex flex-col">
                     {uploadDone ? (
-                      <div className="flex-1 w-full bg-gradient-to-b from-emerald-50/50 to-white border-2 border-emerald-100 border-dashed rounded-[1.5rem] p-8 flex flex-col items-center justify-center text-center">
-                        <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-sm">
-                          <CheckCircle2 size={40} />
+                      <div className="flex-1 w-full bg-gradient-to-b from-emerald-50/50 to-white border-2 border-emerald-100 border-dashed rounded-xl sm:rounded-[1.5rem] p-6 sm:p-8 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-sm">
+                          <CheckCircle2 size={36} />
                         </div>
-                        <h4 className="text-lg font-bold text-slate-900 truncate w-full max-w-xs">{resumeFile?.name || 'Resume Ready'}</h4>
-                        <p className="text-sm text-emerald-600 font-bold mt-1">Successfully Parsed & Ready</p>
+                        <h4 className="text-base sm:text-lg font-bold text-slate-900 truncate w-full max-w-xs">{resumeFile?.name || 'Resume Ready'}</h4>
+                        <p className="text-xs sm:text-sm text-emerald-600 font-bold mt-1">Successfully Parsed & Ready</p>
                         <button 
                           onClick={() => { setUploadDone(false); setResumeFile(null); setResumeId(''); }} 
-                          className="mt-6 px-6 py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-bold shadow-sm transition-all cursor-pointer"
+                          className="mt-5 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer"
                         >
                           Upload Different File
                         </button>
                       </div>
                     ) : (
-                      <div {...getResumeRootProps()} className={`flex-1 w-full border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center p-8 text-center cursor-pointer transition-all ${resumeDrag ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'}`}>
+                      <div {...getResumeRootProps()} className={`flex-1 w-full border-2 border-dashed rounded-xl sm:rounded-[1.5rem] flex flex-col items-center justify-center p-6 sm:p-8 text-center cursor-pointer transition-all ${resumeDrag ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'}`}>
                         <input {...getResumeInputProps()} />
                         {uploading ? (
                           <div className="w-full max-w-[240px]">
                             <div className="flex items-center justify-center mb-3">
-                              <Loader2 size={24} className="animate-spin text-[#2E9BDA] mr-3" />
-                              <span className="text-sm font-bold text-slate-700">Uploading Document...</span>
+                              <Loader2 size={22} className="animate-spin text-[#2E9BDA] mr-2.5" />
+                              <span className="text-xs sm:text-sm font-bold text-slate-700">Uploading Document...</span>
                             </div>
                             <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                               <div className="bg-[#2E9BDA] h-full transition-all duration-300" style={{ width: `${uploadProgress || 50}%` }} />
@@ -462,11 +462,11 @@ export default function Results() {
                           </div>
                         ) : (
                           <>
-                            <div className="w-16 h-16 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center mb-4">
-                              <Upload size={28} className="text-[#2E9BDA]" />
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center mb-3.5 sm:mb-4">
+                              <Upload size={24} className="text-[#2E9BDA]" />
                             </div>
-                            <p className="text-base font-bold text-slate-800">Drag & drop your resume here</p>
-                            <p className="text-sm text-slate-500 font-medium mt-1">or click to browse from your computer</p>
+                            <p className="text-sm sm:text-base font-bold text-slate-800">Drag & drop your resume here</p>
+                            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">or click to browse from your computer</p>
                           </>
                         )}
                       </div>
@@ -475,22 +475,22 @@ export default function Results() {
                 </div>
 
                 {/* 2. Job Description Card */}
-                <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-5 sm:p-7 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-[#2E9BDA]/5 rounded-bl-full -z-10" />
 
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
-                        <Layers size={22} />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
+                    <div className="flex items-center gap-3.5 sm:gap-4">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
+                        <Layers size={20} />
                       </div>
                       <div>
-                        <h3 className="text-lg font-black text-slate-900 tracking-tight">2. Target Role</h3>
-                        <p className="text-sm text-slate-500 font-medium">Define the JD requirements</p>
+                        <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">2. Target Role</h3>
+                        <p className="text-xs sm:text-sm text-slate-500 font-medium">Define the JD requirements</p>
                       </div>
                     </div>
-                    <div className="flex bg-slate-100/80 p-1.5 rounded-xl text-xs font-bold border border-slate-200/80">
-                      <button onClick={() => setJdMode('paste')} className={`px-4 py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'paste' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Paste Text</button>
-                      <button onClick={() => setJdMode('upload')} className={`px-4 py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'upload' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Upload File</button>
+                    <div className="flex self-start sm:self-auto bg-slate-100/80 p-1 rounded-xl text-xs font-bold border border-slate-200/80">
+                      <button onClick={() => setJdMode('paste')} className={`px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'paste' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Paste Text</button>
+                      <button onClick={() => setJdMode('upload')} className={`px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'upload' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Upload File</button>
                     </div>
                   </div>
 

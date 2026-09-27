@@ -1,5 +1,5 @@
 """Structured Interview Kits, Scorecards & Calibration API Routes.
-CareerPilot ATS v2.0.0 - Enterprise ATS Workflows.
+CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from typing import Any, Dict, List, Optional

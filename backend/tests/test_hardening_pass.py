@@ -1,5 +1,5 @@
 """
-Regression test suite for CareerPilot Production Hardening & Correctness Pass.
+Regression test suite for CareerShala Production Hardening & Correctness Pass.
 Covers P0, P1, and P2 hardening items.
 """
 

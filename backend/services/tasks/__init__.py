@@ -1,5 +1,5 @@
 """
-Asynchronous Worker and Task Queue Module for CareerPilot ATS.
+Asynchronous Worker and Task Queue Module for CareerShala ATS.
 """
 
 from services.tasks.task_manager import TaskManager, task_manager

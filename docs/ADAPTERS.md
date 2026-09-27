@@ -1,6 +1,6 @@
 # Occupation-Family Scoring Adapters
 
-CareerPilot ATS v2.0.0 uses specialized domain adapters to tailor feature weights, eligibility knockouts, and evidence extraction to the distinct reality of each occupation family.
+CareerShala ATS v2.0.0 uses specialized domain adapters to tailor feature weights, eligibility knockouts, and evidence extraction to the distinct reality of each occupation family.
 
 ## Architecture
 

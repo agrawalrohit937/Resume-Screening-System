@@ -1,5 +1,5 @@
 """
-Distributed Lock Mechanism for CareerPilot ATS Multi-Replica Scheduling & Deduplication.
+Distributed Lock Mechanism for CareerShala ATS Multi-Replica Scheduling & Deduplication.
 Guarantees:
   - Mutual exclusion across multi-replica deployments (Kubernetes, Render, ECS).
   - Redis-backed atomic distributed locking via SET NX EX.

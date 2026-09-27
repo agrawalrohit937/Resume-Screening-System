@@ -174,7 +174,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
   const hasCandidateRole = userRoles.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
   const hasEmployerRole = isAdmin || isExecutive || isHiringManager || isInterviewer || isRecruiter
 
-  const savedContext = typeof window !== 'undefined' ? localStorage.getItem('careerpilot_view_context') : null
+  const savedContext = typeof window !== 'undefined' ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')) : null
   const isCandidateView = savedContext === 'candidate' && hasCandidateRole
 
   let effectiveRole = 'candidate'
@@ -261,7 +261,7 @@ export default function ProfilePlanDropdown({ user: propUser, onClose }) {
 
   const handleSwitchContext = () => {
     const nextContext = isCandidateView ? 'employer' : 'candidate'
-    localStorage.setItem('careerpilot_view_context', nextContext)
+    localStorage.setItem('careershala_view_context', nextContext)
     onClose?.()
     if (nextContext === 'candidate') {
       navigate('/dashboard')

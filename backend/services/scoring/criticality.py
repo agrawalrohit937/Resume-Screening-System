@@ -1,5 +1,5 @@
 """
-Requirement Criticality Weighting Module for CareerPilot ATS.
+Requirement Criticality Weighting Module for CareerShala ATS.
 Infuse job requirements with criticality weights (3.0 must, 2.0 important, 1.0 nice-to-have)
 based on explicit required skills and precomputed context windows in the JD text.
 """

@@ -1,5 +1,5 @@
 """
-Embedding Cache and Quantization Engine for CareerPilot ATS.
+Embedding Cache and Quantization Engine for CareerShala ATS.
 Provides:
   - Redis-backed cache for embedding vectors keyed on sha256(text) + model_version with 30-day TTL.
   - In-memory LRU cache fallback when Redis is offline.

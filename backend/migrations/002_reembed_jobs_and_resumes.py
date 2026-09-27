@@ -41,7 +41,7 @@ def run_reembed_migration(
     database_name: str | None = None,
 ) -> int:
     uri = mongodb_url or os.getenv("MONGO_URI") or "mongodb://localhost:27017"
-    db_name = database_name or os.getenv("MONGO_DB_NAME", "careerpilot")
+    db_name = database_name or os.getenv("MONGO_DB_NAME", os.getenv("DATABASE_NAME", "careershala"))
 
     logger.info("Connecting to MongoDB for reembed migration", host=uri.split("@")[-1], db=db_name)
     client: MongoClient = MongoClient(uri, serverSelectionTimeoutMS=5000)
@@ -196,7 +196,7 @@ def _process_resume_batch(db: Any, batch: List[Dict[str, Any]], model: Any, vers
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Re-embed jobs and resumes for CareerPilot multilingual upgrade")
+    parser = argparse.ArgumentParser(description="Re-embed jobs and resumes for CareerShala multilingual upgrade")
     parser.add_argument("--dry-run", action="store_true", help="Report pending document counts without modifying database")
     parser.add_argument("--batch-size", type=int, default=50, help="Batch size for embedding calculation and updates")
     parser.add_argument("--url", default=None, help="MongoDB connection URI")

@@ -58,7 +58,7 @@ export default function CareerQuest() {
 
   if (loading) {
     return (
-      <div className="max-w-[1200px] mx-auto p-4 md:p-6 lg:p-8 space-y-6 w-full">
+      <div className="w-full space-y-6">
         {/* Premium Skeleton Loader matched to the new aesthetic */}
         <div className="h-48 rounded-[32px] bg-blue-50/60 animate-pulse border border-blue-100/50" />
         <div className="flex gap-5">
@@ -75,7 +75,7 @@ export default function CareerQuest() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-16 w-full overflow-hidden">
+    <div className="w-full space-y-6 pb-16">
       <ProfileHero
         profile={profile}
         name={user?.full_name || user?.name || user?.username}

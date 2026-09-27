@@ -1,4 +1,4 @@
-# CareerPilot Evaluation Report
+# CareerShala Evaluation Report
 
 Golden dataset: `backend/eval/resumeJD2_pairs.csv` (500 labeled pairs across multi-domain occupations).
 

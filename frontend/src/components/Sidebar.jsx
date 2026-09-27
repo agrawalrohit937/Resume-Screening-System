@@ -411,7 +411,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   // If user has any employer role, default their view to 'employer'
   const [viewContext, setViewContext] = useState(() => {
     if (typeof window === 'undefined') return 'candidate'
-    const saved = localStorage.getItem('careerpilot_view_context')
+    const saved = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
     if (saved === 'employer' || saved === 'candidate') {
       if (saved === 'employer' && !hasEmployerRole) return 'candidate'
       if (saved === 'candidate' && !hasCandidateRole && hasEmployerRole) return 'employer'
@@ -424,10 +424,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   useEffect(() => {
     if (!hasEmployerRole && viewContext === 'employer') {
       setViewContext('candidate')
-      localStorage.setItem('careerpilot_view_context', 'candidate')
+      localStorage.setItem('careershala_view_context', 'candidate')
     } else if (!hasCandidateRole && hasEmployerRole && viewContext === 'candidate') {
       setViewContext('employer')
-      localStorage.setItem('careerpilot_view_context', 'employer')
+      localStorage.setItem('careershala_view_context', 'employer')
     }
   }, [hasEmployerRole, hasCandidateRole, viewContext])
 
@@ -436,7 +436,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     if (newContext === 'candidate' && !hasCandidateRole) return
     if (newContext === 'employer' && !hasEmployerRole) return
     setViewContext(newContext)
-    localStorage.setItem('careerpilot_view_context', newContext)
+    localStorage.setItem('careershala_view_context', newContext)
     onNavigate?.()
 
     if (newContext === 'candidate') {

@@ -326,7 +326,7 @@ async def execute_bulk_rescore(
 if celery_app is not None:
     import asyncio
 
-    @celery_app.task(name="careerpilot.parse_resume", bind=True, max_retries=3)
+    @celery_app.task(name="careershala.parse_resume", bind=True, max_retries=3)
     def parse_resume_celery(self, payload: Dict[str, Any], idempotency_key: str):
         loop = asyncio.get_event_loop()
         try:
@@ -337,7 +337,7 @@ if celery_app is not None:
             countdown = 2 ** self.request.retries
             raise self.retry(exc=exc, countdown=countdown)
 
-    @celery_app.task(name="careerpilot.batch_scoring", bind=True, max_retries=3)
+    @celery_app.task(name="careershala.batch_scoring", bind=True, max_retries=3)
     def batch_scoring_celery(self, payload: Dict[str, Any], idempotency_key: str):
         loop = asyncio.get_event_loop()
         try:
@@ -348,7 +348,7 @@ if celery_app is not None:
             countdown = 2 ** self.request.retries
             raise self.retry(exc=exc, countdown=countdown)
 
-    @celery_app.task(name="careerpilot.bulk_rescore", bind=True, max_retries=3)
+    @celery_app.task(name="careershala.bulk_rescore", bind=True, max_retries=3)
     def bulk_rescore_celery(self, payload: Dict[str, Any], idempotency_key: str):
         loop = asyncio.get_event_loop()
         try:
@@ -358,3 +358,4 @@ if celery_app is not None:
         except Exception as exc:
             countdown = 2 ** self.request.retries
             raise self.retry(exc=exc, countdown=countdown)
+

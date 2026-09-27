@@ -1,5 +1,5 @@
 """Consented Talent Pool Service (Privacy-Preserving Search & Candidate Controls).
-CareerPilot ATS v2.0.0 - Enterprise ATS Marketplace.
+CareerShala ATS v2.0.0 - Enterprise ATS Marketplace.
 """
 
 from datetime import datetime

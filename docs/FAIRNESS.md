@@ -1,7 +1,7 @@
-# CareerPilot ATS v2.0.0 — Fairness, Anti-Bias & Regulatory Compliance
+# CareerShala ATS v2.0.0 — Fairness, Anti-Bias & Regulatory Compliance
 
 ## 1. Regulatory Frameworks Addressed
-CareerPilot ATS is designed to comply with global algorithmic accountability and employment equity regulations:
+CareerShala ATS is designed to comply with global algorithmic accountability and employment equity regulations:
 - **NYC Local Law 144 (AEDT)**: Annual independent bias audits, publicly accessible summary tables of selection rates and impact ratios, 10 business-day candidate notice.
 - **EEOC Uniform Guidelines on Employee Selection Procedures (UGESP)**: Monitoring the **Four-Fifths (80%) Rule** across gender, race, and ethnicity.
 - **EU AI Act (High-Risk AI Systems — Annex III, Employment)**: Transparency, human oversight, logging of automated decision paths, and non-discriminatory design.

@@ -89,7 +89,7 @@ def run_migration(dry_run: bool = False, mongodb_url: str | None = None, databas
         return 0
 
     uri = mongodb_url or os.getenv("MONGODB_URL") or os.getenv("MONGO_URI") or "mongodb://localhost:27017"
-    db_name = database_name or os.getenv("DATABASE_NAME", "careerpilot")
+    db_name = database_name or os.getenv("DATABASE_NAME", os.getenv("MONGO_DB_NAME", "careershala"))
 
     logger.info("Connecting to MongoDB for vector migration", host=uri.split("@")[-1], db=db_name)
     client: MongoClient = MongoClient(uri, serverSelectionTimeoutMS=5000)
@@ -135,7 +135,7 @@ def run_migration(dry_run: bool = False, mongodb_url: str | None = None, databas
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create Atlas Vector Search Indexes for CareerPilot")
+    parser = argparse.ArgumentParser(description="Create Atlas Vector Search Indexes for CareerShala")
     parser.add_argument("--dry-run", action="store_true", help="Print index definitions as JSON without modifying database")
     parser.add_argument("--url", default=None, help="MongoDB connection URI (overrides MONGODB_URL env)")
     parser.add_argument("--db", default=None, help="Database name (overrides DATABASE_NAME env)")

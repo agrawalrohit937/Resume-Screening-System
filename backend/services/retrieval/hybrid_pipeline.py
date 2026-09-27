@@ -1,5 +1,5 @@
 """
-Two-Stage Retrieve-Then-Rank Hybrid Pipeline for CareerPilot ATS.
+Two-Stage Retrieve-Then-Rank Hybrid Pipeline for CareerShala ATS.
 Stage 1: Hybrid Recall (BM25 Lexical ⊕ Dense Vector ANN ⊕ Pre-Search Hard Filters) via RRF (k=60).
 Stage 2: Precision Ranking (Feature Scoring / Cross-Encoder / LTR Ranker).
 """

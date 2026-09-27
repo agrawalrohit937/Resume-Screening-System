@@ -1,5 +1,5 @@
 """Enterprise SSO (SAML 2.0 / OIDC) and SCIM 2.0 API Routes.
-CareerPilot ATS v2.0.0 - Enterprise Authentication.
+CareerShala ATS v2.0.0 - Enterprise Authentication.
 """
 
 from typing import Any, Dict, List, Optional

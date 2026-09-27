@@ -450,41 +450,39 @@ function MCQPractice() {
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function Interview() {
     return (
-        <div className="min-h-screen bg-slate-50 [background-image:radial-gradient(circle_at_1px_1px,theme(colors.slate.200)_1px,transparent_0)] [background-size:24px_24px] p-3.5 sm:p-6 md:p-8 font-sans text-slate-900">
-            <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
-                {/* Hero Header */}
-                <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
-                    className="relative overflow-hidden rounded-3xl border border-indigo-100/70 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-8 lg:p-10 shadow-sm">
-                    <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-indigo-200/30 blur-3xl" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-violet-200/30 blur-3xl" />
-                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="max-w-2xl">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white/80 px-3 py-1 text-xs font-semibold text-indigo-600 shadow-sm">
-                                <Sparkles className="h-3.5 w-3.5" /> AI MCQ Coach
-                            </span>
-                            <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">Sharpen Your Edge.</h1>
-                            <p className="mt-2.5 text-sm sm:text-base text-slate-600 leading-relaxed">
-                                AI-powered multiple choice practice across any topic, tech stack, or difficulty level — test yourself with instant feedback, explanations &amp; verifiable certifications.
-                            </p>
-                            <div className="mt-4 sm:mt-5 flex flex-wrap gap-1.5 sm:gap-2">
-                                {[
-                                    { icon: Zap, label: 'Instant Generation' },
-                                    { icon: Target, label: 'Targeted Concepts' },
-                                    { icon: CheckCircle2, label: 'Real-time Explanations' },
-                                    { icon: Award, label: 'E-Certificate Eligible' },
-                                ].map(({ icon: Icon, label }) => (
-                                    <span key={label} className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white/70 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-slate-600">
-                                        <Icon className="h-3.5 w-3.5 text-indigo-500" /> {label}
-                                    </span>
-                                ))}
-                            </div>
+        <div className="w-full space-y-6 sm:space-y-8 font-sans text-slate-900">
+            {/* Hero Header */}
+            <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
+                className="relative overflow-hidden rounded-3xl border border-indigo-100/70 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-8 lg:p-10 shadow-sm">
+                <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-indigo-200/30 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-violet-200/30 blur-3xl" />
+                <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-2xl">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white/80 px-3 py-1 text-xs font-semibold text-indigo-600 shadow-sm">
+                            <Sparkles className="h-3.5 w-3.5" /> AI MCQ Coach
+                        </span>
+                        <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">Sharpen Your Edge.</h1>
+                        <p className="mt-2.5 text-sm sm:text-base text-slate-600 leading-relaxed">
+                            AI-powered multiple choice practice across any topic, tech stack, or difficulty level — test yourself with instant feedback, explanations &amp; verifiable certifications.
+                        </p>
+                        <div className="mt-4 sm:mt-5 flex flex-wrap gap-1.5 sm:gap-2">
+                            {[
+                                { icon: Zap, label: 'Instant Generation' },
+                                { icon: Target, label: 'Targeted Concepts' },
+                                { icon: CheckCircle2, label: 'Real-time Explanations' },
+                                { icon: Award, label: 'E-Certificate Eligible' },
+                            ].map(({ icon: Icon, label }) => (
+                                <span key={label} className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white/70 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-slate-600">
+                                    <Icon className="h-3.5 w-3.5 text-indigo-500" /> {label}
+                                </span>
+                            ))}
                         </div>
                     </div>
-                </motion.div>
+                </div>
+            </motion.div>
 
-                {/* Content: MCQ Practice Cockpit */}
-                <MCQPractice />
-            </div>
+            {/* Content: MCQ Practice Cockpit */}
+            <MCQPractice />
         </div>
     )
 }

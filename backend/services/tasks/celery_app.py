@@ -1,5 +1,5 @@
 """
-Celery Application Initialization and Configuration for CareerPilot ATS.
+Celery Application Initialization and Configuration for CareerShala ATS.
 Provides distributed worker execution for CPU-intensive and long-running pipelines
 (resume parsing, bulk re-scoring, batch embeddings).
 """
@@ -21,7 +21,7 @@ try:
     CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 
     celery_app = Celery(
-        "careerpilot_workers",
+        "careershala_workers",
         broker=CELERY_BROKER_URL,
         backend=CELERY_RESULT_BACKEND,
     )
@@ -36,6 +36,9 @@ try:
         task_reject_on_worker_lost=True,
         worker_prefetch_multiplier=1,
         task_routes={
+            "careershala.parse_resume": {"queue": "parsing"},
+            "careershala.bulk_rescore": {"queue": "scoring"},
+            "careershala.dlq": {"queue": "dlq"},
             "careerpilot.parse_resume": {"queue": "parsing"},
             "careerpilot.bulk_rescore": {"queue": "scoring"},
             "careerpilot.dlq": {"queue": "dlq"},

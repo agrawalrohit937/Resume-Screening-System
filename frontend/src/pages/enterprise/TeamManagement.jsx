@@ -246,7 +246,7 @@ export default function TeamManagement() {
       </div>
 
       {/* ── 2. Key Metrics Cards (Matching Company Profile White Card Aesthetic) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {/* Card 1: Active Members */}
         <div className="p-6 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/80 shadow-xs hover:shadow-sm transition-all">
           <div className="flex items-center justify-between">
@@ -344,8 +344,8 @@ export default function TeamManagement() {
                 <p className="text-slate-500 text-xs mt-1">Start by inviting your colleagues to this organization.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto custom-scrollbar w-full">
+                <table className="w-full text-left border-collapse min-w-[620px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-50/80">
                       <th className="py-3.5 px-6">Member</th>

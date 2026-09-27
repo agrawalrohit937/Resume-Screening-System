@@ -257,8 +257,8 @@ export default function InterviewerDashboard() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-4 md:p-8 lg:p-10 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-6 pb-20 font-sans">
+      <div className="w-full space-y-6">
 
         {/* ════════════════════════════════════════════════════════════════════ */}
         {/* VIEW 1: DEDICATED SCORECARD WORKSPACE (FOCUS MODE - NO CRAMPING)    */}
