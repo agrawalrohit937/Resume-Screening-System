@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, BackgroundTasks, status
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
@@ -1460,29 +1460,79 @@ async def update_job(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 6. POST /admin/trigger-alerts — MANUAL NIGHTLY JOB ALERT TRIGGER (TESTING)
+# 6. ADMIN / CRON TRIGGER ENDPOINTS (MANUAL & WEBHOOK SCHEDULING)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/admin/trigger-alerts")
 async def trigger_job_alerts_manually(
     target_email: Optional[str] = Query(None, description="Optional single email to test dispatch only to this user"),
-    current_user: UserModel = Depends(get_current_user),
+    cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+    current_user: Optional[UserModel] = Depends(get_optional_current_user),
     db: Any = Depends(get_database),
 ):
     """
-    Manual trigger for Nightly AI Job Alerts background process.
-    Pass target_email to send ONLY to your own test account without affecting other candidates.
-    Restricted to Administrator role.
+    Manual & Automated Webhook trigger for Nightly AI Job Alerts retention loop.
+    Authentication:
+      - Authenticated Admin user (JWT), OR
+      - Matching CRON_SECRET / SECRET_KEY via 'X-Cron-Secret' header or 'cron_secret' query param.
     """
-    if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
+    secret_provided = x_cron_secret or cron_secret
+    valid_cron_auth = (
+        secret_provided
+        and (
+            (settings.CRON_SECRET and secret_provided == settings.CRON_SECRET)
+            or (settings.SECRET_KEY and secret_provided == settings.SECRET_KEY)
+        )
+    )
+
+    is_admin = current_user and current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
+
+    if not valid_cron_auth and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required to trigger batch job alerts.",
+            detail="Admin privileges or valid CRON_SECRET required to trigger batch job alerts.",
         )
 
     from scheduler.job_alerts import run_nightly_job_alerts
     result = await run_nightly_job_alerts(db=db, target_email=target_email)
     return {"success": True, "result": result}
+
+
+@router.post("/admin/trigger-scrape")
+async def trigger_job_scrape_manually(
+    cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+    current_user: Optional[UserModel] = Depends(get_optional_current_user),
+    db: Any = Depends(get_database),
+):
+    """
+    Manual & Automated Webhook trigger for External JSearch Job Scraper.
+    Authentication:
+      - Authenticated Admin user (JWT), OR
+      - Matching CRON_SECRET / SECRET_KEY via 'X-Cron-Secret' header or 'cron_secret' query param.
+    """
+    secret_provided = x_cron_secret or cron_secret
+    valid_cron_auth = (
+        secret_provided
+        and (
+            (settings.CRON_SECRET and secret_provided == settings.CRON_SECRET)
+            or (settings.SECRET_KEY and secret_provided == settings.SECRET_KEY)
+        )
+    )
+
+    is_admin = current_user and current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
+
+    if not valid_cron_auth and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges or valid CRON_SECRET required to trigger job scrape.",
+        )
+
+    from scheduler.job_alerts import run_external_job_scrape
+    result = await run_external_job_scrape()
+    return {"success": True, "result": result}
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════

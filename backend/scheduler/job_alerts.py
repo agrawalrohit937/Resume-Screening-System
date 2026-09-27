@@ -111,158 +111,158 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
             logger.error("Failed to query candidates for job alert batch", error=str(exc))
             return {"error": str(exc), "sent": 0}
 
-    total_candidates = len(candidates)
-    candidates_with_resume = 0
-    candidates_matched = 0
-    emails_sent = 0
-    errors_count = 0
-    delivery_details: List[Dict[str, Any]] = []
+        total_candidates = len(candidates)
+        candidates_with_resume = 0
+        candidates_matched = 0
+        emails_sent = 0
+        errors_count = 0
+        delivery_details: List[Dict[str, Any]] = []
 
-    # 2. Iterate through candidates and compute recommendations
-    for candidate in candidates:
-        candidate_id = str(candidate["_id"])
-        candidate_email = candidate.get("email")
-        candidate_name = candidate.get("full_name") or candidate.get("name") or "Candidate"
+        # 2. Iterate through candidates and compute recommendations
+        for candidate in candidates:
+            candidate_id = str(candidate["_id"])
+            candidate_email = candidate.get("email")
+            candidate_name = candidate.get("full_name") or candidate.get("name") or "Candidate"
 
-        if not candidate_email or "@" not in candidate_email:
-            continue
-
-        try:
-            # Check if candidate has a parsed resume
-            resume_doc = await db.resumes.find_one(
-                {"user_id": candidate_id, "status": "parsed", "parsed_data": {"$ne": None}},
-                sort=[("is_primary", -1), ("created_at", -1)],
-            )
-
-            if not resume_doc:
+            if not candidate_email or "@" not in candidate_email:
                 continue
 
-            candidates_with_resume += 1
+            try:
+                # Check if candidate has a parsed resume
+                resume_doc = await db.resumes.find_one(
+                    {"user_id": candidate_id, "status": "parsed", "parsed_data": {"$ne": None}},
+                    sort=[("is_primary", -1), ("created_at", -1)],
+                )
 
-            # Fetch top candidate job matches from BGE-base vector engine
-            match_res = await find_jobs_for_candidate(
-                candidate_id=candidate_id,
-                limit=10,
-                db=db,
-            )
+                if not resume_doc:
+                    continue
 
-            rec_jobs = match_res.get("recommended_jobs", [])
+                candidates_with_resume += 1
 
-            # Filter: match_score >= 50.0 and is_applied == False
-            qualifying_jobs = [
-                j for j in rec_jobs
-                if float(j.get("match_score", 0)) >= 50.0 and not j.get("is_applied", False)
-            ]
+                # Fetch top candidate job matches from BGE-base vector engine
+                match_res = await find_jobs_for_candidate(
+                    candidate_id=candidate_id,
+                    limit=10,
+                    db=db,
+                )
 
-            if not qualifying_jobs:
-                continue
+                rec_jobs = match_res.get("recommended_jobs", [])
 
-            candidates_matched += 1
-            top_3_jobs = qualifying_jobs[:3]
+                # Filter: match_score >= 50.0 and is_applied == False
+                qualifying_jobs = [
+                    j for j in rec_jobs
+                    if float(j.get("match_score", 0)) >= 50.0 and not j.get("is_applied", False)
+                ]
 
-            # Dynamically fetch company_logo_url directly from specific tenant/employer document
-            from bson import ObjectId
-            import re
-            from services.cloudinary_service import upload_base64_company_logo
+                if not qualifying_jobs:
+                    continue
 
-            for j in top_3_jobs:
-                job_id = j.get("id") or j.get("_id")
-                job_doc = None
-                if job_id:
-                    try:
-                        job_doc = await db.jobs.find_one({"_id": ObjectId(str(job_id))})
-                    except Exception:
-                        pass
+                candidates_matched += 1
+                top_3_jobs = qualifying_jobs[:3]
 
-                tenant_id = (job_doc.get("tenant_id") if job_doc else None) or j.get("tenant_id")
-                company_name = (job_doc.get("company_name") if job_doc else None) or j.get("company_name")
+                # Dynamically fetch company_logo_url directly from specific tenant/employer document
+                from bson import ObjectId
+                import re
+                from services.cloudinary_service import upload_base64_company_logo
 
-                comp_doc = None
-                if tenant_id and tenant_id != "default":
-                    comp_doc = await db.companies.find_one({"tenant_id": tenant_id})
-                if not comp_doc and company_name:
-                    comp_doc = await db.companies.find_one(
-                        {"company_name": {"$regex": f"^{re.escape(str(company_name).strip())}$", "$options": "i"}}
+                for j in top_3_jobs:
+                    job_id = j.get("id") or j.get("_id")
+                    job_doc = None
+                    if job_id:
+                        try:
+                            job_doc = await db.jobs.find_one({"_id": ObjectId(str(job_id))})
+                        except Exception:
+                            pass
+
+                    tenant_id = (job_doc.get("tenant_id") if job_doc else None) or j.get("tenant_id")
+                    company_name = (job_doc.get("company_name") if job_doc else None) or j.get("company_name")
+
+                    comp_doc = None
+                    if tenant_id and tenant_id != "default":
+                        comp_doc = await db.companies.find_one({"tenant_id": tenant_id})
+                    if not comp_doc and company_name:
+                        comp_doc = await db.companies.find_one(
+                            {"company_name": {"$regex": f"^{re.escape(str(company_name).strip())}$", "$options": "i"}}
+                        )
+
+                    employer_logo = (
+                        j.get("company_logo_url")
+                        or j.get("company_logo")
+                        or (comp_doc.get("logo_url") if comp_doc else None)
+                        or (job_doc.get("company_logo") if job_doc else None)
+                        or (job_doc.get("company_logo_url") if job_doc else None)
                     )
 
-                employer_logo = (
-                    j.get("company_logo_url")
-                    or j.get("company_logo")
-                    or (comp_doc.get("logo_url") if comp_doc else None)
-                    or (job_doc.get("company_logo") if job_doc else None)
-                    or (job_doc.get("company_logo_url") if job_doc else None)
+                    if employer_logo:
+                        employer_logo_str = str(employer_logo).strip()
+                        # If logo is base64 data URI, upload to Cloudinary to get permanent HTTPS URL
+                        if employer_logo_str.startswith("data:image/"):
+                            c_id = tenant_id or (company_name.lower().replace(" ", "-") if company_name else "company")
+                            uploaded_logo_url = await upload_base64_company_logo(employer_logo_str, company_id=c_id)
+                            if uploaded_logo_url:
+                                employer_logo_str = uploaded_logo_url
+                                # Persist the clean HTTPS URL to MongoDB for this company and job
+                                if comp_doc:
+                                    await db.companies.update_one({"_id": comp_doc["_id"]}, {"$set": {"logo_url": uploaded_logo_url}})
+                                if job_doc:
+                                    await db.jobs.update_one({"_id": job_doc["_id"]}, {"$set": {"company_logo": uploaded_logo_url}})
+
+                        j["company_logo_url"] = employer_logo_str
+                        j["company_logo"] = employer_logo_str
+
+                # 3. Dispatch Job Alert Email
+                dispatch_res = await send_job_alert_email(
+                    to_email=candidate_email,
+                    candidate_name=candidate_name,
+                    matched_jobs=top_3_jobs,
                 )
 
-                if employer_logo:
-                    employer_logo_str = str(employer_logo).strip()
-                    # If logo is base64 data URI, upload to Cloudinary to get permanent HTTPS URL
-                    if employer_logo_str.startswith("data:image/"):
-                        c_id = tenant_id or (company_name.lower().replace(" ", "-") if company_name else "company")
-                        uploaded_logo_url = await upload_base64_company_logo(employer_logo_str, company_id=c_id)
-                        if uploaded_logo_url:
-                            employer_logo_str = uploaded_logo_url
-                            # Persist the clean HTTPS URL to MongoDB for this company and job
-                            if comp_doc:
-                                await db.companies.update_one({"_id": comp_doc["_id"]}, {"$set": {"logo_url": uploaded_logo_url}})
-                            if job_doc:
-                                await db.jobs.update_one({"_id": job_doc["_id"]}, {"$set": {"company_logo": uploaded_logo_url}})
+                if dispatch_res.get("sent"):
+                    emails_sent += 1
+                    delivery_details.append({
+                        "candidate_id": candidate_id,
+                        "email": candidate_email,
+                        "matched_count": len(top_3_jobs),
+                        "simulated": dispatch_res.get("simulated", False),
+                    })
+                else:
+                    errors_count += 1
+                    logger.warning(
+                        "Job alert email dispatch reported failure",
+                        candidate_id=candidate_id,
+                        email=candidate_email,
+                        error=dispatch_res.get("error"),
+                    )
 
-                    j["company_logo_url"] = employer_logo_str
-                    j["company_logo"] = employer_logo_str
-
-            # 3. Dispatch Job Alert Email
-            dispatch_res = await send_job_alert_email(
-                to_email=candidate_email,
-                candidate_name=candidate_name,
-                matched_jobs=top_3_jobs,
-            )
-
-            if dispatch_res.get("sent"):
-                emails_sent += 1
-                delivery_details.append({
-                    "candidate_id": candidate_id,
-                    "email": candidate_email,
-                    "matched_count": len(top_3_jobs),
-                    "simulated": dispatch_res.get("simulated", False),
-                })
-            else:
+            except Exception as exc:
                 errors_count += 1
-                logger.warning(
-                    "Job alert email dispatch reported failure",
+                logger.error(
+                    "Error processing candidate for nightly job alert",
                     candidate_id=candidate_id,
-                    email=candidate_email,
-                    error=dispatch_res.get("error"),
+                    error=str(exc),
                 )
 
-        except Exception as exc:
-            errors_count += 1
-            logger.error(
-                "Error processing candidate for nightly job alert",
-                candidate_id=candidate_id,
-                error=str(exc),
-            )
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        summary = {
+            "status": "completed",
+            "timestamp": now_utc.isoformat(),
+            "candidates_scanned": total_candidates,
+            "candidates_with_resume": candidates_with_resume,
+            "candidates_matched": candidates_matched,
+            "emails_sent": emails_sent,
+            "errors": errors_count,
+            "elapsed_ms": elapsed_ms,
+            "sample_deliveries": delivery_details[:5],
+        }
 
-    elapsed_ms = int((time.perf_counter() - t0) * 1000)
-    summary = {
-        "status": "completed",
-        "timestamp": now_utc.isoformat(),
-        "candidates_scanned": total_candidates,
-        "candidates_with_resume": candidates_with_resume,
-        "candidates_matched": candidates_matched,
-        "emails_sent": emails_sent,
-        "errors": errors_count,
-        "elapsed_ms": elapsed_ms,
-        "sample_deliveries": delivery_details[:5],
-    }
-
-    logger.info(
-        "Nightly AI Job Alerts batch completed",
-        scanned=total_candidates,
-        matched=candidates_matched,
-        sent=emails_sent,
-        elapsed_ms=elapsed_ms,
-    )
-    return summary
+        logger.info(
+            "Nightly AI Job Alerts batch completed",
+            scanned=total_candidates,
+            matched=candidates_matched,
+            sent=emails_sent,
+            elapsed_ms=elapsed_ms,
+        )
+        return summary
 
 
 async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any]:
@@ -354,7 +354,7 @@ def start_job_alert_scheduler() -> None:
 
         job_alerts_scheduler.add_job(
             run_external_job_scrape,
-            trigger=IntervalTrigger(days=1),
+            trigger=CronTrigger(hour=1, minute=0, timezone="UTC"),
             id="external_job_scrape",
             name="Daily JSearch External Job Scrape",
             replace_existing=True,
