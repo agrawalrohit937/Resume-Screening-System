@@ -1,5 +1,5 @@
 """Outbound Webhooks API Routes.
-CareerPilot ATS v2.0.0 - Enterprise ATS Ecosystem.
+CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 from typing import Any, Dict, List, Optional

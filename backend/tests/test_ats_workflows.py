@@ -1,5 +1,5 @@
 """Unit and Integration Tests for Enterprise ATS Workflows (Task 5.3).
-CareerPilot ATS v2.0.0.
+CareerShala ATS v2.0.0.
 """
 
 import pytest

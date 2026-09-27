@@ -395,24 +395,48 @@ async def get_enterprise_analytics(
 
     # ── 6. Monthly hiring velocity (last 6 months) ────────────────────────────
     now = datetime.now(timezone.utc)
-    velocity = []
+    months_meta = []
     for months_ago in range(5, -1, -1):
         month_start = (now.replace(day=1) - timedelta(days=months_ago * 30)).replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         )
         month_end = (month_start + timedelta(days=32)).replace(day=1)
         month_label = month_start.strftime("%b")
-        if job_ids:
-            hires_this_month = await db.applications.count_documents({
-                "job_id": {"$in": job_ids},
-                "stage": {"$in": hire_stage_variants},
-                "updated_at": {"$gte": month_start, "$lt": month_end},
-            })
-        else:
-            hires_this_month = 0
-        # Target: distribute approved headcount evenly across months
-        monthly_target = round(approved_headcount / 6) if approved_headcount > 0 else 0
-        velocity.append({"month": month_label, "hires": hires_this_month, "target": monthly_target})
+        months_meta.append((month_start, month_end, month_label))
+
+    velocity_counts = {m_label: 0 for _, _, m_label in months_meta}
+    if job_ids and months_meta:
+        earliest_start = months_meta[0][0]
+        latest_end = months_meta[-1][1]
+        agg_cursor = db.applications.aggregate([
+            {
+                "$match": {
+                    "job_id": {"$in": job_ids},
+                    "stage": {"$in": hire_stage_variants},
+                    "updated_at": {"$gte": earliest_start, "$lt": latest_end},
+                }
+            },
+            {
+                "$project": {
+                    "updated_at": 1,
+                }
+            }
+        ])
+        matching_hires = await agg_cursor.to_list(length=5000)
+        for doc in matching_hires:
+            u_at = doc.get("updated_at")
+            if u_at and hasattr(u_at, "timestamp"):
+                if u_at.tzinfo is None:
+                    u_at = u_at.replace(tzinfo=timezone.utc)
+                for m_start, m_end, m_label in months_meta:
+                    if m_start <= u_at < m_end:
+                        velocity_counts[m_label] += 1
+                        break
+
+    velocity = []
+    monthly_target = round(approved_headcount / 6) if approved_headcount > 0 else 0
+    for _, _, m_label in months_meta:
+        velocity.append({"month": m_label, "hires": velocity_counts.get(m_label, 0), "target": monthly_target})
 
     # ── 7. EEO / Diversity (Isolated Vault Aggregation) ───────────────────────
     eeo_filters = []

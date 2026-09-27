@@ -1,5 +1,5 @@
 """
-Probability Calibration Engine for CareerPilot ATS.
+Probability Calibration Engine for CareerShala ATS.
 Maps raw multi-factor ATS scores (0-100) to calibrated probabilities of candidate shortlisting:
     P(advance_past_screening | raw_score) ∈ [0.0, 1.0]
 using Isotonic Regression (non-parametric) and Platt Scaling (parametric logistic).

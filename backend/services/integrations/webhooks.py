@@ -1,5 +1,5 @@
 """Enterprise Outbound Webhooks with HMAC SHA-256 Signatures.
-CareerPilot ATS v2.0.0 - Enterprise ATS Ecosystem.
+CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 import hmac
@@ -104,9 +104,10 @@ class WebhookService:
             signature = compute_webhook_signature(payload_json, sub.secret_key)
             headers = {
                 "Content-Type": "application/json",
+                "X-CareerShala-Signature": signature,
+                "X-CareerShala-Event": event_type,
+                "X-CareerShala-Delivery": payload_obj.event_id,
                 "X-CareerPilot-Signature": signature,
-                "X-CareerPilot-Event": event_type,
-                "X-CareerPilot-Delivery": payload_obj.event_id,
             }
 
             if self.http_client:

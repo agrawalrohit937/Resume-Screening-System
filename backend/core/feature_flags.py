@@ -1,5 +1,5 @@
 """
-Feature Flags Module for CareerPilot ATS.
+Feature Flags Module for CareerShala ATS.
 Provides environment-driven boolean feature toggles for zero-downtime, safe rollouts.
 """
 

@@ -185,7 +185,7 @@ export default function Dashboard() {
           <div className="relative z-10 text-center lg:text-left flex-1 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-              CareerPilot Copilot Active
+              CareerShala Copilot Active
             </div>
 
             <div className="space-y-1.5">
@@ -288,7 +288,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── 2. KPI Metrics Grid ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <StatBox 
           label="Best ATS Match" 
           value={`${atsStrength}%`} 
@@ -335,7 +335,7 @@ export default function Dashboard() {
           subtitle="Consolidated high-impact improvements to boost your interview callback rate" 
         />
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
 
           {/* Action 1: Resume Keyword Gaps */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">

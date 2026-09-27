@@ -149,7 +149,10 @@ function MobileHeader({ onMenuToggle }) {
 }
 
 export default function AppLayout() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 1024
+  })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
@@ -161,6 +164,16 @@ export default function AppLayout() {
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [location.pathname, location.key])
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024 && !collapsed) {
+        setCollapsed(true)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [collapsed])
 
   useEffect(() => {
     if (!isMobileMenuOpen) return undefined
@@ -252,7 +265,7 @@ export default function AppLayout() {
               <Navbar sidebarCollapsed={collapsed} onMenuToggle={() => setCollapsed(p => !p)} />
             </div>
           )}
-          <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive ? 'p-0 overflow-hidden' : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-4 sm:px-6 lg:px-8 py-6'}`}>
+          <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive ? 'p-0 overflow-hidden' : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6'}`}>
             <div key={location.pathname} className={`mx-auto w-full min-w-0 ${isFullscreenActive ? 'max-w-none' : 'max-w-7xl animate-fade-in'}`}>
               <RouteErrorBoundary>
                 <Outlet />

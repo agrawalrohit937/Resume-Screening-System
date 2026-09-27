@@ -1,5 +1,5 @@
 """
-Evidence-Grounded Explainability & SHAP Attribution Service for CareerPilot ATS.
+Evidence-Grounded Explainability & SHAP Attribution Service for CareerShala ATS.
 Computes per-feature SHAP contributions, requirement-level cited evidence spans,
 effort-ranked counterfactuals, and enforces anti-hallucination text validation.
 """

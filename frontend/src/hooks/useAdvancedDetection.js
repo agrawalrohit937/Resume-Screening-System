@@ -217,8 +217,18 @@ export function useAdvancedDetection({
   // ── 6. Lazy Initialize Engines (FaceMesh + Background Object Detection) ──
   useEffect(() => {
     if (!active) {
-      if (faceTimerRef.current) clearInterval(faceTimerRef.current)
-      if (objTimerRef.current) clearInterval(objTimerRef.current)
+      if (faceTimerRef.current) {
+        clearInterval(faceTimerRef.current)
+        faceTimerRef.current = null
+      }
+      if (objTimerRef.current) {
+        clearInterval(objTimerRef.current)
+        objTimerRef.current = null
+      }
+      if (faceMeshRef.current?.close) {
+        try { faceMeshRef.current.close() } catch (_) {}
+        faceMeshRef.current = null
+      }
       setStatus(s => ({ ...s, isWorkerReady: false, isWorkerLoading: false, workerStatus: 'idle', mpReady: false, tfReady: false }))
       return
     }
@@ -293,11 +303,10 @@ export function useAdvancedDetection({
             }
           }
         } catch (e) {
-          console.warn('[Object Detection] Background model notice:', e.message)
+          // background model notice
         }
 
       } catch (err) {
-        console.error('[AI Proctoring] Initialization failed:', err)
         if (!isCancelled && mountedRef.current) {
           setStatus(s => ({
             ...s,
@@ -313,6 +322,10 @@ export function useAdvancedDetection({
 
     return () => {
       isCancelled = true
+      if (faceMeshRef.current?.close) {
+        try { faceMeshRef.current.close() } catch (_) {}
+        faceMeshRef.current = null
+      }
     }
   }, [active, handleFaceMeshResults, loadScript])
 

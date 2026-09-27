@@ -578,7 +578,7 @@ What We Are Looking For:
       const p = JSON.parse(localStorage.getItem('recruiter_preferences') || '{}')
       if (p.company?.trim()) return p.company.trim()
     } catch { }
-    return 'CareerPilot Technologies'
+    return 'CareerShala Technologies'
   }
 
   // Submit New Job Posting (Draft vs Publish)

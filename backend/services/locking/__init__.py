@@ -1,5 +1,5 @@
 """
-Distributed Locking Module for Multi-Replica CareerPilot ATS Deployments.
+Distributed Locking Module for Multi-Replica CareerShala ATS Deployments.
 """
 
 from services.locking.distributed_lock import DistributedLock, distributed_lock

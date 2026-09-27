@@ -9,6 +9,7 @@ export function clearAllUserStorage() {
     localStorage.removeItem("access_token")
     localStorage.removeItem("refresh_token")
     localStorage.removeItem("tenant_id")
+    localStorage.removeItem("careershala_view_context")
     localStorage.removeItem("careerpilot_view_context")
     localStorage.removeItem("admin_view_mode")
 

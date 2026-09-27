@@ -1,5 +1,5 @@
 """
-Immutable Decision Log Service for CareerPilot ATS.
+Immutable Decision Log Service for CareerShala ATS.
 Provides an append-only audit trail recording every scoring verdict, eligibility check,
 and human recruiter override to db.decision_log for regulatory compliance (GDPR Art 22, EU AI Act, NYC LL144).
 """

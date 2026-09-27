@@ -1,5 +1,5 @@
 """
-Ontology package for CareerPilot ATS.
+Ontology package for CareerShala ATS.
 Provides multi-domain, multi-relational occupation and skill graphs across ESCO, O*NET, and NCO-2015 taxonomies.
 """
 

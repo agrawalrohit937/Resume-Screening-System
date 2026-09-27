@@ -1,5 +1,5 @@
 """
-Multi-Tenancy Context & Isolation Layer for CareerPilot ATS.
+Multi-Tenancy Context & Isolation Layer for CareerShala ATS.
 
 Phase 5, Task 5.1:
 Provides contextvars-driven tenant scoping, ensuring every database operation,

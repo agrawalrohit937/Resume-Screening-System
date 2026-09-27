@@ -1,5 +1,5 @@
 """
-FastAPI Multi-Tenant Enforcement Middleware for CareerPilot ATS.
+FastAPI Multi-Tenant Enforcement Middleware for CareerShala ATS.
 
 Phase 5:
 Extracts tenant_id and roles from JWT access tokens (header or cookie),

@@ -1,0 +1,7 @@
+# ─── Development & Test Dependencies ──────────────────────────
+-r requirements.txt
+
+pytest==8.2.0
+pytest-asyncio==0.23.6
+faker==25.0.0
+pytest-cov>=5.0.0

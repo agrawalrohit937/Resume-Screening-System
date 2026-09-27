@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 import structlog
@@ -102,7 +103,7 @@ class CertificateService:
         }
 
         try:
-            pdf_bytes = render_certificate_pdf(template_dir, render_context)
+            pdf_bytes = await asyncio.to_thread(render_certificate_pdf, template_dir, render_context)
         except Exception as e:
             logger.error("Certificate PDF rendering failed", error=str(e))
             raise

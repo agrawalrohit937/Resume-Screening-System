@@ -30,7 +30,7 @@ function ThemeInit() {
 
 const Login = lazy(() => import('./pages/Login'))
 const Signup = lazy(() => import('./pages/Signup'))
-const CareerPilotLanding = lazy(() => import('./pages/CareerPilotLanding'))
+const CareerShalaLanding = lazy(() => import('./pages/CareerShalaLanding'))
 const Careers = lazy(() => import('./pages/Careers'))
 const LinkedinCallback = lazy(() => import('./pages/LinkedinCallback'))
 const GitHubCallback = lazy(() => import('./pages/GithubCallback'))
@@ -92,7 +92,7 @@ function PublicRoute({ children }) {
     user?.role,
   ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
-  const savedCtx = localStorage.getItem('careerpilot_view_context')
+  const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
   const ENTERPRISE = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
   const hasEnterprise = userRoles.some((r) => ENTERPRISE.includes(r))
 
@@ -237,7 +237,7 @@ export default function App() {
 
 
               {/* ── Public Landing, Careers & Portfolios ── */}
-              <Route path="/" element={<CareerPilotLanding />} />
+              <Route path="/" element={<CareerShalaLanding />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="/portfolio/:username" element={<PublicPortfolio />} />
               <Route path="/portfolio/public/:username" element={<PublicPortfolio />} />

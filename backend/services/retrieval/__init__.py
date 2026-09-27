@@ -1,5 +1,5 @@
 """
-Retrieval Package for CareerPilot ATS.
+Retrieval Package for CareerShala ATS.
 Two-Stage Retrieve-Then-Rank Architecture:
 - BM25 Lexical Retriever
 - Dense Vector Retriever

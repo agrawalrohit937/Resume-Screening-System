@@ -86,7 +86,7 @@ async def test_admin_trigger_alerts_endpoint_rbac():
     """Verify POST /api/v1/jobs/admin/trigger-alerts enforces Admin role."""
     import httpx
     from main import create_application
-    from api.deps import get_current_user, get_database
+    from api.deps import get_current_user, get_optional_current_user, get_database
     from models.user_model import UserModel, UserRole
     from bson import ObjectId
 
@@ -101,6 +101,7 @@ async def test_admin_trigger_alerts_endpoint_rbac():
         status="active",
     )
     app.dependency_overrides[get_current_user] = lambda: candidate_user
+    app.dependency_overrides[get_optional_current_user] = lambda: candidate_user
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         res = await client.post("/api/v1/jobs/admin/trigger-alerts")
@@ -115,6 +116,7 @@ async def test_admin_trigger_alerts_endpoint_rbac():
             status="active",
         )
         app.dependency_overrides[get_current_user] = lambda: admin_user
+        app.dependency_overrides[get_optional_current_user] = lambda: admin_user
 
         mock_db = MagicMock()
         mock_cursor = MagicMock()

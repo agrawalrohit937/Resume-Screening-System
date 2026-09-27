@@ -108,7 +108,7 @@ export default function ExecDashboard() {
   const handleExportExcel = () => {
     try {
       const rows = []
-      rows.push(['CAREERPILOT ENTERPRISE TALENT INTELLIGENCE — EXECUTIVE BOARD AUDIT'])
+      rows.push(['CAREERSHALA ENTERPRISE TALENT INTELLIGENCE — EXECUTIVE BOARD AUDIT'])
       rows.push([`Reporting Period: ${selectedQuarter}`, `Generated: ${new Date().toLocaleString()}`, 'Status: Official / Confidential'])
       rows.push([])
       rows.push(['1. KEY PERFORMANCE INDICATORS (KPIS)'])
@@ -307,7 +307,7 @@ export default function ExecDashboard() {
   <div class="memo-container">
     <div class="header-bar">
       <div>
-        <div class="org-title">CareerPilot Enterprise • Executive Leadership Portal</div>
+        <div class="org-title">CareerShala Enterprise • Executive Leadership Portal</div>
         <h1 class="doc-title">Board of Directors Talent Deck</h1>
         <p style="font-size: 12px; color: #475569; margin-top: 2px;">
           Statutory Headcount Attainment & Workforce Performance Audit
@@ -368,7 +368,7 @@ export default function ExecDashboard() {
     </div>
 
     <div class="memo-footer">
-      <span>CareerPilot Corporate Governance • Read-Only Executive Brief</span>
+      <span>CareerShala Corporate Governance • Read-Only Executive Brief</span>
       <button class="no-print" onclick="window.print()" style="padding: 6px 14px; background: #0F172A; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;">
         🖨️ Print / Save as PDF
       </button>
@@ -410,17 +410,17 @@ export default function ExecDashboard() {
         
         {/* Background Image - strictly on the right 55% */}
         <div 
-          className="absolute top-0 right-0 w-[55%] h-full bg-cover bg-center"
+          className="hidden sm:block absolute top-0 right-0 w-[55%] h-full bg-cover bg-center"
           style={{ 
             backgroundImage: "url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')" 
           }}
         />
         
         {/* Exact color stops fading to 0 opacity of the same background color */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#eef3fb] from-[45%] via-[#eef3fb]/85 via-[60%] to-[#eef3fb]/0 z-0 pointer-events-none" />
+        <div className="hidden sm:block absolute inset-0 bg-gradient-to-r from-[#eef3fb] from-[45%] via-[#eef3fb]/85 via-[60%] to-[#eef3fb]/0 z-0 pointer-events-none" />
 
         {/* Content Container */}
-        <div className="relative z-10 w-full p-6 sm:p-8 h-full flex flex-col justify-center">
+        <div className="relative z-10 w-full p-5 sm:p-8 h-full flex flex-col justify-center">
           <div className="max-w-2xl space-y-3 pt-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100/70 text-indigo-700 text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60">

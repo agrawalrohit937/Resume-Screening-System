@@ -24,7 +24,7 @@ const GITHUB_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_GITHUB_REDI
 //   3. No saved context → fall back to role-based default (enterprise first if available)
 function getSmartRedirectPath(userRoles) {
   const normalised = userRoles.map((r) => String(r).toLowerCase().trim())
-  const savedCtx = localStorage.getItem('careerpilot_view_context') // 'employer' | 'candidate' | null
+  const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context') // 'employer' | 'candidate' | null
 
   const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
   const hasEnterpriseRole = normalised.some((r) => ENTERPRISE_ROLES.includes(r))

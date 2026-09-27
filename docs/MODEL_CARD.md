@@ -1,7 +1,7 @@
-# CareerPilot ATS v2.0.0 — Model Card: Learned Ranking & Calibration
+# CareerShala ATS v2.0.0 — Model Card: Learned Ranking & Calibration
 
 ## Model Details
-- **Model Name**: CareerPilot LTR Ranker & Calibrator
+- **Model Name**: CareerShala LTR Ranker & Calibrator
 - **Model Version**: `v2.0.0-phase3`
 - **Architecture**:
   - Two-Stage Retrieval: BM25Okapi + Dense Vector (`BAAI/bge-m3`) fused via Reciprocal Rank Fusion ($k=60$).

@@ -1,5 +1,5 @@
 """Unit and Integration Tests for Consented Talent Pools (Task 5.5).
-CareerPilot ATS v2.0.0.
+CareerShala ATS v2.0.0.
 """
 
 import pytest

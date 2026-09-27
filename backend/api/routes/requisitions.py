@@ -1,5 +1,5 @@
 """Requisition and Headcount Management API Routes.
-CareerPilot ATS v2.0.0 - Enterprise ATS Workflows.
+CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from typing import Any, Dict, List, Optional
@@ -84,18 +84,40 @@ async def get_pipeline_candidates_route(
     apps = await cursor.to_list(length=100)
     results: List[Dict[str, Any]] = []
 
+    # Batch fetch jobs
+    valid_job_ids = []
+    app_ids = []
+    for app in apps:
+        jid = app.get("job_id")
+        if jid and ObjectId.is_valid(jid):
+            valid_job_ids.append(ObjectId(jid))
+        aid = str(app.get("id") or app.get("_id"))
+        if aid:
+            app_ids.append(aid)
+
+    jobs_map = {}
+    if valid_job_ids:
+        job_cursor = db.jobs.find({"_id": {"$in": valid_job_ids}}, {"jd_embedding": 0})
+        fetched_jobs = await job_cursor.to_list(length=100)
+        jobs_map = {str(j["_id"]): j for j in fetched_jobs}
+
+    # Batch count scorecards per application
+    scorecard_counts_map = {}
+    if app_ids:
+        sc_cursor = db.scorecards.aggregate([
+            {"$match": {"application_id": {"$in": app_ids}, "tenant_id": tenant_id}},
+            {"$group": {"_id": "$application_id", "count": {"$sum": 1}}}
+        ])
+        sc_groups = await sc_cursor.to_list(length=100)
+        scorecard_counts_map = {str(g["_id"]): g.get("count", 0) for g in sc_groups}
+
     for app in apps:
         job_id = app.get("job_id")
-        job = None
-        if job_id:
-            try:
-                job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-            except Exception:
-                job = None
+        job = jobs_map.get(str(job_id)) if job_id else None
 
         app_id_str = str(app.get("id") or app.get("_id"))
         cand_id_str = str(app.get("candidate_id") or app.get("user_id") or "")
-        scorecards_count = await db.scorecards.count_documents({"application_id": app_id_str, "tenant_id": tenant_id})
+        scorecards_count = scorecard_counts_map.get(app_id_str, 0)
 
         score = float(app.get("quality_score") or app.get("match_score") or app.get("ats_score") or 0.0)
         if scorecards_count > 0:

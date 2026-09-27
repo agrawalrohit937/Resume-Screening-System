@@ -1,3 +1,3 @@
 """
-CareerPilot Scoring Package
+CareerShala Scoring Package
 """

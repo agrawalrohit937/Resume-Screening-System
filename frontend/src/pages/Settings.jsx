@@ -782,7 +782,7 @@ export default function Settings() {
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed">
-              In accordance with CareerPilot's strict transparency covenant, every search query and recruiter view of your profile is permanently audited.
+              In accordance with CareerShala's strict transparency covenant, every search query and recruiter view of your profile is permanently audited.
             </p>
 
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
