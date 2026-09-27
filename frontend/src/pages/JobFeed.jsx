@@ -31,7 +31,8 @@ import {
   Info,
   Bookmark,
   BookmarkCheck,
-  Share2
+  Share2,
+  Loader2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
@@ -186,6 +187,7 @@ export default function JobFeed() {
   // Data state
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [total, setTotal] = useState(0)
 
   // Filters state
@@ -462,6 +464,49 @@ What We Are Looking For:
     }
   }
 
+  // Load more jobs (pagination)
+  const handleLoadMore = async () => {
+    if (loadingMore || jobs.length >= total) return
+    setLoadingMore(true)
+    try {
+      const maxYearsVal = EXP_LEVELS.find(e => e.id === selectedExp)?.maxYears
+      const modeVal = selectedMode && selectedMode.toLowerCase() !== 'all' ? selectedMode : undefined
+      const params = {
+        search: searchQuery.trim() || undefined,
+        work_mode: modeVal,
+        location: locationQuery.trim() || undefined,
+        min_years: maxYearsVal !== null && maxYearsVal !== undefined ? maxYearsVal : undefined,
+        skill: selectedSkill || undefined,
+        skip: jobs.length,
+        limit: 30,
+      }
+
+      const response = await getJobs(params)
+      const rawList = extractJobsArray(response)
+      const fetchedJobs = rawList.map(normalizeJob)
+
+      setJobs(prev => {
+        const existingIds = new Set(prev.map(j => j.id))
+        const uniqueNew = fetchedJobs.filter(j => !existingIds.has(j.id))
+        return [...prev, ...uniqueNew]
+      })
+
+      const serverAppliedIds = fetchedJobs.filter((j) => Boolean(j.has_applied)).map((j) => j.id)
+      if (serverAppliedIds.length > 0) {
+        setAppliedJobs((prev) => {
+          const next = new Set(prev)
+          serverAppliedIds.forEach((id) => next.add(id))
+          return next
+        })
+      }
+    } catch (err) {
+      console.error('Failed to load more jobs:', err)
+      toast.error('Unable to load more jobs.')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   // Reload when non-debounced filters change
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -631,160 +676,158 @@ What We Are Looking For:
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/60 font-sans text-slate-800 antialiased pb-20">
+    <div className="w-full space-y-6 font-sans text-slate-800 antialiased pb-20">
 
       {/* ── 1. Top Header & Clean Filter Toolbar ────────────────── */}
-      <div className="bg-white border-b border-slate-200/80 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-poppins tracking-tight">
-                Explore Jobs
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Browse verified tech roles matched directly with your skills, projects, and ATS score.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                {total || jobs.length} {jobs.length === 1 ? 'Open Role' : 'Open Roles'}
-              </span>
-              {isRecruiterOrAdmin && (
-                <button
-                  type="button"
-                  onClick={() => setIsPostModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
-                >
-                  <PlusCircle size={15} />
-                  Post Job
-                </button>
-              )}
-            </div>
+      <div className="w-full bg-white rounded-3xl border border-slate-200/80 shadow-xs p-5 sm:p-7">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-poppins tracking-tight">
+              Explore Jobs
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Browse verified tech roles matched directly with your skills, projects, and ATS score.
+            </p>
           </div>
 
-          {/* ── Single Unified Search & Filter Bar ── */}
-          <div className="mt-5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center gap-2 shadow-2xs">
-
-            {/* Keyword Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder="Search by role title, skill, or company..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200/80 focus:border-indigo-500 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition shadow-2xs"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  title="Clear search"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Location Search */}
-            <div className="relative md:w-52">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-              <input
-                type="text"
-                placeholder="Location (e.g. Remote)..."
-                value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200/80 focus:border-indigo-500 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition shadow-2xs"
-              />
-              {locationQuery && (
-                <button
-                  type="button"
-                  onClick={() => setLocationQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  title="Clear location"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Work Mode Dropdown */}
-            <CustomDropdown
-              options={[
-                { value: 'all', label: 'All Modes' },
-                { value: 'Remote', label: 'Remote' },
-                { value: 'Hybrid', label: 'Hybrid' },
-                { value: 'Onsite', label: 'Onsite' },
-              ]}
-              value={selectedMode}
-              onChange={setSelectedMode}
-              className="w-full md:w-36"
-              buttonClassName="py-2.5 px-3 text-xs font-semibold rounded-xl"
-              menuClassName="min-w-[150px]"
-            />
-
-            {/* Experience Dropdown */}
-            <CustomDropdown
-              options={[
-                { value: 'all', label: 'All Experience' },
-                { value: 'fresher', label: 'Fresher (0-1 yr)' },
-                { value: 'mid', label: 'Associate (1-3 yrs)' },
-                { value: 'senior', label: 'Senior (3+ yrs)' },
-              ]}
-              value={selectedExp}
-              onChange={setSelectedExp}
-              className="w-full md:w-44"
-              buttonClassName="py-2.5 px-3 text-xs font-semibold rounded-xl"
-              menuClassName="min-w-[180px]"
-            />
-
-            {/* Reset Filters (Only appears if any filter is set) */}
-            {activeFiltersCount > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {total || jobs.length} {jobs.length === 1 ? 'Open Role' : 'Open Roles'}
+            </span>
+            {isRecruiterOrAdmin && (
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/80 transition cursor-pointer shrink-0"
-                title="Clear all filters"
+                onClick={() => setIsPostModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
               >
-                <RotateCcw size={13} />
-                Clear ({activeFiltersCount})
+                <PlusCircle size={15} />
+                Post Job
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Single Unified Search & Filter Bar ── */}
+        <div className="mt-5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center gap-2 shadow-2xs">
+
+          {/* Keyword Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search by role title, skill, or company..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200/80 focus:border-indigo-500 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                title="Clear search"
+              >
+                <X size={14} />
               </button>
             )}
           </div>
 
-          {/* ── Popular Skills: Ultra-clean horizontal pill row ── */}
-          <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-            <span className="text-[11px] font-bold text-slate-400 shrink-0 mr-1">Popular:</span>
-            {POPULAR_SKILLS.map((skill) => {
-              const active = selectedSkill.toLowerCase() === skill.toLowerCase()
-              return (
-                <button
-                  key={skill}
-                  type="button"
-                  onClick={() => setSelectedSkill(active ? '' : skill)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer whitespace-nowrap ${active
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 border border-transparent'
-                    }`}
-                >
-                  {skill}
-                </button>
-              )
-            })}
+          {/* Location Search */}
+          <div className="relative md:w-52">
+            <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              type="text"
+              placeholder="Location (e.g. Remote)..."
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200/80 focus:border-indigo-500 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition shadow-2xs"
+            />
+            {locationQuery && (
+              <button
+                type="button"
+                onClick={() => setLocationQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                title="Clear location"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
+
+          {/* Work Mode Dropdown */}
+          <CustomDropdown
+            options={[
+              { value: 'all', label: 'All Modes' },
+              { value: 'Remote', label: 'Remote' },
+              { value: 'Hybrid', label: 'Hybrid' },
+              { value: 'Onsite', label: 'Onsite' },
+            ]}
+            value={selectedMode}
+            onChange={setSelectedMode}
+            className="w-full md:w-36"
+            buttonClassName="py-2.5 px-3 text-xs font-semibold rounded-xl"
+            menuClassName="min-w-[150px]"
+          />
+
+          {/* Experience Dropdown */}
+          <CustomDropdown
+            options={[
+              { value: 'all', label: 'All Experience' },
+              { value: 'fresher', label: 'Fresher (0-1 yr)' },
+              { value: 'mid', label: 'Associate (1-3 yrs)' },
+              { value: 'senior', label: 'Senior (3+ yrs)' },
+            ]}
+            value={selectedExp}
+            onChange={setSelectedExp}
+            className="w-full md:w-44"
+            buttonClassName="py-2.5 px-3 text-xs font-semibold rounded-xl"
+            menuClassName="min-w-[180px]"
+          />
+
+          {/* Reset Filters (Only appears if any filter is set) */}
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100/80 border border-rose-200/80 transition cursor-pointer shrink-0"
+              title="Clear all filters"
+            >
+              <RotateCcw size={13} />
+              Clear ({activeFiltersCount})
+            </button>
+          )}
+        </div>
+
+        {/* ── Popular Skills: Ultra-clean horizontal pill row ── */}
+        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+          <span className="text-[11px] font-bold text-slate-400 shrink-0 mr-1">Popular:</span>
+          {POPULAR_SKILLS.map((skill) => {
+            const active = selectedSkill.toLowerCase() === skill.toLowerCase()
+            return (
+              <button
+                key={skill}
+                type="button"
+                onClick={() => setSelectedSkill(active ? '' : skill)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer whitespace-nowrap ${active
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 border border-transparent'
+                  }`}
+              >
+                {skill}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* ── 2. Main Content ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full space-y-4">
 
         {/* Subtle sub-header bar */}
         <div className="flex items-center justify-between mb-4 px-1">
           <span className="text-xs font-bold text-slate-600">
-            Showing <strong className="text-slate-900">{jobs.length}</strong> {jobs.length === 1 ? 'position' : 'positions'}
+            Showing <strong className="text-slate-900">{jobs.length}</strong> {total > 0 && total !== jobs.length ? <>of <strong className="text-slate-900">{total}</strong></> : null} {jobs.length === 1 ? 'position' : 'positions'}
           </span>
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
             <Sparkles size={13} className="text-indigo-600" />
@@ -841,6 +884,30 @@ What We Are Looking For:
                     onShare={() => handleShareJob(job)}
                   />
                 ))}
+
+                {/* Pagination Load More Button */}
+                {jobs.length < total && (
+                  <div className="pt-2 pb-6 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className="px-6 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-800 text-xs font-semibold rounded-xl shadow-2xs hover:shadow-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin text-indigo-600" />
+                          <span>Loading more roles...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Load More Positions ({jobs.length} of {total})</span>
+                          <ChevronDown size={14} className="text-slate-400" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               /* Fallback Card & Empty State */
@@ -905,11 +972,26 @@ What We Are Looking For:
 
           {/* Right Column (Sticky Detail Pane) */}
           {activeJobDetail && (
-            <div className="w-full lg:w-[45%] sticky top-24 h-[calc(100vh-120px)] overflow-y-auto bg-white border border-slate-200 rounded-3xl shadow-lg p-6 custom-scrollbar flex flex-col justify-between">
+            <div className="w-full lg:w-[45%] sticky top-20 sm:top-24 h-[calc(100vh-100px)] sm:h-[calc(100vh-120px)] overflow-y-auto bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-lg p-4 sm:p-6 custom-scrollbar flex flex-col justify-between">
               <div>
+                {/* Mobile Back Button (Visible on < lg) */}
+                <div className="lg:hidden mb-3 pb-3 border-b border-slate-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setActiveJobDetail(null)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition py-1 px-2.5 rounded-lg bg-indigo-50"
+                  >
+                    <ChevronRight size={14} className="rotate-180" />
+                    Back to All Jobs
+                  </button>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    Job Details
+                  </span>
+                </div>
+
                 {/* 1. Top Section: Logo, Title, Company Name + Apply Now & Share / Close */}
-                <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-100">
-                  <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
                     {(() => {
                       const siteUrl = getCompanyWebsiteUrl(activeJobDetail)
                       return (
@@ -926,7 +1008,7 @@ What We Are Looking For:
                                 companyName={activeJobDetail.company_name}
                                 logoUrl={resolveJobLogo(activeJobDetail)}
                                 website={siteUrl}
-                                size="lg"
+                                size="md"
                                 showVerified={true}
                               />
                             </a>
@@ -935,17 +1017,17 @@ What We Are Looking For:
                               <CompanyLogo
                                 companyName={activeJobDetail.company_name}
                                 logoUrl={resolveJobLogo(activeJobDetail)}
-                                size="lg"
+                                size="md"
                                 showVerified={true}
                               />
                             </div>
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <h2 className="text-lg sm:text-xl font-black text-slate-900 font-poppins tracking-tight truncate" title={activeJobDetail.title}>
+                            <h2 className="text-base sm:text-xl font-black text-slate-900 font-poppins tracking-tight truncate" title={activeJobDetail.title}>
                               {activeJobDetail.title}
                             </h2>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               {siteUrl ? (
                                 <a
                                   href={siteUrl}
@@ -969,7 +1051,7 @@ What We Are Looking For:
                               {activeJobDetail.is_external && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
                                   <ExternalLink size={10} />
-                                  External Listing
+                                  External
                                 </span>
                               )}
                             </div>
@@ -979,8 +1061,8 @@ What We Are Looking For:
                     })()}
                   </div>
 
-                  {/* Top Right: Apply Now (indigo) + Share icon + Close X */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Top Right: Apply Now + Share + Close */}
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-start">
                     {Boolean(activeJobDetail.has_applied || appliedJobs.has(activeJobDetail.id)) ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold select-none">
                         <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
@@ -998,7 +1080,7 @@ What We Are Looking For:
                         ) : (
                           <>
                             {activeJobDetail.is_external 
-                              ? `Apply on ${activeJobDetail.publisher_source || 'Corporate Site'}` 
+                              ? `Apply on ${activeJobDetail.publisher_source || 'Site'}` 
                               : 'Apply Now'}
                             <ArrowUpRight size={13} />
                           </>
@@ -1577,16 +1659,16 @@ export function JobCard({
     <motion.div
       whileHover={{ y: -2 }}
       onClick={onViewDetail}
-      className={`group bg-white rounded-3xl border p-5 sm:p-6 transition-all duration-200 shadow-2xs hover:shadow-md relative overflow-hidden cursor-pointer ${isSelected
+      className={`group bg-white rounded-2xl sm:rounded-3xl border p-4 sm:p-6 transition-all duration-200 shadow-2xs hover:shadow-md relative overflow-hidden cursor-pointer ${isSelected
           ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-md bg-indigo-50/10'
           : 'border-slate-200/90 hover:border-indigo-200'
         }`}
     >
       {/* Top row: Company, Title, Meta and Match Button */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
 
         {/* Left: Company Logo & Title Info */}
-        <div className="flex items-start gap-4 flex-1 min-w-0">
+        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
           {companySite ? (
             <a
               href={companySite}
@@ -1620,13 +1702,13 @@ export function JobCard({
 
           <div className="flex-1 min-w-0">
             {/* Title & Fresher Friendly Badge tight group */}
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
               <h3
                 onClick={(e) => {
                   e.stopPropagation()
                   onViewDetail()
                 }}
-                className="text-base sm:text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins truncate min-w-0 flex-1"
+                className="text-sm sm:text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins truncate min-w-0 flex-1"
                 title={jobTitle}
               >
                 {jobTitle}
@@ -1646,7 +1728,7 @@ export function JobCard({
                     : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                 }`}>
                   <ExternalLink size={10} />
-                  {safeJob.publisher_source ? `${safeJob.publisher_source} Verified` : 'External Listing'}
+                  {safeJob.publisher_source ? `${safeJob.publisher_source} Verified` : 'External'}
                 </span>
               )}
             </div>
@@ -1680,7 +1762,7 @@ export function JobCard({
             </p>
 
             {/* Clean Metadata Row (De-duplicated) */}
-            <div className="mt-2.5 flex items-center gap-2.5 flex-wrap text-xs font-medium text-slate-500">
+            <div className="mt-2.5 flex items-center gap-2 flex-wrap text-xs font-medium text-slate-500">
               {/* Experience */}
               <span className="inline-flex items-center gap-1 text-slate-600 shrink-0">
                 <Award size={12} className="text-slate-400" />
@@ -1728,7 +1810,7 @@ export function JobCard({
             e.stopPropagation()
             onCalculateMatch()
           }}
-          className="self-start inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 border border-indigo-200/90 shadow-2xs transition-all hover:scale-102 cursor-pointer shrink-0"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 border border-indigo-200/90 shadow-2xs transition-all hover:scale-102 cursor-pointer shrink-0"
           title="Click to evaluate your resume against this job using the unified ATS scoring engine"
         >
           <Sparkles size={13} className="text-indigo-600" />
@@ -1737,7 +1819,7 @@ export function JobCard({
       </div>
 
       {/* Snippet / Description (Clamped) */}
-      <p className="mt-3.5 text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
+      <p className="mt-3 text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
         {job.jd_text_raw}
       </p>
 
@@ -1758,7 +1840,7 @@ export function JobCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
           <button
             type="button"
             onClick={async (e) => {
@@ -1812,7 +1894,7 @@ export function JobCard({
           </button>
 
           {hasApplied ? (
-            <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-semibold cursor-not-allowed select-none">
+            <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs sm:text-sm font-semibold cursor-not-allowed select-none">
               <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
               Applied
             </span>
@@ -1824,7 +1906,7 @@ export function JobCard({
                 e.stopPropagation()
                 onApply()
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
             >
               {isApplying ? (
                 'Applying...'

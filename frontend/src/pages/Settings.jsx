@@ -196,8 +196,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans antialiased">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="w-full space-y-6 sm:space-y-8 font-sans antialiased">
+      <div className="w-full space-y-8">
 
         {/* ── Top Hero / Header Section ─────────────────────────────────── */}
         <motion.div

@@ -281,8 +281,8 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="w-full space-y-6 sm:space-y-8 font-sans">
+      <div className="w-full space-y-8">
 
         {/* ── Hero / Header Section ───────────────────────────────────────────── */}
         <div className="bg-white rounded-[2rem] border border-slate-200/60 p-8 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-8 shadow-sm relative overflow-hidden">
