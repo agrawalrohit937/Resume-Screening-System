@@ -679,10 +679,10 @@ What We Are Looking For:
     <div className="w-full space-y-6 font-sans text-slate-800 antialiased pb-20">
 
       {/* ── 1. Top Header & Clean Filter Toolbar ────────────────── */}
-      <div className="w-full bg-white rounded-3xl border border-slate-200/80 shadow-xs p-5 sm:p-7">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-poppins tracking-tight">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 font-poppins tracking-tight">
               Explore Jobs
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -690,8 +690,8 @@ What We Are Looking For:
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               {total || jobs.length} {jobs.length === 1 ? 'Open Role' : 'Open Roles'}
             </span>
@@ -699,9 +699,9 @@ What We Are Looking For:
               <button
                 type="button"
                 onClick={() => setIsPostModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
               >
-                <PlusCircle size={15} />
+                <PlusCircle size={14} />
                 Post Job
               </button>
             )}
@@ -709,7 +709,7 @@ What We Are Looking For:
         </div>
 
         {/* ── Single Unified Search & Filter Bar ── */}
-        <div className="mt-5 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center gap-2 shadow-2xs">
+        <div className="mt-4 bg-slate-50 p-2 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center gap-2 shadow-2xs">
 
           {/* Keyword Search */}
           <div className="relative flex-1">
@@ -836,10 +836,10 @@ What We Are Looking For:
         </div>
 
         {/* Dynamic Split-Pane Layout */}
-        <div className="flex items-start gap-6 relative w-full">
+        <div className="flex flex-col lg:flex-row items-start gap-4 lg:gap-6 relative w-full min-w-0">
 
           {/* Left Column (Scrollable Job List) */}
-          <div className={activeJobDetail ? "hidden lg:flex lg:w-[55%] flex-col gap-4" : "w-full flex flex-col gap-4"}>
+          <div className={activeJobDetail ? "hidden lg:flex lg:w-[55%] flex-col gap-4 min-w-0" : "w-full flex flex-col gap-4 min-w-0"}>
 
             {/* Loading Skeleton */}
             {loading ? (
@@ -972,19 +972,19 @@ What We Are Looking For:
 
           {/* Right Column (Sticky Detail Pane) */}
           {activeJobDetail && (
-            <div className="w-full lg:w-[45%] sticky top-20 sm:top-24 h-[calc(100vh-100px)] sm:h-[calc(100vh-120px)] overflow-y-auto bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-lg p-4 sm:p-6 custom-scrollbar flex flex-col justify-between">
+            <div className="w-full lg:w-[45%] h-auto lg:h-[calc(100vh-120px)] lg:sticky lg:top-24 overflow-y-auto bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-lg p-4 sm:p-6 custom-scrollbar flex flex-col justify-between">
               <div>
                 {/* Mobile Back Button (Visible on < lg) */}
                 <div className="lg:hidden mb-3 pb-3 border-b border-slate-100 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => setActiveJobDetail(null)}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition py-1 px-2.5 rounded-lg bg-indigo-50"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition py-1.5 px-3 rounded-xl bg-indigo-50 border border-indigo-100"
                   >
                     <ChevronRight size={14} className="rotate-180" />
-                    Back to All Jobs
+                    Back to All Open Roles
                   </button>
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     Job Details
                   </span>
                 </div>
@@ -1024,10 +1024,10 @@ What We Are Looking For:
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <h2 className="text-base sm:text-xl font-black text-slate-900 font-poppins tracking-tight truncate" title={activeJobDetail.title}>
+                            <h2 className="text-base sm:text-xl font-black text-slate-900 font-poppins tracking-tight break-words" title={activeJobDetail.title}>
                               {activeJobDetail.title}
                             </h2>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {siteUrl ? (
                                 <a
                                   href={siteUrl}
@@ -1062,7 +1062,7 @@ What We Are Looking For:
                   </div>
 
                   {/* Top Right: Apply Now + Share + Close */}
-                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-start">
+                  <div className="flex items-center gap-1.5 shrink-0 justify-end w-full sm:w-auto pt-1 sm:pt-0">
                     {Boolean(activeJobDetail.has_applied || appliedJobs.has(activeJobDetail.id)) ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold select-none">
                         <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
@@ -1079,10 +1079,12 @@ What We Are Looking For:
                           'Applying...'
                         ) : (
                           <>
-                            {activeJobDetail.is_external 
-                              ? `Apply on ${activeJobDetail.publisher_source || 'Site'}` 
-                              : 'Apply Now'}
-                            <ArrowUpRight size={13} />
+                            <span className="truncate max-w-[130px] sm:max-w-none">
+                              {activeJobDetail.is_external 
+                                ? `Apply on ${activeJobDetail.publisher_source || 'Site'}` 
+                                : 'Apply Now'}
+                            </span>
+                            <ArrowUpRight size={13} className="shrink-0" />
                           </>
                         )}
                       </button>
@@ -1197,8 +1199,8 @@ What We Are Looking For:
                 )}
               </div>
 
-              {/* Bottom Action Section: Check ATS Match and Save Job side-by-side */}
-              <div className="pt-5 mt-5 border-t border-slate-100 flex items-center gap-3">
+              {/* Bottom Action Section: Check ATS Match and Save Job */}
+              <div className="pt-4 mt-5 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => handleCalculateMatch(activeJobDetail)}
@@ -1659,7 +1661,7 @@ export function JobCard({
     <motion.div
       whileHover={{ y: -2 }}
       onClick={onViewDetail}
-      className={`group bg-white rounded-2xl sm:rounded-3xl border p-4 sm:p-6 transition-all duration-200 shadow-2xs hover:shadow-md relative overflow-hidden cursor-pointer ${isSelected
+      className={`group bg-white rounded-2xl sm:rounded-3xl border p-4 sm:p-5 md:p-6 transition-all duration-200 shadow-2xs hover:shadow-md relative overflow-hidden cursor-pointer ${isSelected
           ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-md bg-indigo-50/10'
           : 'border-slate-200/90 hover:border-indigo-200'
         }`}
@@ -1702,13 +1704,13 @@ export function JobCard({
 
           <div className="flex-1 min-w-0">
             {/* Title & Fresher Friendly Badge tight group */}
-            <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               <h3
                 onClick={(e) => {
                   e.stopPropagation()
                   onViewDetail()
                 }}
-                className="text-sm sm:text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins truncate min-w-0 flex-1"
+                className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins truncate min-w-0"
                 title={jobTitle}
               >
                 {jobTitle}
@@ -1762,7 +1764,7 @@ export function JobCard({
             </p>
 
             {/* Clean Metadata Row (De-duplicated) */}
-            <div className="mt-2.5 flex items-center gap-2 flex-wrap text-xs font-medium text-slate-500">
+            <div className="mt-2 flex items-center gap-2 flex-wrap text-xs font-medium text-slate-500">
               {/* Experience */}
               <span className="inline-flex items-center gap-1 text-slate-600 shrink-0">
                 <Award size={12} className="text-slate-400" />
@@ -1771,7 +1773,7 @@ export function JobCard({
 
               <span className="text-slate-300">•</span>
 
-              {/* Work Mode / Location (De-duplicated) */}
+              {/* Work Mode / Location */}
               <span className="inline-flex items-center gap-1 text-slate-600 shrink-0">
                 {job.work_mode === 'Remote' ? (
                   <Globe size={12} className="text-emerald-600" />
@@ -1803,17 +1805,17 @@ export function JobCard({
           </div>
         </div>
 
-        {/* Right: Calculate Match % Placeholder Badge */}
+        {/* Right: Calculate Match % Button */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation()
             onCalculateMatch()
           }}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 border border-indigo-200/90 shadow-2xs transition-all hover:scale-102 cursor-pointer shrink-0"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 border border-indigo-200/90 shadow-2xs transition-all cursor-pointer shrink-0"
           title="Click to evaluate your resume against this job using the unified ATS scoring engine"
         >
-          <Sparkles size={13} className="text-indigo-600" />
+          <Sparkles size={12} className="text-indigo-600" />
           <span>Calculate Match %</span>
         </button>
       </div>
@@ -1824,23 +1826,23 @@ export function JobCard({
       </p>
 
       {/* Skills Badges & Card Footer */}
-      <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         {/* Skills list */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {(job.required_skills || []).slice(0, 6).map((s, idx) => (
-            <span key={idx} className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200/70 hover:bg-slate-100 transition">
+        <div className="flex items-center gap-1 flex-wrap">
+          {(job.required_skills || []).slice(0, 5).map((s, idx) => (
+            <span key={idx} className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200/70 hover:bg-slate-100 transition">
               {s}
             </span>
           ))}
-          {(job.required_skills || []).length > 6 && (
+          {(job.required_skills || []).length > 5 && (
             <span className="text-[10px] font-bold text-slate-400">
-              +{(job.required_skills || []).length - 6} more
+              +{(job.required_skills || []).length - 5} more
             </span>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2.5 w-full sm:w-auto shrink-0">
           <button
             type="button"
             onClick={async (e) => {
@@ -1875,10 +1877,10 @@ export function JobCard({
                 }
               }
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
             title="Share job link"
           >
-            <Share2 size={15} />
+            <Share2 size={13} />
             <span className="hidden sm:inline">Share</span>
           </button>
 
@@ -1888,14 +1890,14 @@ export function JobCard({
               e.stopPropagation()
               onViewDetail()
             }}
-            className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 transition cursor-pointer px-2 py-1.5"
+            className="text-xs font-semibold text-slate-600 hover:text-indigo-600 transition cursor-pointer px-2 py-1.5"
           >
             View Details
           </button>
 
           {hasApplied ? (
-            <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs sm:text-sm font-semibold cursor-not-allowed select-none">
-              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold cursor-not-allowed select-none">
+              <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
               Applied
             </span>
           ) : (
@@ -1906,14 +1908,14 @@ export function JobCard({
                 e.stopPropagation()
                 onApply()
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
             >
               {isApplying ? (
                 'Applying...'
               ) : (
                 <>
                   Apply
-                  <ArrowUpRight size={14} />
+                  <ArrowUpRight size={13} />
                 </>
               )}
             </button>
