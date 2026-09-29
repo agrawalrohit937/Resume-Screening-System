@@ -56,6 +56,8 @@ async def test_send_job_alert_email_rendering():
 async def test_run_nightly_job_alerts_empty_db():
     """Verify batch alert handles empty candidate pool gracefully without crashing."""
     mock_db = MagicMock()
+    mock_db.jobs.count_documents = AsyncMock(return_value=5)
+    mock_db.jobs.delete_many = AsyncMock(return_value=MagicMock(deleted_count=0))
     mock_cursor = MagicMock()
     mock_cursor.to_list = AsyncMock(return_value=[])
     mock_db.users.find.return_value = mock_cursor
@@ -119,6 +121,8 @@ async def test_admin_trigger_alerts_endpoint_rbac():
         app.dependency_overrides[get_optional_current_user] = lambda: admin_user
 
         mock_db = MagicMock()
+        mock_db.jobs.count_documents = AsyncMock(return_value=5)
+        mock_db.jobs.delete_many = AsyncMock(return_value=MagicMock(deleted_count=0))
         mock_cursor = MagicMock()
         mock_cursor.to_list = AsyncMock(return_value=[])
         mock_db.users.find.return_value = mock_cursor
