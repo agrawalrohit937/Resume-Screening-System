@@ -63,10 +63,10 @@ def resolve_best_apply_url(external_job: Dict[str, Any]) -> Tuple[str, str]:
 
 async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dict[str, int]:
     """Fetch fresh JSearch results (LinkedIn & Naukri prioritized) and upsert them by provider job_id."""
-    # 1. Clean up stale external jobs older than 7 days first
+    # 1. Clean up stale external jobs older than 3 days first
     try:
         from services.job_cleanup_service import cleanup_stale_external_jobs
-        await cleanup_stale_external_jobs(db, max_age_days=7)
+        await cleanup_stale_external_jobs(db, max_age_days=3)
     except Exception as exc:
         logger.warning("Pre-scrape stale job cleanup encountered an issue", error=str(exc))
 
@@ -98,7 +98,7 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
         for q in queries_to_run:
             params = {
                 "query": q,
-                "date_posted": "week",  # Only fetch fresh, actively open listings posted within the last 7 days
+                "date_posted": "3days",  # Only fetch fresh, actively open listings posted within the last 72 hours
                 "employment_types": "FULLTIME,INTERN",
                 "page": 1,
                 "num_pages": 1,

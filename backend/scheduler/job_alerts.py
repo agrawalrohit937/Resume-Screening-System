@@ -65,14 +65,64 @@ async def run_external_job_scrape() -> Dict[str, int]:
         return {"fetched": 0, "upserted": 0, "skipped": 0}
 
 
+async def _resolve_company_logo(job: Dict[str, Any], db: Any) -> Optional[str]:
+    """Helper to cleanly resolve company logo URL for job cards."""
+    logo = (
+        job.get("company_logo_url")
+        or job.get("company_logo")
+        or job.get("logo_url")
+        or job.get("logo")
+    )
+    if logo and not str(logo).startswith("data:image/"):
+        return str(logo).strip()
+
+    job_id = job.get("id") or job.get("_id")
+    tenant_id = job.get("tenant_id")
+    company_name = job.get("company_name") or job.get("company")
+
+    comp_doc = None
+    if tenant_id and tenant_id != "default":
+        try:
+            comp_doc = await db.companies.find_one({"tenant_id": tenant_id})
+        except Exception:
+            pass
+    if not comp_doc and company_name:
+        try:
+            comp_doc = await db.companies.find_one(
+                {"company_name": {"$regex": f"^{re.escape(str(company_name).strip())}$", "$options": "i"}}
+            )
+        except Exception:
+            pass
+
+    resolved_logo = (
+        (comp_doc.get("logo_url") if comp_doc else None)
+        or logo
+    )
+
+    if resolved_logo:
+        logo_str = str(resolved_logo).strip()
+        if logo_str.startswith("data:image/"):
+            try:
+                from services.cloudinary_service import upload_base64_company_logo
+                c_id = tenant_id or (re.sub(r"[^a-zA-Z0-9_-]", "-", str(company_name).lower()) if company_name else "company")
+                uploaded = await upload_base64_company_logo(logo_str, company_id=c_id)
+                if uploaded:
+                    return uploaded
+            except Exception:
+                pass
+        return logo_str
+
+    return None
+
+
 async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optional[str] = None) -> Dict[str, Any]:
     """
     Executes the batch Nightly AI Job Alert retention pipeline:
-    1. Scans candidates in the platform (or a single target_email if specified).
-    2. Verifies presence of a parsed resume.
-    3. Finds top AI matches (cosine similarity >= 60% calibrated match).
-    4. Filters out jobs already applied to by the candidate.
-    5. Dispatches responsive HTML digest email.
+    1. Fast pre-check: Verifies active open jobs exist before scanning candidates.
+    2. Scans active candidates with parsed resumes and enabled notifications.
+    3. Finds top AI matches (cosine similarity >= 50% calibrated match) for unapplied jobs.
+    4. Applies deduplication to avoid re-sending identical job sets sent in the last 24h.
+    5. Dispatches responsive HTML digest email and updates last sent timestamp.
     """
     t0 = time.perf_counter()
     now_utc = datetime.now(timezone.utc)
@@ -85,14 +135,40 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
             logger.error("Database connection unavailable for job alerts", error=str(exc))
             return {"error": "Database not initialized", "sent": 0}
 
-    # Task 4.2: Distributed lock prevents duplicate runs across multi-replica deployments
+    # 1. Clean up stale/closed external jobs older than 3 days before candidate matching
+    try:
+        from services.job_cleanup_service import cleanup_stale_external_jobs
+        await cleanup_stale_external_jobs(db, max_age_days=3)
+    except Exception as exc:
+        logger.warning("Pre-digest stale job cleanup encountered an issue", error=str(exc))
+
+    # 2. Cost Optimization: Verify open jobs exist before looping through all candidates
+    try:
+        open_jobs_count = await db.jobs.count_documents({"status": {"$in": ["open", "published"]}})
+        if open_jobs_count == 0:
+            logger.info("No active open jobs in database; skipping job alerts retention loop.")
+            return {
+                "status": "completed",
+                "timestamp": now_utc.isoformat(),
+                "candidates_scanned": 0,
+                "candidates_with_resume": 0,
+                "candidates_matched": 0,
+                "emails_sent": 0,
+                "errors": 0,
+                "elapsed_ms": int((time.perf_counter() - t0) * 1000),
+                "reason": "no_open_jobs",
+            }
+    except Exception as exc:
+        logger.warning("Could not count open jobs, proceeding with caution", error=str(exc))
+
+    # Distributed lock prevents duplicate runs across multi-replica deployments
     lock_key = f"cron:nightly_job_alerts:{target_email}" if target_email else "cron:nightly_job_alerts"
     async with distributed_lock(lock_key, ttl_seconds=3600, db=db) as acquired:
         if not acquired:
             logger.info("Another replica is executing nightly_job_alerts, skipping.")
             return {"status": "skipped", "reason": "lock_held_by_another_replica", "sent": 0}
 
-        # 1. Fetch candidate account(s) via streaming cursor
+        # 2. Fetch active candidate accounts
         candidates = []
         try:
             if target_email:
@@ -105,6 +181,7 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                         {"role": None},
                     ],
                     "status": {"$ne": "deleted"},
+                    "job_alerts_enabled": {"$ne": False},
                 })
             candidates = await stream_cursor(candidate_cursor)
         except Exception as exc:
@@ -118,7 +195,7 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
         errors_count = 0
         delivery_details: List[Dict[str, Any]] = []
 
-        # 2. Iterate through candidates and compute recommendations
+        # 3. Iterate through candidates and compute recommendations
         for candidate in candidates:
             candidate_id = str(candidate["_id"])
             candidate_email = candidate.get("email")
@@ -139,10 +216,10 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
 
                 candidates_with_resume += 1
 
-                # Fetch top candidate job matches from BGE-base vector engine
+                # Fetch top candidate job matches from vector engine
                 match_res = await find_jobs_for_candidate(
                     candidate_id=candidate_id,
-                    limit=10,
+                    limit=6,
                     db=db,
                 )
 
@@ -157,60 +234,32 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                 if not qualifying_jobs:
                     continue
 
-                candidates_matched += 1
                 top_3_jobs = qualifying_jobs[:3]
+                top_3_ids = [str(j.get("id") or j.get("_id")) for j in top_3_jobs if (j.get("id") or j.get("_id"))]
 
-                # Dynamically fetch company_logo_url directly from specific tenant/employer document
-                from bson import ObjectId
-                import re
-                from services.cloudinary_service import upload_base64_company_logo
+                # Deduplication: Check if candidate already received identical recommendations in the last 24h
+                last_sent_ids = candidate.get("last_job_alert_job_ids", [])
+                last_sent_at = candidate.get("last_job_alert_at")
+                if (
+                    not target_email
+                    and last_sent_ids
+                    and set(top_3_ids) == set(last_sent_ids)
+                    and isinstance(last_sent_at, datetime)
+                    and (now_utc - last_sent_at).total_seconds() < 86400
+                ):
+                    logger.debug("Skipping candidate as identical job alert was sent recently", candidate_id=candidate_id)
+                    continue
 
+                candidates_matched += 1
+
+                # Clean company logo resolution
                 for j in top_3_jobs:
-                    job_id = j.get("id") or j.get("_id")
-                    job_doc = None
-                    if job_id:
-                        try:
-                            job_doc = await db.jobs.find_one({"_id": ObjectId(str(job_id))})
-                        except Exception:
-                            pass
+                    logo_url = await _resolve_company_logo(j, db)
+                    if logo_url:
+                        j["company_logo_url"] = logo_url
+                        j["company_logo"] = logo_url
 
-                    tenant_id = (job_doc.get("tenant_id") if job_doc else None) or j.get("tenant_id")
-                    company_name = (job_doc.get("company_name") if job_doc else None) or j.get("company_name")
-
-                    comp_doc = None
-                    if tenant_id and tenant_id != "default":
-                        comp_doc = await db.companies.find_one({"tenant_id": tenant_id})
-                    if not comp_doc and company_name:
-                        comp_doc = await db.companies.find_one(
-                            {"company_name": {"$regex": f"^{re.escape(str(company_name).strip())}$", "$options": "i"}}
-                        )
-
-                    employer_logo = (
-                        j.get("company_logo_url")
-                        or j.get("company_logo")
-                        or (comp_doc.get("logo_url") if comp_doc else None)
-                        or (job_doc.get("company_logo") if job_doc else None)
-                        or (job_doc.get("company_logo_url") if job_doc else None)
-                    )
-
-                    if employer_logo:
-                        employer_logo_str = str(employer_logo).strip()
-                        # If logo is base64 data URI, upload to Cloudinary to get permanent HTTPS URL
-                        if employer_logo_str.startswith("data:image/"):
-                            c_id = tenant_id or (company_name.lower().replace(" ", "-") if company_name else "company")
-                            uploaded_logo_url = await upload_base64_company_logo(employer_logo_str, company_id=c_id)
-                            if uploaded_logo_url:
-                                employer_logo_str = uploaded_logo_url
-                                # Persist the clean HTTPS URL to MongoDB for this company and job
-                                if comp_doc:
-                                    await db.companies.update_one({"_id": comp_doc["_id"]}, {"$set": {"logo_url": uploaded_logo_url}})
-                                if job_doc:
-                                    await db.jobs.update_one({"_id": job_doc["_id"]}, {"$set": {"company_logo": uploaded_logo_url}})
-
-                        j["company_logo_url"] = employer_logo_str
-                        j["company_logo"] = employer_logo_str
-
-                # 3. Dispatch Job Alert Email
+                # Dispatch Job Alert Email
                 dispatch_res = await send_job_alert_email(
                     to_email=candidate_email,
                     candidate_name=candidate_name,
@@ -225,6 +274,17 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                         "matched_count": len(top_3_jobs),
                         "simulated": dispatch_res.get("simulated", False),
                     })
+                    # Persist last alert metadata for deduplication
+                    try:
+                        await db.users.update_one(
+                            {"_id": candidate["_id"]},
+                            {"$set": {
+                                "last_job_alert_at": now_utc,
+                                "last_job_alert_job_ids": top_3_ids,
+                            }}
+                        )
+                    except Exception:
+                        pass
                 else:
                     errors_count += 1
                     logger.warning(
