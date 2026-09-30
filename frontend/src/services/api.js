@@ -340,9 +340,19 @@ export const acceptTeamInvite = (payload) => api.post('/team/accept-invite', pay
 export const revokeTeamInvite = (inviteId) => api.delete(`/team/invite/${inviteId}`)
 export const removeTeamMember = (userId) => api.delete(`/team/members/${userId}`)
 
-// ── Equal Employment Opportunity (EEO) Isolated Vault ────────────────────────
-export const submitEEOSelfId = (payload) => api.post('/eeo/self-identify', payload)
-export const getEEOAggregateReport = () => api.get('/eeo/aggregate-report')
-export const seedDemoEEOData = () => api.post('/eeo/demo-seed')
+// ── Live AI Assessment Engine (B2B SaaS) ──────────────────────────────────
+export const scheduleLiveInterview = (payload) => api.post('/live-interview/schedule', payload)
+export const scheduleBulkLiveInterviews = (payload) => api.post('/live-interview/schedule/bulk', payload)
+export const getEmployerLiveSessions = (params) => api.get('/live-interview/employer/sessions', { params })
+export const getEmployerLiveScorecard = (sessionId) => api.get(`/live-interview/employer/scorecard/${sessionId}`)
+export const exportEmployerEvaluationsExcel = (jobId) =>
+  api.get('/live-interview/employer/export-excel', {
+    params: { job_id: jobId },
+    responseType: 'blob',
+  })
+
+// EEO Demographic Self-ID & Analytics API
+export const submitEEOSelfId = (payload) => api.post('/eeo/self-id', payload)
+export const seedDemoEEOData = () => api.post('/analytics/seed-eeo-demo')
 
 export default api

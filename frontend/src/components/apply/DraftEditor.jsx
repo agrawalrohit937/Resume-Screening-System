@@ -4,16 +4,20 @@ import { Mail, FileText, Copy, Check, Send, Sparkles, CheckCircle2 } from 'lucid
 
 export default function DraftEditor({ draft, onSave, onApproveSend, isSubmitting }) {
   const [activeTab, setActiveTab] = useState('email'); // 'email' | 'cover_letter'
+  
+  const cleanText = (str) => (str ? String(str).replace(/<br\s*\/?>/gi, '\n') : '');
+
   const [subject, setSubject] = useState(draft?.email_subject || '');
-  const [body, setBody] = useState(draft?.email_body || '');
-  const [coverLetter, setCoverLetter] = useState(draft?.cover_letter_text || '');
+  const [body, setBody] = useState(cleanText(draft?.email_body || ''));
+  const [coverLetter, setCoverLetter] = useState(cleanText(draft?.cover_letter_text || ''));
   const [copiedField, setCopiedField] = useState(null);
 
   useEffect(() => {
     setSubject(draft?.email_subject || '');
-    setBody(draft?.email_body || '');
-    setCoverLetter(draft?.cover_letter_text || '');
+    setBody(cleanText(draft?.email_body || ''));
+    setCoverLetter(cleanText(draft?.cover_letter_text || ''));
   }, [draft]);
+
 
   const handleBlurSave = (field, value) => {
     if (onSave) onSave({ [field]: value });

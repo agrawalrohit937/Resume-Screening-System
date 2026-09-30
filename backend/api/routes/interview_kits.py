@@ -149,7 +149,7 @@ async def get_assigned_interviews_route(
         resume_snapshot = app.get("resume_snapshot") or {}
         resume_url = app.get("resume_url") or resume_snapshot.get("file_url") or "#"
 
-        # Check if a scorecard was already submitted for this application
+        # Check if a scorecard was already submitted for THIS specific application
         scorecard_doc = await db.scorecards.find_one({
             "application_id": app_id_str,
             "$or": [
@@ -159,25 +159,11 @@ async def get_assigned_interviews_route(
             ]
         }, sort=[("submitted_at", -1), ("_id", -1)])
 
-        cand_id_str = str(app.get("candidate_id") or app.get("user_id") or "")
-        if not scorecard_doc and cand_id_str:
-            scorecard_doc = await db.scorecards.find_one({
-                "candidate_id": cand_id_str,
-                "$or": [
-                    {"interviewer_id": user_id_str},
-                    {"interviewer_id": current_user.id or "interviewer_user"},
-                    {"interviewer_id": str(current_user.id)}
-                ]
-            }, sort=[("submitted_at", -1), ("_id", -1)])
         if not scorecard_doc and app.get(f"scorecard_{user_id_str}"):
             scorecard_doc = app.get(f"scorecard_{user_id_str}")
         if not scorecard_doc:
             scorecard_doc = await db.scorecards.find_one({
                 "application_id": app_id_str
-            }, sort=[("submitted_at", -1), ("_id", -1)])
-        if not scorecard_doc and cand_id_str:
-            scorecard_doc = await db.scorecards.find_one({
-                "candidate_id": cand_id_str
             }, sort=[("submitted_at", -1), ("_id", -1)])
 
         scorecard_data = None

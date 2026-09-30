@@ -78,13 +78,35 @@ async def get_pipeline_candidates_route(
     current_user: UserModel = Depends(get_current_user),
     db: Any = Depends(get_database),
 ):
-    """Lists active candidates in the hiring pipeline for the active tenant."""
+    """Lists active candidates in the hiring pipeline for the active tenant with high-speed projections."""
+    import asyncio
     tenant_id = getattr(current_user, "tenant_id", "default")
-    cursor = db.applications.find({"tenant_id": tenant_id})
+    
+    app_projection = {
+        "_id": 1,
+        "id": 1,
+        "job_id": 1,
+        "candidate_id": 1,
+        "user_id": 1,
+        "candidate_name": 1,
+        "full_name": 1,
+        "job_title": 1,
+        "stage": 1,
+        "quality_score": 1,
+        "match_score": 1,
+        "ats_score": 1,
+        "years_experience": 1,
+        "status": 1,
+        "created_at": 1,
+        "resume_url": 1,
+        "resume_snapshot.file_url": 1,
+    }
+
+    cursor = db.applications.find({"tenant_id": tenant_id}, app_projection).sort("created_at", -1)
     apps = await cursor.to_list(length=100)
     results: List[Dict[str, Any]] = []
 
-    # Batch fetch jobs
+    # Batch fetch jobs & scorecards
     valid_job_ids = []
     app_ids = []
     for app in apps:
@@ -95,21 +117,25 @@ async def get_pipeline_candidates_route(
         if aid:
             app_ids.append(aid)
 
-    jobs_map = {}
-    if valid_job_ids:
-        job_cursor = db.jobs.find({"_id": {"$in": valid_job_ids}}, {"jd_embedding": 0})
-        fetched_jobs = await job_cursor.to_list(length=100)
-        jobs_map = {str(j["_id"]): j for j in fetched_jobs}
+    jobs_task = (
+        db.jobs.find(
+            {"_id": {"$in": valid_job_ids}},
+            {"_id": 1, "title": 1, "min_years": 1, "department": 1}
+        ).to_list(length=100)
+        if valid_job_ids else asyncio.sleep(0, result=[])
+    )
 
-    # Batch count scorecards per application
-    scorecard_counts_map = {}
-    if app_ids:
-        sc_cursor = db.scorecards.aggregate([
+    scorecard_task = (
+        db.scorecards.aggregate([
             {"$match": {"application_id": {"$in": app_ids}, "tenant_id": tenant_id}},
             {"$group": {"_id": "$application_id", "count": {"$sum": 1}}}
-        ])
-        sc_groups = await sc_cursor.to_list(length=100)
-        scorecard_counts_map = {str(g["_id"]): g.get("count", 0) for g in sc_groups}
+        ]).to_list(length=100)
+        if app_ids else asyncio.sleep(0, result=[])
+    )
+
+    fetched_jobs, sc_groups = await asyncio.gather(jobs_task, scorecard_task)
+    jobs_map = {str(j["_id"]): j for j in (fetched_jobs or [])}
+    scorecard_counts_map = {str(g["_id"]): g.get("count", 0) for g in (sc_groups or [])}
 
     for app in apps:
         job_id = app.get("job_id")

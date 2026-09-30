@@ -146,39 +146,14 @@ export default function SystemCheckStep({
   }
 
   const handleEnterAndStart = useCallback(async () => {
-    // If models are not yet ready (and not on mobile), show waiting popup
-    const isReady = detectionStatus?.isWorkerReady || detectionStatus?.workerStatus === 'ready'
-    if (!isMobile && !isReady) {
-      setIsWaitingForModels(true)
-      return
-    }
     setIsWaitingForModels(false)
     setEnteringFs(true)
-    await fsGate?.enterImmersive?.()
+    try {
+      await fsGate?.enterImmersive?.()
+    } catch (_) {}
     setEnteringFs(false)
     onComplete?.()
-  }, [detectionStatus?.isWorkerReady, detectionStatus?.workerStatus, fsGate, isMobile, onComplete])
-
-  // Automatically proceed to interview as soon as models finish loading
-  useEffect(() => {
-    const isReady = detectionStatus?.isWorkerReady || detectionStatus?.workerStatus === 'ready'
-    if (isWaitingForModels && isReady) {
-      setIsWaitingForModels(false)
-      handleEnterAndStart()
-    }
-  }, [isWaitingForModels, detectionStatus?.isWorkerReady, detectionStatus?.workerStatus, handleEnterAndStart])
-
-  // Safety fallback: if models take > 12s, automatically allow proceeding
-  useEffect(() => {
-    let t
-    if (isWaitingForModels) {
-      t = setTimeout(() => {
-        setIsWaitingForModels(false)
-        handleEnterAndStart()
-      }, 12000)
-    }
-    return () => clearTimeout(t)
-  }, [isWaitingForModels, handleEnterAndStart])
+  }, [fsGate, onComplete])
 
   return (
     <div className="min-h-screen w-full bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased">
@@ -227,54 +202,87 @@ export default function SystemCheckStep({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-          {/* Left: persistent live preview + checklist */}
-          <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-8">
-            <div className="bg-white border border-blue-200/70 rounded-3xl p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-              <div className="flex items-center justify-between px-1.5 pb-3">
-                <span className="text-[11px] font-bold text-blue-900/50 uppercase tracking-wider">Live Preview</span>
-                <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${faceOk ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  <User className="h-3.5 w-3.5" /> {faceLabel}
-                </span>
-              </div>
-              <div className="rounded-2xl overflow-hidden border border-blue-100 bg-blue-950 aspect-[4/3] relative">
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover [transform:scaleX(-1)]" />
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full [transform:scaleX(-1)]" />
-                {!cameraReady && !cameraError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-blue-950/70 backdrop-blur-sm">
-                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
+          {/* Left: Live Camera Feed Preview */}
+          <div className="lg:col-span-5 flex flex-col">
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-sm flex-1 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between px-1 pb-3.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Live Camera Feed</span>
                   </div>
-                )}
-                {cameraError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-blue-950/85 p-4 text-center">
-                    <p className="text-rose-300 text-[12px] font-semibold">{cameraError}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-950 to-[#0B1220] text-white rounded-2xl p-5 space-y-2.5">
-              <div className="flex items-center gap-2 pb-1.5 border-b border-white/10">
-                <ShieldCheck className="h-4 w-4 text-[#5FC3F0]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200">Setup Checklist</span>
-              </div>
-              {[
-                ['camera', 'Camera', Camera],
-                ['microphone', 'Microphone', Mic],
-                ['speaker', 'Speaker', Volume2],
-              ].map(([key, label, Icon]) => (
-                <div key={key} className={`flex items-center justify-between rounded-xl px-3 py-2 border text-[12px] font-mono font-semibold transition-colors ${checklist[key] ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : step === key ? 'bg-white/10 border-white/20 text-white' : 'bg-white/[0.03] border-white/10 text-blue-300'
-                  }`}>
-                  <span className="flex items-center gap-2"><Icon className="h-3.5 w-3.5" /> {label}</span>
-                  {checklist[key] ? <CheckCircle2 className="h-4 w-4" /> : <span className="text-[10px] uppercase tracking-wider opacity-60">{step === key ? 'Checking' : 'Pending'}</span>}
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${faceOk ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    <User className="h-3.5 w-3.5" /> {faceLabel}
+                  </span>
                 </div>
-              ))}
+
+                <div className="mt-4 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 aspect-[4/3] relative shadow-inner">
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover [transform:scaleX(-1)]" />
+                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full [transform:scaleX(-1)]" />
+                  {!cameraReady && !cameraError && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
+                      <Loader2 className="h-7 w-7 text-indigo-400 animate-spin" />
+                    </div>
+                  )}
+                  {cameraError && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 p-4 text-center">
+                      <p className="text-rose-300 text-xs font-semibold">{cameraError}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" /> Proctoring Stream Secured
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">720p HD</span>
+              </div>
             </div>
           </div>
 
-          {/* Right: active step panel */}
-          <div className="lg:col-span-7">
-            <div className="bg-white border border-blue-200/70 rounded-3xl p-6 sm:p-8 shadow-[0_1px_2px_rgba(15,23,42,0.04)] min-h-[420px] flex flex-col justify-center">
+          {/* Right: Active System Verification Panel with Integrated Top Stepper */}
+          <div className="lg:col-span-7 flex flex-col">
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-sm flex-1 flex flex-col justify-between min-h-[460px]">
+              {/* Integrated Horizontal Step Selector Bar */}
+              <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/70 mb-6">
+                {[
+                  { key: 'camera', label: '1. Camera', icon: Camera, done: checklist.camera },
+                  { key: 'microphone', label: '2. Microphone', icon: Mic, done: checklist.microphone },
+                  { key: 'speaker', label: '3. Speaker', icon: Volume2, done: checklist.speaker },
+                ].map((item) => {
+                  const isCurrent = step === item.key
+                  const isDone = item.done
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        if (item.key === 'camera' || checklist.camera) {
+                          setStep(item.key)
+                        }
+                      }}
+                      className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/90'
+                          : isDone
+                          ? 'text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/60 border border-emerald-100'
+                          : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      ) : (
+                        <item.icon className="w-3.5 h-3.5 shrink-0" />
+                      )}
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex-1 flex flex-col justify-center">
               <AnimatePresence mode="wait">
                 {/* ── Camera ── */}
                 {step === 'camera' && (
@@ -437,6 +445,7 @@ export default function SystemCheckStep({
           </div>
         </div>
       </div>
+    </div>
 
       {/* ── Waiting for AI Models Loading Modal ── */}
       <AnimatePresence>

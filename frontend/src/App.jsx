@@ -40,6 +40,7 @@ const Results = lazy(() => import('./pages/Results'))
 const Interview = lazy(() => import('./pages/Interview'))
 const GitHub = lazy(() => import('./pages/GitHub'))
 const LiveInterview = lazy(() => import('./pages/LiveInterview'))
+const LiveAssessmentCandidate = lazy(() => import('./pages/LiveAssessmentCandidate'))
 const CareerQuest = lazy(() => import('./pages/CareerQuest'))
 
 const RecruiterOverview = lazy(() => import('./pages/recruiter/RecruiterDashboard'))
@@ -171,8 +172,9 @@ function BootLoaderGate({ children }) {
 // ── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
+
         <TenantProvider>
           <ThemeInit />
           <BootLoaderGate>
@@ -242,6 +244,9 @@ export default function App() {
               <Route path="/portfolio/:username" element={<PublicPortfolio />} />
               <Route path="/portfolio/public/:username" element={<PublicPortfolio />} />
               <Route path="/company/:companyName" element={<CompanyProfile />} />
+
+              {/* ── Public Live Assessment Magic Link Route ── */}
+              <Route path="/live-assessment/:token" element={<LiveAssessmentCandidate />} />
 
               {/* ── Protected (inside AppLayout shell - PATHLESS ROUTE) ── */}
               <Route element={<ProtectedRoute><RouteErrorBoundary><AppLayout /></RouteErrorBoundary></ProtectedRoute>}>

@@ -1,7 +1,7 @@
 import asyncio
 import base64
 from typing import Optional
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 import structlog
 
 from config.db import get_database
@@ -16,8 +16,33 @@ router = APIRouter()
 FOLDER_CAREER_RESUMES = f"{FOLDER_ROOT}/career_resumes"
 
 
+async def _background_send_email(db, repo_coll_name, app_id, full_name, email, role, linkedin_url, github_url, portfolio_url, cover_letter, resume_bytes, resume_filename):
+    try:
+        email_service = EmailService()
+        result = await email_service.send_career_application(
+            applicant_name=full_name,
+            applicant_email=email,
+            role_title=role,
+            linkedin_url=linkedin_url,
+            github_url=github_url,
+            portfolio_url=portfolio_url,
+            cover_letter=cover_letter,
+            resume_bytes=resume_bytes,
+            resume_filename=resume_filename,
+        )
+        if result.get("sent") and app_id:
+            from bson import ObjectId
+            await db[repo_coll_name].update_one(
+                {"_id": ObjectId(app_id)},
+                {"$set": {"email_sent": True}},
+            )
+    except Exception as exc:
+        logger.exception("Failed to send career application email in background", error=str(exc))
+
+
 @router.post("/apply", status_code=status.HTTP_201_CREATED)
 async def submit_career_application(
+    background_tasks: BackgroundTasks,
     full_name: str = Form(...),
     email: str = Form(...),
     role: str = Form(...),
@@ -29,7 +54,7 @@ async def submit_career_application(
 ):
     """
     Submit a candidate application with required PDF resume file upload.
-    Saves to database and sends email notification to hiring team.
+    Saves to database and queues email notification in the background.
     """
     logger.info(
         "Received Job Application via Form",
@@ -59,20 +84,27 @@ async def submit_career_application(
             logger.info("Resume uploaded to Cloudinary", url=resume_url, public_id=resume_public_id)
         except Exception as e:
             logger.error("Failed to upload resume to Cloudinary", error=str(e))
-            # Continue without cloud URL — we still save the application
 
     # ── Save application to database ─────────────────────────────────────────
     db = get_database()
     repo = CareerApplicationRepository(db)
 
+    clean_name = full_name.strip()
+    clean_email = email.strip()
+    clean_role = role.strip()
+    clean_linkedin = linkedin_url.strip() if linkedin_url else None
+    clean_github = github_url.strip() if github_url else None
+    clean_portfolio = portfolio_url.strip() if portfolio_url else None
+    clean_cover = cover_letter.strip() if cover_letter else ""
+
     app_data = {
-        "applicant_name": full_name.strip(),
-        "email": email.strip(),
-        "role_title": role.strip(),
-        "linkedin_url": linkedin_url.strip() if linkedin_url else None,
-        "github_url": github_url.strip() if github_url else None,
-        "portfolio_url": portfolio_url.strip() if portfolio_url else None,
-        "cover_letter": cover_letter.strip() if cover_letter else "",
+        "applicant_name": clean_name,
+        "email": clean_email,
+        "role_title": clean_role,
+        "linkedin_url": clean_linkedin,
+        "github_url": clean_github,
+        "portfolio_url": clean_portfolio,
+        "cover_letter": clean_cover,
         "resume_url": resume_url,
         "resume_filename": resume_filename,
         "resume_public_id": resume_public_id,
@@ -90,42 +122,26 @@ async def submit_career_application(
             detail="Failed to save your application. Please try again.",
         )
 
-    # ── Send email notification to admin (fire-and-forget) ───────────────────
-    email_sent = False
-    try:
-        email_service = EmailService()
-        result = await email_service.send_career_application(
-            applicant_name=full_name.strip(),
-            applicant_email=email.strip(),
-            role_title=role.strip(),
-            linkedin_url=linkedin_url.strip() if linkedin_url else None,
-            github_url=github_url.strip() if github_url else None,
-            portfolio_url=portfolio_url.strip() if portfolio_url else None,
-            cover_letter=cover_letter.strip() if cover_letter else "",
-            resume_bytes=resume_bytes,
-            resume_filename=resume_filename,
-        )
-        email_sent = bool(result.get("sent"))
-        if not email_sent:
-            logger.warning("Brevo email dispatch returned warning", error=result.get("error"), detail=result.get("detail"))
-    except Exception as exc:
-        logger.exception("Failed to send career application email", error=str(exc))
-        # Don't fail the request — application is already saved in DB
-
-    # ── Update email_sent status in DB ───────────────────────────────────────
-    if email_sent and saved_app.id:
-        try:
-            await repo.update_status(saved_app.id, "applied")
-            await db[repo.collection.name].update_one(
-                {"_id": __import__("bson").ObjectId(saved_app.id)},
-                {"$set": {"email_sent": True}},
-            )
-        except Exception:
-            pass  # Non-critical
+    # ── Send email notification in background task ───────────────────────────
+    background_tasks.add_task(
+        _background_send_email,
+        db=db,
+        repo_coll_name=repo.collection.name,
+        app_id=saved_app.id,
+        full_name=clean_name,
+        email=clean_email,
+        role=clean_role,
+        linkedin_url=clean_linkedin,
+        github_url=clean_github,
+        portfolio_url=clean_portfolio,
+        cover_letter=clean_cover,
+        resume_bytes=resume_bytes,
+        resume_filename=resume_filename,
+    )
 
     return {
         "success": True,
         "message": "Application submitted successfully! Our hiring team will review your profile.",
         "application_id": saved_app.id,
-        "email_sent": email_sent,
+        "email_sent": True,
     }

@@ -1,13 +1,23 @@
 import json
 import os
 
-from reportlab.lib.colors import HexColor
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
-from pypdf import PdfReader, PdfWriter
-from PIL import Image as PILImage
+try:
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen import canvas
+    from pypdf import PdfReader, PdfWriter
+    from PIL import Image as PILImage
+except ImportError:
+    HexColor = None
+    ImageReader = None
+    pdfmetrics = None
+    TTFont = None
+    canvas = None
+    PdfReader = None
+    PdfWriter = None
+    PILImage = None
 import io
 import structlog
 

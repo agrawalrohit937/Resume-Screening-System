@@ -125,6 +125,17 @@ async def lifespan(app: FastAPI):
 
         # Nightly AI Job Alerts Scheduler (Phase D Retention Loops)
         start_job_alert_scheduler()
+
+        # Non-blocking model pre-warmup in background
+        async def _warmup_engine():
+            try:
+                from services.embedding_service import embedding_model
+                await asyncio.to_thread(embedding_model.encode, ["AI Engineer Python Machine Learning"])
+                logger.info("Embedding model pre-warmed successfully on startup")
+            except Exception as w_err:
+                logger.warning("Embedding model warmup skipped", error=str(w_err))
+
+        asyncio.create_task(_warmup_engine())
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise

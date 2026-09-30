@@ -1,8 +1,10 @@
 import hashlib
 import hmac
 from typing import Optional, Dict, Any
-from fastapi import HTTPException
-import razorpay
+try:
+    import razorpay
+except ImportError:
+    razorpay = None
 import structlog
 from core.config import settings
 

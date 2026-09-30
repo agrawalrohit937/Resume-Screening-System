@@ -94,6 +94,21 @@ class InterviewSession(BaseModel):
     strength_areas:       List[str] = []
     weakness_areas:       List[str] = []
 
+    # Employer-driven B2B Scheduling
+    is_employer_scheduled: bool = False
+    magic_token:           Optional[str] = None
+    expires_at:            Optional[str] = None
+    employer_id:           Optional[str] = None
+    employer_name:         Optional[str] = None
+    company_name:          Optional[str] = None
+    job_id:                Optional[str] = None
+    full_job_description:  Optional[str] = None
+    custom_questions:      Optional[List[str]] = []
+    candidate_email:       Optional[str] = None
+    candidate_name:        Optional[str] = None
+    application_id:        Optional[str] = None
+    magic_link_url:        Optional[str] = None
+
     started_at:   Optional[str] = None
     completed_at: Optional[str] = None
     created_at:   str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

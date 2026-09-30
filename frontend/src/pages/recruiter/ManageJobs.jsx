@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -29,10 +30,10 @@ import {
   Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { getMyPostedJobs, createJob, updateJob, toggleJobStatus } from '../../services/api'
 import CustomDropdown from '../../components/common/CustomDropdown'
+import ScheduleLiveInterviewModal from '../../components/recruiter/ScheduleLiveInterviewModal'
 
 export default function ManageJobs() {
   const { user } = useAuth()
@@ -46,6 +47,8 @@ export default function ManageJobs() {
   const [togglingId, setTogglingId] = useState(null)
   const [selectedJob, setSelectedJob] = useState(null)
   const [openMenuJobId, setOpenMenuJobId] = useState(null)
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
+  const [scheduleJobTarget, setScheduleJobTarget] = useState(null)
 
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -233,7 +236,11 @@ Requirements & Qualifications:
         status: isDraft ? 'draft' : 'open',
       }
 
-      await createJob(payload)
+      const res = await createJob(payload)
+      const createdJob = res?.data || res
+      if (createdJob && createdJob.id) {
+        setJobs(prev => [createdJob, ...prev])
+      }
       toast.success(isDraft ? 'Job saved as draft! 📋' : 'Job published successfully! 🚀')
       setIsPostModalOpen(false)
       setSkillsList(['React', 'Node.js', 'PostgreSQL'])
@@ -249,7 +256,7 @@ Requirements & Qualifications:
         salary_range: '$90,000 - $130,000',
         department: 'Engineering',
       })
-      fetchJobs()
+      fetchJobs(true)
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to post new job.'
       toast.error(msg)
@@ -659,6 +666,19 @@ Requirements & Qualifications:
 
                               {openMenuJobId === job.id && (
                                 <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 text-left animate-in fade-in zoom-in-95 duration-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setScheduleJobTarget(job)
+                                      setIsScheduleModalOpen(true)
+                                      setOpenMenuJobId(null)
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 flex items-center gap-2 cursor-pointer transition-colors"
+                                  >
+                                    <Sparkles size={14} className="text-indigo-500" />
+                                    <span>AI Interview</span>
+                                  </button>
+
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1338,6 +1358,16 @@ Requirements & Qualifications:
         </AnimatePresence>,
         document.body
       )}
+
+      {/* ── Schedule Live AI Interview Modal ── */}
+      <ScheduleLiveInterviewModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => {
+          setIsScheduleModalOpen(false)
+          setScheduleJobTarget(null)
+        }}
+        initialJob={scheduleJobTarget}
+      />
     </div>
   )
 }

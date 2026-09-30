@@ -489,9 +489,31 @@ export default function ExecDashboard() {
       </div>
 
       {loading && !analytics ? (
-        <div className="p-16 flex flex-col items-center justify-center space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Loading aggregate enterprise talent intelligence...</p>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-6 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/80 shadow-xs animate-pulse">
+                <div className="flex justify-between items-center">
+                  <div className="h-3 w-28 bg-slate-200 rounded" />
+                  <div className="w-10 h-10 rounded-xl bg-slate-100" />
+                </div>
+                <div className="h-8 w-20 bg-slate-200 rounded mt-4" />
+                <div className="h-3 w-36 bg-slate-100 rounded mt-3 pt-2.5 border-t border-slate-100" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-7 bg-white p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs h-[360px] animate-pulse">
+              <div className="h-4 w-48 bg-slate-200 rounded mb-2" />
+              <div className="h-3 w-64 bg-slate-100 rounded mb-8" />
+              <div className="h-56 bg-slate-50 rounded-xl" />
+            </div>
+            <div className="lg:col-span-5 bg-white p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs h-[360px] animate-pulse">
+              <div className="h-4 w-48 bg-slate-200 rounded mb-2" />
+              <div className="h-3 w-64 bg-slate-100 rounded mb-8" />
+              <div className="h-56 bg-slate-50 rounded-xl" />
+            </div>
+          </div>
         </div>
       ) : (
         <>

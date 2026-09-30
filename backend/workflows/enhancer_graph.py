@@ -19,7 +19,10 @@ import re
 from typing import TypedDict, List, Optional, Dict, Any
 
 import structlog
-from google import genai
+try:
+    from google import genai
+except ImportError:
+    genai = None
 from langgraph.graph import StateGraph, END
 from core.llm_client import gemini_key_pool
 from schemas.enhancement_schema import EnhancedResumeSection

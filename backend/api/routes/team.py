@@ -399,18 +399,51 @@ async def list_team_members(
     db: Any = Depends(get_database),
 ):
     """
-    Lists active team members and pending invitations for the current user's tenant.
+    Lists active team members and pending invitations for the current user's tenant with ultra-fast parallel queries.
     """
+    import asyncio
     tenant_id = current_user.tenant_id or "default"
     users_coll = db["users"]
     invites_coll = db["team_invites"]
 
-    # Active members with matching tenant_id
-    cursor = users_coll.find(
+    user_projection = {
+        "_id": 1,
+        "email": 1,
+        "full_name": 1,
+        "role": 1,
+        "roles": 1,
+        "tenant_id": 1,
+        "status": 1,
+        "created_at": 1,
+        "last_login": 1,
+        "profile_picture": 1,
+    }
+
+    invite_projection = {
+        "_id": 1,
+        "email": 1,
+        "role": 1,
+        "tenant_id": 1,
+        "status": 1,
+        "created_at": 1,
+        "expires_at": 1,
+        "invited_by_name": 1,
+        "invited_by_email": 1,
+        "token": 1,
+    }
+
+    # Parallel query execution for instantaneous loading
+    users_task = users_coll.find(
         {"tenant_id": tenant_id, "status": {"$ne": "deleted"}},
-        {"hashed_password": 0, "payment_history": 0, "refresh_token": 0},
-    ).sort("created_at", -1)
-    raw_members = await cursor.to_list(length=100)
+        user_projection,
+    ).sort("created_at", -1).to_list(length=100)
+
+    invites_task = invites_coll.find(
+        {"tenant_id": tenant_id, "status": "pending"},
+        invite_projection,
+    ).sort("created_at", -1).to_list(length=100)
+
+    raw_members, raw_invites = await asyncio.gather(users_task, invites_task)
 
     members: List[TeamMemberItem] = []
     for m in raw_members:
@@ -429,10 +462,6 @@ async def list_team_members(
                 profile_picture=m.get("profile_picture"),
             )
         )
-
-    # Pending invitations
-    inv_cursor = invites_coll.find({"tenant_id": tenant_id, "status": "pending"}).sort("created_at", -1)
-    raw_invites = await inv_cursor.to_list(length=100)
 
     pending_invites: List[PendingInviteItem] = []
     frontend_base = settings.FRONTEND_URL.rstrip("/")

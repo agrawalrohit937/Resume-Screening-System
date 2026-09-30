@@ -9,6 +9,7 @@ and the Graph wiring in a single file.
 - Uses Gemini 1.5 Pro for writing high-quality emails and cover letters.
 """
 
+import asyncio
 import json
 import re
 from pathlib import Path
@@ -17,9 +18,11 @@ from langgraph.graph import StateGraph, END
 
 # LLM Imports
 from langchain_core.prompts import ChatPromptTemplate
-from core.llm_client import get_groq_client, gemini_key_pool
+try:
+    from google import genai
+except Exception:
+    genai = None
 
-from google import genai
 import os
 # ─── STATE DEFINITION ────────────────────────────────────────────────────────
 
@@ -109,8 +112,9 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
             subject = f"Application for {job_title} at {company_name}"
             body = content
 
-        formatted_body = body.replace("\n\n", "<br><br>").replace("\n", "<br>")
-        return {"email_subject": subject, "email_body": formatted_body}
+        # Clean any raw <br> tags into clean plain-text newlines
+        clean_body = re.sub(r"<br\s*/?>", "\n", body, flags=re.IGNORECASE).strip()
+        return {"email_subject": subject, "email_body": clean_body}
 
     try:
         return await gemini_key_pool.execute_async_with_fallback(_generate)
@@ -120,14 +124,15 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
     # Fallback professional email template
     subject = f"Application for {job_title} at {company_name}"
     body = (
-        f"Dear Hiring Manager at {company_name},<br><br>"
+        f"Dear Hiring Manager at {company_name},\n\n"
         f"I am writing to express my strong interest in the {job_title} position. "
         f"With a solid foundation in software engineering, technical innovation, and collaborative problem solving, "
-        f"I am eager to contribute effectively to your team's ongoing success.<br><br>"
-        f"Please find my resume attached for your review. I look forward to discussing how my experience aligns with your requirements.<br><br>"
-        f"Sincerely,<br>Candidate"
+        f"I am eager to contribute effectively to your team's ongoing success.\n\n"
+        f"Please find my resume attached for your review. I look forward to discussing how my experience aligns with your requirements.\n\n"
+        f"Sincerely,\nCandidate"
     )
     return {"email_subject": subject, "email_body": body}
+
 
 
 # ─── NODE 3: COVER LETTER GENERATOR (DIRECT GEMINI CLIENT WITH KEY POOL FALLBACK) ────
@@ -254,25 +259,38 @@ def _route_after_validation(state: ApplyAssistantState) -> str:
         return "give_up"
     return "retry"
 
+async def concurrent_drafting_node(state: ApplyAssistantState) -> dict:
+    """Executes Email and Cover Letter generation concurrently using asyncio.gather for ultra-low latency."""
+    email_res, cl_res = await asyncio.gather(
+        email_generator_node(state),
+        cover_letter_generator_node(state),
+        return_exceptions=True
+    )
+    result = {}
+    if isinstance(email_res, dict):
+        result.update(email_res)
+    if isinstance(cl_res, dict):
+        result.update(cl_res)
+    return result
+
+
 def build_apply_assistant_graph():
     graph = StateGraph(ApplyAssistantState)
 
     graph.add_node("jd_analyzer", jd_analyzer_node)
-    graph.add_node("email_generator", email_generator_node)
-    graph.add_node("cover_letter_generator", cover_letter_generator_node)
+    graph.add_node("drafting_engine", concurrent_drafting_node)
     graph.add_node("quality_validator", quality_validator_node)
 
     graph.set_entry_point("jd_analyzer")
-    graph.add_edge("jd_analyzer", "email_generator")
-    graph.add_edge("email_generator", "cover_letter_generator")
-    graph.add_edge("cover_letter_generator", "quality_validator")
+    graph.add_edge("jd_analyzer", "drafting_engine")
+    graph.add_edge("drafting_engine", "quality_validator")
 
     graph.add_conditional_edges(
         "quality_validator",
         _route_after_validation,
         {
             "end": END,
-            "retry": "email_generator",   
+            "retry": "drafting_engine",   
             "give_up": END,               
         },
     )

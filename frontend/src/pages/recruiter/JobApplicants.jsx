@@ -32,13 +32,16 @@ import {
   X,
   Eye,
   GraduationCap,
-  Trash2
+  Trash2,
+  FileSpreadsheet
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getJobApplications, updateApplicationStage } from '../../services/api'
+import { getJobApplications, updateApplicationStage, exportEmployerEvaluationsExcel } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 import CustomDropdown from '../../components/common/CustomDropdown'
 import CandidateHoverCard from '../../components/recruiter/CandidateHoverCard'
 import GithubHoverCard from '../../components/recruiter/GithubHoverCard'
+import ScheduleLiveInterviewModal from '../../components/recruiter/ScheduleLiveInterviewModal'
 import { resolveAvatarUrl, getInitials } from '../../utils/avatarUtils'
 
 // Helper to extract clean GitHub username from applicant object
@@ -260,6 +263,25 @@ function CompactCandidateCard({
               </span>
             )}
           </div>
+
+          {/* Row 4: Live AI Interview Score & Integrity Badge */}
+          {app.live_interview_completed && (
+            <div className="mt-2 flex items-center justify-between text-[10.5px] px-2 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100">
+              <span className="font-bold text-indigo-950 flex items-center gap-1">
+                <Sparkles size={11} className="text-indigo-600" />
+                Live AI: {app.live_interview_score ?? app.live_interview_scorecard?.overall_score ?? '-'}/10
+              </span>
+              {app.live_interview_scorecard?.warning_count > 0 ? (
+                <span className="font-bold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 text-[10px]">
+                  ⚠️ {app.live_interview_scorecard.warning_count} Flags
+                </span>
+              ) : (
+                <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 text-[10px]">
+                  ✓ 0 Flags
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -320,6 +342,19 @@ function CompactCandidateCard({
 export default function JobApplicants() {
   const { jobId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const userRoles = useMemo(() => {
+    if (!user) return []
+    const roles = Array.isArray(user.roles) ? user.roles : [user.role]
+    return roles.map(r => String(r || '').toLowerCase())
+  }, [user])
+
+  // Interview scheduling authority is granted to Interviewers, Hiring Managers, Executives, and Admins
+  const canScheduleInterview = useMemo(() => {
+    const allowed = ['interviewer', 'hiring_manager', 'executive', 'exec', 'employer', 'admin', 'platform_admin']
+    return userRoles.some(r => allowed.includes(r))
+  }, [userRoles])
 
   // State
   const [job, setJob] = useState(null)
@@ -333,7 +368,49 @@ export default function JobApplicants() {
   const [dragOverStage, setDragOverStage] = useState(null)
   const [updatingId, setUpdatingId] = useState(null)
   const [pipelineView, setPipelineView] = useState('active') // 'active' | 'completed'
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
+  const [scheduleTargetCandidate, setScheduleTargetCandidate] = useState(null)
+  const [scheduleBatchCandidates, setScheduleBatchCandidates] = useState([])
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
   const undoTimerRef = useRef(null)
+
+  // Excel evaluations export handler
+  const handleExportExcel = async () => {
+    setDownloadingExcel(true)
+    try {
+      const res = await exportEmployerEvaluationsExcel(jobId)
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const sanitizedTitle = (job?.title || 'Report').replace(/[^a-zA-Z0-9_-]/g, '_')
+      link.setAttribute('download', `Live_AI_Evaluations_${sanitizedTitle}.xlsx`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Excel evaluations sheet downloaded successfully! 📊')
+    } catch (err) {
+      console.error('Failed to export Excel report:', err)
+      toast.error('Could not export Excel report.')
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
+
+  // Bulk schedule candidates in stage handler
+  const handleBulkScheduleStage = (stageName = 'Interview') => {
+    const candidatesInStage = stageGroups[stageName] || []
+    if (candidatesInStage.length === 0) {
+      toast.error(`No candidates found in "${stageName}" stage. Move candidates here first.`)
+      return
+    }
+    setScheduleBatchCandidates(candidatesInStage)
+    setScheduleTargetCandidate(null)
+    setIsScheduleModalOpen(true)
+  }
 
   // Cleanup undo timer on unmount
   useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }, [])
@@ -631,6 +708,42 @@ export default function JobApplicants() {
                 <span className="text-lg font-black text-emerald-700 font-poppins">{avgMatch}%</span>
               </div>
             </div>
+
+            {/* Export Excel & Bulk Actions */}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={downloadingExcel}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-bold text-xs shadow-2xs transition cursor-pointer disabled:opacity-50"
+              title="Download full candidate assessment evaluations & proctoring report as Excel sheet"
+            >
+              {downloadingExcel ? (
+                <span className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-700 rounded-full animate-spin" />
+              ) : (
+                <FileSpreadsheet size={15} className="text-emerald-700" />
+              )}
+              <span className="hidden sm:inline">Export Excel</span>
+            </button>
+
+            {canScheduleInterview ? (
+              <button
+                type="button"
+                onClick={() => handleBulkScheduleStage('Interview')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs shadow-sm shadow-indigo-500/20 transition cursor-pointer"
+                title="Bulk schedule Live AI interviews for Interview stage candidates"
+              >
+                <Sparkles size={14} />
+                <span>Bulk AI Interview</span>
+              </button>
+            ) : (
+              <div
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold shadow-2xs"
+                title="Recruiter: Move candidates to the Interview stage. The Interviewer or Hiring Manager will schedule the AI assessments."
+              >
+                <Users size={13} className="text-slate-400" />
+                <span>Interview Pipeline ({stageGroups['Interview']?.length || 0})</span>
+              </div>
+            )}
 
             <button
               type="button"
@@ -1096,12 +1209,184 @@ export default function JobApplicants() {
                         <span className="truncate">LinkedIn</span>
                       </a>
                     )}
+
+                    {/* Schedule Live AI Interview Button */}
+                    {canScheduleInterview ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScheduleTargetCandidate({
+                            name: selectedApplicant.candidate_name,
+                            email: selectedApplicant.candidate_email,
+                            applicationId: selectedApplicant.id,
+                          })
+                          setIsScheduleModalOpen(true)
+                        }}
+                        className="flex-1 min-w-[140px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer truncate group"
+                      >
+                        <Sparkles size={14} className="text-indigo-200 group-hover:rotate-12 transition-transform shrink-0" />
+                        <span className="truncate">Schedule AI Interview</span>
+                      </button>
+                    ) : (
+                      <div className="flex-1 min-w-[140px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs sm:text-sm font-semibold rounded-xl truncate">
+                        <Users size={14} className="text-slate-400 shrink-0" />
+                        <span className="truncate">Pipeline: {selectedApplicant.stage || 'Applied'}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* 2. Scrollable Content Body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                   
+                  {/* ── LIVE AI INTERVIEW SCORECARD (If Completed) ── */}
+                  {selectedApplicant.live_interview_scorecard ? (
+                    <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white rounded-3xl p-5 sm:p-6 border border-indigo-500/30 shadow-xl space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 uppercase tracking-wider">
+                            <Sparkles size={12} className="text-indigo-400" />
+                            Live AI Assessment Scorecard
+                          </span>
+                          <h3 className="text-base font-extrabold text-white mt-1.5">
+                            {selectedApplicant.live_interview_scorecard.job_title || 'Role Assessment'}
+                          </h3>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[28px] font-black text-emerald-400 font-poppins leading-none">
+                            {Math.round(selectedApplicant.live_interview_scorecard.overall_score || selectedApplicant.live_interview_score || 0)}%
+                          </span>
+                          <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            AI Score
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Proctoring & Integrity Bar */}
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 text-xs">
+                        <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                          <ShieldCheck size={14} className={selectedApplicant.live_interview_scorecard.session_aborted ? 'text-rose-400' : 'text-emerald-400'} />
+                          Proctoring Integrity
+                        </span>
+                        <span className={`font-bold px-2 py-0.5 rounded-md text-[11px] ${
+                          selectedApplicant.live_interview_scorecard.session_aborted
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : (selectedApplicant.live_interview_scorecard.warning_count || 0) > 0
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        }`}>
+                          {selectedApplicant.live_interview_scorecard.session_aborted
+                            ? 'Aborted (Security Limit)'
+                            : `${selectedApplicant.live_interview_scorecard.warning_count || 0} Flags Recorded • Clean`}
+                        </span>
+                      </div>
+
+                      {/* Executive Summary */}
+                      {selectedApplicant.live_interview_scorecard.summary && (
+                        <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-slate-200 leading-relaxed font-medium">
+                          <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider mb-1">
+                            AI Executive Summary
+                          </p>
+                          {selectedApplicant.live_interview_scorecard.summary}
+                        </div>
+                      )}
+
+                      {/* Strengths & Weaknesses */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        {(selectedApplicant.live_interview_scorecard.strengths || []).length > 0 && (
+                          <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/20">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">
+                              Key Strengths
+                            </span>
+                            <ul className="space-y-1 text-slate-300 text-[11.5px] list-disc list-inside">
+                              {(selectedApplicant.live_interview_scorecard.strengths || []).slice(0, 3).map((st, i) => (
+                                <li key={i}>{st}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(selectedApplicant.live_interview_scorecard.weaknesses || []).length > 0 && (
+                          <div className="p-3 rounded-2xl bg-rose-950/40 border border-rose-500/20">
+                            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider block mb-1">
+                              Critical Gaps
+                            </span>
+                            <ul className="space-y-1 text-slate-300 text-[11.5px] list-disc list-inside">
+                              {(selectedApplicant.live_interview_scorecard.weaknesses || []).slice(0, 3).map((wk, i) => (
+                                <li key={i}>{wk}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Question by Question Q&A Transcript */}
+                      {(selectedApplicant.live_interview_scorecard.answers || []).length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Interview Transcript ({(selectedApplicant.live_interview_scorecard.answers || []).length} Questions)
+                          </span>
+                          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                            {(selectedApplicant.live_interview_scorecard.answers || []).map((ans, idx) => (
+                              <div key={idx} className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5 text-xs">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-indigo-300">Q{idx + 1}: {ans.question_text}</span>
+                                  <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                                    (ans.ai_score || 0) >= 70 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-300'
+                                  }`}>
+                                    {Math.round(ans.ai_score || 0)}%
+                                  </span>
+                                </div>
+                                <div className="p-2 rounded-xl bg-black/20 border border-white/5 text-[11px] text-slate-300 leading-relaxed font-mono">
+                                  "{ans.user_answer || 'No response'}"
+                                </div>
+                                {ans.ai_feedback && (
+                                  <p className="text-[10.5px] text-slate-400 italic">
+                                    💡 {ans.ai_feedback}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Live Interview Invite Banner */
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
+                          AI Assessment Pipeline
+                        </span>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5">
+                          {selectedApplicant.stage === 'Interview' ? 'Candidate in Interview Stage' : `Candidate: ${selectedApplicant.candidate_name || 'candidate'}`}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {canScheduleInterview
+                            ? 'Generates targeted questions from this job description and tracks candidate performance.'
+                            : 'Recruiter role: Drag candidate to the Interview stage. The Interviewer or Hiring Manager will generate the AI interview link and invite.'}
+                        </p>
+                      </div>
+                      {canScheduleInterview && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScheduleTargetCandidate({
+                              name: selectedApplicant.candidate_name,
+                              email: selectedApplicant.candidate_email,
+                              applicationId: selectedApplicant.id,
+                            })
+                            setIsScheduleModalOpen(true)
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0 transition cursor-pointer"
+                        >
+                          Schedule Link →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Hiring Stage & ATS Score Card */}
                   <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/60 flex items-center justify-between gap-4">
                     <div>
@@ -1254,6 +1539,23 @@ export default function JobApplicants() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* ── 5. Schedule Live AI Interview Modal ── */}
+      <ScheduleLiveInterviewModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => {
+          setIsScheduleModalOpen(false)
+          setScheduleTargetCandidate(null)
+          setScheduleBatchCandidates([])
+        }}
+        initialJob={job}
+        initialCandidate={scheduleTargetCandidate}
+        candidates={scheduleBatchCandidates}
+        applicationId={scheduleTargetCandidate?.applicationId || scheduleTargetCandidate?.id}
+        onSuccess={() => {
+          fetchApplications()
+        }}
+      />
 
     </div>
   )
