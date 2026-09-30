@@ -173,13 +173,7 @@ export default function TeamManagement() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader />
-      </div>
-    )
-  }
+
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans text-slate-800 antialiased">
@@ -257,9 +251,13 @@ export default function TeamManagement() {
               <Users className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 mt-3">
-            {members.length}
-          </p>
+          {loading && members.length === 0 ? (
+            <div className="h-9 w-16 bg-slate-200 animate-pulse rounded-lg mt-3" />
+          ) : (
+            <p className="text-3xl font-black text-slate-900 mt-3">
+              {members.length}
+            </p>
+          )}
           <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-indigo-600">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Organization members with active login access</span>
@@ -276,9 +274,13 @@ export default function TeamManagement() {
               <Clock className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 mt-3">
-            {pendingInvites.length}
-          </p>
+          {loading && members.length === 0 ? (
+            <div className="h-9 w-16 bg-slate-200 animate-pulse rounded-lg mt-3" />
+          ) : (
+            <p className="text-3xl font-black text-slate-900 mt-3">
+              {pendingInvites.length}
+            </p>
+          )}
           <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-amber-700">
             <span className={`w-1.5 h-1.5 rounded-full ${pendingInvites.length > 0 ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'}`} />
             <span>{pendingInvites.length > 0 ? `${pendingInvites.length} awaiting acceptance` : 'No invites pending'}</span>
@@ -295,9 +297,13 @@ export default function TeamManagement() {
               <Shield className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 mt-3">
-            {configuredRolesCount}
-          </p>
+          {loading && members.length === 0 ? (
+            <div className="h-9 w-16 bg-slate-200 animate-pulse rounded-lg mt-3" />
+          ) : (
+            <p className="text-3xl font-black text-slate-900 mt-3">
+              {configuredRolesCount}
+            </p>
+          )}
           <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-purple-600">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Multi-tenant flexible role matrix</span>
@@ -317,7 +323,7 @@ export default function TeamManagement() {
             }`}
           >
             <Users className="w-4 h-4" />
-            Active Members ({members.length})
+            Active Members ({loading && members.length === 0 ? '...' : members.length})
           </button>
           <button
             onClick={() => setActiveTab('invites')}
@@ -328,14 +334,29 @@ export default function TeamManagement() {
             }`}
           >
             <Clock className="w-4 h-4" />
-            Pending Invitations ({pendingInvites.length})
+            Pending Invitations ({loading && pendingInvites.length === 0 ? '...' : pendingInvites.length})
           </button>
         </div>
 
         {/* ── TAB 1: Active Members Table ── */}
         {activeTab === 'members' && (
           <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
-            {members.length === 0 ? (
+            {loading && members.length === 0 ? (
+              <div className="p-8 space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="flex items-center justify-between p-3 border-b border-slate-100 last:border-0 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200" />
+                      <div className="space-y-2">
+                        <div className="h-4 w-36 bg-slate-200 rounded" />
+                        <div className="h-3 w-48 bg-slate-100 rounded" />
+                      </div>
+                    </div>
+                    <div className="h-6 w-24 bg-slate-200 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ) : members.length === 0 ? (
               <div className="p-12 text-center">
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-3">
                   <Users className="w-6 h-6" />

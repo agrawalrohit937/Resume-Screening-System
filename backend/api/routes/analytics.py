@@ -301,7 +301,8 @@ async def get_enterprise_analytics(
     current_user: UserModel = Depends(get_current_user),
     db=Depends(get_database),
 ):
-    """Computes executive talent, headcount, hiring velocity, and anonymized diversity metrics."""
+    """Computes executive talent, headcount, hiring velocity, and anonymized diversity metrics with high-speed parallel execution."""
+    import asyncio
     from bson import ObjectId
 
     tenant_id = getattr(current_user, "tenant_id", "default") or "default"
@@ -320,23 +321,95 @@ async def get_enterprise_analytics(
 
     # Approved headcount = sum of openings from active (open) jobs; fallback 1 per job
     approved_headcount = sum(int(j.get("openings", 1) or 1) for j in open_jobs) if open_jobs else 0
-
-    # ── 2. Filled hires — count applications with stage == "Hired" ───────────
     hire_stage_variants = ["Hired", "hired"]
+
+    # Setup time window for hiring velocity (last 6 months)
+    now = datetime.now(timezone.utc)
+    months_meta = []
+    for months_ago in range(5, -1, -1):
+        month_start = (now.replace(day=1) - timedelta(days=months_ago * 30)).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        month_label = month_start.strftime("%b")
+        months_meta.append((month_start, month_end, month_label))
+
+    earliest_start = months_meta[0][0] if months_meta else now
+    latest_end = months_meta[-1][1] if months_meta else now
+
+    # EEO query setup
+    eeo_filters = []
+    if tenant_id and tenant_id != "default":
+        eeo_filters.append({"tenant_id": tenant_id})
+    else:
+        eeo_filters.append({"tenant_id": {"$in": ["default", None, ""]}})
     if job_ids:
-        hired_count = await db.applications.count_documents({
+        eeo_filters.append({"job_id": {"$in": job_ids}})
+    eeo_query = {"$or": eeo_filters} if len(eeo_filters) > 1 else eeo_filters[0]
+
+    # ── Parallel Query Dispatch ──────────────────────────────────────────────
+    if job_ids:
+        hired_count_task = db.applications.count_documents({
             "job_id": {"$in": job_ids},
             "stage": {"$in": hire_stage_variants},
         })
+        hired_apps_task = db.applications.find(
+            {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
+            {"job_id": 1},
+        ).to_list(length=2000)
+        total_offers_task = db.applications.count_documents({
+            "job_id": {"$in": job_ids},
+            "stage": {"$in": ["offer", "Offer", "hired", "Hired"]},
+        })
+        ttf_apps_task = db.applications.find(
+            {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
+            {"created_at": 1, "updated_at": 1},
+        ).to_list(length=500)
+        velocity_task = db.applications.aggregate([
+            {
+                "$match": {
+                    "job_id": {"$in": job_ids},
+                    "stage": {"$in": hire_stage_variants},
+                    "updated_at": {"$gte": earliest_start, "$lt": latest_end},
+                }
+            },
+            {"$project": {"updated_at": 1}}
+        ]).to_list(length=5000)
     else:
-        # Fallback: any hired app for this tenant
-        hired_count = await db.applications.count_documents({
+        hired_count_task = db.applications.count_documents({
             "tenant_id": tenant_id,
             "stage": {"$in": hire_stage_variants},
         })
-    filled_hires = hired_count
+        hired_apps_task = asyncio.sleep(0, result=[])
+        total_offers_task = db.applications.count_documents({
+            "tenant_id": tenant_id,
+            "stage": {"$in": ["offer", "Offer", "hired", "Hired"]}
+        })
+        ttf_apps_task = asyncio.sleep(0, result=[])
+        velocity_task = asyncio.sleep(0, result=[])
 
-    # ── 3. Department breakdown (from jobs) ───────────────────────────────────
+    eeo_task = db.eeo_responses.find(eeo_query, {"race_ethnicity": 1, "gender": 1}).to_list(length=1000)
+
+    # Concurrently execute all analytics sub-queries
+    (
+        hired_count,
+        hired_apps,
+        total_offers,
+        ttf_apps,
+        matching_hires,
+        eeo_responses
+    ) = await asyncio.gather(
+        hired_count_task,
+        hired_apps_task,
+        total_offers_task,
+        ttf_apps_task,
+        velocity_task,
+        eeo_task
+    )
+
+    filled_hires = hired_count or 0
+
+    # ── 3. Department breakdown ──────────────────────────────────────────────
     dept_map: dict = {}
     for j in jobs_list:
         dept = j.get("department") or "General"
@@ -345,12 +418,7 @@ async def get_enterprise_analytics(
         if j.get("status", "open") == "open":
             dept_map[dept]["approved"] += int(j.get("openings", 1) or 1)
 
-    if job_ids:
-        hired_apps_cursor = db.applications.find(
-            {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
-            {"job_id": 1},
-        )
-        hired_apps = await hired_apps_cursor.to_list(length=2000)
+    if hired_apps:
         job_dept_map = {str(j["_id"]): (j.get("department") or "General") for j in jobs_list}
         for ha in hired_apps:
             dept = job_dept_map.get(str(ha.get("job_id")), "General")
@@ -361,27 +429,12 @@ async def get_enterprise_analytics(
     headcount_data = [v for v in dept_map.values() if v["approved"] > 0 or v["filled"] > 0]
 
     # ── 4. Offer acceptance rate ──────────────────────────────────────────────
-    if job_ids:
-        total_offers = await db.applications.count_documents({
-            "job_id": {"$in": job_ids},
-            "stage": {"$in": ["offer", "Offer", "hired", "Hired"]},
-        })
-        accepted_offers = filled_hires
-    else:
-        total_offers = await db.applications.count_documents({
-            "tenant_id": tenant_id, "stage": {"$in": ["offer", "Offer", "hired", "Hired"]}
-        })
-        accepted_offers = filled_hires
-    offer_rate = round((accepted_offers / max(1, total_offers)) * 100, 1) if total_offers > 0 else 0.0
+    accepted_offers = filled_hires
+    offer_rate = round((accepted_offers / max(1, total_offers or 0)) * 100, 1) if (total_offers or 0) > 0 else 0.0
 
-    # ── 5. Avg time-to-fill (days) from hired apps ────────────────────────────
+    # ── 5. Avg time-to-fill (days) ────────────────────────────────────────────
     avg_time_to_fill = 0.0
-    if job_ids:
-        ttf_cursor = db.applications.find(
-            {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
-            {"created_at": 1, "updated_at": 1},
-        )
-        ttf_apps = await ttf_cursor.to_list(length=500)
+    if ttf_apps:
         durations = []
         for a in ttf_apps:
             c = a.get("created_at")
@@ -393,36 +446,9 @@ async def get_enterprise_analytics(
         if durations:
             avg_time_to_fill = round(sum(durations) / len(durations), 1)
 
-    # ── 6. Monthly hiring velocity (last 6 months) ────────────────────────────
-    now = datetime.now(timezone.utc)
-    months_meta = []
-    for months_ago in range(5, -1, -1):
-        month_start = (now.replace(day=1) - timedelta(days=months_ago * 30)).replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0
-        )
-        month_end = (month_start + timedelta(days=32)).replace(day=1)
-        month_label = month_start.strftime("%b")
-        months_meta.append((month_start, month_end, month_label))
-
+    # ── 6. Monthly hiring velocity ────────────────────────────────────────────
     velocity_counts = {m_label: 0 for _, _, m_label in months_meta}
-    if job_ids and months_meta:
-        earliest_start = months_meta[0][0]
-        latest_end = months_meta[-1][1]
-        agg_cursor = db.applications.aggregate([
-            {
-                "$match": {
-                    "job_id": {"$in": job_ids},
-                    "stage": {"$in": hire_stage_variants},
-                    "updated_at": {"$gte": earliest_start, "$lt": latest_end},
-                }
-            },
-            {
-                "$project": {
-                    "updated_at": 1,
-                }
-            }
-        ])
-        matching_hires = await agg_cursor.to_list(length=5000)
+    if matching_hires:
         for doc in matching_hires:
             u_at = doc.get("updated_at")
             if u_at and hasattr(u_at, "timestamp"):
@@ -438,19 +464,8 @@ async def get_enterprise_analytics(
     for _, _, m_label in months_meta:
         velocity.append({"month": m_label, "hires": velocity_counts.get(m_label, 0), "target": monthly_target})
 
-    # ── 7. EEO / Diversity (Isolated Vault Aggregation) ───────────────────────
-    eeo_filters = []
-    if tenant_id and tenant_id != "default":
-        eeo_filters.append({"tenant_id": tenant_id})
-    else:
-        eeo_filters.append({"tenant_id": {"$in": ["default", None, ""]}})
-    if job_ids:
-        eeo_filters.append({"job_id": {"$in": job_ids}})
-
-    eeo_query = {"$or": eeo_filters} if len(eeo_filters) > 1 else eeo_filters[0]
-    eeo_cursor = db.eeo_responses.find(eeo_query)
-    eeo_responses = await eeo_cursor.to_list(length=1000)
-    total_eeo = len(eeo_responses)
+    # ── 7. EEO / Diversity ───────────────────────────────────────────────────
+    total_eeo = len(eeo_responses or [])
 
     def _normalize_race(val: Optional[str]) -> str:
         if not val:

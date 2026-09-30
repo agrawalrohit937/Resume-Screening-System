@@ -18,7 +18,10 @@ import re
 
 import structlog
 from jinja2 import Environment, FileSystemLoader
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 
 from core.config import settings
 from services.cloudinary_service import upload_ats_resume

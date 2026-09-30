@@ -8,7 +8,10 @@ import uuid
 from pathlib import Path
 from typing import Tuple
 
-import aiofiles
+try:
+    import aiofiles
+except ImportError:
+    aiofiles = None
 import structlog
 from fastapi import UploadFile, HTTPException, status
 
@@ -98,8 +101,12 @@ async def validate_and_save_file(
     file_path = upload_path / unique_name
 
     # Write file
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(contents)
+    if aiofiles:
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(contents)
+    else:
+        with open(file_path, "wb") as f:
+            f.write(contents)
 
     logger.info("File saved securely", path=str(file_path), size=file_size, user=user_id)
     return str(file_path), unique_name, file_ext, file_size

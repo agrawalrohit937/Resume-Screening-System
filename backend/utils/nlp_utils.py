@@ -7,26 +7,38 @@ import string
 from typing import List, Set, Tuple
 
 import structlog
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize, sent_tokenize
-from sklearn.feature_extraction.text import TfidfVectorizer
+try:
+    import nltk
+    from nltk.corpus import stopwords
+    from nltk.stem import WordNetLemmatizer
+    from nltk.tokenize import word_tokenize, sent_tokenize
+except ImportError:
+    nltk = None
+    stopwords = None
+    WordNetLemmatizer = None
+    word_tokenize = None
+    sent_tokenize = None
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+except ImportError:
+    TfidfVectorizer = None
 
 # Download NLTK data safely (checking before download)
-_nltk_downloads = ["punkt", "stopwords", "wordnet", "averaged_perceptron_tagger"]
-for pkg in _nltk_downloads:
-    try:
-        nltk.data.find(f"tokenizers/{pkg}" if "punkt" in pkg else f"corpora/{pkg}")
-    except LookupError:
+if nltk:
+    _nltk_downloads = ["punkt", "stopwords", "wordnet", "averaged_perceptron_tagger"]
+    for pkg in _nltk_downloads:
         try:
-            nltk.download(pkg, quiet=True)
-        except Exception:
-            pass
+            nltk.data.find(f"tokenizers/{pkg}" if "punkt" in pkg else f"corpora/{pkg}")
+        except LookupError:
+            try:
+                nltk.download(pkg, quiet=True)
+            except Exception:
+                pass
 
-_lemmatizer = WordNetLemmatizer()
+_lemmatizer = WordNetLemmatizer() if WordNetLemmatizer else None
 try:
-    _stop_words = set(stopwords.words("english"))
+    _stop_words = set(stopwords.words("english")) if stopwords else set()
 except Exception:
     _stop_words = set()
 logger = structlog.get_logger(__name__)

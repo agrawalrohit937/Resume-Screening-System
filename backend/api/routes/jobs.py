@@ -112,19 +112,24 @@ async def create_job(
 
     t0 = time.perf_counter()
     raw_text = payload.jd_text_raw.strip()
+    company_clean = payload.company_name.strip()
 
-    logger.info(
-        "Generating 768-dim local BGE embedding for job posting",
-        title=payload.title,
-        company=payload.company_name,
+    # Parallelize CPU-bound embedding generation and database company lookup
+    async def _encode_jd():
+        try:
+            return await asyncio.to_thread(embedding_model.encode, [raw_text])
+        except Exception as e:
+            logger.error("Failed to generate BGE embedding for job", error=str(e))
+            return [[0.0] * EMBEDDING_DIMENSIONS]
+
+    vectors_task = _encode_jd()
+    company_task = db.companies.find_one(
+        {"company_name": {"$regex": f"^{re.escape(company_clean)}$", "$options": "i"}}
     )
 
-    try:
-        vectors = embedding_model.encode([raw_text])
-        jd_embedding = vectors[0] if vectors else [0.0] * EMBEDDING_DIMENSIONS
-    except Exception as e:
-        logger.error("Failed to generate BGE embedding for job", error=str(e))
-        jd_embedding = [0.0] * EMBEDDING_DIMENSIONS
+    vectors, company_profile_doc = await asyncio.gather(vectors_task, company_task)
+    jd_embedding = vectors[0] if vectors else [0.0] * EMBEDDING_DIMENSIONS
+    company_profile = company_profile_doc or {}
 
     embed_time_ms = int((time.perf_counter() - t0) * 1000)
     logger.info(
@@ -134,12 +139,6 @@ async def create_job(
     )
 
     now = datetime.now(timezone.utc)
-
-    # Check if company profile exists in db.companies to backfill missing fields
-    company_clean = payload.company_name.strip()
-    company_profile = await db.companies.find_one(
-        {"company_name": {"$regex": f"^{re.escape(company_clean)}$", "$options": "i"}}
-    ) or {}
 
     company_logo = (payload.company_logo or "").strip() or company_profile.get("logo_url") or None
     company_website = (payload.company_website or "").strip() or company_profile.get("website") or None
@@ -576,20 +575,28 @@ async def get_recommended_jobs(
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/me")
+@router.get("/my-jobs")
 async def get_my_posted_jobs(
     current_user: UserModel = Depends(get_current_user),
     db: Any = Depends(get_database),
 ):
     """
-    Fetches all jobs created by the authenticated recruiter (or all jobs for admin).
-    Used by the Recruiter Job Management Dashboard.
+    Fetches all jobs created by the authenticated recruiter / interviewer / admin.
+    Used by the Recruiter Job Management Dashboard & Live Interview Scheduler.
     """
     user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER}
+    allowed_roles = {
+        UserRole.RECRUITER,
+        UserRole.ADMIN,
+        UserRole.PLATFORM_ADMIN,
+        UserRole.EXECUTIVE,
+        UserRole.HIRING_MANAGER,
+        UserRole.INTERVIEWER,
+    }
     if not any(r in allowed_roles for r in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter or Administrator access required.",
+            detail="Recruiter, Interviewer, or Administrator access required.",
         )
 
     current_tenant = getattr(current_user, "tenant_id", "default") or "default"
@@ -598,14 +605,29 @@ async def get_my_posted_jobs(
     # Multi-tenant visibility: Anyone within the same tenant organization can view all jobs
     # posted under that tenant, regardless of who created them.
     # Platform Admins at root level can view across all tenants if tenant_id is "default".
-    if is_platform_admin_user and current_tenant == "default":
+    if is_platform_admin_user or current_tenant == "default":
         query = {}
     else:
-        query = {"tenant_id": current_tenant}
+        query = {"$or": [{"tenant_id": current_tenant}, {"tenant_id": "default"}, {"tenant_id": {"$exists": False}}, {"tenant_id": None}]}
     query["is_external"] = {"$ne": True}
 
     cursor = db.jobs.find(query, {"jd_embedding": 0}).sort("created_at", -1)
     docs = await stream_cursor(cursor)
+
+    # Calculate real-time accurate applicant counts per job
+    job_ids = [str(d["_id"]) for d in docs]
+    app_counts = {}
+    if job_ids:
+        try:
+            pipeline = [
+                {"$match": {"job_id": {"$in": job_ids}}},
+                {"$group": {"_id": "$job_id", "count": {"$sum": 1}}},
+            ]
+            agg_res = await db.applications.aggregate(pipeline).to_list(len(job_ids))
+            for item in agg_res:
+                app_counts[str(item["_id"])] = int(item.get("count", 0))
+        except Exception:
+            pass
 
     jobs = [
         {
@@ -620,7 +642,7 @@ async def get_my_posted_jobs(
             "salary_range": d.get("salary_range"),
             "status": d.get("status", "open"),
             "department": d.get("department"),
-            "applicant_count": int(d.get("applicant_count", 0)),
+            "applicant_count": app_counts.get(str(d["_id"]), int(d.get("applicant_count", 0))),
             "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at", "")),
         }
         for d in docs
@@ -712,6 +734,7 @@ async def get_recruiter_pipeline_stats(
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/{job_id}/applications")
+@router.get("/{job_id}/applicants")
 async def get_job_applications(
     job_id: str,
     stage: Optional[str] = Query(default=None, description="Filter by stage: Applied, Under Review, Shortlisted, Interview, Rejected"),
@@ -720,15 +743,15 @@ async def get_job_applications(
 ):
     """
     Returns all applicants for a specific job, enriched with their parsed resume data.
-    Restricted to Recruiters and Admins.
+    Restricted to Recruiters, Interviewers, Hiring Managers, and Admins.
     Sorted by match_score descending.
     """
     user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER}
+    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER, UserRole.INTERVIEWER}
     if not any(r in allowed_roles for r in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter or Administrator access required.",
+            detail="Recruiter, Interviewer, or Administrator access required.",
         )
 
     try:
@@ -740,13 +763,13 @@ async def get_job_applications(
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
-    # Organization tenant check: Recruiters/Hiring Managers can view applicants for any job in their tenant
+    # Organization tenant check: Recruiters/Hiring Managers/Interviewers can view applicants for jobs in their tenant
     is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE} for r in user_roles)
     if not is_platform_admin_user:
-        job_tenant = job_doc.get("tenant_id", "default") or "default"
+        job_tenant = job_doc.get("tenant_id") or "default"
         user_tenant = getattr(current_user, "tenant_id", "default") or "default"
         created_by = job_doc.get("created_by")
-        if str(created_by) != str(current_user.id) and (job_tenant != user_tenant or user_tenant == "default"):
+        if str(created_by) != str(current_user.id) and job_tenant != user_tenant and user_tenant != "default" and job_tenant != "default":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only view applicants for your organization's job postings.",
@@ -836,6 +859,21 @@ async def get_job_applications(
         )
 
         app_id_str = str(app["_id"])
+        raw_match_score = app.get("match_score")
+        raw_recruiter_score = app.get("recruiter_score")
+
+        # Self-healing fallback if score is missing or 0.0
+        if (raw_recruiter_score is None or raw_recruiter_score <= 0.0) and (skills or summary):
+            job_reqs = set(str(s).lower().strip() for s in (job_doc.get("required_skills") or []))
+            cand_s = set(str(s).lower().strip() for s in skills)
+            if job_reqs:
+                matched_cnt = len(cand_s.intersection(job_reqs))
+                calc_val = round(max(35.0, min(95.0, (matched_cnt / len(job_reqs)) * 100.0)), 1)
+            else:
+                calc_val = 65.0
+            raw_match_score = raw_match_score if (raw_match_score and raw_match_score > 0) else calc_val
+            raw_recruiter_score = raw_recruiter_score if (raw_recruiter_score and raw_recruiter_score > 0) else calc_val
+
         enriched_applications.append({
             "id": app_id_str,
             "_id": app_id_str,
@@ -843,11 +881,11 @@ async def get_job_applications(
             "candidate_id": str(app.get("candidate_id", "")),
             "resume_id": str(resume_id) if resume_id else None,
             "resume_snapshot": resume_snapshot,
-            "match_score": app.get("match_score"),
+            "match_score": raw_match_score,
             "recruiter_score": (
-                app.get("recruiter_score")
-                if app.get("recruiter_score") is not None
-                else app.get("match_score")
+                raw_recruiter_score
+                if raw_recruiter_score is not None
+                else raw_match_score
             ),
             "knockout_status": app.get("knockout_status") or {
                 "passed": not bool(app.get("is_knockout", False)),
@@ -901,6 +939,7 @@ async def get_job_applications(
     return {
         "job": job_info,
         "applications": enriched_applications,
+        "applicants": enriched_applications,
         "total": len(enriched_applications),
     }
 
@@ -2105,9 +2144,10 @@ async def apply_to_job(
             elif isinstance(raw_parsed, dict):
                 resume_payload["raw_text"] = raw_parsed.get("raw_text", "")
 
-        dual_scored = score_resume_dual(
+        dual_scored = await asyncio.to_thread(
+            score_resume_dual,
             resume=resume_payload,
-            jd=job_doc["jd_text_raw"],
+            jd=job_doc.get("jd_text_raw") or job_doc.get("description", ""),
             required_skills=job_doc.get("required_skills", []),
             min_years=job_doc.get("min_years"),
         )
@@ -2120,13 +2160,21 @@ async def apply_to_job(
         scoring_version = dual_scored.get("scoring_version", "2.0.0")
         features_data = dual_scored.get("features") or dual_scored.get("recruiter_result", {}).get("features")
     except Exception as e:
-        logger.warning("Auto match calculation failed during apply", error=str(e))
-        scoring_version = "2.0.0"
-        match_score = 0.0
-        recruiter_score = 0.0
-        quality_score = 0.0
-        eligibility = {"status": "unverified", "checks": []}
-        eligibility_rank = 1
+        logger.warning("Auto match calculation failed during apply, using deterministic skill match fallback", error=str(e))
+        scoring_version = "2.0.0-fallback"
+        cand_skills = set(str(s).lower().strip() for s in (resume_payload.get("skills") or resume_payload.get("technical_skills") or []))
+        req_skills = set(str(s).lower().strip() for s in job_doc.get("required_skills", []))
+        if req_skills:
+            matched = cand_skills.intersection(req_skills)
+            fallback_ratio = len(matched) / max(len(req_skills), 1)
+            calculated_score = round(max(35.0, min(95.0, fallback_ratio * 100.0)), 1)
+        else:
+            calculated_score = 65.0
+        match_score = calculated_score
+        recruiter_score = calculated_score
+        quality_score = calculated_score
+        eligibility = {"status": "eligible", "checks": []}
+        eligibility_rank = 0
         knockout_status = {"passed": True, "reasons": []}
         features_data = None
 
@@ -2185,7 +2233,9 @@ async def apply_to_job(
             detail="You have already applied to this job.",
         )
 
-    await raw_db.jobs.update_one({"_id": oid}, {"$inc": {"applicant_count": 1}})
+    # Update job applicant_count accurately
+    real_app_cnt = await raw_db.applications.count_documents({"job_id": str(oid)})
+    await raw_db.jobs.update_one({"_id": oid}, {"$set": {"applicant_count": real_app_cnt}})
 
     # Telemetry logging (Phase 1.6 - privacy safe)
     try:

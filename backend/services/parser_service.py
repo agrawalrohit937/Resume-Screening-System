@@ -10,9 +10,16 @@ import re
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-import pdfplumber
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
+
 import structlog
-from docx import Document
+try:
+    from docx import Document
+except ImportError:
+    Document = None
 
 from models.resume_model import (
     ParsedResumeData, ContactInfo, WorkExperience,

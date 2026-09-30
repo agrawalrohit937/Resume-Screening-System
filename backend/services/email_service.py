@@ -250,6 +250,38 @@ class EmailService:
         )
         return await self._send(recipient_email, subject, html)
 
+    async def send_live_interview_invitation(
+        self,
+        *,
+        recipient_email: Optional[str] = None,
+        to_email: Optional[str] = None,
+        candidate_name: str = "Candidate",
+        company_name: str = "Hiring Team",
+        job_title: str = "Open Position",
+        interview_mode_label: str = "Live AI Assessment",
+        magic_link_url: str = "",
+        expiry_hours: int = 48,
+    ) -> bool:
+        """Sends an enterprise B2B Live AI interview magic link invitation email."""
+        target_email = recipient_email or to_email
+        if not target_email:
+            logger.warning("No recipient email provided for live interview invitation")
+            return False
+
+        subject = f"Live AI Interview Assessment: {job_title} at {company_name}"
+
+        html = _render_template(
+            "live_interview_invitation.html",
+            candidate_name=candidate_name or "Candidate",
+            company_name=company_name or "Hiring Team",
+            job_title=job_title or "Open Position",
+            interview_mode_label=interview_mode_label or "All-in-One Assessment",
+            magic_link_url=magic_link_url,
+            expiry_hours=expiry_hours,
+        )
+        logger.info("Dispatching live interview invitation email", to=target_email, job=job_title)
+        return await self._send(target_email, subject, html)
+
     async def send_certificate(
         self,
         *,

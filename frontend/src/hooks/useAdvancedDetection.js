@@ -182,6 +182,7 @@ export function useAdvancedDetection({
     const gaze = computeIrisGaze(lm)
     const headPose = computeHeadPose(lm)
     const eyeOpen = computeEyeOpenness(lm)
+    const currentEmotion = computeEmotion(lm, gaze, headPose, eyeOpen)
 
     // Looking down detection: eyes dropped (offsetY > 0.10 or eyeGazeDrop > 0.05) OR head tilted down (pitch > 6.0)
     const isLookingDown = gaze.dir === 'down' || gaze.offsetY > 0.10 || (gaze.eyeGazeDrop !== undefined && gaze.eyeGazeDrop > 0.05) || headPose.pitch > 6.0
@@ -204,12 +205,13 @@ export function useAdvancedDetection({
         gazeOffY:    gaze.offsetY,
         eyeOpenness: eyeOpen,
         headPose,
+        emotion:     currentEmotion,
         confidence:  count === 1 ? 0.95 : 0.60,
       }))
     }
 
-    // Draw visual debug overlay
-    if (canvasRef?.current && results.image) {
+    // Clean overlay without obstructing eyes or mirrored text
+    if (canvasRef?.current) {
       drawOverlay(canvasRef.current, lm, gaze, headPose, count)
     }
   }, [canvasRef, emitEvent, trackLookAway, trackLookingDown])
@@ -523,30 +525,62 @@ function computeEyeOpenness(lm) {
   }
 }
 
+// Emotion Analysis using 3D facial landmark geometry (Mouth, Eyebrows, Head Pose)
+function computeEmotion(lm, gaze, headPose, eyeOpen) {
+  try {
+    if (!lm || lm.length < 468) return 'neutral'
+
+    const lipLeft = lm[61]
+    const lipRight = lm[291]
+    const lipTop = lm[13]
+    const lipBottom = lm[14]
+    const browLeft = lm[70]
+    const browRight = lm[300]
+    const browInnerL = lm[55]
+    const browInnerR = lm[285]
+    const cheekLeft = lm[234]
+    const cheekRight = lm[454]
+    const chin = lm[152]
+    const forehead = lm[10]
+
+    const faceWidth = Math.hypot(cheekRight.x - cheekLeft.x, cheekRight.y - cheekLeft.y) || 0.1
+    const faceHeight = Math.hypot(chin.y - forehead.y, chin.x - forehead.x) || 0.1
+    
+    // 1. Smile / Happiness: Lip corners pulled upwards and outwards
+    const lipCornerAvgY = (lipLeft.y + lipRight.y) / 2
+    const smileLift = (lipTop.y - lipCornerAvgY) / faceHeight
+    const mouthWidthRatio = Math.hypot(lipRight.x - lipLeft.x, lipRight.y - lipLeft.y) / faceWidth
+
+    // 2. Openness / Surprise: Mouth open height + raised eyebrows
+    const mouthOpenRatio = Math.hypot(lipBottom.y - lipTop.y, lipBottom.x - lipTop.x) / faceHeight
+    const browAvgY = (browLeft.y + browRight.y) / 2
+    const eyeAvgY = (lm[159].y + lm[386].y) / 2
+    const browHeightRatio = (eyeAvgY - browAvgY) / faceHeight
+
+    // 3. Brow Furrow (Inner eyebrows pulled together): Focused / Stressed
+    const innerBrowDist = Math.hypot(browInnerR.x - browInnerL.x, browInnerR.y - browInnerL.y) / faceWidth
+
+    if (smileLift > 0.015 && mouthWidthRatio > 0.35) {
+      return 'happy'
+    }
+    if (mouthOpenRatio > 0.065 && browHeightRatio > 0.13) {
+      return 'surprised'
+    }
+    if (innerBrowDist < 0.16 && mouthOpenRatio < 0.035) {
+      return 'focused'
+    }
+    if (browHeightRatio < 0.08 || smileLift < -0.018) {
+      return 'nervous'
+    }
+    return 'neutral'
+  } catch {
+    return 'neutral'
+  }
+}
+
 function drawOverlay(canvas, landmarks, gaze, headPose, faceCount) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-  const W = canvas.width, H = canvas.height
-  const gazeColor = gaze.dir === 'center' ? '#10B981' : '#F59E0B'
-  ctx.strokeStyle = gazeColor
-  ctx.lineWidth = 2
-
-  // Draw iris markers
-  ;[LEFT_IRIS_CENTER, RIGHT_IRIS_CENTER].forEach(idx => {
-    const pt = landmarks[idx]
-    if (!pt) return
-    const x = pt.x * W, y = pt.y * H
-    ctx.beginPath()
-    ctx.arc(x, y, 4, 0, 2 * Math.PI)
-    ctx.fillStyle = gazeColor + 'CC'
-    ctx.fill()
-  })
-
-  // Status text
-  const statusColor = faceCount === 0 ? '#F43F5E' : faceCount > 1 ? '#F59E0B' : '#10B981'
-  ctx.fillStyle = statusColor
-  ctx.font = 'bold 11px JetBrains Mono, monospace'
-  ctx.fillText(`Faces: ${faceCount}  Gaze: ${gaze.dir}  Yaw: ${headPose.yaw.toFixed(0)}°  Pitch: ${headPose.pitch.toFixed(0)}°`, 8, 18)
+  // Clean, unobtrusive camera feed — no circles over eyes or flipped text
 }

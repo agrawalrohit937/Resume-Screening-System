@@ -97,13 +97,15 @@ function HeadPoseDisplay({ yaw = 0, pitch = 0, roll = 0 }) {
 // ── Emotion badge ──────────────────────────────────────────────────────────────
 function EmotionBadge({ emotion }) {
   const EMOTIONS = {
-    neutral:   { icon:'😐', color:'#6366F1', bg:'#EFF6FF', label:'Neutral' },
-    happy:     { icon:'😊', color:'#10B981', bg:'#ECFDF5', label:'Happy' },
+    neutral:   { icon:'😐', color:'#6366F1', bg:'#EFF6FF', label:'Neutral / Calm' },
+    happy:     { icon:'😊', color:'#10B981', bg:'#ECFDF5', label:'Happy / Smiling' },
+    focused:   { icon:'🧐', color:'#8B5CF6', bg:'#F5F3FF', label:'Focused / Thinking' },
+    nervous:   { icon:'😰', color:'#F43F5E', bg:'#FFF1F2', label:'Nervous / Stressed' },
+    surprised: { icon:'😲', color:'#F59E0B', bg:'#FFFBEB', label:'Surprised' },
     sad:       { icon:'😢', color:'#3B82F6', bg:'#EFF6FF', label:'Sad' },
     angry:     { icon:'😠', color:'#EF4444', bg:'#FFF1F2', label:'Angry' },
     fearful:   { icon:'😨', color:'#F43F5E', bg:'#FFF1F2', label:'Fearful' },
     disgusted: { icon:'🤢', color:'#F59E0B', bg:'#FFFBEB', label:'Disgusted' },
-    surprised: { icon:'😲', color:'#F59E0B', bg:'#FFFBEB', label:'Surprised' },
   }
   const cfg = EMOTIONS[emotion] || { icon:'❓', color:'#94A3B8', bg:'#F8FAFC', label: emotion || 'Detecting...' }
 

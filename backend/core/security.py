@@ -19,12 +19,18 @@ import hashlib
 import hmac
 import uuid
 
-# ─── Password Context ─────────────────────────────────────────────────────────
-# pwd_context uses argon2 for secure password hashing
-pwd_context = CryptContext(
-    schemes=["argon2", "bcrypt"],
-    deprecated="auto"
-)
+# pwd_context uses argon2 for secure password hashing with bcrypt fallback
+try:
+    pwd_context = CryptContext(
+        schemes=["argon2", "bcrypt"],
+        deprecated="auto"
+    )
+    pwd_context.hash("backend_check")
+except Exception:
+    pwd_context = CryptContext(
+        schemes=["bcrypt"],
+        deprecated="auto"
+    )
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)

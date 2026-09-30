@@ -237,7 +237,7 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                 top_3_jobs = qualifying_jobs[:3]
                 top_3_ids = [str(j.get("id") or j.get("_id")) for j in top_3_jobs if (j.get("id") or j.get("_id"))]
 
-                # Deduplication: Check if candidate already received identical recommendations in the last 24h
+                # Deduplication: Check if candidate already received identical recommendations in the last 5h
                 last_sent_ids = candidate.get("last_job_alert_job_ids", [])
                 last_sent_at = candidate.get("last_job_alert_at")
                 if (
@@ -245,9 +245,9 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                     and last_sent_ids
                     and set(top_3_ids) == set(last_sent_ids)
                     and isinstance(last_sent_at, datetime)
-                    and (now_utc - last_sent_at).total_seconds() < 86400
+                    and (now_utc - last_sent_at).total_seconds() < 18000
                 ):
-                    logger.debug("Skipping candidate as identical job alert was sent recently", candidate_id=candidate_id)
+                    logger.debug("Skipping candidate as identical job alert was sent in current slot", candidate_id=candidate_id)
                     continue
 
                 candidates_matched += 1
@@ -382,7 +382,10 @@ async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any
 def start_job_alert_scheduler() -> None:
     """
     Initializes and starts the APScheduler background cron job.
-    Schedules nightly job alerts daily at 02:00 AM UTC and periodic stuck-resume sweeps.
+    Schedules job alerts twice daily:
+    - Morning Slot: 07:30 AM IST (02:00 UTC)
+    - Afternoon Slot: 02:00 PM IST (08:30 UTC)
+    Plus periodic stuck-resume sweeps and external job scrapes.
     """
     if not APSCHEDULER_AVAILABLE:
         logger.info("APScheduler package not installed, running without background cron tasks")
@@ -393,16 +396,27 @@ def start_job_alert_scheduler() -> None:
         return
 
     try:
-
+        # 1. Morning Job Alert Digest (07:30 AM IST)
         job_alerts_scheduler.add_job(
             run_nightly_job_alerts,
-            trigger=CronTrigger(hour=2, minute=0, timezone="UTC"),
-            id="nightly_job_alerts",
-            name="Nightly AI Job Alerts Retention Loop",
+            trigger=CronTrigger(hour=7, minute=30, timezone="Asia/Kolkata"),
+            id="morning_job_alerts",
+            name="Morning AI Job Alerts Digest (07:30 AM IST)",
             replace_existing=True,
             misfire_grace_time=3600,
         )
 
+        # 2. Afternoon Job Alert Digest (02:00 PM IST)
+        job_alerts_scheduler.add_job(
+            run_nightly_job_alerts,
+            trigger=CronTrigger(hour=14, minute=0, timezone="Asia/Kolkata"),
+            id="afternoon_job_alerts",
+            name="Afternoon AI Job Alerts Digest (02:00 PM IST)",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
+        # 3. Sweep stuck resumes every 5 minutes
         job_alerts_scheduler.add_job(
             sweep_stuck_pending_resumes,
             trigger=IntervalTrigger(minutes=5),
@@ -412,17 +426,18 @@ def start_job_alert_scheduler() -> None:
             misfire_grace_time=300,
         )
 
+        # 4. Twice-daily external job scrape (06:30 AM IST and 01:00 PM IST)
         job_alerts_scheduler.add_job(
             run_external_job_scrape,
-            trigger=CronTrigger(hour=1, minute=0, timezone="UTC"),
+            trigger=CronTrigger(hour="6,13", minute=30, timezone="Asia/Kolkata"),
             id="external_job_scrape",
-            name="Daily JSearch External Job Scrape",
+            name="Twice-Daily JSearch External Job Scrape",
             replace_existing=True,
             misfire_grace_time=3600,
         )
 
         job_alerts_scheduler.start()
-        logger.info("Nightly AI Job Alerts & Background sweep schedulers started")
+        logger.info("Twice-Daily AI Job Alerts (7:30 AM & 2:00 PM IST) & Background schedulers started")
     except Exception as exc:
         logger.error("Failed to start job alerts scheduler", error=str(exc))
 

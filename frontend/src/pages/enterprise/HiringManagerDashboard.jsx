@@ -235,9 +235,18 @@ export default function HiringManagerDashboard() {
 
       {/* Loading state */}
       {loading && requisitions.length === 0 && candidates.length === 0 ? (
-        <div className="p-16 flex flex-col items-center justify-center space-y-4 bg-white rounded-3xl border border-slate-200/80 shadow-sm">
-          <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Loading department requisitions & talent pipeline...</p>
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-8 shadow-xs animate-pulse space-y-4">
+            <div className="h-5 w-48 bg-slate-200 rounded" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="h-28 bg-slate-100 rounded-2xl" />
+              <div className="h-28 bg-slate-100 rounded-2xl" />
+            </div>
+          </div>
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-8 shadow-xs animate-pulse space-y-4">
+            <div className="h-5 w-48 bg-slate-200 rounded" />
+            <div className="h-40 bg-slate-100 rounded-2xl" />
+          </div>
         </div>
       ) : (
         <>

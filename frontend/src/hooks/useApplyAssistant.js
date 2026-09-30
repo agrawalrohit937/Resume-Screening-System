@@ -123,5 +123,6 @@ export function useApplyAssistant() {
     sessionStorage.removeItem('pending_application_id');
   }, []);
 
-  return { step, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset };
+  return { step, setStep, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset };
 }
+

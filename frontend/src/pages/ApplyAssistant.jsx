@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Briefcase, FileText, CheckCircle,
   Loader2, Send, ArrowRight, History, Plus,
-  AlertTriangle, ScanSearch, Mail
+  AlertTriangle, ScanSearch, Mail, RotateCcw
 } from 'lucide-react';
+
 
 import { useAuth } from '../context/AuthContext';
 import { getResumes } from '../services/api';
@@ -73,7 +74,7 @@ export default function ApplyAssistant() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { step, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset } = useApplyAssistant();
+  const { step, setStep, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset } = useApplyAssistant();
   const [resumeId, setResumeId] = useState(null);
   const [jobDetailsState, setJobDetailsState] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -88,69 +89,63 @@ export default function ApplyAssistant() {
   });
   const [extractingDetails, setExtractingDetails] = useState(false);
 
-  // 👇 Restore pending draft and check Gmail connection status on mount / return from /gmail-callback
+  // 👇 Check Gmail connection and only restore draft if returning from Google OAuth redirect
   useEffect(() => {
     const checkAndRestore = async () => {
-      // 1. Check for stored pending draft in sessionStorage
-      const storedDraftJson = sessionStorage.getItem('pending_application_draft');
-      const storedAppId = sessionStorage.getItem('pending_application_id');
-      let restored = false;
+      const params = new URLSearchParams(location.search);
+      const isGmailReturn = params.get('gmail') === 'connected';
 
-      if (storedDraftJson) {
-        try {
-          const parsed = JSON.parse(storedDraftJson);
-          restoreDraft(parsed);
-          restored = true;
-        } catch (e) {
-          console.error('[ApplyAssistant] Failed to parse stored draft', e);
-        }
-      }
+      // 1. If returning from Gmail OAuth callback, restore the draft so user can send immediately
+      if (isGmailReturn) {
+        const storedDraftJson = sessionStorage.getItem('pending_application_draft');
+        const storedAppId = sessionStorage.getItem('pending_application_id');
+        let restored = false;
 
-      if (!restored && storedAppId) {
-        try {
-          const fetched = await applyAssistantApi.getDraft(storedAppId);
-          if (fetched) {
-            restoreDraft(fetched);
-            sessionStorage.setItem('pending_application_draft', JSON.stringify(fetched));
+        if (storedDraftJson) {
+          try {
+            const parsed = JSON.parse(storedDraftJson);
+            restoreDraft(parsed);
             restored = true;
-          }
-        } catch (e) {
-          if (e?.response?.status === 404) {
-            sessionStorage.removeItem('pending_application_id');
-            sessionStorage.removeItem('pending_application_draft');
-          }
-          console.error('[ApplyAssistant] Failed to fetch draft by stored ID', e);
-        }
-      }
-
-      if (!restored) {
-        try {
-          const active = await applyAssistantApi.getActiveDraft();
-          if (active && active.status === 'ready_for_review') {
-            restoreDraft(active);
-            sessionStorage.setItem('pending_application_draft', JSON.stringify(active));
-            sessionStorage.setItem('pending_application_id', active.application_id);
-          } else {
-            reset();
-          }
-        } catch (err) {
-          // Gracefully catch 404 when no active draft exists
-          if (err?.response?.status === 404) {
-            reset();
-          } else {
-            console.error('[ApplyAssistant] Error checking active draft:', err);
-            reset();
+          } catch (e) {
+            console.error('[ApplyAssistant] Failed to parse stored draft', e);
           }
         }
+
+        if (!restored && storedAppId) {
+          try {
+            const fetched = await applyAssistantApi.getDraft(storedAppId);
+            if (fetched) {
+              restoreDraft(fetched);
+              restored = true;
+            }
+          } catch (e) {
+            console.error('[ApplyAssistant] Failed to fetch draft by stored ID', e);
+          }
+        }
+
+        if (!restored) {
+          try {
+            const active = await applyAssistantApi.getActiveDraft();
+            if (active && active.status === 'ready_for_review') {
+              restoreDraft(active);
+            }
+          } catch {
+            // Ignore if no active draft
+          }
+        }
+      } else {
+        // Standard page load or refresh: start clean on Job Details form
+        sessionStorage.removeItem('pending_application_draft');
+        sessionStorage.removeItem('pending_application_id');
+        reset();
       }
 
-      // 2. Check Gmail connection
+      // 2. Check Gmail connection status
       try {
         const { is_connected } = await applyAssistantApi.checkGmailConnected();
         setIsGmailConnected(is_connected);
 
-        const params = new URLSearchParams(location.search);
-        if (params.get('gmail') === 'connected' && is_connected) {
+        if (isGmailReturn && is_connected) {
           toast.success('Gmail connected! Your application draft is ready to send.');
           setShowConfirm(true);
           window.history.replaceState({}, '', location.pathname);
@@ -163,36 +158,65 @@ export default function ApplyAssistant() {
     checkAndRestore();
   }, [location.search, restoreDraft, reset]);
 
+
   // 👇 Fetch the primary parsed resume from the backend on load
-  useEffect(() => {
-    const fetchPrimaryResume = async () => {
-      try {
-        const response = await getResumes({ status: 'parsed' });
-        const data = response.data;
-        if (data && data.resumes && data.resumes.length > 0) {
-          setResumeId(data.resumes[0].id);
+  const fetchPrimaryResume = useCallback(async () => {
+    try {
+      const response = await getResumes({ page_size: 10 });
+      const data = response.data;
+      if (data && data.resumes && data.resumes.length > 0) {
+        const primary =
+          data.resumes.find((r) => r.is_primary) ||
+          data.resumes.find((r) => r.status === 'parsed') ||
+          data.resumes[0];
+        if (primary) {
+          const validId = primary.id || primary._id;
+          setResumeId(validId);
+          return validId;
         }
-      } catch (err) {
-        console.error('Failed to load primary resume for Apply Assistant', err);
       }
-    };
-
-    if (user?.profile_resume_url) {
-      fetchPrimaryResume();
+    } catch (err) {
+      console.error('Failed to load primary resume for Apply Assistant', err);
     }
-  }, [user]);
+    return null;
+  }, []);
 
+  useEffect(() => {
+    fetchPrimaryResume();
+  }, [fetchPrimaryResume, user]);
+
+  // ⚡ 1-Click Express Apply Action
   const handleJobDetailsSubmit = useCallback(
-    (jobDetails) => {
-      if (!resumeId) {
+    async (jobDetails) => {
+      let targetResumeId = resumeId;
+      if (!targetResumeId) {
+        targetResumeId = await fetchPrimaryResume();
+      }
+      if (!targetResumeId) {
         toast.error('Please upload a resume in your Profile section first.');
         return;
       }
-      // First check ATS score before generating draft
       setJobDetailsState(jobDetails);
-      checkATSScore(resumeId, jobDetails);
+      generateDraft(targetResumeId, jobDetails);
     },
-    [resumeId, checkATSScore],
+    [resumeId, fetchPrimaryResume, generateDraft],
+  );
+
+  // 🔍 Optional Manual ATS Check Action
+  const handleCheckATS = useCallback(
+    async (jobDetails) => {
+      let targetResumeId = resumeId;
+      if (!targetResumeId) {
+        targetResumeId = await fetchPrimaryResume();
+      }
+      if (!targetResumeId) {
+        toast.error('Please upload a resume in your Profile section first.');
+        return;
+      }
+      setJobDetailsState(jobDetails);
+      checkATSScore(targetResumeId, jobDetails);
+    },
+    [resumeId, fetchPrimaryResume, checkATSScore],
   );
 
   const handleProceedToDraft = useCallback(() => {
@@ -200,6 +224,8 @@ export default function ApplyAssistant() {
       generateDraft(resumeId, jobDetailsState);
     }
   }, [resumeId, jobDetailsState, generateDraft]);
+
+
 
   const handleGoToATSMatcher = useCallback(() => {
     navigate('/results');
@@ -235,7 +261,7 @@ export default function ApplyAssistant() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-3.5 sm:space-y-8 font-sans text-slate-900 py-1 sm:py-6">
+    <div className="w-full max-w-[1550px] mx-auto px-2 sm:px-6 space-y-3.5 sm:space-y-8 font-sans text-slate-900 py-1 sm:py-6">
 
       {/* Header & Tabs */}
       <div className="space-y-3 sm:space-y-6">
@@ -250,7 +276,10 @@ export default function ApplyAssistant() {
 
         <div className="flex items-center gap-1 border-b border-slate-200">
           <button
-            onClick={() => setActiveTab('apply')}
+            onClick={() => {
+              setActiveTab('apply');
+              reset();
+            }}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${activeTab === 'apply'
                 ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
@@ -258,6 +287,7 @@ export default function ApplyAssistant() {
           >
             <Plus size={16} /> New Application
           </button>
+
           <button
             onClick={() => setActiveTab('history')}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${activeTab === 'history'
@@ -413,6 +443,7 @@ export default function ApplyAssistant() {
                             setValues={setFormValues}
                             extracting={extractingDetails}
                             onSubmit={handleJobDetailsSubmit}
+                            onCheckATS={handleCheckATS}
                             isSubmitting={isSubmitting}
                           />
                         </div>
@@ -453,7 +484,16 @@ export default function ApplyAssistant() {
                           <h2 className="text-lg font-semibold text-slate-900">Review Draft</h2>
                           <p className="text-sm text-slate-500 mt-1">Verify and adjust the generated content before sending.</p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => reset()}
+                          className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <RotateCcw size={13} />
+                          <span>Start New Application</span>
+                        </button>
                       </div>
+
 
                       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                         <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500 font-medium">Loading editor...</div>}>

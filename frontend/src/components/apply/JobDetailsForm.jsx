@@ -1,6 +1,7 @@
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, ScanSearch } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-export default function JobDetailsForm({ values, setValues, extracting, onSubmit, isSubmitting }) {
+export default function JobDetailsForm({ values, setValues, extracting, onSubmit, onCheckATS, isSubmitting }) {
   const safeValues = values || {
     company_name: '',
     job_title: '',
@@ -14,9 +15,36 @@ export default function JobDetailsForm({ values, setValues, extracting, onSubmit
     }
   };
 
+  const validateFields = () => {
+    if (!safeValues.company_name?.trim()) {
+      toast.error('Please enter the company name.');
+      return false;
+    }
+    if (!safeValues.job_title?.trim()) {
+      toast.error('Please enter the job title.');
+      return false;
+    }
+    if (!safeValues.hr_email?.trim()) {
+      toast.error('Please enter the recruiter / HR email.');
+      return false;
+    }
+    if (!safeValues.job_description?.trim()) {
+      toast.error('Please provide the job description.');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!validateFields()) return;
     if (onSubmit) onSubmit(safeValues);
+  };
+
+  const handleCheckATS = (e) => {
+    e.preventDefault();
+    if (!validateFields()) return;
+    if (onCheckATS) onCheckATS(safeValues);
   };
 
   return (
@@ -100,7 +128,7 @@ export default function JobDetailsForm({ values, setValues, extracting, onSubmit
             </label>
             <textarea
               required
-              rows={8}
+              rows={7}
               value={safeValues.job_description}
               onChange={handleChange('job_description')}
               placeholder="Paste the full job description or auto-extract via screenshot on the left..."
@@ -108,25 +136,30 @@ export default function JobDetailsForm({ values, setValues, extracting, onSubmit
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting || extracting}
-            className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-[#2E9BDA] hover:from-indigo-700 hover:to-[#2380b8] px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                <span>Checking ATS Compatibility...</span>
-              </>
-            ) : (
-              <>
-                <span>Analyze Job & Check ATS Match</span>
-                <Sparkles size={16} />
-              </>
-            )}
-          </button>
+          <div className="space-y-2.5 pt-1">
+            {/* Primary Action: 1-Click Express Apply */}
+            <button
+              type="submit"
+              disabled={isSubmitting || extracting}
+              className="w-full rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-[#2E9BDA] hover:from-indigo-700 hover:to-[#2380b8] px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Drafting Tailored Application...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} className="text-amber-300" />
+                  <span>⚡ 1-Click Express Apply (Auto-Draft)</span>
+                </>
+              )}
+            </button>
+          </div>
+
         </>
       )}
     </form>
   );
 }
+

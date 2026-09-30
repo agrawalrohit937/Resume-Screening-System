@@ -59,8 +59,38 @@ async def _ensure_indexes() -> None:
         await db.users.create_indexes([
             IndexModel([("email", ASCENDING)], unique=True, name="email_unique"),
             IndexModel([("role", ASCENDING)], name="role_idx"),
+            IndexModel([("tenant_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], name="user_tenant_status_created_idx"),
+            IndexModel([("tenant_id", ASCENDING)], name="user_tenant_idx"),
             IndexModel([("created_at", DESCENDING)], name="created_at_idx"),
             IndexModel([("portfolio_slug", ASCENDING)], name="user_portfolio_slug_idx", sparse=True),
+        ])
+
+        # team_invites
+        await db.team_invites.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], name="team_invite_tenant_status_idx"),
+            IndexModel([("email", ASCENDING), ("tenant_id", ASCENDING), ("status", ASCENDING)], name="team_invite_lookup_idx"),
+            IndexModel([("token", ASCENDING)], name="team_invite_token_idx"),
+        ])
+
+        # requisitions (headcount & budget)
+        await db.requisitions.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], name="req_tenant_status_created_idx"),
+            IndexModel([("hiring_manager_id", ASCENDING)], name="req_manager_idx"),
+        ])
+
+        # talent_pool_profiles (consented talent marketplace)
+        await db.talent_pool_profiles.create_indexes([
+            IndexModel([("candidate_id", ASCENDING)], unique=True, name="talent_candidate_unique"),
+            IndexModel([("opted_in", ASCENDING), ("visibility_tier", ASCENDING), ("years_experience", ASCENDING)], name="talent_search_optin_idx"),
+        ])
+
+        # scorecards & eeo responses
+        await db.scorecards.create_indexes([
+            IndexModel([("application_id", ASCENDING), ("tenant_id", ASCENDING)], name="scorecard_app_tenant_idx"),
+        ])
+        await db.eeo_responses.create_indexes([
+            IndexModel([("tenant_id", ASCENDING)], name="eeo_tenant_idx"),
+            IndexModel([("job_id", ASCENDING)], name="eeo_job_idx"),
         ])
 
         # resumes
@@ -134,12 +164,16 @@ async def _ensure_indexes() -> None:
         # ─── applications ──────────────────────────────────────────────────
         await db.applications.create_indexes([
             IndexModel([("job_id", ASCENDING), ("candidate_id", ASCENDING)], unique=True, name="app_job_candidate_unique"),
+            IndexModel([("tenant_id", ASCENDING), ("stage", ASCENDING)], name="app_tenant_stage_idx"),
+            IndexModel([("tenant_id", ASCENDING), ("status", ASCENDING)], name="app_tenant_status_idx"),
             IndexModel([("job_id", ASCENDING)], name="app_job_idx"),
             IndexModel([("candidate_id", ASCENDING)], name="app_candidate_idx"),
             IndexModel([("created_at", DESCENDING)], name="app_created_idx"),
         ])
 
         await db.jobs.create_indexes([
+            IndexModel([("tenant_id", ASCENDING), ("status", ASCENDING)], name="jobs_tenant_status_idx"),
+            IndexModel([("created_by", ASCENDING)], name="jobs_creator_idx"),
             IndexModel([("external_job_id", ASCENDING)], unique=True, sparse=True, name="jobs_external_id_unique"),
             IndexModel([("is_external", ASCENDING), ("status", ASCENDING)], name="jobs_external_status_idx"),
         ])

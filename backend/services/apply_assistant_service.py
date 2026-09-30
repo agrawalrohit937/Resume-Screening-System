@@ -20,8 +20,12 @@ from repositories.user_repo import UserRepository
 import base64
 import json
 import re
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except Exception:
+    genai = None
+    types = None
 import structlog
 from core.llm_client import gemini_key_pool, groq_key_pool
 
