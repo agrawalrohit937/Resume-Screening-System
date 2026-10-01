@@ -275,19 +275,6 @@ async def match_resume(
                 "total_ats_checks",
             )
 
-            # Shadow scoring parallel evaluation (Phase 4.6)
-            try:
-                from services.shadow_scoring import shadow_scoring_service
-                db_inst = getattr(result_repo, "db", None) or getattr(getattr(result_repo, "collection", None), "database", None)
-                shadow_scoring_service.dispatch_shadow_score(
-                    job_id=str(jd.id) if jd and hasattr(jd, "id") else "ats_check",
-                    candidate_id=str(current_user.id),
-                    primary_score=score_data["final_score"],
-                    features_dict=scored.get("features"),
-                    db=db_inst,
-                )
-            except Exception as shadow_err:
-                logger.debug("Shadow scoring dispatch skipped in ATS check", error=str(shadow_err))
         except Exception as e:
             logger.warning("Failed to save ATS result in database", error=str(e))
 

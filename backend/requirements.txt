@@ -25,6 +25,7 @@ langgraph>=0.0.50
 groq>=0.5.0
 google-genai>=0.1.1
 google-api-python-client>=2.198.0
+json-repair>=0.30.0
 
 # ─── File & Document Parsing ──────────────────────────────────
 pdfplumber==0.11.0

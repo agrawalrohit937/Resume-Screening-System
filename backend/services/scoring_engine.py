@@ -77,9 +77,6 @@ except Exception:
     normalize_skill = None
     ONTOLOGY_VERSION = "ontology-v2.1.0-fallback"
 
-HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
-HF_API_URL = os.getenv("HF_API_URL", "https://api-inference.huggingface.co/models/BAAI/bge-large-en-v1.5")
-
 # Cosine calibration bounds for the embedding path (BGE cosine typically lives in ~0.40-0.85).
 # Min-Max maps raw cosine [VEC_SIM_FLOOR, VEC_SIM_CEIL] -> [0, 100].
 VEC_SIM_FLOOR = float(os.getenv("VEC_SIM_FLOOR", "0.40"))
@@ -1109,10 +1106,13 @@ def _calibrate_cosine(sim: float) -> float:
 
 
 def _semantic_vector_similarity(resume_text: str, jd_text: str) -> float:
+    """
+    100% Neural & Semantic ATS vector similarity powered by BGE-M3 / BGE embeddings.
+    Strictly zero legacy TF-IDF/BM25 keyword matching for true deep semantic understanding.
+    """
     if not resume_text or not jd_text:
         return 0.0
 
-    # 1. Prefer local BGE embedding model (instant, offline CPU execution)
     try:
         from services.embedding_service import embedding_model
         vecs = embedding_model.encode([resume_text[:VEC_TEXT_BUDGET], jd_text[:VEC_TEXT_BUDGET]])
@@ -1122,52 +1122,10 @@ def _semantic_vector_similarity(resume_text: str, jd_text: str) -> float:
             denom = float(np.linalg.norm(v1) * np.linalg.norm(v2)) or 1.0
             return _calibrate_cosine(float(v1 @ v2) / denom)
     except Exception as e:
-        logger.debug("Local embedding similarity failed, trying remote or TF-IDF", error=str(e))
-
-    # NOTE: the remote HF and TF-IDF fallbacks have different score distributions than local BGE
-    # and are intentionally NOT calibrated with the BGE floor/ceil above.
-    if HF_TOKEN:
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        payload = {
-            "inputs": {
-                "source_sentence": jd_text[:2500],
-                "sentences": [resume_text[:2500]],
-            }
-        }
-        try:
-            response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
-            if response.status_code == 200:
-                raw_json = response.json()
-                if isinstance(raw_json, list) and raw_json:
-                    val_item = raw_json[0]
-                    if isinstance(val_item, list) and val_item:
-                        val_item = val_item[0]
-                    val = float(val_item)
-                    val_pct = val * 100.0 if val <= 1.0 else val
-                    return max(0.0, min(100.0, round(val_pct, 1)))
-        except Exception as e:
-            logger.debug("HuggingFace API similarity failed, using TF-IDF fallback", error=str(e))
-
-    # Fast TF-IDF Cosine Similarity Fallback
-    words1 = [w for w in re.findall(r"\b[a-zA-Z0-9+#.-]{2,}\b", (resume_text or "").lower()) if w not in _ENGLISH_STOPWORDS]
-    words2 = [w for w in re.findall(r"\b[a-zA-Z0-9+#.-]{2,}\b", (jd_text or "").lower()) if w not in _ENGLISH_STOPWORDS]
-    if not words1 or not words2:
+        logger.warning("Neural embedding similarity calculation error", error=str(e))
         return 0.0
 
-    tf1 = Counter(words1)
-    tf2 = Counter(words2)
-    common_terms = set(tf1.keys()).intersection(set(tf2.keys()))
-    if not common_terms:
-        return 0.0
-
-    dot_product = sum(tf1[term] * tf2[term] for term in common_terms)
-    mag1 = math.sqrt(sum(v ** 2 for v in tf1.values()))
-    mag2 = math.sqrt(sum(v ** 2 for v in tf2.values()))
-    if mag1 == 0 or mag2 == 0:
-        return 0.0
-
-    cosine_sim = dot_product / (mag1 * mag2)
-    return round(min(100.0, max(0.0, cosine_sim * 100.0)), 1)
+    return 0.0
 
 
 # ══════════════════════════════════════════════════════════════════════════

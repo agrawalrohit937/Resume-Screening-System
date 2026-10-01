@@ -20,11 +20,15 @@ import {
   SlidersHorizontal,
   Layers,
   ArrowUpRight,
+  ArrowRight,
   TrendingUp,
   Award,
   AlertTriangle,
   Globe,
   Laptop,
+  Home,
+  User,
+  Leaf,
   ChevronDown,
   ShieldCheck,
   Users,
@@ -199,6 +203,7 @@ export default function JobFeed() {
 
   // Modals & Drawers
   const [activeJobDetail, setActiveJobDetail] = useState(null)
+  const [matchTargetJob, setMatchTargetJob] = useState(null)
   const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [isMatchModalOpen, setIsMatchModalOpen] = useState(false)
   const [matchResult, setMatchResult] = useState(null)
@@ -548,8 +553,9 @@ What We Are Looking For:
 
   // Calculate Match %
   const handleCalculateMatch = async (job) => {
+    if (!job) return
     setMatchLoading(true)
-    setActiveJobDetail(job)
+    setMatchTargetJob(job)
     setIsMatchModalOpen(true)
     setMatchResult(null)
 
@@ -561,6 +567,7 @@ What We Are Looking For:
       const msg = err.response?.data?.detail || 'Please upload a parsed resume first to calculate match %.'
       toast.error(msg)
       setIsMatchModalOpen(false)
+      setMatchTargetJob(null)
     } finally {
       setMatchLoading(false)
     }
@@ -1245,186 +1252,196 @@ What We Are Looking For:
 
       {/* ── 3. Match % Calculation Modal ────────────────────────────────────── */}
       <AnimatePresence>
-        {isMatchModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 sm:p-7 relative overflow-hidden"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-5">
-                <div>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mb-2">
-                    <Sparkles size={12} /> ATS Engine Evaluation
-                  </span>
-                  <h3 className="text-lg font-extrabold text-slate-900 font-poppins">
-                    {activeJobDetail?.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    {activeJobDetail?.company_name} • {activeJobDetail?.location}
-                  </p>
+        {isMatchModalOpen && (() => {
+          const targetMatchJob = matchTargetJob || activeJobDetail
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 sm:p-7 relative overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-5">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mb-2">
+                      <Sparkles size={12} /> ATS Engine Evaluation
+                    </span>
+                    <h3 className="text-lg font-extrabold text-slate-900 font-poppins">
+                      {targetMatchJob?.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {targetMatchJob?.company_name} • {targetMatchJob?.location}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMatchModalOpen(false)
+                      setMatchTargetJob(null)
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMatchModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              {/* Body */}
-              {matchLoading ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center">
-                  <div className="w-12 h-12 rounded-2xl border-4 border-indigo-600 border-t-transparent animate-spin mb-4" />
-                  <p className="text-sm font-bold text-slate-800 font-poppins">
-                    Evaluating Match Percentage...
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                    Comparing technical skills (70%), internship/experience (15%), and education (15%).
-                  </p>
-                </div>
-              ) : matchResult ? (() => {
-                const dedupeCaseInsensitive = (arr) => {
-                  const seen = new Set()
-                  return (arr || []).filter((item) => {
-                    const lower = item.toLowerCase().trim()
-                    if (seen.has(lower)) return false
-                    seen.add(lower)
-                    return true
-                  })
-                }
-                const matchedSkills = dedupeCaseInsensitive(matchResult.matched_skills || [])
-                const matchedLower = new Set(matchedSkills.map((s) => s.toLowerCase().trim()))
-                const missingSkills = dedupeCaseInsensitive(matchResult.missing_skills || []).filter(
-                  (s) => !matchedLower.has(s.toLowerCase().trim())
-                )
-                const totalSkillsCount = matchedSkills.length + missingSkills.length
+                {/* Body */}
+                {matchLoading ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center">
+                    <div className="w-12 h-12 rounded-2xl border-4 border-[#2E9BDA] border-t-transparent animate-spin mb-4" />
+                    <p className="text-sm font-bold text-slate-800 font-poppins">
+                      Evaluating Match Percentage...
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                      Comparing technical skills, internship/experience, and role relevance.
+                    </p>
+                  </div>
+                ) : matchResult ? (() => {
+                  const dedupeCaseInsensitive = (arr) => {
+                    const seen = new Set()
+                    return (arr || []).filter((item) => {
+                      const lower = item.toLowerCase().trim()
+                      if (seen.has(lower)) return false
+                      seen.add(lower)
+                      return true
+                    })
+                  }
+                  const matchedSkills = dedupeCaseInsensitive(matchResult.matched_skills || [])
+                  const matchedLower = new Set(matchedSkills.map((s) => s.toLowerCase().trim()))
+                  const missingSkills = dedupeCaseInsensitive(matchResult.missing_skills || []).filter(
+                    (s) => !matchedLower.has(s.toLowerCase().trim())
+                  )
+                  const totalSkillsCount = matchedSkills.length + missingSkills.length
 
-                return (
-                  <div className="space-y-5">
-                    {/* Score Pill Card */}
-                    <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Estimated Match
-                        </p>
-                        <h4 className="text-3xl font-black text-slate-900 font-poppins mt-0.5">
-                          {Math.round(matchResult.final_score)}%
-                        </h4>
-                        <p className="text-xs font-bold text-indigo-700 mt-0.5">
-                          {matchResult.recommendation}
-                        </p>
-                      </div>
+                  return (
+                    <div className="space-y-5">
+                      {/* Score Pill Card */}
+                      <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Estimated Match
+                          </p>
+                          <h4 className="text-3xl font-black text-slate-900 font-poppins mt-0.5">
+                            {Math.round(matchResult.final_score)}%
+                          </h4>
+                          <p className="text-xs font-bold text-indigo-700 mt-0.5">
+                            {matchResult.recommendation}
+                          </p>
+                        </div>
 
-                      <div className="text-right text-xs space-y-1">
-                        <p className="text-slate-600 font-medium">
-                          Skills Match: <strong className="text-slate-900">{matchedSkills.length}</strong> / {totalSkillsCount}
-                        </p>
-                        <p className="text-slate-600 font-medium">
-                          Weight: <strong className="text-indigo-600 font-bold">Skills 70% • Exp 15% • Edu 15%</strong>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Knockout Warning Banner */}
-                    {(matchResult.is_knockout || (matchResult.knockout_reasons && matchResult.knockout_reasons.length > 0)) && (
-                      <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 flex items-start gap-3 text-amber-900 shadow-2xs">
-                        <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                        <div className="text-xs space-y-1">
-                          <div className="font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                            <span>Requirement Warning</span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-200/80 text-amber-900 font-bold">Deficit Detected</span>
-                          </div>
-                          {matchResult.knockout_reasons && matchResult.knockout_reasons.length > 0 ? (
-                            matchResult.knockout_reasons.map((reason, idx) => (
-                              <p key={idx} className="font-semibold text-amber-800">
-                                • {reason}
-                              </p>
-                            ))
-                          ) : (
-                            <p className="font-semibold text-amber-800">
-                              • Role requirements (experience or education) not fully met.
-                            </p>
-                          )}
-                          <p className="text-[11px] text-amber-700/90 font-medium pt-0.5">
-                            Warning: You may still apply, but recruiters will see this deficit during candidate screening.
+                        <div className="text-right text-xs space-y-1">
+                          <p className="text-slate-600 font-medium">
+                            Skills Match: <strong className="text-slate-900">{matchedSkills.length}</strong> / {totalSkillsCount}
+                          </p>
+                          <p className="text-slate-600 font-medium">
+                            Weight: <strong className="text-indigo-600 font-bold">Skills 70% • Exp 15% • Edu 15%</strong>
                           </p>
                         </div>
                       </div>
-                    )}
 
-                    {/* Matched Skills */}
-                    {matchedSkills.length > 0 && (
-                      <div>
-                        <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                          Matching Competencies ({matchedSkills.length})
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {matchedSkills.map((s, idx) => (
-                            <span key={idx} className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              ✓ {s}
-                            </span>
-                          ))}
+                      {/* Knockout Warning Banner */}
+                      {(matchResult.is_knockout || (matchResult.knockout_reasons && matchResult.knockout_reasons.length > 0)) && (
+                        <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 flex items-start gap-3 text-amber-900 shadow-2xs">
+                          <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div className="text-xs space-y-1">
+                            <div className="font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                              <span>Requirement Warning</span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-200/80 text-amber-900 font-bold">Deficit Detected</span>
+                            </div>
+                            {matchResult.knockout_reasons && matchResult.knockout_reasons.length > 0 ? (
+                              matchResult.knockout_reasons.map((reason, idx) => (
+                                <p key={idx} className="font-semibold text-amber-800">
+                                  • {reason}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="font-semibold text-amber-800">
+                                • Role requirements (experience or education) not fully met.
+                              </p>
+                            )}
+                            <p className="text-[11px] text-amber-700/90 font-medium pt-0.5">
+                              Warning: You may still apply, but recruiters will see this deficit during candidate screening.
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Missing Skills */}
-                    {missingSkills.length > 0 && (
-                      <div>
-                        <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                          Potential Gaps to Highlight ({missingSkills.length})
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {missingSkills.slice(0, 6).map((s, idx) => (
-                            <span key={idx} className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              + {s}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsMatchModalOpen(false)}
-                        className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 transition"
-                      >
-                        Close
-                      </button>
-                      <button
-                        type="button"
-                        disabled={Boolean(activeJobDetail?.has_applied || appliedJobs.has(activeJobDetail?.id)) || applyingJobId === activeJobDetail?.id}
-                        onClick={() => {
-                          setIsMatchModalOpen(false)
-                          handleApply(activeJobDetail)
-                        }}
-                        className={`px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition ${Boolean(activeJobDetail?.has_applied || appliedJobs.has(activeJobDetail?.id))
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed opacity-90'
-                            : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'
-                          }`}
-                      >
-                        {Boolean(activeJobDetail?.has_applied || appliedJobs.has(activeJobDetail?.id)) ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <CheckCircle2 size={14} className="text-emerald-600" />
-                            Already Applied
+                      {/* Matched Skills */}
+                      {matchedSkills.length > 0 && (
+                        <div>
+                          <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                            Matching Competencies ({matchedSkills.length})
                           </span>
-                        ) : (
-                          'Apply Now with Resume'
-                        )}
-                      </button>
+                          <div className="flex flex-wrap gap-1.5">
+                            {matchedSkills.map((s, idx) => (
+                              <span key={idx} className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                ✓ {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Missing Skills */}
+                      {missingSkills.length > 0 && (
+                        <div>
+                          <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                            Potential Gaps to Highlight ({missingSkills.length})
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {missingSkills.slice(0, 6).map((s, idx) => (
+                              <span key={idx} className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                + {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMatchModalOpen(false)
+                            setMatchTargetJob(null)
+                          }}
+                          className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 transition cursor-pointer"
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          disabled={Boolean(targetMatchJob?.has_applied || appliedJobs.has(targetMatchJob?.id)) || applyingJobId === targetMatchJob?.id}
+                          onClick={() => {
+                            setIsMatchModalOpen(false)
+                            setMatchTargetJob(null)
+                            handleApply(targetMatchJob)
+                          }}
+                          className={`px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition ${Boolean(targetMatchJob?.has_applied || appliedJobs.has(targetMatchJob?.id))
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed opacity-90'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'
+                            }`}
+                        >
+                          {Boolean(targetMatchJob?.has_applied || appliedJobs.has(targetMatchJob?.id)) ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <CheckCircle2 size={14} className="text-emerald-600" />
+                              Already Applied
+                            </span>
+                          ) : (
+                            'Apply Now with Resume'
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )
-              })() : null}
-            </motion.div>
-          </div>
-        )}
+                  )
+                })() : null}
+              </motion.div>
+            </div>
+          )
+        })()}
       </AnimatePresence>
 
 
@@ -1662,192 +1679,155 @@ export function JobCard({
   const jobTitle = safeJob.title
   const companyName = safeJob.company_name
 
+  // Pure presentation of backend-provided required_skills
+  const displaySkills = useMemo(() => {
+    if (Array.isArray(job?.required_skills) && job.required_skills.length > 0) {
+      return job.required_skills
+    }
+    if (safeJob.department) {
+      return [safeJob.department, 'Full-time']
+    }
+    return ['Full-time', 'Verified']
+  }, [job?.required_skills, safeJob.department])
+
   return (
     <motion.div
       whileHover={{ y: -2 }}
       onClick={onViewDetail}
-      className={`group bg-white rounded-2xl sm:rounded-3xl border p-4 sm:p-5 md:p-6 transition-all duration-200 shadow-2xs hover:shadow-md relative overflow-hidden cursor-pointer ${isSelected
-          ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-md bg-indigo-50/10'
-          : 'border-slate-200/90 hover:border-indigo-200'
-        }`}
+      className={`group bg-white rounded-2xl border p-4 sm:p-4.5 transition-all duration-200 shadow-2xs hover:shadow-md relative cursor-pointer ${
+        isSelected
+          ? 'border-sky-500 ring-2 ring-sky-500/20 shadow-md bg-sky-50/5'
+          : 'border-slate-200/90 hover:border-slate-300'
+      }`}
     >
-      {/* Top row: Company, Title, Meta and Match Button */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+      {/* ── 1. Top Section: Logo + Company + Title + Top-Right Tag ── */}
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          {/* Compact Logo */}
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-indigo-50/80 via-purple-50/40 to-blue-50/80 border border-slate-100 flex items-center justify-center shrink-0 p-1 shadow-2xs mt-0.5">
+            <CompanyLogo
+              companyName={companyName}
+              logoUrl={logoUrl}
+              website={companySite}
+              size="sm"
+              showVerified={false}
+            />
+          </div>
 
-        {/* Left: Company Logo & Title Info */}
-        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
-          {companySite ? (
-            <a
-              href={companySite}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="shrink-0 transition-transform duration-200 hover:scale-105"
-              title={`Visit ${companyName} official website`}
-            >
-              <CompanyLogo
-                companyName={companyName}
-                logoUrl={logoUrl}
-                website={companySite}
-                size="md"
-                showVerified={true}
-              />
-            </a>
-          ) : (
-            <div
-              className="shrink-0"
+          {/* Company Name & Role Info */}
+          <div className="min-w-0 flex-1 pr-1">
+            <h3
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewDetail()
+              }}
+              className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-sky-600 transition font-poppins tracking-tight line-clamp-1 leading-snug cursor-pointer"
               title={companyName}
             >
-              <CompanyLogo
-                companyName={companyName}
-                logoUrl={logoUrl}
-                size="md"
-                showVerified={true}
-              />
-            </div>
-          )}
+              {companyName}
+            </h3>
 
-          <div className="flex-1 min-w-0">
-            {/* Title & Fresher Friendly Badge tight group */}
-            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-              <h3
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onViewDetail()
-                }}
-                className="text-sm sm:text-base md:text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins truncate min-w-0"
-                title={jobTitle}
-              >
-                {jobTitle}
-              </h3>
-              {isFresher && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-1 shrink-0">
-                  <Sparkles size={10} className="text-emerald-600" />
-                  Fresher Friendly
-                </span>
-              )}
-              {safeJob.is_external && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black inline-flex items-center gap-1 shrink-0 ${
-                  safeJob.publisher_source === 'LinkedIn'
-                    ? 'bg-[#0A66C2]/10 text-[#0A66C2] border border-[#0A66C2]/30'
-                    : safeJob.publisher_source === 'Naukri'
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                }`}>
-                  <ExternalLink size={10} />
-                  {safeJob.publisher_source ? `${safeJob.publisher_source} Verified` : 'External'}
-                </span>
-              )}
-            </div>
-
-            {/* Company & Department */}
-            <p className="text-xs font-bold text-slate-500 mt-1 flex items-center gap-1.5 truncate">
-              <Building2 size={13} className="text-slate-400 shrink-0" />
-              {companySite ? (
-                <a
-                  href={companySite}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-slate-700 hover:text-indigo-600 hover:underline transition font-bold truncate inline-flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
-                  title={`Visit ${companyName} official website`}
-                >
-                  <span>{companyName}</span>
-                  <ExternalLink size={11} className="text-slate-400 shrink-0" />
-                </a>
-              ) : (
-                <span className="text-slate-700 font-bold truncate">
-                  {companyName}
-                </span>
-              )}
-              {job.department && (
-                <>
-                  <span className="text-slate-300 shrink-0">•</span>
-                  <span className="text-slate-500 font-medium truncate">{job.department}</span>
-                </>
-              )}
+            {/* Role Title Subtitle */}
+            <p className="text-xs text-slate-500 font-medium line-clamp-1 mt-0.5" title={jobTitle}>
+              {jobTitle}
             </p>
-
-            {/* Clean Metadata Row (De-duplicated) */}
-            <div className="mt-2 flex items-center gap-2 flex-wrap text-xs font-medium text-slate-500">
-              {/* Experience */}
-              <span className="inline-flex items-center gap-1 text-slate-600 shrink-0">
-                <Award size={12} className="text-slate-400" />
-                <span>{job.min_years === 0 ? '0-1 Yr (Fresher)' : `${job.min_years}+ Years`}</span>
-              </span>
-
-              <span className="text-slate-300">•</span>
-
-              {/* Work Mode / Location */}
-              <span className="inline-flex items-center gap-1 text-slate-600 shrink-0">
-                {job.work_mode === 'Remote' ? (
-                  <Globe size={12} className="text-emerald-600" />
-                ) : job.work_mode === 'Hybrid' ? (
-                  <Laptop size={12} className="text-blue-600" />
-                ) : (
-                  <MapPin size={12} className="text-slate-400" />
-                )}
-                <span>
-                  {job.work_mode === 'Remote'
-                    ? 'Remote'
-                    : safeJob.location && safeJob.location.toLowerCase() !== 'remote'
-                      ? `${safeJob.location}${safeJob.work_mode ? ` (${safeJob.work_mode})` : ''}`
-                      : safeJob.work_mode || safeJob.location || 'Remote'}
-                </span>
-              </span>
-
-              {/* Salary Range */}
-              {safeJob.salary_range && (
-                <>
-                  <span className="text-slate-300">•</span>
-                  <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70 shrink-0">
-                    <DollarSign size={11} className="text-emerald-600" />
-                    <span>{safeJob.salary_range}</span>
-                  </span>
-                </>
-              )}
-            </div>
           </div>
         </div>
 
-        {/* Right: Calculate Match % Button */}
+        {/* Top-Right Badge */}
+        <div className="shrink-0">
+          {isFresher ? (
+            <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10.5px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70 inline-flex items-center gap-1 shadow-2xs">
+              <Leaf size={11} className="text-emerald-600 fill-emerald-600/20 shrink-0" />
+              <span className="hidden xs:inline sm:inline">Fresher Friendly</span>
+              <span className="xs:hidden sm:hidden">Fresher</span>
+            </span>
+          ) : safeJob.is_external ? (
+            <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10.5px] sm:text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/80 inline-flex items-center gap-1 shadow-2xs">
+              <ExternalLink size={11} />
+              <span>{safeJob.publisher_source || 'External'}</span>
+            </span>
+          ) : (
+            <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10.5px] sm:text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200/80 inline-flex items-center gap-1 shadow-2xs">
+              <Sparkles size={11} className="text-sky-600" />
+              <span>Direct</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── 2. Metadata Chips Row (Fits in 1 Compact Row) ── */}
+      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-xs text-slate-600">
+        {/* Experience Pill */}
+        <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/60 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
+          <User size={11} className="text-slate-400 shrink-0" />
+          <span>{job.min_years === 0 ? 'Fresher (0–1 Yr)' : `${job.min_years}+ Yrs Exp`}</span>
+        </span>
+
+        {/* Location Pill */}
+        <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/60 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
+          <MapPin size={11} className="text-slate-400 shrink-0" />
+          <span className="truncate max-w-[130px] sm:max-w-xs">{safeJob.location || 'Remote'}</span>
+        </span>
+
+        {/* Work Mode Pill */}
+        <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/60 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
+          <Home size={11} className="text-slate-400 shrink-0" />
+          <span>{job.work_mode || (safeJob.location?.toLowerCase().includes('remote') ? 'Remote' : 'On-site')}</span>
+        </span>
+
+        {/* Salary Pill if available */}
+        {safeJob.salary_range && (
+          <span className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700">
+            <DollarSign size={11} className="text-emerald-600 shrink-0" />
+            <span>{safeJob.salary_range}</span>
+          </span>
+        )}
+      </div>
+
+      {/* ── 3. Snippet Preview ── */}
+      {job.jd_text_raw && (
+        <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed">
+          {job.jd_text_raw}
+        </p>
+      )}
+
+      {/* ── 4. Skills Pill List ── */}
+      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+        {displaySkills.slice(0, 4).map((s, idx) => (
+          <span
+            key={idx}
+            className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-50 text-slate-700 border border-slate-200/50 hover:bg-slate-100 transition"
+          >
+            {s}
+          </span>
+        ))}
+        {displaySkills.length > 4 && (
+          <span className="text-[11px] font-medium text-slate-400 pl-0.5">
+            +{displaySkills.length - 4} more
+          </span>
+        )}
+      </div>
+
+      {/* ── 5. Action Footer ── */}
+      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+        {/* Left: Match % Button */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation()
             onCalculateMatch()
           }}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 border border-indigo-200/90 shadow-2xs transition-all cursor-pointer shrink-0"
-          title="Click to evaluate your resume against this job using the unified ATS scoring engine"
+          className="inline-flex items-center gap-1 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs font-bold bg-sky-50 hover:bg-sky-100/80 text-sky-600 border border-sky-200/70 transition-all cursor-pointer shadow-2xs active:scale-95"
+          title="Calculate ATS Match %"
         >
-          <Sparkles size={12} className="text-indigo-600" />
-          <span>Calculate Match %</span>
+          <TrendingUp size={13} className="text-sky-600 shrink-0" />
+          <span>Match %</span>
         </button>
-      </div>
 
-      {/* Snippet / Description (Clamped) */}
-      <p className="mt-3 text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
-        {job.jd_text_raw}
-      </p>
-
-      {/* Skills Badges & Card Footer */}
-      <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        {/* Skills list */}
-        <div className="flex items-center gap-1 flex-wrap">
-          {(job.required_skills || []).slice(0, 5).map((s, idx) => (
-            <span key={idx} className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200/70 hover:bg-slate-100 transition">
-              {s}
-            </span>
-          ))}
-          {(job.required_skills || []).length > 5 && (
-            <span className="text-[10px] font-bold text-slate-400">
-              +{(job.required_skills || []).length - 5} more
-            </span>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2.5 w-full sm:w-auto shrink-0">
+        {/* Right: Share + Apply Button */}
+        <div className="flex items-center gap-3 sm:gap-3.5 shrink-0">
+          {/* Circular Share Button */}
           <button
             type="button"
             onClick={async (e) => {
@@ -1875,33 +1855,22 @@ export function JobCard({
 
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                   navigator.clipboard.writeText(shareUrl)
-                    .then(() => toast.success('Job link copied to clipboard! 📋'))
+                    .then(() => toast.success('Job link copied! 📋'))
                     .catch(() => toast.success('Job link: ' + shareUrl))
                 } else {
                   toast.success('Job link: ' + shareUrl)
                 }
               }
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full border border-slate-200/90 hover:border-slate-300 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-800 transition cursor-pointer shadow-2xs shrink-0 active:scale-95"
             title="Share job link"
           >
             <Share2 size={13} />
-            <span className="hidden sm:inline">Share</span>
           </button>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onViewDetail()
-            }}
-            className="text-xs font-semibold text-slate-600 hover:text-indigo-600 transition cursor-pointer px-2 py-1.5"
-          >
-            View Details
-          </button>
-
+          {/* Primary Apply Button */}
           {hasApplied ? (
-            <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold cursor-not-allowed select-none">
+            <span className="inline-flex items-center gap-1 px-4 py-1.5 sm:px-5 sm:py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold select-none shadow-2xs">
               <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
               Applied
             </span>
@@ -1913,14 +1882,14 @@ export function JobCard({
                 e.stopPropagation()
                 onApply()
               }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
+              className="inline-flex items-center gap-1.5 px-4.5 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-sm hover:shadow-md cursor-pointer disabled:opacity-50 shrink-0 active:scale-95"
             >
               {isApplying ? (
                 'Applying...'
               ) : (
                 <>
-                  Apply
-                  <ArrowUpRight size={13} />
+                  <span>Apply</span>
+                  <ArrowRight size={13} />
                 </>
               )}
             </button>

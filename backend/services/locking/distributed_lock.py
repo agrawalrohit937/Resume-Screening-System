@@ -1,10 +1,10 @@
 """
 Distributed Lock Mechanism for CareerShala ATS Multi-Replica Scheduling & Deduplication.
 Guarantees:
-  - Mutual exclusion across multi-replica deployments (Kubernetes, Render, ECS).
+  - Mutual exclusion across multi-replica deployments (Kubernetes, Azure App Service, Docker).
   - Redis-backed atomic distributed locking via SET NX EX.
   - Safe lock release via token comparison Lua script.
-  - Transparent MongoDB atomic / in-memory fallback when Redis is offline.
+  - Transparent MongoDB atomic fallback when Redis is offline.
 """
 
 from __future__ import annotations
@@ -19,9 +19,6 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# In-memory lock registry for local development fallback
-_IN_MEMORY_LOCKS: Dict[str, Dict[str, Any]] = {}
-
 # Lua script to ensure safe release only by the lock owner
 _LUA_RELEASE_LOCK = """
 if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -34,7 +31,7 @@ end
 
 class DistributedLock:
     """
-    Distributed lock supporting Redis, MongoDB, and in-memory execution.
+    Distributed lock supporting Redis with MongoDB atomic document lock fallback.
 
     Complexity:
         Time: O(1) for acquire and release operations.
@@ -57,13 +54,15 @@ class DistributedLock:
 
     async def acquire(self) -> bool:
         """
-        Attempts to acquire the lock atomically.
-        Returns True if acquired, False otherwise.
+        Attempts to acquire the lock atomically from a Single Source of Truth.
+        - If Redis is configured: Redis is the sole lock authority (returns False on failure/disconnect).
+        - If Redis is not configured: MongoDB is the sole lock authority.
+        Never crosses between databases to prevent split-brain duplicate task executions.
         """
         now = time.time()
         expires_at = now + self.ttl_seconds
 
-        # 1. Attempt Redis lock
+        # 1. Authoritative Redis lock
         if self.redis is not None:
             try:
                 # set with NX (not exists) and EX (expire seconds)
@@ -74,9 +73,10 @@ class DistributedLock:
                     return True
                 return False
             except Exception as e:
-                logger.debug("Redis distributed lock acquire failed, trying fallback", error=str(e))
+                logger.warning("Redis distributed lock failed to acquire (aborting to prevent split-brain)", error=str(e))
+                return False
 
-        # 2. Attempt MongoDB lock
+        # 2. Authoritative MongoDB atomic lock (used only when Redis is not configured)
         if self.db is not None:
             try:
                 coll = self.db["distributed_locks"]
@@ -108,17 +108,8 @@ class DistributedLock:
                         return True
                     return False
             except Exception as e:
-                logger.debug("MongoDB distributed lock acquire failed, trying in-memory", error=str(e))
-
-        # 3. In-memory fallback
-        mem = _IN_MEMORY_LOCKS.get(self.lock_key)
-        if mem is None or mem.get("expires_at", 0) < now:
-            _IN_MEMORY_LOCKS[self.lock_key] = {
-                "token": self.token,
-                "expires_at": expires_at,
-            }
-            self._acquired = True
-            return True
+                logger.warning("MongoDB distributed lock acquire failed", error=str(e))
+                return False
 
         return False
 
@@ -129,17 +120,17 @@ class DistributedLock:
         if not self._acquired:
             return False
 
-        released = False
-
-        # 1. Release Redis
+        # 1. Release Redis if configured as authority
         if self.redis is not None:
             try:
                 res = await self.redis.eval(_LUA_RELEASE_LOCK, 1, self.lock_key, self.token)
                 released = bool(res == 1)
             except Exception as e:
                 logger.debug("Redis distributed lock release failed", error=str(e))
+            self._acquired = False
+            return released
 
-        # 2. Release MongoDB
+        # 2. Release MongoDB if configured as authority
         if self.db is not None:
             try:
                 coll = self.db["distributed_locks"]
@@ -149,12 +140,6 @@ class DistributedLock:
                 released = True
             except Exception as e:
                 logger.debug("MongoDB distributed lock release failed", error=str(e))
-
-        # 3. Release In-memory
-        mem = _IN_MEMORY_LOCKS.get(self.lock_key)
-        if mem and mem.get("token") == self.token:
-            _IN_MEMORY_LOCKS.pop(self.lock_key, None)
-            released = True
 
         self._acquired = False
         return released

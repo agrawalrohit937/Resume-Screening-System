@@ -65,13 +65,10 @@ export default function MobileBottomNav({ onMenuToggle }) {
                   : 'text-slate-500 hover:text-slate-700 font-medium'
               }`}
             >
-              <div className={`relative p-1 rounded-xl transition-all duration-200 ${
+              <div className={`p-1 rounded-xl transition-all duration-200 ${
                 isActive ? 'bg-[#2E9BDA]/10 text-[#2E9BDA] scale-105' : 'text-slate-500'
               }`}>
                 <Icon className="w-5 h-5" strokeWidth={isActive ? 2.3 : 1.8} />
-                {isActive && (
-                  <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#2E9BDA] rounded-full" />
-                )}
               </div>
               <span className="text-[10px] mt-0.5 tracking-tight leading-none truncate max-w-[62px]">
                 {item.label}
