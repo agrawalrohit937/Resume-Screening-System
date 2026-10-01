@@ -793,34 +793,22 @@ async def send_application_via_gmail_api(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# NIGHTLY AI JOB ALERT EMAIL SERVICE (SMTP & MIME)
+# NIGHTLY AI JOB ALERT EMAIL SERVICE (BREVO HTTP API)
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def send_job_alert_email(
     to_email: str,
     candidate_name: str,
     matched_jobs: List[Dict[str, Any]],
+    has_resume: bool = True,
 ) -> Dict[str, Any]:
     """
-    Sends a nightly AI Job Alert email to a candidate with high-matching opportunities.
-    Uses built-in smtplib and email.mime with non-blocking async execution.
-    Configured via SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FROM_EMAIL env vars.
-    Falls back gracefully to simulated delivery in dev environments if SMTP is unconfigured.
+    Sends a nightly AI Job Alert email to a candidate with high-matching opportunities
+    via Brevo HTTP API v3.
     """
-    import asyncio
-    import os
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-
     if not to_email or not matched_jobs:
         return {"sent": False, "error": "Recipient email and matched jobs are required"}
 
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    from_email = os.getenv("FROM_EMAIL", getattr(settings, "MAIL_FROM_EMAIL", None) or "alerts@careershala.tech")
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
     count = len(matched_jobs)
@@ -846,7 +834,7 @@ async def send_job_alert_email(
         salary = escape(str(job.get("salary_range") or job.get("salary") or "")) if (job.get("salary_range") or job.get("salary")) else None
         match_score = int(round(float(job.get("match_score", 85))))
         job_id = str(job.get("id") or job.get("_id") or "")
-        job_url = f"{frontend_url}/jobs"
+        job_url = f"{frontend_url}/jobs?jobId={job_id}" if job_id else f"{frontend_url}/jobs"
 
         # Company logo resolution: dynamically use employer's company_logo_url
         raw_logo = (
@@ -978,6 +966,7 @@ async def send_job_alert_email(
         candidate_name=candidate_name or "there",
         job_cards_rendered=job_cards_rendered,
         frontend_url=frontend_url,
+        has_resume=has_resume,
     )
 
     # Plain text alternative
@@ -992,67 +981,25 @@ async def send_job_alert_email(
     text_lines.append(f"View all matches: {frontend_url}/jobs")
     plain_text = "\n".join(text_lines)
 
-    # 3. Assemble MIME message
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"CareerShala Job Alerts <{from_email}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
-    msg.attach(MIMEText(html_template, "html", "utf-8"))
-    msg_bytes = msg.as_bytes()
-
-    # 4. Dispatch via Brevo HTTP API (primary) or SMTP fallback
-    if getattr(settings, "BREVO_API_KEY", None):
-        try:
-            email_svc = EmailService()
-            brevo_res = await email_svc._send_brevo_email(
-                to_email=to_email,
-                to_name=candidate_name,
-                subject=subject,
-                html_body=html_template,
-                text_body=plain_text,
-                sender_name="CareerShala Job Alerts",
-            )
-            if brevo_res.get("sent"):
-                logger.info("Job alert email dispatched via Brevo", to=to_email, count=count)
-                return {"sent": True, "method": "brevo", "to": to_email, "count": count}
-            else:
-                logger.warning("Brevo returned error for job alert", res=brevo_res)
-        except Exception as exc:
-            logger.warning("Brevo dispatch exception for job alert, falling back to SMTP", error=str(exc))
-
-    # 5. Synchronous SMTP transport helper
-    def _send_smtp_sync() -> None:
-        server = smtplib.SMTP(smtp_host, smtp_port, timeout=20)
-        try:
-            server.ehlo()
-            if server.has_extn("STARTTLS"):
-                server.starttls()
-                server.ehlo()
-            if smtp_user and smtp_password:
-                server.login(smtp_user, smtp_password)
-            server.sendmail(from_email, [to_email], msg_bytes)
-        finally:
-            try:
-                server.quit()
-            except Exception:
-                pass
-
-    # 6. Dispatch via SMTP or simulate in development
-    if smtp_user and smtp_password:
-        try:
-            await asyncio.to_thread(_send_smtp_sync)
-            logger.info("Job alert email dispatched via SMTP", to=to_email, count=count)
-            return {"sent": True, "method": "smtp", "to": to_email, "count": count}
-        except Exception as exc:
-            logger.error("Failed to send job alert via SMTP", to=to_email, error=str(exc))
-            return {"sent": False, "error": str(exc), "to": to_email}
+    # 3. Dispatch via Brevo HTTP API
+    email_svc = EmailService()
+    brevo_res = await email_svc._send_brevo_email(
+        to_email=to_email,
+        to_name=candidate_name,
+        subject=subject,
+        html_body=html_template,
+        text_body=plain_text,
+        sender_name="CareerShala Job Alerts",
+    )
+    if brevo_res.get("sent"):
+        logger.info("Job alert email dispatched via Brevo", to=to_email, count=count)
+        return {"sent": True, "method": "brevo", "to": to_email, "count": count}
     else:
-        logger.info(
-            "SMTP credentials not fully configured; simulated job alert email dispatch",
-            to=to_email,
-            job_count=count,
-            host=smtp_host,
-        )
-        return {"sent": True, "simulated": True, "to": to_email, "count": count}
+        logger.warning("Brevo returned error for job alert", res=brevo_res)
+        return {
+            "sent": False,
+            "error": brevo_res.get("error", "Failed to dispatch email via Brevo"),
+            "to": to_email,
+            "count": count,
+        }
 
