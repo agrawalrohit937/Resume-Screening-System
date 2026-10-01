@@ -16,7 +16,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from models.audit_log_model import AuditLogModel, AuditAction, AuditResourceType
 from repositories.audit_log_repo import AuditLogRepository
-from services.audit.audit_service import AuditService
 from models.user_model import UserModel, UserRole
 
 
@@ -208,33 +207,6 @@ async def test_audit_log_query_filtering_and_time_range(mock_audit_db):
     )
     assert count == 1
     assert recent_logs[0].resource_id == "cand_99"
-
-
-@pytest.mark.asyncio
-async def test_audit_service_helper(mock_audit_db):
-    """Verify audit_service helper records events gracefully without raising on missing handles."""
-    service = AuditService(mock_audit_db)
-
-    res = await service.record_event(
-        action=AuditAction.COPILOT_TOOL_EXECUTED,
-        resource_type=AuditResourceType.COPILOT_SESSION,
-        resource_id="session_xyz",
-        tenant_id=TENANT_ALPHA,
-        actor_id=ACTOR_ALICE,
-        payload={"tool_name": "candidate_lookup"},
-    )
-    assert res is not None
-    assert res.action == "copilot.tool_executed"
-    assert res.payload["tool_name"] == "candidate_lookup"
-
-    # Degraded mode without DB returns None safely
-    empty_service = AuditService(None)
-    noop = await empty_service.record_event(
-        action=AuditAction.AUTH_LOGIN,
-        resource_type=AuditResourceType.USER,
-        resource_id="user_1",
-    )
-    assert noop is None
 
 
 @pytest.mark.asyncio

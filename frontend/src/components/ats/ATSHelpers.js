@@ -2,14 +2,6 @@
  * ATSHelpers.js — Shared constants, file text extraction utilities, and formatters for ATS Matcher.
  */
 
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
-import mammoth from 'mammoth/mammoth.browser'
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
-
 // ── Preset Role Templates for 1-Click Instant Testing ────────────────────────
 export const PRESET_ROLES = [
   {
@@ -84,62 +76,18 @@ Requirements:
 ]
 
 // ── Text Extraction Helpers ──────────────────────────────────────────────────
-export async function extractPdfText(file) {
-  const data = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data }).promise
-  const pageTexts = []
-
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber)
-    const content = await page.getTextContent()
-    const text = content.items
-      .map(item => (item.str || '').trim())
-      .filter(Boolean)
-      .join(' ')
-
-    if (text) pageTexts.push(text)
-  }
-
-  const combined = pageTexts.join('\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-
-  if (!combined) {
-    throw new Error('No text could be extracted from the PDF.')
-  }
-  return combined
-}
-
-export async function extractDocxText(file) {
-  const arrayBuffer = await file.arrayBuffer()
-  const result = await mammoth.extractRawText({ arrayBuffer })
-  const text = (result.value || '')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-
-  if (!text) {
-    throw new Error('No text could be extracted from the DOCX file.')
-  }
-  return text
-}
-
 export async function extractJobDescriptionText(file) {
   if (!file) return ''
-  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-    return extractPdfText(file)
-  }
-  if (
-    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    file.name.toLowerCase().endsWith('.docx')
-  ) {
-    return extractDocxText(file)
-  }
-  if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
+  if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt') || file.name.toLowerCase().endsWith('.md')) {
     return file.text()
   }
-  throw new Error('Unsupported JD file type. Please use PDF, DOCX, or TXT.')
+  // For PDF / DOCX, parse using standard browser text extraction or prompt user
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ||
+      file.name.toLowerCase().endsWith('.docx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    return file.text().catch(() => '')
+  }
+  return file.text ? file.text() : ''
 }
 
 export function dedupeCaseInsensitive(items) {

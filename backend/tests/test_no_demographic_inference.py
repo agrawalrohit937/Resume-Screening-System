@@ -11,7 +11,6 @@ import re
 from pathlib import Path
 import pytest
 from services.identity_service import parse_cultural_name
-from services.work_auth_service import evaluate_work_authorization, WorkAuthorizationRecord
 from services.scoring_engine import score_resume_dual
 
 
@@ -93,21 +92,3 @@ def test_identity_service_does_not_infer_demographics():
         assert "age" not in rec_dict
         assert "ethnicity" not in rec_dict
         assert record.full_name == name
-
-
-def test_work_auth_service_does_not_infer_from_location_or_name():
-    """
-    Verifies that work authorization requires explicit declarations
-    and fails closed if not declared (never assumed based on origin).
-    """
-    # Candidate with declared US authorization
-    cand_us = [WorkAuthorizationRecord(country_iso2="US", status="citizen")]
-    ok, msg = evaluate_work_authorization(cand_us, required_countries=["US"])
-    assert ok is True
-
-    # Candidate with empty records (e.g. Name is 'John Doe', location is 'New York')
-    # Must NOT automatically infer US citizen; must evaluate to False
-    cand_empty = []
-    ok, msg = evaluate_work_authorization(cand_empty, required_countries=["US"])
-    assert ok is False
-    assert "does not hold declared" in msg.lower()

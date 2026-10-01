@@ -16,16 +16,8 @@ from services.embedding_cache import (
     compute_embedding_cache_key,
     quantize_embeddings_int8,
     dequantize_embeddings_int8,
-    _IN_MEMORY_EMB_CACHE,
 )
 from services.embedding_service import embedding_model
-
-
-@pytest.fixture(autouse=True)
-def clean_cache():
-    _IN_MEMORY_EMB_CACHE.clear()
-    yield
-    _IN_MEMORY_EMB_CACHE.clear()
 
 
 def test_cache_key_deterministic():

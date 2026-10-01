@@ -66,10 +66,8 @@ export default defineConfig({
               return 'vendor-icons'
             }
             if (
-              normalized.includes('/pdfjs-dist/') ||
               normalized.includes('/jspdf/') ||
-              normalized.includes('/html2canvas/') ||
-              normalized.includes('/mammoth/')
+              normalized.includes('/html2canvas/')
             ) {
               return 'vendor-pdf'
             }

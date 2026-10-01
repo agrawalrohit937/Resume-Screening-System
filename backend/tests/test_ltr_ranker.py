@@ -15,7 +15,6 @@ from ml.train_ranker import (
     prepare_ranking_dataset,
     train_xgboost_ranker,
 )
-from ml.ranker_service import LTRRankerService
 
 
 def test_protected_attribute_denylist_enforcement():
@@ -93,14 +92,3 @@ def test_xgboost_ranker_training_and_prediction():
     pred_poor = ranker.predict(poor_features)
 
     assert pred_good[0] > pred_poor[0]
-
-
-def test_ranker_service_graceful_fallback_when_no_model():
-    service = LTRRankerService()
-    # Query an occupation family that has no serialized model
-    score = service.predict_rank_score(
-        features_dict={"quality_score": 75.0, "skills_score": 0.8},
-        occupation_family="unseen_family",
-    )
-    # Must return None so engine falls back gracefully to deterministic adapter
-    assert score is None

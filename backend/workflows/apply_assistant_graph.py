@@ -24,6 +24,7 @@ except Exception:
     genai = None
 
 import os
+from utils.json_utils import parse_llm_json
 # ─── STATE DEFINITION ────────────────────────────────────────────────────────
 
 class ApplyAssistantState(TypedDict, total=False):
@@ -66,7 +67,9 @@ async def jd_analyzer_node(state: ApplyAssistantState) -> dict:
         llm = get_groq_client()
         prompt = _load_prompt("jd_analysis.txt").format(job_description=state.get("job_description", ""))
         response = await llm.ainvoke(prompt)
-        jd_analysis = json.loads(response.content)
+        jd_analysis = parse_llm_json(response.content, default=_DEFAULT_ANALYSIS)
+        if not isinstance(jd_analysis, dict):
+            jd_analysis = _DEFAULT_ANALYSIS
     except Exception:
         jd_analysis = _DEFAULT_ANALYSIS
 
@@ -229,7 +232,7 @@ async def _llm_tone_check(state: ApplyAssistantState) -> list:
             cover_letter_text=state.get("cover_letter_text", ""),
         )
         response = await llm.ainvoke(prompt)
-        issues = json.loads(response.content)
+        issues = parse_llm_json(response.content, default=[])
         return issues if isinstance(issues, list) else []
     except Exception:
         return []
