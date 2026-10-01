@@ -383,7 +383,7 @@ def start_job_alert_scheduler() -> None:
     Initializes and starts the APScheduler background cron job.
     Schedules job alerts twice daily:
     - Morning Slot: 07:30 AM IST (02:00 UTC)
-    - Afternoon Slot: 02:00 PM IST (08:30 UTC)
+    - Afternoon Slot: 03:00 PM IST (09:30 UTC)
     Plus periodic stuck-resume sweeps and external job scrapes.
     """
     if not APSCHEDULER_AVAILABLE:
@@ -405,12 +405,12 @@ def start_job_alert_scheduler() -> None:
             misfire_grace_time=3600,
         )
 
-        # 2. Afternoon Job Alert Digest (02:00 PM IST)
+        # 2. Afternoon Job Alert Digest (03:00 PM IST)
         job_alerts_scheduler.add_job(
             run_nightly_job_alerts,
-            trigger=CronTrigger(hour=14, minute=0, timezone="Asia/Kolkata"),
+            trigger=CronTrigger(hour=15, minute=0, timezone="Asia/Kolkata"),
             id="afternoon_job_alerts",
-            name="Afternoon AI Job Alerts Digest (02:00 PM IST)",
+            name="Afternoon AI Job Alerts Digest (03:00 PM IST)",
             replace_existing=True,
             misfire_grace_time=3600,
         )
@@ -436,7 +436,7 @@ def start_job_alert_scheduler() -> None:
         )
 
         job_alerts_scheduler.start()
-        logger.info("Twice-Daily AI Job Alerts (7:30 AM & 2:00 PM IST) & Background schedulers started")
+        logger.info("Twice-Daily AI Job Alerts (7:30 AM & 3:00 PM IST) & Background schedulers started")
     except Exception as exc:
         logger.error("Failed to start job alerts scheduler", error=str(exc))
 
