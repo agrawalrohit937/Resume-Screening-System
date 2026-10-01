@@ -307,10 +307,10 @@ async def list_jobs(
     raw_db = getattr(db, "raw_db", db)
     total = await raw_db.jobs.count_documents(query)
 
-    # Sort: Internal jobs first (is_external: false/None/missing), then external jobs, each newest first
+    # Sort: Newest jobs first (created_at: -1)
     cursor = (
         raw_db.jobs.find(query, {"jd_embedding": 0, "jd_embedding_bge": 0})
-        .sort([("is_external", 1), ("created_at", -1)])
+        .sort("created_at", -1)
         .skip(skip)
         .limit(limit)
     )
@@ -329,7 +329,7 @@ async def list_jobs(
         if raw_count > 0:
             fallback_cursor = (
                 raw_db.jobs.find({"status": {"$ne": "closed"}}, {"jd_embedding": 0, "jd_embedding_bge": 0})
-                .sort([("is_external", 1), ("created_at", -1)])
+                .sort("created_at", -1)
                 .skip(skip)
                 .limit(limit)
             )

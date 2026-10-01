@@ -14,8 +14,13 @@ from scheduler.job_alerts import (
 
 
 @pytest.mark.asyncio
-async def test_send_job_alert_email_rendering():
-    """Verify HTML generation, job cards rendering, and fallback simulation for email alert."""
+async def test_send_job_alert_email_rendering(monkeypatch):
+    """Verify HTML generation, job cards rendering, and Brevo dispatch for email alert."""
+    from services.email_service import EmailService
+
+    fake_brevo = AsyncMock(return_value={"sent": True, "messageId": "<test-msg-id>"})
+    monkeypatch.setattr(EmailService, "_send_brevo_email", fake_brevo)
+
     sample_jobs = [
         {
             "id": "660000000000000000000010",
@@ -76,7 +81,7 @@ async def test_scheduler_lifecycle():
     import asyncio
     start_job_alert_scheduler()
     assert job_alerts_scheduler.running is True
-    assert job_alerts_scheduler.get_job("nightly_job_alerts") is not None
+    assert job_alerts_scheduler.get_job("morning_job_alerts") is not None
 
     stop_job_alert_scheduler()
     await asyncio.sleep(0.05)

@@ -2,10 +2,9 @@
 Nightly AI Job Alert Scheduler — Retention Loop Engine (Phase D).
 
 Automated background cron task using APScheduler (AsyncIOScheduler):
-- Identifies active candidates with primary parsed resumes.
-- Computes bidirectional AI match recommendations via local 768-dim BGE vector model.
-- Filters opportunities with Match Score >= 75% that haven't been applied to yet.
-- Dispatches professional HTML email digest via async SMTP/MIME service.
+- Scans active candidates with or without primary parsed resumes.
+- Computes skill & role match recommendations (or trending open jobs).
+- Dispatches professional HTML email digest via Brevo HTTP API.
 """
 
 from __future__ import annotations
@@ -211,12 +210,11 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                     sort=[("is_primary", -1), ("created_at", -1)],
                 )
 
-                if not resume_doc:
-                    continue
+                has_resume = bool(resume_doc)
+                if has_resume:
+                    candidates_with_resume += 1
 
-                candidates_with_resume += 1
-
-                # Fetch top candidate job matches from vector engine
+                # Fetch top candidate job matches (or trending jobs if no resume)
                 match_res = await find_jobs_for_candidate(
                     candidate_id=candidate_id,
                     limit=6,
@@ -225,10 +223,10 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
 
                 rec_jobs = match_res.get("recommended_jobs", [])
 
-                # Filter: match_score >= 50.0 and is_applied == False
+                # Filter: unapplied jobs with valid score (or trending jobs)
                 qualifying_jobs = [
                     j for j in rec_jobs
-                    if float(j.get("match_score", 0)) >= 50.0 and not j.get("is_applied", False)
+                    if not j.get("is_applied", False)
                 ]
 
                 if not qualifying_jobs:
@@ -264,6 +262,7 @@ async def run_nightly_job_alerts(db: Optional[Any] = None, target_email: Optiona
                     to_email=candidate_email,
                     candidate_name=candidate_name,
                     matched_jobs=top_3_jobs,
+                    has_resume=has_resume,
                 )
 
                 if dispatch_res.get("sent"):

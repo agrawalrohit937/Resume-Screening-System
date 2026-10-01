@@ -605,8 +605,13 @@ What We Are Looking For:
         )
         setActiveJobDetail((prev) => (prev?.id === job.id ? { ...prev, has_applied: true } : prev))
         setAppliedJobs((prev) => new Set([...prev, job.id]))
+        toast.error(msg)
+      } else if (typeof msg === 'string' && (msg.toLowerCase().includes('upload a parsed resume') || msg.toLowerCase().includes('resume before applying'))) {
+        toast.error('Please upload your resume in Profile to apply for this job! Redirecting...')
+        setTimeout(() => navigate('/profile'), 1200)
+      } else {
+        toast.error(msg)
       }
-      toast.error(msg)
     } finally {
       setApplyingJobId(null)
     }

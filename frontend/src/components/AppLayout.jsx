@@ -4,6 +4,7 @@ import { Menu, Crown } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
+import MobileBottomNav from './MobileBottomNav'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import AvatarRing from './AvatarRing'
 import { resolveAvatarUrl } from '../utils/avatarUtils'
@@ -17,7 +18,7 @@ const PAGE_TITLES = {
   '/upload': { title: 'Resume Library', sub: 'Upload and manage your resumes' },
   '/results': { title: 'ATS Matcher', sub: 'AI Semantic & Keyword scoring' },
   '/analytics': { title: 'Analytics', sub: 'Performance trends & insights' },
-  '/interview': { title: 'Quick Practice', sub: 'Fast mock interview sessions' },
+  '/interview': { title: 'Mock Interview', sub: 'AI mock interview practice & instant feedback' },
   '/live-interview': { title: 'Live AI Interview', sub: 'Full session with camera & AI feedback' },
   '/github': { title: 'GitHub Analysis', sub: 'Profile & contribution insights' },
   '/gamification': { title: 'Rewards Hub', sub: 'Points, badges & leaderboard' },
@@ -265,13 +266,14 @@ export default function AppLayout() {
               <Navbar sidebarCollapsed={collapsed} onMenuToggle={() => setCollapsed(p => !p)} />
             </div>
           )}
-          <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive ? 'p-0 overflow-hidden' : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6'}`}>
+          <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive ? 'p-0 overflow-hidden' : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6'}`}>
             <div key={location.pathname} className={`mx-auto w-full min-w-0 ${isFullscreenActive ? 'max-w-none' : 'max-w-7xl animate-fade-in'}`}>
               <RouteErrorBoundary>
                 <Outlet />
               </RouteErrorBoundary>
             </div>
           </main>
+          {!isFullscreenActive && <MobileBottomNav onMenuToggle={() => setIsMobileMenuOpen(true)} />}
         </div>
         {!isFullscreenActive && (
           <Suspense fallback={null}>

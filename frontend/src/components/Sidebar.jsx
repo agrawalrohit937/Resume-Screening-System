@@ -142,8 +142,8 @@ const CANDIDATE_NAV_SECTIONS = [
   {
     title: 'Interview Prep',
     items: [
-      { to: '/live-interview', label: 'Live Interview', badge: 'NEW', icon: Icons.liveInterview },
-      { to: '/interview', label: 'Quick Practice', icon: Icons.interview },
+      { to: '/interview', label: 'Mock Interview', icon: Icons.interview },
+      { to: '/live-interview', label: 'Live AI Interview', badge: 'AI', icon: Icons.liveInterview },
     ],
   },
   {
