@@ -15,6 +15,7 @@ from models.interview_session_model import (
     DifficultyLevel, CheatingEventType,
 )
 from services.ai_interview_service import AIInterviewService
+from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)
 _ai_svc = AIInterviewService()
@@ -179,16 +180,8 @@ class LiveInterviewService:
             if not raw:
                 raise ValueError("LLM returned empty response")
 
-            import json, re
-            # Parse JSON from LLM output
-            clean = raw.replace("```json", "").replace("```", "").strip()
-            try:
-                data = json.loads(clean)
-            except json.JSONDecodeError:
-                match = re.search(r'\{.*"questions".*\}', raw, re.DOTALL)
-                data = json.loads(match.group(0)) if match else None
-
-            if not data or "questions" not in data:
+            data = parse_llm_json(raw, default=None)
+            if not isinstance(data, dict) or "questions" not in data:
                 raise ValueError("Could not parse LLM questions JSON")
 
             ai_questions = []

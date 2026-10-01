@@ -26,6 +26,7 @@ except ImportError:
 from langgraph.graph import StateGraph, END
 from core.llm_client import gemini_key_pool
 from schemas.enhancement_schema import EnhancedResumeSection
+from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)
 
@@ -228,12 +229,10 @@ Output ONLY valid JSON matching this exact schema:
         if not response or not response.text:
             raise ValueError("Empty response from Gemini")
 
-        raw_text = response.text.strip()
-        if raw_text.startswith("```"):
-            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-            raw_text = re.sub(r"\s*```$", "", raw_text)
-
-        return json.loads(raw_text)
+        parsed = parse_llm_json(response.text, default=None)
+        if not isinstance(parsed, dict):
+            raise ValueError("Could not parse valid JSON from Gemini enhancement response")
+        return parsed
 
     try:
         enhanced_dict = await gemini_key_pool.execute_async_with_fallback(_enhance_with_gemini)

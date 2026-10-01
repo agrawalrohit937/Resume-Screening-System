@@ -8,8 +8,10 @@ Tests for Observability Infrastructure:
 import asyncio
 import pytest
 from httpx import ASGITransport, AsyncClient
-from opentelemetry import trace
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
+try:
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
+except ImportError:
+    pytest.skip("opentelemetry-sdk not installed", allow_module_level=True)
 
 from core.logging import add_trace_id, clear_trace_id, set_trace_id, trace_context
 from core.metrics import (

@@ -15,6 +15,7 @@ import structlog
 from core.config import settings
 from core.llm_client import groq_key_pool
 from models.resume_model import ResumeModel
+from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)
 
@@ -129,24 +130,10 @@ Return ONLY valid JSON in this exact format — no markdown, no explanation:
 }}"""
 
     def _parse_questions(self, raw: str, expected: int, difficulty: str) -> List[Dict]:
-        """Parse LLM JSON output with multiple fallback strategies."""
-        # Try direct JSON parse
-        try:
-            data = json.loads(raw)
-            if "questions" in data:
-                return self._normalize_questions(data["questions"])
-        except json.JSONDecodeError:
-            pass
-
-        # Try extracting JSON from markdown
-        json_match = re.search(r'\{.*"questions".*\}', raw, re.DOTALL)
-        if json_match:
-            try:
-                data = json.loads(json_match.group(0))
-                if "questions" in data:
-                    return self._normalize_questions(data["questions"])
-            except json.JSONDecodeError:
-                pass
+        """Parse LLM JSON output with centralized parse_llm_json and template fallback."""
+        data = parse_llm_json(raw, default=None)
+        if isinstance(data, dict) and "questions" in data and isinstance(data["questions"], list):
+            return self._normalize_questions(data["questions"])
 
         logger.warning("LLM JSON parse failed — using template fallback")
         return self._fallback_questions(expected, difficulty)
@@ -234,23 +221,10 @@ Return ONLY a valid JSON object in this exact format. Do NOT wrap in markdown fo
 }}"""
 
     def _parse_mcqs(self, raw: str, expected: int, difficulty: str, topic: str) -> List[Dict]:
-        """Parse MCQ JSON output with fallback strategies."""
-        try:
-            # Clean up potential markdown blocks if the LLM ignored instructions
-            clean_raw = raw.replace("```json", "").replace("```", "").strip()
-            data = json.loads(clean_raw)
-            if "questions" in data:
-                return self._normalize_mcqs(data["questions"])
-        except json.JSONDecodeError:
-            # Regex extraction fallback
-            json_match = re.search(r'\{.*"questions".*\}', raw, re.DOTALL)
-            if json_match:
-                try:
-                    data = json.loads(json_match.group(0))
-                    if "questions" in data:
-                        return self._normalize_mcqs(data["questions"])
-                except json.JSONDecodeError:
-                    pass
+        """Parse MCQ JSON output with centralized parse_llm_json and fallback."""
+        data = parse_llm_json(raw, default=None)
+        if isinstance(data, dict) and "questions" in data and isinstance(data["questions"], list):
+            return self._normalize_mcqs(data["questions"])
 
         logger.warning(f"MCQ LLM JSON parse failed for topic: {topic} — using fallback")
         return self._fallback_mcqs(expected, topic)
@@ -324,17 +298,9 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
 }}"""
 
         raw = await self._call_llm(prompt, max_tokens=1200)
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-            if json_match:
-                try:
-                    data = json.loads(json_match.group(0))
-                except Exception:
-                    data = self._fallback_evaluation(user_answer)
-            else:
-                data = self._fallback_evaluation(user_answer)
+        data = parse_llm_json(raw, default=None)
+        if not isinstance(data, dict):
+            data = self._fallback_evaluation(user_answer)
 
         # Normalize score
         score = int(data.get("score", 5))

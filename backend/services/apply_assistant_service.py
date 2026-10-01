@@ -28,6 +28,7 @@ except Exception:
     types = None
 import structlog
 from core.llm_client import gemini_key_pool, groq_key_pool
+from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)
 
@@ -108,20 +109,9 @@ class ApplyAssistantService:
         if not raw_response:
             return {"company_name": "", "job_title": "", "hr_email": "", "job_description": ""}
 
-        cleaned = raw_response.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-        elif cleaned.startswith("```"):
-            cleaned = cleaned.split("```")[1].split("```")[0].strip()
-
-        try:
-            data = json.loads(cleaned)
-        except Exception:
-            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if match:
-                data = json.loads(match.group(0))
-            else:
-                data = {}
+        data = parse_llm_json(raw_response, default={})
+        if not isinstance(data, dict):
+            data = {}
 
         return {
             "company_name": str(data.get("company_name", "") or "").strip(),

@@ -10,7 +10,6 @@ from ml.train_ranker import (
     LTR_FEATURE_NAMES,
     PROTECTED_ATTRIBUTE_DENYLIST,
 )
-from ml.ranker_service import LTRRankerService, ltr_ranker_service
 
 __all__ = [
     "train_xgboost_ranker",
@@ -19,6 +18,4 @@ __all__ = [
     "validate_feature_set_cleanliness",
     "LTR_FEATURE_NAMES",
     "PROTECTED_ATTRIBUTE_DENYLIST",
-    "LTRRankerService",
-    "ltr_ranker_service",
 ]

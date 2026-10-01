@@ -11,6 +11,7 @@ import structlog
 
 from core.config import settings
 from core.llm_client import groq_key_pool
+from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)
 
@@ -167,19 +168,8 @@ Evaluate strictly and return ONLY valid JSON — no markdown, no explanation, no
 
     # ── Parse LLM JSON response ───────────────────────────────────────────────
     def _parse_response(self, raw: str) -> Optional[Dict]:
-        # Try direct parse
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-        # Try extracting JSON block
-        m = re.search(r'\{.*\}', raw, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except json.JSONDecodeError:
-                pass
-        return None
+        data = parse_llm_json(raw, default=None)
+        return data if isinstance(data, dict) else None
 
     # ── Heuristic fallback ────────────────────────────────────────────────────
     def _heuristic_eval(self, answer: str, question: str, fillers: int, conf_penalty: int) -> Dict:
