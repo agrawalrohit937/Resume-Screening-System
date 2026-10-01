@@ -404,25 +404,6 @@ class TestNLPUtils:
         assert "react" in tech
         assert "aws" in tech
 
-    def test_extract_keywords(self):
-        from utils.nlp_utils import extract_keywords
-        text = "Python developer with FastAPI MongoDB Docker experience building REST APIs and microservices"
-        keywords = extract_keywords(text, top_n=5)
-        assert isinstance(keywords, list)
-        assert len(keywords) > 0
-        assert all(isinstance(k[0], str) and isinstance(k[1], float) for k in keywords)
-
-    def test_tfidf_similarity_identical(self):
-        from utils.nlp_utils import get_tfidf_similarity
-        text = "Python FastAPI MongoDB Docker microservices REST API development"
-        score = get_tfidf_similarity(text, text)
-        assert score == 1.0
-
-    def test_tfidf_similarity_different(self):
-        from utils.nlp_utils import get_tfidf_similarity
-        score = get_tfidf_similarity("python developer", "graphic designer photoshop")
-        assert score < 0.3
-
     def test_score_to_label(self):
         from utils.validators import score_to_label
         assert score_to_label(0.90) == "strong_match"

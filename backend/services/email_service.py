@@ -87,10 +87,13 @@ class EmailService:
         attachments: Optional[List[Dict[str, str]]] = None,
         sender_email: Optional[str] = None,
         sender_name: Optional[str] = None,
+        is_critical: bool = False,
+        max_retries: int = 1,
     ) -> Dict[str, Any]:
         """Core async method for dispatching emails via Brevo HTTP API (v3/smtp/email).
-
-        :param attachments: List of dicts with keys 'name' and 'content' (base64 string)
+        
+        Critical emails (OTP, Auth, Password Reset, Team Invites) use automatic retry backoff.
+        Non-critical emails (Job Alerts, Newsletters) fail fast with structured warning logs.
         """
         api_key = settings.BREVO_API_KEY
         if not api_key:
@@ -129,50 +132,65 @@ class EmailService:
                 "Sending Email via Brevo HTTP API",
                 to=to_email,
                 subject=safe_subj,
+                is_critical=is_critical,
                 has_reply_to=bool(reply_to_email),
                 attachment_count=len(attachments or []),
             )
         except Exception:
             pass
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(BREVO_API_URL, headers=headers, json=payload)
+        effective_retries = max(max_retries, 3 if is_critical else 1)
+        last_error = ""
 
-            if response.status_code in (200, 201, 202):
-                data = response.json()
-                message_id = data.get("messageId") or data.get("message_id") or "brevo-success"
-                try:
-                    safe_subj = str(subject).encode("ascii", "replace").decode("ascii")
-                    logger.info("Brevo Email Sent Successfully", to=to_email, subject=safe_subj, message_id=message_id)
-                except Exception:
-                    pass
-                return {"sent": True, "to": to_email, "subject": subject, "message_id": message_id}
-            else:
-                logger.error(
-                    "Brevo API Error Response",
-                    status_code=response.status_code,
-                    to=to_email,
-                    subject=subject,
-                    response_text=response.text[:300],
-                )
-                return {
-                    "sent": False,
-                    "error": f"Brevo API returned status {response.status_code}",
-                    "detail": response.text,
-                }
-        except httpx.TimeoutException as exc:
-            logger.error("Brevo API Timeout", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": "Brevo HTTP API connection timeout."}
-        except httpx.RequestError as exc:
-            logger.error("Brevo HTTP Request Error", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": f"Failed to connect to Brevo API: {str(exc)}"}
-        except Exception as exc:
-            logger.exception("Unexpected error in Brevo Email Dispatch", to=to_email, subject=subject, error=str(exc))
-            return {"sent": False, "error": "Unexpected error while dispatching email via Brevo."}
+        for attempt in range(1, effective_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(BREVO_API_URL, headers=headers, json=payload)
 
-    async def _send(self, to_email: str, subject: str, html_body: str) -> bool:
-        result = await self._send_brevo_email(to_email=to_email, subject=subject, html_body=html_body)
+                if response.status_code in (200, 201, 202):
+                    data = response.json()
+                    message_id = data.get("messageId") or data.get("message_id") or "brevo-success"
+                    try:
+                        safe_subj = str(subject).encode("ascii", "replace").decode("ascii")
+                        logger.info("Brevo Email Sent Successfully", to=to_email, subject=safe_subj, message_id=message_id, attempt=attempt)
+                    except Exception:
+                        pass
+                    return {"sent": True, "to": to_email, "subject": subject, "message_id": message_id}
+                elif response.status_code in (429, 500, 502, 503, 504) and attempt < effective_retries:
+                    last_error = f"Brevo status {response.status_code}: {response.text[:200]}"
+                    logger.warning("Brevo transient error, retrying critical email", attempt=attempt, max_retries=effective_retries, error=last_error)
+                    await asyncio.sleep(attempt * 1.5)
+                    continue
+                else:
+                    logger.error(
+                        "Brevo API Error Response",
+                        status_code=response.status_code,
+                        to=to_email,
+                        subject=subject,
+                        response_text=response.text[:300],
+                        attempt=attempt,
+                    )
+                    return {
+                        "sent": False,
+                        "error": f"Brevo API returned status {response.status_code}",
+                        "detail": response.text,
+                    }
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                last_error = str(exc)
+                if attempt < effective_retries:
+                    logger.warning("Brevo connection issue, retrying critical email", attempt=attempt, max_retries=effective_retries, error=last_error)
+                    await asyncio.sleep(attempt * 1.5)
+                    continue
+                logger.error("Brevo API Connection Failed after retries", to=to_email, subject=subject, error=last_error, attempts=attempt)
+                return {"sent": False, "error": f"Brevo HTTP API connection failed: {last_error}"}
+            except Exception as exc:
+                logger.exception("Unexpected error in Brevo Email Dispatch", to=to_email, subject=subject, error=str(exc))
+                return {"sent": False, "error": "Unexpected error while dispatching email via Brevo."}
+
+        return {"sent": False, "error": f"Failed after {effective_retries} attempts: {last_error}"}
+
+    async def _send(self, to_email: str, subject: str, html_body: str, is_critical: bool = False) -> bool:
+        result = await self._send_brevo_email(to_email=to_email, subject=subject, html_body=html_body, is_critical=is_critical)
         return bool(result.get("sent"))
 
     async def send_email(
@@ -204,7 +222,7 @@ class EmailService:
         )
 
     async def send_otp(self, to_email: str, full_name: str, otp: str, purpose: OTPPurpose) -> bool:
-        """1. User Sign-up / Auth OTP Verification"""
+        """1. User Sign-up / Auth OTP Verification (Critical delivery with 3x retry)"""
         try:
             template, subject = _OTP_DISPATCH[purpose]
         except KeyError:
@@ -216,7 +234,7 @@ class EmailService:
             otp=otp,
             expiry_minutes=settings.OTP_EXPIRE_MINUTES,
         )
-        return await self._send(to_email, subject, html)
+        return await self._send(to_email, subject, html, is_critical=True)
 
     async def send_team_invitation(
         self,
@@ -248,7 +266,7 @@ class EmailService:
             invite_url=invite_url,
             expiry_days=expires_days,
         )
-        return await self._send(recipient_email, subject, html)
+        return await self._send(recipient_email, subject, html, is_critical=True)
 
     async def send_live_interview_invitation(
         self,
@@ -280,7 +298,7 @@ class EmailService:
             expiry_hours=expiry_hours,
         )
         logger.info("Dispatching live interview invitation email", to=target_email, job=job_title)
-        return await self._send(target_email, subject, html)
+        return await self._send(target_email, subject, html, is_critical=True)
 
     async def send_certificate(
         self,

@@ -2,7 +2,7 @@
 Embedding Cache and Quantization Engine for CareerShala ATS.
 Provides:
   - Redis-backed cache for embedding vectors keyed on sha256(text) + model_version with 30-day TTL.
-  - In-memory LRU cache fallback when Redis is offline.
+  - Zero-RAM footprint pass-through when Redis is offline (prevents Azure memory bloat).
   - Dynamic batching to prevent CPU thread blocking during request spikes.
   - Int8 quantization and dequantization abstractions for compact memory footprint.
 """
@@ -21,10 +21,6 @@ logger = structlog.get_logger(__name__)
 
 # 30 days TTL in seconds (30 * 24 * 3600)
 DEFAULT_CACHE_TTL_SECONDS = 2592000
-
-# In-memory LRU fallback cache: key -> (embedding_vector, expires_at)
-_IN_MEMORY_EMB_CACHE: Dict[str, Tuple[List[float], float]] = {}
-_MAX_IN_MEMORY_ENTRIES = 10000
 
 
 def compute_embedding_cache_key(text: str, model_version: str) -> str:
@@ -71,11 +67,7 @@ def dequantize_embeddings_int8(
 
 class EmbeddingCacheManager:
     """
-    Manages embedding caching across Redis and in-memory stores.
-
-    Complexity:
-        Time: O(1) key lookup / storage.
-        Space: O(D) per embedding vector (1024 floats).
+    Manages embedding caching across Redis store with zero-RAM pass-through fallback.
     """
 
     def __init__(self, redis_client: Optional[Any] = None, ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS):
@@ -94,7 +86,6 @@ class EmbeddingCacheManager:
             missing_indices: list of original indices that were NOT in cache
             missing_texts: list of texts corresponding to missing_indices
         """
-        now = time.time()
         cached_map: Dict[int, List[float]] = {}
         missing_indices: List[int] = []
         missing_texts: List[str] = []
@@ -105,14 +96,12 @@ class EmbeddingCacheManager:
         redis_results = None
         if self.redis is not None:
             try:
-                # Sync or async Redis client inspection
                 if hasattr(self.redis, "mget"):
                     redis_results = self.redis.mget(keys)
             except Exception as e:
-                logger.debug("Redis mget failed, falling back to in-memory cache", error=str(e))
+                logger.debug("Redis mget failed, calculating vectors on-demand", error=str(e))
 
         for idx, (text, key) in enumerate(zip(texts, keys)):
-            # Check Redis result
             if redis_results and idx < len(redis_results) and redis_results[idx]:
                 try:
                     val = json.loads(redis_results[idx])
@@ -120,12 +109,6 @@ class EmbeddingCacheManager:
                     continue
                 except Exception:
                     pass
-
-            # Check In-memory fallback
-            mem = _IN_MEMORY_EMB_CACHE.get(key)
-            if mem and mem[1] > now:
-                cached_map[idx] = mem[0]
-                continue
 
             missing_indices.append(idx)
             missing_texts.append(text)
@@ -139,12 +122,8 @@ class EmbeddingCacheManager:
         model_version: str,
     ) -> None:
         """
-        Caches newly computed embeddings into Redis and in-memory store.
+        Caches newly computed embeddings into Redis store.
         """
-        now = time.time()
-        expires_at = now + self.ttl_seconds
-
-        # 1. Redis storage
         if self.redis is not None:
             try:
                 pipe = self.redis.pipeline()
@@ -155,17 +134,6 @@ class EmbeddingCacheManager:
             except Exception as e:
                 logger.debug("Redis store embeddings failed", error=str(e))
 
-        # 2. In-memory store (LRU eviction if exceeded)
-        if len(_IN_MEMORY_EMB_CACHE) > _MAX_IN_MEMORY_ENTRIES:
-            # Evict 20% oldest entries
-            sorted_keys = sorted(_IN_MEMORY_EMB_CACHE.keys(), key=lambda k: _IN_MEMORY_EMB_CACHE[k][1])
-            for k in sorted_keys[:int(_MAX_IN_MEMORY_ENTRIES * 0.2)]:
-                _IN_MEMORY_EMB_CACHE.pop(k, None)
 
-        for text, emb in zip(texts, embeddings):
-            key = compute_embedding_cache_key(text, model_version)
-            _IN_MEMORY_EMB_CACHE[key] = (emb, expires_at)
-
-
-# Global singleton cache manager
+# Singleton instance
 embedding_cache = EmbeddingCacheManager()

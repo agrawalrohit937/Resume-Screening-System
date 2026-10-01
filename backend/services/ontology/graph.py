@@ -361,20 +361,24 @@ class OccupationSkillGraph:
                         bucket=info["bucket"],
                     )
 
-        # 6. Fuzzy Matching (RapidFuzz) with token-length guard (len >= 4)
+        # 6. Fuzzy Matching with strict token-length guard (len >= 4, no substring matching)
         if len(req_clean) >= 4:
             try:
-                from rapidfuzz import fuzz
                 best_fuzzy_match = None
                 best_fuzzy_score = 0.0
+                try:
+                    from rapidfuzz import fuzz
+                    calc_ratio = lambda a, b: max(float(fuzz.ratio(a, b)), float(fuzz.token_sort_ratio(a, b)))
+                except ImportError:
+                    from difflib import SequenceMatcher
+                    calc_ratio = lambda a, b: SequenceMatcher(None, a, b).ratio() * 100.0
+
                 for c_norm_clean, original_text in cand_map.items():
                     c_clean = _clean_term(original_text)
+                    # Both terms must be at least 4 characters; short acronyms (C, AWS, CSS, UI) are exact-only
                     if len(c_clean) >= 4:
-                        ratio = float(fuzz.ratio(req_clean, c_clean))
-                        token_ratio = float(fuzz.token_sort_ratio(req_clean, c_clean))
-                        partial = float(fuzz.partial_ratio(req_clean, c_clean)) if min(len(req_clean), len(c_clean)) >= 6 else 0.0
-                        score = max(ratio, token_ratio, partial)
-                        if score >= 80.0 and score > best_fuzzy_score:
+                        score = calc_ratio(req_clean, c_clean)
+                        if score >= 82.0 and score > best_fuzzy_score:
                             best_fuzzy_score = score
                             best_fuzzy_match = original_text
 

@@ -19,11 +19,6 @@ except ImportError:
     word_tokenize = None
     sent_tokenize = None
 
-try:
-    from sklearn.feature_extraction.text import TfidfVectorizer
-except ImportError:
-    TfidfVectorizer = None
-
 # Download NLTK data safely (checking before download)
 if nltk:
     _nltk_downloads = ["punkt", "stopwords", "wordnet", "averaged_perceptron_tagger"]
@@ -97,30 +92,6 @@ def lemmatize_text(text: str) -> str:
     return " ".join(_lemmatizer.lemmatize(t) for t in tokens)
 
 
-def extract_keywords(
-    text: str,
-    top_n: int = 30,
-    min_df: int = 1,
-) -> List[Tuple[str, float]]:
-    """Extract top-n keywords using TF-IDF from a single document."""
-    cleaned = clean_text(text, remove_stopwords=True)
-    if not cleaned:
-        return []
-    try:
-        vectorizer = TfidfVectorizer(
-            ngram_range=(1, 2),
-            max_features=200,
-            min_df=min_df,
-            stop_words="english",
-        )
-        tfidf_matrix = vectorizer.fit_transform([cleaned])
-        scores = zip(vectorizer.get_feature_names_out(), tfidf_matrix.toarray()[0])
-        sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
-        return [(word, round(score, 4)) for word, score in sorted_scores[:top_n] if score > 0]
-    except Exception:
-        return []
-
-
 def detect_skills_in_text(text: str) -> Tuple[List[str], List[str]]:
     """Returns (technical_skills, soft_skills) found in text."""
     lowered = text.lower()
@@ -178,31 +149,6 @@ def extract_years_of_experience(text: str) -> float:
             except ValueError:
                 pass
     return max_years
-
-
-def get_tfidf_similarity(text1: str, text2: str) -> float:
-    """Compute cosine TF-IDF similarity between two texts."""
-    from sklearn.metrics.pairwise import cosine_similarity
-    try:
-        # FIX: Use clean_text WITHOUT remove_stopwords — the vectorizer handles stopwords.
-        # Previously had double stopword removal which destroyed vocabulary.
-        t1 = clean_text(text1)  # just normalize whitespace/punctuation
-        t2 = clean_text(text2)
-        if not t1.strip() or not t2.strip():
-            return 0.0
-        vectorizer = TfidfVectorizer(
-            ngram_range=(1, 2),
-            stop_words="english",
-            sublinear_tf=True,      # dampen high-freq terms — better for short docs
-            min_df=1,
-            max_df=1.0,
-        )
-        matrix = vectorizer.fit_transform([t1, t2])
-        sim = cosine_similarity(matrix[0:1], matrix[1:2])[0][0]
-        return round(float(sim), 4)
-    except Exception as e:
-        logger.warning("TF-IDF similarity failed", error=str(e))
-        return 0.0
 
 
 def extract_sections(text: str) -> dict:

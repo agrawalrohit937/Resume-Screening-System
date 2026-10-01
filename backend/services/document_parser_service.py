@@ -121,14 +121,19 @@ class DocumentParserService:
                 "PDF exceeds 2 pages: Bypassing Azure Document Intelligence to prevent F0 truncation. Using local pdfplumber.",
                 page_count=page_count,
             )
+            cleaned_local = self._clean_text(local_text)
+            if not cleaned_local or len(cleaned_local) < 30:
+                raise ValueError(
+                    "Could not extract readable text from PDF. Please upload a text-based PDF (scanned image-only PDFs without selectable text are not supported)."
+                )
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
             return {
-                "raw_text": self._clean_text(local_text),
+                "raw_text": cleaned_local,
                 "page_count": page_count,
                 "source": "pdfplumber",
                 "metadata": {
                     "reason": "page_count_gt_2_guardrail",
-                    "word_count": len(local_text.split()),
+                    "word_count": len(cleaned_local.split()),
                     "processing_time_ms": elapsed_ms,
                 },
             }
@@ -156,14 +161,19 @@ class DocumentParserService:
                 )
 
         # 4. Fallback: local pdfplumber extraction
+        cleaned_local = self._clean_text(local_text)
+        if not cleaned_local or len(cleaned_local) < 30:
+            raise ValueError(
+                "Could not extract readable text from PDF. Please upload a text-based PDF (scanned image-only PDFs without selectable text are not supported)."
+            )
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         return {
-            "raw_text": self._clean_text(local_text),
+            "raw_text": cleaned_local,
             "page_count": page_count,
             "source": "pdfplumber",
             "metadata": {
                 "fallback": True,
-                "word_count": len(local_text.split()),
+                "word_count": len(cleaned_local.split()),
                 "processing_time_ms": elapsed_ms,
             },
         }
@@ -283,50 +293,52 @@ class DocumentParserService:
             except Exception as e:
                 logger.error("Local pdfplumber extraction failed", error=str(e))
 
-        # Secondary fallback: pypdf (if pdfplumber unavailable or produced empty text)
-        if not text_parts and pdf_bytes:
-            try:
-                import pypdf
-                reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-                page_count = len(reader.pages)
-                for p in reader.pages:
-                    pt = p.extract_text() or ""
-                    if pt.strip():
-                        text_parts.append(pt)
-            except Exception as e:
-                logger.debug("pypdf fallback extraction failed", error=str(e))
-
         combined = "\n\n".join(text_parts).strip()
         return page_count, pdf_bytes, combined
 
     def _parse_docx(self, file_input: Union[str, Path, bytes], start_time: float) -> Dict[str, Any]:
         import io
-        if isinstance(file_input, (str, Path)):
-            doc = Document(file_input)
-        else:
-            doc = Document(io.BytesIO(file_input))
+        if Document is None:
+            raise RuntimeError("python-docx library is not installed on server.")
 
-        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
-                if row_text:
-                    paragraphs.append(row_text)
+        try:
+            if isinstance(file_input, (str, Path)):
+                doc = Document(file_input)
+            else:
+                doc = Document(io.BytesIO(file_input))
 
-        full_text = "\n\n".join(paragraphs).strip()
-        # Estimate page count for docx based on typical 3000 chars/page
-        estimated_pages = max(1, math.ceil(len(full_text) / 2800))
-        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                    if row_text:
+                        paragraphs.append(row_text)
 
-        return {
-            "raw_text": self._clean_text(full_text),
-            "page_count": estimated_pages,
-            "source": "docx",
-            "metadata": {
-                "word_count": len(full_text.split()),
-                "processing_time_ms": elapsed_ms,
-            },
-        }
+            full_text = "\n\n".join(paragraphs).strip()
+            cleaned_text = self._clean_text(full_text)
+            if not cleaned_text or len(cleaned_text) < 15:
+                raise ValueError("DOCX document appears to be empty.")
+
+            # Estimate page count for docx based on typical 3000 chars/page
+            estimated_pages = max(1, math.ceil(len(cleaned_text) / 2800))
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+
+            return {
+                "raw_text": cleaned_text,
+                "page_count": estimated_pages,
+                "source": "docx",
+                "metadata": {
+                    "word_count": len(cleaned_text.split()),
+                    "processing_time_ms": elapsed_ms,
+                },
+            }
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error("Failed to parse DOCX file", error=str(e))
+            raise ValueError(
+                "Unable to read DOCX file. Please ensure it is a valid, uncorrupted Microsoft Word (.docx) document."
+            )
 
     def _parse_txt(self, file_input: Union[str, Path, bytes], start_time: float) -> Dict[str, Any]:
         if isinstance(file_input, (str, Path)):

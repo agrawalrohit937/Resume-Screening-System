@@ -85,6 +85,67 @@ class JDAuditPayload(BaseModel):
     jd_text: str = Field(..., min_length=10, description="Job description text")
 
 
+def derive_fallback_skills(title: str, department: Optional[str] = None, jd_text: Optional[str] = None) -> List[str]:
+    """
+    Backend heuristic to derive foundational required skills from job title, department, and description.
+    Ensures that jobs without explicit required_skills still have high-quality skill tags,
+    keeping client-side Frontend code lightweight and dumb.
+    """
+    derived: List[str] = []
+    lt = (title or "").lower()
+    
+    if "react" in lt:
+        derived.append("React")
+    if "frontend" in lt or "front-end" in lt or "front end" in lt:
+        if "Frontend" not in derived:
+            derived.append("Frontend")
+        if "JavaScript" not in derived:
+            derived.append("JavaScript")
+    if "python" in lt or "django" in lt or "fastapi" in lt or "flask" in lt:
+        if "Python" not in derived:
+            derived.append("Python")
+        if "Backend" not in derived:
+            derived.append("Backend")
+    if "node" in lt or "express" in lt or "backend" in lt or "back-end" in lt:
+        if "Node.js" not in derived and "node" in lt:
+            derived.append("Node.js")
+        if "Backend" not in derived:
+            derived.append("Backend")
+    if "full stack" in lt or "fullstack" in lt or "full-stack" in lt:
+        if "Full Stack" not in derived:
+            derived.append("Full Stack")
+        if "Web Development" not in derived:
+            derived.append("Web Development")
+    if "data" in lt or "analytics" in lt or "sql" in lt:
+        if "Data Analysis" not in derived:
+            derived.append("Data Analysis")
+        if "SQL" not in derived:
+            derived.append("SQL")
+    if "machine learning" in lt or "ml" in lt or "ai " in lt or "ai/" in lt or "deep learning" in lt:
+        if "Machine Learning" not in derived:
+            derived.append("Machine Learning")
+        if "Python" not in derived:
+            derived.append("Python")
+    if "ui" in lt or "ux" in lt or "design" in lt or "product designer" in lt:
+        if "UI/UX" not in derived:
+            derived.append("UI/UX")
+        if "Figma" not in derived:
+            derived.append("Figma")
+    if "devops" in lt or "cloud" in lt or "aws" in lt or "sre" in lt or "kubernetes" in lt:
+        if "DevOps" not in derived:
+            derived.append("DevOps")
+        if "Cloud" not in derived:
+            derived.append("Cloud")
+
+    if not derived and department and str(department).strip():
+        derived.append(str(department).strip())
+
+    if not derived:
+        derived.extend(["Software Engineering", "Problem Solving"])
+
+    return canonicalize_skills(derived)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. POST / — POST A NEW JOB (LOCAL BGE-BASE EMBEDDING)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -155,11 +216,15 @@ async def create_job(
         extracted = parse_structured_job_requirements(raw_text, payload.title)
         reqs_structured = [r.dict() for r in extracted]
 
+    initial_skills = canonicalize_skills(payload.required_skills) if payload.required_skills else []
+    if not initial_skills:
+        initial_skills = derive_fallback_skills(payload.title, payload.department, raw_text)
+
     job_doc = {
         "company_name": company_clean,
         "title": payload.title.strip(),
         "jd_text_raw": raw_text,
-        "required_skills": canonicalize_skills(payload.required_skills),
+        "required_skills": initial_skills,
         "min_years": payload.min_years,
         "location": payload.location.strip() or "Remote",
         "work_mode": payload.work_mode,
@@ -384,6 +449,9 @@ async def list_jobs(
             safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
         else:
             safe_skills = []
+
+        if not safe_skills:
+            safe_skills = derive_fallback_skills(d.get("title") or "", d.get("department"), d.get("jd_text_raw") or d.get("jd_text"))
 
         comp_logo = d.get("company_logo") or d.get("company_logo_url") or d.get("logo_url") or d.get("logo")
         comp_site = d.get("company_website") or d.get("website")
@@ -1876,11 +1944,14 @@ async def get_job_detail(
 
     raw_skills = doc.get("required_skills")
     if isinstance(raw_skills, list):
-        safe_skills = [str(s) for s in raw_skills if s is not None]
+        safe_skills = [str(s).strip() for s in raw_skills if s is not None and str(s).strip()]
     elif isinstance(raw_skills, str) and raw_skills.strip():
         safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
     else:
         safe_skills = []
+
+    if not safe_skills:
+        safe_skills = derive_fallback_skills(doc.get("title") or "", doc.get("department"), doc.get("jd_text_raw") or doc.get("jd_text"))
 
     return {
         "id": str(doc["_id"]),
@@ -2252,19 +2323,6 @@ async def apply_to_job(
         )
     except Exception as log_err:
         logger.warning("Failed to log apply match event", error=str(log_err))
-
-    # Shadow scoring parallel evaluation (Phase 4.6)
-    try:
-        from services.shadow_scoring import shadow_scoring_service
-        shadow_scoring_service.dispatch_shadow_score(
-            job_id=job_id,
-            candidate_id=str(current_user.id),
-            primary_score=quality_score,
-            features_dict=features_data if isinstance(features_data, dict) else None,
-            db=db,
-        )
-    except Exception as shadow_err:
-        logger.debug("Shadow scoring dispatch skipped", error=str(shadow_err))
 
     logger.info(
         "Application submitted to 'applications' collection",
