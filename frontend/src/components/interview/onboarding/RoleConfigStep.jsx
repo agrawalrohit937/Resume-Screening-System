@@ -4,7 +4,7 @@ import {
   Briefcase, Sliders, Layers, Sparkles, ArrowRight, Zap, Target,
   Crosshair, Rocket, CheckCircle2, Search, Bot, Clock, List, Check, Star
 } from 'lucide-react'
-import FlowStepper from '../components/interview/onboarding/FlowStepper'
+import FlowStepper from './FlowStepper'
 
 const DIFFICULTIES = [
   { id: 'easy', label: 'Warm-up', sub: 'Great for building confidence.', time: 2, icon: Target, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -56,8 +56,6 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
   const isFormValid = form.job_title.trim().length > 1
 
   return (
-    // ADDED NEGATIVE MARGINS (-m-4 sm:-m-6 lg:-m-8) AND min-h-[calc(100vh-80px)]
-    // This pulls the background out to cover the dashboard padding.
     <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-80px)] bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased flex flex-col">
       <div className="pointer-events-none absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-indigo-400/5 blur-3xl" />

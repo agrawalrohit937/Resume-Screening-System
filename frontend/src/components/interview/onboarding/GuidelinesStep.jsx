@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, Mic, Eye, Clock4, ShieldAlert, RotateCcw, MonitorCheck, Sparkles, ArrowRight, ShieldCheck, Volume2, BookOpen, ChevronRight } from 'lucide-react'
-import FlowStepper from '../components/interview/onboarding/FlowStepper'
+import FlowStepper from './FlowStepper'
 
 const RULES = [
   { icon: MonitorCheck, title: 'Full-screen required', desc: 'Leaving full-screen will be recorded as a distraction warning.' },
@@ -22,7 +22,6 @@ export default function GuidelinesStep({ onBack, onContinue }) {
   const [agreed, setAgreed] = useState(false)
 
   return (
-    // Added negative margins (-m-4 md:-m-6 lg:-m-8) to pull the background over the parent layout's padding
     <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-80px)] bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased flex flex-col justify-center">
       
       {/* Ambient backdrop glow */}

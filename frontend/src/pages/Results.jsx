@@ -99,7 +99,7 @@ export default function Results() {
           setResumeFile(null)
           setUploadDone(false)
         }
-      } catch (err) {}
+      } catch (err) { }
     }
 
     fetchExistingResume()
@@ -402,11 +402,10 @@ export default function Results() {
                         whileTap={{ scale: 0.97 }}
                         key={idx}
                         onClick={() => applyPresetRole(role)}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer shadow-sm ${
-                          isSelected 
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-md' 
+                        className={`px-5 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer shadow-sm ${isSelected
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                             : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300 hover:shadow-md'
-                        }`}
+                          }`}
                       >
                         <span className="text-base">{role.icon}</span> {role.title}
                       </motion.button>
@@ -417,11 +416,11 @@ export default function Results() {
 
               {/* Dual Workstation Cards (Balanced Heights) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch min-h-[480px]">
-                
+
                 {/* 1. Resume Card */}
                 <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-5 sm:p-7 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/5 rounded-bl-full -z-10" />
-                  
+
                   <div className="flex items-center gap-3.5 sm:gap-4 mb-6 sm:mb-8">
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
                       <FileText size={20} />
@@ -440,8 +439,8 @@ export default function Results() {
                         </div>
                         <h4 className="text-base sm:text-lg font-bold text-slate-900 truncate w-full max-w-xs">{resumeFile?.name || 'Resume Ready'}</h4>
                         <p className="text-xs sm:text-sm text-emerald-600 font-bold mt-1">Successfully Parsed & Ready</p>
-                        <button 
-                          onClick={() => { setUploadDone(false); setResumeFile(null); setResumeId(''); }} 
+                        <button
+                          onClick={() => { setUploadDone(false); setResumeFile(null); setResumeId(''); }}
                           className="mt-5 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer"
                         >
                           Upload Different File
@@ -531,11 +530,11 @@ export default function Results() {
                       </div>
                     ) : (
                       <div className="relative flex-1 flex flex-col">
-                        <textarea 
-                          value={jdText} 
-                          onChange={e => setJdText(e.target.value)} 
-                          placeholder="Paste the full job description here..." 
-                          className="flex-1 w-full min-h-[160px] p-5 bg-slate-50 border border-slate-200 rounded-[1.5rem] text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white resize-none transition-all shadow-sm" 
+                        <textarea
+                          value={jdText}
+                          onChange={e => setJdText(e.target.value)}
+                          placeholder="Paste the full job description here..."
+                          className="flex-1 w-full min-h-[160px] p-5 bg-slate-50 border border-slate-200 rounded-[1.5rem] text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white resize-none transition-all shadow-sm"
                         />
                         <div className="absolute bottom-4 right-4">
                           <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm border ${jdText.length >= 50 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}>

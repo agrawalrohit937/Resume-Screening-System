@@ -102,7 +102,7 @@ export default function SupportCategoryCards({ selectedCategory, onSelect, onBac
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+      <div className="grid grid-cols-1 gap-2 sm:gap-2.5 max-h-[360px] sm:max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
         {CATEGORIES.map((cat, idx) => {
           const Icon = cat.icon
           const isSelected = selectedCategory === cat.id
@@ -115,25 +115,25 @@ export default function SupportCategoryCards({ selectedCategory, onSelect, onBac
               initial="hidden"
               animate="visible"
               onClick={() => onSelect(cat.id)}
-              className={`w-full flex items-center gap-3.5 p-4 rounded-xl border transition-all text-left group
+              className={`w-full flex items-center gap-3 sm:gap-3.5 p-3 sm:p-4 rounded-xl border transition-all text-left group
                 ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-300 bg-indigo-50/50' : `border-slate-200 bg-white ${cat.hoverColor}`}
               `}
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cat.color}`}>
-                <Icon size={20} strokeWidth={1.8} />
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${cat.color}`}>
+                <Icon size={18} className="sm:w-5 sm:h-5" strokeWidth={1.8} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
                   {cat.label}
                 </p>
                 {cat.subcategories.length > 0 && (
-                  <p className="text-[10px] font-medium text-slate-400 mt-0.5 truncate">
+                  <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 mt-0.5 truncate">
                     {cat.subcategories.slice(0, 3).join(' · ')}
                     {cat.subcategories.length > 3 && ` +${cat.subcategories.length - 3} more`}
                   </p>
                 )}
               </div>
-              <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" strokeWidth={2.5} />
+              <ChevronRight size={15} className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" strokeWidth={2.5} />
             </motion.button>
           )
         })}

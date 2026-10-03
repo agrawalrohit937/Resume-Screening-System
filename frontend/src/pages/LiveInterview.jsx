@@ -39,8 +39,8 @@ import DetectionPanel from '../components/detection/DetectionPanel'
 import InterviewReport from '../components/interview/InterviewReport'
 import ImmersiveShell from '../components/interview/onboarding/ImmersiveShell'
 import CheatingWarningModal from '../components/detection/CheatingWarningModal'
-import RoleConfigStep from './RoleConfigStep'
-import GuidelinesStep from './GuidelinesStep'
+import RoleConfigStep from '../components/interview/onboarding/RoleConfigStep'
+import GuidelinesStep from '../components/interview/onboarding/GuidelinesStep'
 import SystemCheckStep from '../components/interview/onboarding/SystemCheckStep'
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`

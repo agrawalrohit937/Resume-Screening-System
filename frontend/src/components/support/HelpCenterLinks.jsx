@@ -28,10 +28,10 @@ export default function HelpCenterLinks() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, delay: 0.2 }}
     >
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2.5 px-1">
         Help Center
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
         {LINKS.map((link, idx) => {
           const Icon = link.icon
           const isExternal = link.href.startsWith('http') || link.href.startsWith('mailto:')
@@ -42,13 +42,13 @@ export default function HelpCenterLinks() {
               href={link.href}
               target={isExternal ? '_blank' : undefined}
               rel={isExternal ? 'noopener noreferrer' : undefined}
-              className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:border-slate-200 transition-all group"
+              className="flex items-center gap-2.5 px-3.5 py-2.5 sm:py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:border-slate-200 transition-all group"
             >
               <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-all shrink-0">
                 <Icon size={15} strokeWidth={2} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-slate-700 group-hover:text-indigo-700 transition-colors truncate">
+                <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 transition-colors truncate">
                   {link.label}
                 </p>
               </div>

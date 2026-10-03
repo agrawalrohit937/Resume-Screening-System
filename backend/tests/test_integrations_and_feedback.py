@@ -15,12 +15,12 @@ import pytest
 import httpx
 
 from models.job import JobModel, WorkMode
-from services.integrations.webhook_dispatcher import (
+from services.integrations.webhooks import (
     WebhookDispatcher,
     compute_webhook_signature,
     verify_webhook_signature,
 )
-from services.integrations.job_board_syndication import (
+from services.integrations.syndication import (
     generate_indeed_xml_feed,
     generate_linkedin_jobs_json_feed,
 )
