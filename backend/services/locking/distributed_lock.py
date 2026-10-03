@@ -10,6 +10,7 @@ Guarantees:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import os
 import time
 import uuid
@@ -100,13 +101,18 @@ class DistributedLock:
                     upsert=True,
                     return_document=True,
                 )
-                if asyncio.iscoroutine(op):
+                if inspect.isawaitable(op):
                     res = await op
-                    if res and res.get("token") == self.token:
-                        self._acquired = True
-                        logger.debug("Acquired distributed lock via MongoDB", key=self.lock_key)
-                        return True
-                    return False
+                elif isinstance(op, dict):
+                    res = op
+                else:
+                    res = None
+
+                if res and res.get("token") == self.token:
+                    self._acquired = True
+                    logger.debug("Acquired distributed lock via MongoDB", key=self.lock_key)
+                    return True
+                return False
             except Exception as e:
                 logger.warning("MongoDB distributed lock acquire failed", error=str(e))
                 return False
@@ -135,7 +141,7 @@ class DistributedLock:
             try:
                 coll = self.db["distributed_locks"]
                 op = coll.delete_one({"key": self.lock_key, "token": self.token})
-                if asyncio.iscoroutine(op):
+                if inspect.isawaitable(op):
                     await op
                 released = True
             except Exception as e:

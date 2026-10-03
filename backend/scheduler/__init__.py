@@ -7,6 +7,9 @@ from .job_alerts import (
     stop_job_alert_scheduler,
     run_nightly_job_alerts,
     job_alerts_scheduler,
+    recover_missed_job_alerts_on_startup,
+    calculate_slot_id,
+    get_eligible_missed_slot,
 )
 
 __all__ = [
@@ -14,4 +17,8 @@ __all__ = [
     "stop_job_alert_scheduler",
     "run_nightly_job_alerts",
     "job_alerts_scheduler",
+    "recover_missed_job_alerts_on_startup",
+    "calculate_slot_id",
+    "get_eligible_missed_slot",
 ]
+

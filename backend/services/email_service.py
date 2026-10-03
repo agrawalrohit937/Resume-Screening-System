@@ -5,6 +5,7 @@ Brevo HTTP API Email Service — sends transactional emails via Brevo REST API v
 Replaces legacy SMTP (aiosmtplib) with an async, non-blocking HTTP mailer service.
 """
 
+import asyncio
 import base64
 from datetime import datetime, timezone
 from html import escape
@@ -141,10 +142,13 @@ class EmailService:
 
         effective_retries = max(max_retries, 3 if is_critical else 1)
         last_error = ""
+        is_uncertain = False
 
         for attempt in range(1, effective_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                # 30.0s overall timeout; connect timeout 10.0s
+                timeout_config = httpx.Timeout(30.0, connect=10.0)
+                async with httpx.AsyncClient(timeout=timeout_config) as client:
                     response = await client.post(BREVO_API_URL, headers=headers, json=payload)
 
                 if response.status_code in (200, 201, 202):
@@ -158,8 +162,16 @@ class EmailService:
                     return {"sent": True, "to": to_email, "subject": subject, "message_id": message_id}
                 elif response.status_code in (429, 500, 502, 503, 504) and attempt < effective_retries:
                     last_error = f"Brevo status {response.status_code}: {response.text[:200]}"
-                    logger.warning("Brevo transient error, retrying critical email", attempt=attempt, max_retries=effective_retries, error=last_error)
-                    await asyncio.sleep(attempt * 1.5)
+                    retry_after_sec = None
+                    if response.status_code == 429 and "Retry-After" in response.headers:
+                        try:
+                            retry_after_sec = min(float(response.headers["Retry-After"]), 10.0)
+                        except (ValueError, TypeError):
+                            retry_after_sec = None
+
+                    backoff_delay = retry_after_sec if retry_after_sec is not None else min((attempt * 1.5) + (attempt * 0.2), 10.0)
+                    logger.warning("Brevo transient error, retrying email dispatch", attempt=attempt, max_retries=effective_retries, delay=backoff_delay, error=last_error)
+                    await asyncio.sleep(backoff_delay)
                     continue
                 else:
                     logger.error(
@@ -172,22 +184,44 @@ class EmailService:
                     )
                     return {
                         "sent": False,
+                        "uncertain": False,
                         "error": f"Brevo API returned status {response.status_code}",
                         "detail": response.text,
                     }
-            except (httpx.TimeoutException, httpx.RequestError) as exc:
+            except httpx.ConnectTimeout as exc:
+                # Connect timeout happened before request body was transmitted - safe to retry
+                last_error = f"ConnectTimeout: {str(exc)}"
+                if attempt < effective_retries:
+                    backoff = min(attempt * 1.5, 6.0)
+                    logger.warning("Brevo connection timeout (pre-transmission), retrying", attempt=attempt, error=last_error)
+                    await asyncio.sleep(backoff)
+                    continue
+                logger.error("Brevo API Connection Timeout after retries", to=to_email, subject=subject, error=last_error)
+                return {"sent": False, "uncertain": False, "error": f"Brevo HTTP connect timeout: {last_error}"}
+            except httpx.ReadTimeout as exc:
+                # Read timeout happened AFTER request was transmitted - payload may have been received by Brevo!
+                last_error = f"ReadTimeout: {str(exc)}"
+                logger.warning("Brevo ReadTimeout after payload transmission (uncertain outcome)", to=to_email, error=last_error)
+                is_uncertain = True
+                # Do NOT blind-retry a read timeout to prevent duplicate email dispatch
+                return {
+                    "sent": False,
+                    "uncertain": True,
+                    "error": f"Brevo ReadTimeout after dispatch (uncertain provider status): {last_error}",
+                }
+            except httpx.RequestError as exc:
                 last_error = str(exc)
                 if attempt < effective_retries:
-                    logger.warning("Brevo connection issue, retrying critical email", attempt=attempt, max_retries=effective_retries, error=last_error)
+                    logger.warning("Brevo request error, retrying", attempt=attempt, max_retries=effective_retries, error=last_error)
                     await asyncio.sleep(attempt * 1.5)
                     continue
                 logger.error("Brevo API Connection Failed after retries", to=to_email, subject=subject, error=last_error, attempts=attempt)
-                return {"sent": False, "error": f"Brevo HTTP API connection failed: {last_error}"}
+                return {"sent": False, "uncertain": False, "error": f"Brevo HTTP API request error: {last_error}"}
             except Exception as exc:
                 logger.exception("Unexpected error in Brevo Email Dispatch", to=to_email, subject=subject, error=str(exc))
-                return {"sent": False, "error": "Unexpected error while dispatching email via Brevo."}
+                return {"sent": False, "uncertain": False, "error": "Unexpected error while dispatching email via Brevo."}
 
-        return {"sent": False, "error": f"Failed after {effective_retries} attempts: {last_error}"}
+        return {"sent": False, "uncertain": is_uncertain, "error": f"Failed after {effective_retries} attempts: {last_error}"}
 
     async def _send(self, to_email: str, subject: str, html_body: str, is_critical: bool = False) -> bool:
         result = await self._send_brevo_email(to_email=to_email, subject=subject, html_body=html_body, is_critical=is_critical)
@@ -1010,14 +1044,22 @@ async def send_job_alert_email(
         sender_name="CareerShala Job Alerts",
     )
     if brevo_res.get("sent"):
-        logger.info("Job alert email dispatched via Brevo", to=to_email, count=count)
-        return {"sent": True, "method": "brevo", "to": to_email, "count": count}
+        logger.info("Job alert email dispatched via Brevo", to=to_email, count=count, message_id=brevo_res.get("message_id"))
+        return {
+            "sent": True,
+            "method": "brevo",
+            "to": to_email,
+            "count": count,
+            "message_id": brevo_res.get("message_id"),
+        }
     else:
         logger.warning("Brevo returned error for job alert", res=brevo_res)
         return {
             "sent": False,
+            "uncertain": brevo_res.get("uncertain", False),
             "error": brevo_res.get("error", "Failed to dispatch email via Brevo"),
             "to": to_email,
             "count": count,
         }
+
 

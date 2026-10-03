@@ -35,7 +35,11 @@ from core.metrics import (
     record_http_request_metrics,
 )
 from core.telemetry import init_telemetry
-from scheduler.job_alerts import start_job_alert_scheduler, stop_job_alert_scheduler
+from scheduler.job_alerts import (
+    start_job_alert_scheduler,
+    stop_job_alert_scheduler,
+    recover_missed_job_alerts_on_startup,
+)
 from services.multi_tenancy.tenant_context import TenantAccessDeniedError
 from services.multi_tenancy.tenant_middleware import TenantMiddleware
 
@@ -136,6 +140,18 @@ async def lifespan(app: FastAPI):
                 logger.warning("Embedding model warmup skipped", error=str(w_err))
 
         asyncio.create_task(_warmup_engine())
+
+        # Non-blocking startup recovery of eligible missed scheduled job alerts in background
+        async def _recover_missed_job_alerts():
+            try:
+                from config.db import get_database
+                db = get_database()
+                await recover_missed_job_alerts_on_startup(db)
+                logger.info("Startup missed job alerts recovery check completed")
+            except Exception as r_err:
+                logger.warning("Startup missed job alerts recovery check skipped", error=str(r_err))
+
+        asyncio.create_task(_recover_missed_job_alerts())
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise
