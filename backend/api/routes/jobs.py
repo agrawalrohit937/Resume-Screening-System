@@ -1619,13 +1619,15 @@ async def update_job(
 @router.post("/admin/trigger-alerts")
 async def trigger_job_alerts_manually(
     target_email: Optional[str] = Query(None, description="Optional single email to test dispatch only to this user"),
+    slot_id: Optional[str] = Query(None, description="Optional deterministic slot identifier e.g. 2026-10-03_07:30"),
+    force_replay: bool = Query(False, description="Force execution even if the slot was already marked completed"),
     cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
     db: Any = Depends(get_database),
 ):
     """
-    Manual & Automated Webhook trigger for Nightly AI Job Alerts retention loop.
+    Manual & Automated Webhook trigger for Twice-Daily AI Job Alerts retention loop.
     Authentication:
       - Authenticated Admin user (JWT), OR
       - Matching CRON_SECRET / SECRET_KEY via 'X-Cron-Secret' header or 'cron_secret' query param.
@@ -1648,7 +1650,14 @@ async def trigger_job_alerts_manually(
         )
 
     from scheduler.job_alerts import run_nightly_job_alerts
-    result = await run_nightly_job_alerts(db=db, target_email=target_email)
+    triggered_by = "manual_admin_api" if is_admin else "webhook_cron"
+    result = await run_nightly_job_alerts(
+        db=db,
+        target_email=target_email,
+        slot_id=slot_id,
+        triggered_by=triggered_by,
+        force_replay=force_replay,
+    )
     return {"success": True, "result": result}
 
 
