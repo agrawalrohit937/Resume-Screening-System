@@ -15,6 +15,10 @@ htmlcov/
 backend/.env
 backend/.env.*
 uploads/
+backend/uploads/**/*
+!backend/uploads/**/.gitkeep
+backend/temp_storage/**/*
+!backend/temp_storage/**/.gitkeep
 azure-app-settings.json
 backend/azure-app-settings.json
 
@@ -57,7 +61,10 @@ local.properties
 # Log files
 *.log
 
-# Temporary tunnel binaries and tools
-/tools/
+# Temporary tunnel binaries and archives
+tools/zrok/*.exe
+tools/zrok/*.tar.gz
+tools/zrok/*.zip
+tools/temp_*.json
 *.exe
 scratch_synopsis.txt

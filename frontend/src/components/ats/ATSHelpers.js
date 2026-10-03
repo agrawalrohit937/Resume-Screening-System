@@ -83,8 +83,8 @@ export async function extractJobDescriptionText(file) {
   }
   // For PDF / DOCX, parse using standard browser text extraction or prompt user
   if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ||
-      file.name.toLowerCase().endsWith('.docx') ||
-      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    file.name.toLowerCase().endsWith('.docx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
     return file.text().catch(() => '')
   }
   return file.text ? file.text() : ''

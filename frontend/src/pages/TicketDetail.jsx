@@ -168,11 +168,11 @@ export default function TicketDetail() {
   const canResolve = ticket.status !== 'resolved' && ticket.status !== 'closed'
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 px-3 sm:px-0 pb-12">
       {/* Back button */}
       <button
         onClick={() => navigate('/support')}
-        className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors"
+        className="inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors py-1"
       >
         <ArrowLeft size={16} strokeWidth={2.5} />
         Back to all tickets
@@ -185,51 +185,57 @@ export default function TicketDetail() {
         className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
       >
         {/* Status bar */}
-        <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 border-b border-slate-100">
-          <span className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold ${statusConf.color}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${statusConf.dot}`} />
-            {statusConf.label}
-          </span>
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${priorityConf.color}`}>
-            {priorityConf.label} Priority
-          </span>
-          <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 ml-auto">
-            <Clock size={12} />
-            {formatDate(ticket.created_at)}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 sm:px-6 py-2.5 sm:py-3 bg-slate-50 border-b border-slate-100">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-[10px] font-bold ${statusConf.color}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${statusConf.dot}`} />
+              {statusConf.label}
+            </span>
+            <span className={`text-[10px] font-bold px-2 sm:px-2.5 py-1 rounded-lg ${priorityConf.color}`}>
+              {priorityConf.label} Priority
+            </span>
           </div>
 
-          {/* Status Actions */}
-          <div className="relative">
-            <button
-              onClick={() => setStatusMenuOpen(!statusMenuOpen)}
-              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <MoreHorizontal size={14} strokeWidth={2.5} />
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
+              <Clock size={11} />
+              <span>{formatDate(ticket.created_at)}</span>
+            </div>
 
-            {statusMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-20">
-                {Object.entries(STATUS_CONFIG).map(([key, conf]) => (
-                  <button
-                    key={key}
-                    onClick={() => handleStatusChange(key)}
-                    disabled={key === ticket.status}
-                    className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-left transition-colors
-                      ${key === ticket.status ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'hover:bg-slate-50 text-slate-700'}
-                    `}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${conf.dot}`} />
-                    {conf.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Status Actions */}
+            <div className="relative">
+              <button
+                onClick={() => setStatusMenuOpen(!statusMenuOpen)}
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="Change status"
+              >
+                <MoreHorizontal size={14} strokeWidth={2.5} />
+              </button>
+
+              {statusMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-44 sm:w-48 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-20">
+                  {Object.entries(STATUS_CONFIG).map(([key, conf]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleStatusChange(key)}
+                      disabled={key === ticket.status}
+                      className={`w-full flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs font-bold text-left transition-colors
+                        ${key === ticket.status ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'hover:bg-slate-50 text-slate-700'}
+                      `}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${conf.dot}`} />
+                      {conf.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Ticket Info */}
-        <div className="px-6 py-5">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="px-3.5 sm:px-6 py-4 sm:py-5">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
               {ticket.ticket_id}
             </span>
@@ -239,13 +245,13 @@ export default function TicketDetail() {
               </span>
             )}
           </div>
-          <h1 className="text-xl font-black text-slate-900 mb-2">{ticket.subject}</h1>
-          <p className="text-sm font-medium text-slate-600 whitespace-pre-wrap">{ticket.description}</p>
+          <h1 className="text-lg sm:text-xl font-black text-slate-900 mb-2 break-words leading-snug">{ticket.subject}</h1>
+          <p className="text-xs sm:text-sm font-medium text-slate-600 whitespace-pre-wrap break-words leading-relaxed">{ticket.description}</p>
         </div>
 
         {/* Attachments Preview */}
         {attachments.length > 0 && (
-          <div className="px-6 pb-5">
+          <div className="px-3.5 sm:px-6 pb-4 sm:pb-5">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Attachments</p>
             <div className="flex flex-wrap gap-2">
               {attachments.map((att, idx) => (
@@ -254,11 +260,11 @@ export default function TicketDetail() {
                   href={att.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-all group"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-all group max-w-full"
                 >
-                  <Paperclip size={12} className="text-slate-400" />
-                  <span className="max-w-[150px] truncate">{att.filename || 'Attachment'}</span>
-                  <ExternalLink size={10} className="text-slate-300 group-hover:text-indigo-500" />
+                  <Paperclip size={12} className="text-slate-400 shrink-0" />
+                  <span className="max-w-[130px] sm:max-w-[200px] truncate">{att.filename || 'Attachment'}</span>
+                  <ExternalLink size={10} className="text-slate-300 group-hover:text-indigo-500 shrink-0" />
                 </a>
               ))}
             </div>
@@ -271,7 +277,7 @@ export default function TicketDetail() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="space-y-4"
+        className="space-y-3 sm:space-y-4"
       >
         {messages.map((msg, idx) => {
           const isUser = msg.role === 'user'
@@ -281,19 +287,19 @@ export default function TicketDetail() {
           return (
             <div
               key={msg.id || idx}
-              className={`flex gap-3 ${isSupport ? 'justify-start' : 'justify-end'}`}
+              className={`flex gap-2 sm:gap-3 ${isSupport ? 'justify-start' : 'justify-end'}`}
             >
               {/* Avatar */}
               {isSupport && (
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-1 border border-indigo-100">
-                  <Bot size={16} strokeWidth={2} />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-1 border border-indigo-100">
+                  <Bot size={15} strokeWidth={2} />
                 </div>
               )}
 
-              <div className={`max-w-[80%] ${isUser ? 'order-1' : ''}`}>
+              <div className={`max-w-[88%] sm:max-w-[80%] ${isUser ? 'order-1' : ''}`}>
                 {/* Message Bubble */}
                 <div
-                  className={`px-5 py-3.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                  className={`px-3.5 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm break-words whitespace-pre-wrap overflow-hidden ${
                     isUser
                       ? 'bg-slate-900 text-white rounded-tr-sm'
                       : isSupport
@@ -313,17 +319,17 @@ export default function TicketDetail() {
                         href={att.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[10px] font-medium text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                        className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-white border border-slate-200 text-[10px] font-medium text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all max-w-full"
                       >
-                        <Paperclip size={10} />
-                        {att.filename || 'Attachment'}
+                        <Paperclip size={10} className="shrink-0" />
+                        <span className="max-w-[120px] sm:max-w-[180px] truncate">{att.filename || 'Attachment'}</span>
                       </a>
                     ))}
                   </div>
                 )}
 
                 {/* Message Meta */}
-                <div className={`flex items-center gap-2 mt-1.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex items-center gap-1.5 sm:gap-2 mt-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
                   <span className="text-[10px] font-medium text-slate-400">
                     {msg.author_name || (isUser ? 'You' : 'Support')}
                   </span>
@@ -336,8 +342,8 @@ export default function TicketDetail() {
 
               {/* User Avatar */}
               {isUser && (
-                <div className="w-8 h-8 rounded-xl bg-slate-800 text-white flex items-center justify-center shrink-0 mt-1">
-                  <User size={16} strokeWidth={2} />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-slate-800 text-white flex items-center justify-center shrink-0 mt-1">
+                  <User size={15} strokeWidth={2} />
                 </div>
               )}
             </div>
@@ -354,21 +360,22 @@ export default function TicketDetail() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm"
+          className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-5 shadow-sm"
         >
           {/* File Preview */}
           {replyFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2.5 sm:mb-3">
               {replyFiles.map((file, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[10px] font-medium text-slate-600"
+                  className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[10px] font-medium text-slate-600 max-w-full"
                 >
-                  <Paperclip size={10} />
-                  <span className="max-w-[100px] truncate">{file.name}</span>
+                  <Paperclip size={10} className="shrink-0" />
+                  <span className="max-w-[90px] sm:max-w-[140px] truncate">{file.name}</span>
                   <button
                     onClick={() => setReplyFiles((prev) => prev.filter((_, i) => i !== idx))}
-                    className="text-slate-400 hover:text-rose-500 ml-1"
+                    className="text-slate-400 hover:text-rose-500 ml-1 p-0.5"
+                    aria-label="Remove attachment"
                   >
                     ×
                   </button>
@@ -377,26 +384,27 @@ export default function TicketDetail() {
             </div>
           )}
 
-          <form onSubmit={handleReply} className="flex items-end gap-2">
-            <div className="flex-1">
+          <form onSubmit={handleReply} className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 sm:gap-2">
+            <div className="flex-1 min-w-0">
               <textarea
                 ref={replyRef}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Type your reply here..."
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
+                className="w-full px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
               />
             </div>
-            <div className="flex flex-col gap-2 shrink-0">
-              <label className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-600 transition-all cursor-pointer">
+            <div className="flex items-center justify-between sm:justify-start sm:flex-col gap-2 shrink-0">
+              <label className="h-10 px-3.5 sm:px-0 sm:w-10 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 sm:gap-0 text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-700 transition-all cursor-pointer">
                 <Paperclip size={16} strokeWidth={2} />
+                <span className="sm:hidden">Attach File</span>
                 <input type="file" multiple onChange={handleFileSelect} className="hidden" accept=".png,.jpg,.jpeg,.gif,.pdf,.zip" />
               </label>
               <button
                 type="submit"
                 disabled={submitting || (!replyText.trim() && replyFiles.length === 0)}
-                className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                className="flex-1 sm:flex-none h-10 sm:w-10 px-4 sm:px-0 rounded-xl flex items-center justify-center gap-1.5 sm:gap-0 bg-slate-900 text-white text-xs sm:text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
               >
                 {submitting ? (
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -404,7 +412,10 @@ export default function TicketDetail() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                 ) : (
-                  <Send size={16} strokeWidth={2.5} />
+                  <>
+                    <span className="sm:hidden">Send Reply</span>
+                    <Send size={15} strokeWidth={2.5} />
+                  </>
                 )}
               </button>
             </div>
@@ -414,22 +425,22 @@ export default function TicketDetail() {
 
       {/* Resolved/Closed Banner */}
       {!canResolve && (
-        <div className={`rounded-2xl border p-5 text-center ${
+        <div className={`rounded-2xl border p-4 sm:p-5 text-center ${
           ticket.status === 'resolved'
             ? 'bg-emerald-50 border-emerald-200'
             : 'bg-slate-50 border-slate-200'
         }`}>
-          <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto mb-2.5 sm:mb-3 flex items-center justify-center ${
             ticket.status === 'resolved' ? 'bg-emerald-100' : 'bg-slate-200'
           }`}>
-            <CheckCircle2 size={24} className={
-              ticket.status === 'resolved' ? 'text-emerald-600' : 'text-slate-400'
+            <CheckCircle2 size={22} className={
+              ticket.status === 'resolved' ? 'text-emerald-600 sm:w-6 sm:h-6' : 'text-slate-400 sm:w-6 sm:h-6'
             } />
           </div>
-          <p className="text-sm font-bold text-slate-900">
+          <p className="text-xs sm:text-sm font-bold text-slate-900">
             This ticket is {ticket.status === 'resolved' ? 'Resolved' : 'Closed'}
           </p>
-          <p className="text-xs font-medium text-slate-500 mt-1">
+          <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-1">
             {ticket.resolved_at
               ? `Resolved on ${formatDate(ticket.resolved_at)}`
               : ticket.closed_at

@@ -57,7 +57,7 @@ export default function PremiumSupportCard({ onGetSupport }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.1 }}
-      className="relative overflow-hidden rounded-2xl border p-6"
+      className="relative overflow-hidden rounded-2xl border p-4 sm:p-6"
       style={{
         background: `linear-gradient(135deg, ${config.glowColor}, transparent)`,
         borderColor: config.border,
@@ -75,29 +75,29 @@ export default function PremiumSupportCard({ onGetSupport }) {
 
       <div className="relative">
         {/* Badge */}
-        <div className="flex items-center justify-between mb-4">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${config.badge}`}>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${config.badge}`}>
             {config.badgeLabel}
           </span>
-          <span className={`text-[11px] font-bold ${config.accentText} opacity-80`}>
+          <span className={`text-[10px] sm:text-[11px] font-bold ${config.accentText} opacity-80`}>
             Avg. {config.responseTime}
           </span>
         </div>
 
         {/* Title */}
-        <h3 className="text-xl font-black text-slate-900 mb-1">{config.title}</h3>
-        <p className="text-sm font-medium text-slate-500 mb-4">Average response time: <span className="font-bold text-slate-800">{config.responseTime}</span></p>
+        <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-1">{config.title}</h3>
+        <p className="text-xs sm:text-sm font-medium text-slate-500 mb-3 sm:mb-4">Average response time: <span className="font-bold text-slate-800">{config.responseTime}</span></p>
 
         {/* Features */}
-        <div className="space-y-2.5 mb-5">
+        <div className="space-y-2 sm:space-y-2.5 mb-4 sm:mb-5">
           {config.features.map((feat) => (
             <div key={feat} className="flex items-center gap-2.5">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${config.accent}`}>
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shrink-0 ${config.accent}`}>
+                <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <span className="text-sm font-semibold text-slate-700">{feat}</span>
+              <span className="text-xs sm:text-sm font-semibold text-slate-700">{feat}</span>
             </div>
           ))}
         </div>
@@ -105,7 +105,7 @@ export default function PremiumSupportCard({ onGetSupport }) {
         {/* CTA */}
         <button
           onClick={onGetSupport}
-          className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white shadow-md hover:shadow-lg active:scale-[0.98] transition-all"
+          className="w-full flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md hover:shadow-lg active:scale-[0.98] transition-all"
           style={{
             background: `linear-gradient(135deg, ${plan === 'premium' ? '#F59E0B, #D97706' : plan === 'pro' ? '#3B82F6, #6366F1' : '#64748B, #475569'})`,
           }}

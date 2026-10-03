@@ -203,7 +203,7 @@ export default function SupportModal({ isOpen, onClose }) {
             animate="visible"
             exit="exit"
             onClick={(e) => e.stopPropagation()}
-            className="fixed sm:hidden bottom-0 left-0 right-0 z-50 flex flex-col max-h-[92vh] bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 overflow-hidden pointer-events-auto"
+            className="fixed sm:hidden bottom-0 left-0 right-0 z-50 flex flex-col max-h-[90dvh] bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 overflow-hidden pointer-events-auto pb-safe"
           >
             {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -211,23 +211,27 @@ export default function SupportModal({ isOpen, onClose }) {
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                   <LifeBuoy size={16} strokeWidth={2} />
                 </div>
-                <p className="text-sm font-black text-slate-900">Support Center</p>
+                <div>
+                  <p className="text-sm font-black text-slate-900">Support Center</p>
+                  <p className="text-[10px] font-medium text-slate-500">We're here to help</p>
+                </div>
               </div>
               <button
                 onClick={onClose}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                aria-label="Close modal"
               >
                 <X size={18} strokeWidth={2} />
               </button>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto px-4 py-4 overscroll-contain no-scrollbar">
               <AnimatePresence mode="wait">
                 {step === 'categories' && (
                   <motion.div
@@ -235,8 +239,9 @@ export default function SupportModal({ isOpen, onClose }) {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="space-y-5"
+                    className="space-y-4"
                   >
+                    <PremiumSupportCard onGetSupport={handleGetSupport} />
                     <SupportCategoryCards
                       selectedCategory={selectedCategory}
                       onSelect={handleCategorySelect}

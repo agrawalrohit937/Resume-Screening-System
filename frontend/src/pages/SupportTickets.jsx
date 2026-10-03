@@ -151,35 +151,38 @@ export default function SupportTickets() {
   }, [tickets, searchQuery])
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 px-3 sm:px-0 pb-12">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
           <div>
             <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <LifeBuoy size={20} strokeWidth={2} />
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <LifeBuoy size={18} className="sm:w-5 sm:h-5" strokeWidth={2} />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">My Support Tickets</h1>
+              <h1 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">My Support Tickets</h1>
             </div>
-            <p className="text-sm font-medium text-slate-500">
+            <p className="text-xs sm:text-sm font-medium text-slate-500">
               Track and manage your support requests — avg. response time:{' '}
               <span className="font-bold text-slate-700">{responseTime}</span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-stretch sm:self-auto">
             <button
               onClick={() => fetchTickets()}
-              className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all"
-              title="Refresh"
+              className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all shrink-0"
+              title="Refresh tickets"
+              aria-label="Refresh tickets"
             >
               <RefreshCw size={16} strokeWidth={2.5} />
             </button>
-            <SupportButton variant="primary" label="New Ticket" />
+            <div className="flex-1 sm:flex-none">
+              <SupportButton variant="primary" label="New Ticket" className="w-full sm:w-auto" />
+            </div>
           </div>
         </div>
       </motion.div>
@@ -189,13 +192,13 @@ export default function SupportTickets() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.05 }}
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-none"
+        className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 sm:pb-2 no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0"
       >
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.value}
             onClick={() => handleFilterChange(f.value)}
-            className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`shrink-0 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all ${
               statusFilter === f.value
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
@@ -213,18 +216,19 @@ export default function SupportTickets() {
         transition={{ duration: 0.3, delay: 0.08 }}
       >
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={2.5} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" strokeWidth={2.5} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by Ticket ID, subject, or category..."
-            className="w-full h-11 pl-10 pr-4 rounded-xl bg-white border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 outline-none text-sm font-medium text-slate-900 placeholder-slate-400 transition-all"
+            className="w-full h-10 sm:h-11 pl-10 pr-10 rounded-xl bg-white border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 outline-none text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg font-bold"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 text-base font-bold transition-all"
+              aria-label="Clear search"
             >
               ×
             </button>
@@ -241,36 +245,36 @@ export default function SupportTickets() {
         {loading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-24 w-full" />
+              <Skeleton key={i} className="h-20 sm:h-24 w-full" />
             ))}
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-14 h-14 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mb-4">
-              <AlertCircle size={28} className="text-rose-500" />
+          <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mb-3 sm:mb-4">
+              <AlertCircle size={24} className="text-rose-500 sm:w-7 sm:h-7" />
             </div>
             <p className="text-base font-bold text-slate-900 mb-1">Failed to load tickets</p>
-            <p className="text-sm font-medium text-slate-500 mb-4">{error}</p>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 mb-4 max-w-md">{error}</p>
             <button
               onClick={() => fetchTickets()}
-              className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
             >
               Try Again
             </button>
           </div>
         ) : filteredTickets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-4">
+          <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3 sm:mb-4">
               {searchQuery ? (
-                <Search size={32} className="text-slate-300" strokeWidth={1.5} />
+                <Search size={28} className="text-slate-300 sm:w-8 sm:h-8" strokeWidth={1.5} />
               ) : (
-                <MessageCircle size={32} className="text-slate-300" strokeWidth={1.5} />
+                <MessageCircle size={28} className="text-slate-300 sm:w-8 sm:h-8" strokeWidth={1.5} />
               )}
             </div>
-            <p className="text-lg font-black text-slate-900 mb-1">
+            <p className="text-base sm:text-lg font-black text-slate-900 mb-1">
               {searchQuery ? 'No matching tickets' : 'No tickets yet'}
             </p>
-            <p className="text-sm font-medium text-slate-500 max-w-sm mb-6">
+            <p className="text-xs sm:text-sm font-medium text-slate-500 max-w-sm mb-5">
               {searchQuery
                 ? `No results for "${searchQuery}". Try a different search term.`
                 : statusFilter
@@ -280,56 +284,83 @@ export default function SupportTickets() {
             {!searchQuery && <SupportButton variant="primary" label="Create Your First Ticket" />}
           </div>
         ) : (
-          <div className="space-y-3">
-            {tickets.map((ticket, idx) => {
+          <div className="space-y-2.5 sm:space-y-3">
+            {filteredTickets.map((ticket, idx) => {
               const statusConf = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open
               const priorityConf = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.low
               const categoryLabel = CATEGORY_LABELS[ticket.category] || ticket.category
+              const relativeTime = getRelativeTime(ticket.created_at)
 
               return (
-<motion.button
+                <motion.button
                   key={ticket.id || ticket.ticket_id || idx}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.03 }}
                   onClick={() => navigate(`/support/${ticket.ticket_id}`)}
-                  className="w-full flex flex-col sm:flex-row sm:items-center gap-3 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 hover:border-indigo-200 hover:shadow-sm transition-all text-left group"
+                  className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 p-3.5 sm:p-5 rounded-2xl bg-white border border-slate-200 hover:border-indigo-200 hover:shadow-sm transition-all text-left group overflow-hidden"
                 >
-                  {/* Status Badge */}
-                  <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                  {/* Mobile Top Row / Desktop Left Section */}
+                  <div className="flex items-center justify-between sm:hidden w-full">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${statusConf.dot}`} />
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusConf.color}`}>
+                        {statusConf.label}
+                      </span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${priorityConf.color}`}>
+                        {priorityConf.label}
+                      </span>
+                    </div>
+                    {relativeTime && (
+                      <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+                        <Clock size={10} />
+                        {relativeTime}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Desktop Status Badge */}
+                  <div className="hidden sm:flex items-center gap-2 w-32 shrink-0">
                     <span className={`w-2 h-2 rounded-full ${statusConf.dot}`} />
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusConf.color}`}>
                       {statusConf.label}
                     </span>
                   </div>
 
-                  {/* Ticket Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
+                  {/* Ticket Main Info */}
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="hidden sm:flex items-center gap-2 mb-0.5">
                       <span className="text-[10px] font-mono font-bold text-slate-400">{ticket.ticket_id}</span>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${priorityConf.color}`}>
                         {priorityConf.label}
                       </span>
                     </div>
-                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-indigo-700 transition-colors">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 sm:truncate group-hover:text-indigo-700 transition-colors break-words">
                       {ticket.subject}
                     </p>
-                    <p className="text-xs font-medium text-slate-500 truncate mt-0.5">
-                      {categoryLabel}
-                      {ticket.subcategory && ` · ${ticket.subcategory.replace(/_/g, ' ')}`}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1 sm:mt-0.5 flex-wrap">
+                      <span className="text-[10px] font-mono font-bold text-slate-400 sm:hidden">
+                        {ticket.ticket_id}
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-medium text-slate-500 truncate">
+                        {categoryLabel}
+                        {ticket.subcategory && ` · ${ticket.subcategory.replace(/_/g, ' ')}`}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Date & Arrow */}
-                  <div className="flex items-center gap-3 shrink-0">
+                  {/* Date & Arrow (Desktop) / Arrow (Mobile) */}
+                  <div className="flex items-center justify-end sm:justify-center gap-3 shrink-0 self-end sm:self-center">
                     <div className="hidden sm:block text-right">
-                      <p className="text-[10px] font-bold text-slate-500">{getRelativeTime(ticket.created_at)}</p>
+                      <p className="text-[10px] font-bold text-slate-500">{relativeTime}</p>
                     </div>
-                    <ChevronRight
-                      size={16}
-                      className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all"
-                      strokeWidth={2.5}
-                    />
+                    <div className="w-6 h-6 rounded-lg bg-slate-50 sm:bg-transparent flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-colors">
+                      <ChevronRight
+                        size={15}
+                        className="group-hover:translate-x-0.5 transition-transform"
+                        strokeWidth={2.5}
+                      />
+                    </div>
                   </div>
                 </motion.button>
               )

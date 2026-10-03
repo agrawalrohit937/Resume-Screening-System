@@ -1,9 +1,10 @@
-"""Job-Board Syndication: Indeed XML Feed & Google for Jobs Schema.org.
+"""Job-Board Syndication: Indeed XML Feed, LinkedIn Jobs JSON Feed & Google for Jobs Schema.org.
 CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 from datetime import datetime, timezone
 import html
+import json
 from typing import Dict, List, Any, Optional
 from xml.etree import ElementTree as ET
 
@@ -30,52 +31,63 @@ def generate_indeed_xml_feed(
     last_build_date = ET.SubElement(root, "lastBuildDate")
     last_build_date.text = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
 
-    for job in jobs:
-        if job.status != "open":
+    descriptions: Dict[str, str] = {}
+
+    for idx, job in enumerate(jobs):
+        if getattr(job, "status", "open") != "open":
             continue
 
         job_el = ET.SubElement(root, "job")
         
         title_el = ET.SubElement(job_el, "title")
-        title_el.text = job.title
+        title_el.text = getattr(job, "title", "Untitled Job")
 
         date_el = ET.SubElement(job_el, "date")
-        date_el.text = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        created_at = getattr(job, "created_at", None) or datetime.now(timezone.utc)
+        if isinstance(created_at, str):
+            date_el.text = created_at
+        else:
+            date_el.text = created_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
         ref_el = ET.SubElement(job_el, "referencenumber")
-        ref_el.text = str(job.id or "unknown")
+        ref_el.text = str(getattr(job, "id", "") or getattr(job, "requisition_id", "REQ-001"))
 
         url_el = ET.SubElement(job_el, "url")
-        url_el.text = f"{base_url.rstrip('/')}/jobs/{job.id}"
+        url_el.text = f"{base_url.rstrip('/')}/jobs/{getattr(job, 'id', '0')}"
 
         company_el = ET.SubElement(job_el, "company")
-        company_el.text = job.company_name
+        company_el.text = getattr(job, "company_name", publisher_name)
 
         city_el = ET.SubElement(job_el, "city")
-        # Extract city or fallback
-        loc_parts = job.location.split(",")
+        location = getattr(job, "location", "Remote")
+        loc_parts = location.split(",") if location else []
         city_el.text = loc_parts[0].strip() if loc_parts else "Remote"
 
         state_el = ET.SubElement(job_el, "state")
         state_el.text = loc_parts[1].strip() if len(loc_parts) > 1 else ""
 
         country_el = ET.SubElement(job_el, "country")
-        country_el.text = "US"
+        country_el.text = "IN" if location and ("india" in location.lower() or "bengaluru" in location.lower()) else "US"
 
         desc_el = ET.SubElement(job_el, "description")
-        desc_el.text = f"<![CDATA[{job.jd_text_raw}]]>"
+        raw_desc = getattr(job, "jd_text_raw", "") or getattr(job, "description", "")
+        placeholder = f"__CS_CDATA_DESC_{idx}__"
+        descriptions[placeholder] = f"<![CDATA[{raw_desc}]]>"
+        desc_el.text = placeholder
 
-        if job.salary_range:
+        salary_range = getattr(job, "salary_range", None)
+        if salary_range:
             salary_el = ET.SubElement(job_el, "salary")
-            salary_el.text = job.salary_range
+            salary_el.text = salary_range
 
-        if job.work_mode == WorkMode.REMOTE.value:
+        work_mode = getattr(job, "work_mode", None)
+        if work_mode == WorkMode.REMOTE.value if hasattr(WorkMode, "REMOTE") else work_mode == "remote":
             remotetype_el = ET.SubElement(job_el, "remotetype")
             remotetype_el.text = "FULLY_REMOTE"
 
     xml_str = ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
-    # Unescape CDATA tag
-    xml_str = xml_str.replace("&lt;![CDATA[", "<![CDATA[").replace("]]&gt;", "]]>")
+    for placeholder, cdata_val in descriptions.items():
+        xml_str = xml_str.replace(placeholder, cdata_val)
     return xml_str
 
 
@@ -87,55 +99,75 @@ def generate_google_job_posting_ld_json(
     
     Specification: https://developers.google.com/search/docs/appearance/structured-data/job-posting
     """
-    job_url = f"{base_url.rstrip('/')}/jobs/{job.id}"
+    job_id = str(getattr(job, "id", "") or "job_001")
+    job_url = f"{base_url.rstrip('/')}/jobs/{job_id}"
+    company_name = getattr(job, "company_name", "CareerShala Enterprise")
+    raw_desc = getattr(job, "jd_text_raw", "") or getattr(job, "description", "")
     
     ld_json: Dict[str, Any] = {
         "@context": "https://schema.org/",
         "@type": "JobPosting",
-        "title": job.title,
-        "description": job.jd_text_raw,
+        "title": getattr(job, "title", "Position"),
+        "description": raw_desc,
         "identifier": {
             "@type": "PropertyValue",
-            "name": job.company_name,
-            "value": str(job.id or "CP-JOB-001")
+            "name": company_name,
+            "value": job_id
         },
         "datePosted": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "employmentType": "FULL_TIME",
         "hiringOrganization": {
             "@type": "Organization",
-            "name": job.company_name,
-            "sameAs": job.company_website or base_url,
-            "logo": job.company_logo or f"{base_url}/static/default-logo.png"
+            "name": company_name,
+            "sameAs": getattr(job, "company_website", base_url) or base_url,
+            "logo": getattr(job, "company_logo", f"{base_url}/static/logo.png") or f"{base_url}/static/logo.png"
         },
         "directApply": True,
         "url": job_url
     }
 
-    if job.work_mode == WorkMode.REMOTE.value:
+    work_mode = getattr(job, "work_mode", "")
+    location = getattr(job, "location", "Remote") or "Remote"
+
+    if work_mode in (WorkMode.REMOTE.value if hasattr(WorkMode, "REMOTE") else "remote", "remote"):
         ld_json["jobLocationType"] = "TELECOMMUTE"
         ld_json["applicantLocationRequirements"] = {
             "@type": "Country",
-            "name": "US"
+            "name": "Global" if "IN" in location or "Global" in location else "US"
         }
     else:
         ld_json["jobLocation"] = {
             "@type": "Place",
             "address": {
                 "@type": "PostalAddress",
-                "addressLocality": job.location,
-                "addressCountry": "US"
+                "addressLocality": location,
+                "addressCountry": "IN" if "india" in location.lower() or "bengaluru" in location.lower() else "US"
             }
         }
 
-    if job.salary_range:
+    salary_range = getattr(job, "salary_range", None)
+    if salary_range:
         ld_json["baseSalary"] = {
             "@type": "MonetaryAmount",
-            "currency": "USD",
+            "currency": "INR" if "₹" in salary_range or "lpa" in salary_range.lower() else "USD",
             "value": {
                 "@type": "QuantitativeValue",
-                "value": job.salary_range,
+                "value": salary_range,
                 "unitText": "YEAR"
             }
         }
 
     return ld_json
+
+
+def generate_linkedin_jobs_json_feed(
+    jobs: List[JobModel],
+    base_url: str = "https://careershala.tech",
+) -> List[Dict[str, Any]]:
+    """Generates schema.org/JobPosting JSON-LD payloads for LinkedIn Jobs & Google for Jobs."""
+    feed = []
+    for job in jobs:
+        if getattr(job, "status", "open") != "open":
+            continue
+        feed.append(generate_google_job_posting_ld_json(job, base_url=base_url))
+    return feed

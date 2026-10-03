@@ -127,21 +127,22 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
       {/* Header with back */}
       <div className="flex items-center gap-2 mb-1">
         <button
           type="button"
           onClick={onBack}
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          aria-label="Back to categories"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
-          <h3 className="text-base font-black text-slate-900">Describe your issue</h3>
-          <p className="text-xs font-medium text-slate-500 mt-0.5 capitalize">{category.replace('_', ' ')}</p>
+          <h3 className="text-sm sm:text-base font-black text-slate-900">Describe your issue</h3>
+          <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-0.5 capitalize">{category.replace('_', ' ')}</p>
         </div>
       </div>
 
@@ -155,7 +156,7 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Brief summary of your issue"
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all"
+          className="w-full px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all"
           maxLength={200}
         />
       </div>
@@ -190,8 +191,8 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Please describe your issue in detail. Include steps to reproduce if reporting a bug."
-          rows={5}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
+          rows={4}
+          className="w-full px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all resize-none"
           maxLength={5000}
         />
         <p className="text-[10px] font-medium text-slate-400 mt-1 text-right">{description.length}/5000</p>
@@ -205,7 +206,7 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
         <button
           type="button"
           onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all"
+          className="w-full flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-medium text-slate-900 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all"
         >
           <div className="flex items-center gap-2">
             <span className={`inline-block w-2 h-2 rounded-full ${currentPriority.color.split(' ')[0]}`} />
@@ -220,7 +221,7 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
-              className="absolute z-20 top-full left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden"
+              className="absolute z-20 top-full left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden max-h-56 overflow-y-auto"
             >
               {availablePriorities.map((p) => (
                 <button
@@ -230,13 +231,13 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
                     setPriority(p.value)
                     setShowPriorityDropdown(false)
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 sm:py-3 text-left text-xs sm:text-sm transition-colors
                     ${priority === p.value ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'}
                   `}
                 >
-                  <span className={`w-2.5 h-2.5 rounded-full ${p.color.split(' ')[0]}`} />
+                  <span className={`w-2.5 h-2.5 rounded-full ${p.color.split(' ')[0]} shrink-0`} />
                   <div>
-                    <p className="text-sm font-bold">{p.label}</p>
+                    <p className="font-bold">{p.label}</p>
                     <p className="text-[10px] font-medium text-slate-400">{p.description}</p>
                   </div>
                 </button>
@@ -252,27 +253,30 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
           Attachments {files.length > 0 && `(${files.length})`}
         </label>
 
-        <div className="flex flex-wrap gap-2 mb-2">
-          {files.map((file, idx) => {
-            const FileIcon = getFileIcon(file.type)
-            return (
-              <div
-                key={idx}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700"
-              >
-                <FileIcon size={14} className="text-slate-500" />
-                <span className="max-w-[120px] truncate">{file.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeFile(idx)}
-                  className="text-slate-400 hover:text-rose-500 transition-colors"
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2">
+            {files.map((file, idx) => {
+              const FileIcon = getFileIcon(file.type)
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] sm:text-xs font-medium text-slate-700 max-w-full"
                 >
-                  <X size={14} />
-                </button>
-              </div>
-            )
-          })}
-        </div>
+                  <FileIcon size={13} className="text-slate-500 shrink-0" />
+                  <span className="max-w-[110px] sm:max-w-[150px] truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(idx)}
+                    className="text-slate-400 hover:text-rose-500 transition-colors p-0.5"
+                    aria-label="Remove file"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         <input
           ref={fileInputRef}
@@ -286,10 +290,10 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={files.length >= 5}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-500 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Upload size={14} />
-          Upload Screenshot, PDF, ZIP, or Image
+          <Upload size={14} className="shrink-0" />
+          <span className="truncate">Upload Screenshot, PDF, ZIP, or Image</span>
         </button>
         <p className="text-[10px] font-medium text-slate-400 mt-1">Max 5 files, 10MB each</p>
       </div>
@@ -304,7 +308,7 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
             className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700"
           >
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-            <p className="text-xs font-semibold">{error}</p>
+            <p className="text-xs font-semibold break-words">{error}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -313,7 +317,7 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
       <button
         type="submit"
         disabled={submitting || !subject.trim() || !description.trim()}
-        className="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-[0.98]"
+        className="w-full flex items-center justify-center gap-2 px-5 py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-[0.98]"
       >
         {submitting ? (
           <>
@@ -325,7 +329,7 @@ export default function TicketForm({ category, subcategory, onSuccess, onBack })
           </>
         ) : (
           <>
-            <Send size={16} strokeWidth={2.5} />
+            <Send size={15} strokeWidth={2.5} />
             Submit Ticket
           </>
         )}
