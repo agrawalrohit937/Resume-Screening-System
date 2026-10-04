@@ -1,4 +1,4 @@
-﻿"""
+"""
 Subscription Expiry Scheduler.
 
 Daily cron to auto-downgrade expired paid plans to Free.
@@ -57,24 +57,3 @@ async def expire_overdue_subscriptions():
     )
     return {"expired_count": result.modified_count}
 
-
-def register_subscription_expiry_job(scheduler: Any) -> None:
-    """
-    Registers daily midnight-IST cron on the given APScheduler instance.
-    Call from start_job_alert_scheduler() after scheduler.start().
-    """
-    try:
-        from apscheduler.triggers.cron import CronTrigger
-
-        scheduler.add_job(
-            expire_overdue_subscriptions,
-            trigger=CronTrigger(hour=18, minute=30, timezone="UTC"),
-            id="subscription_expiry_sweep",
-            name="Daily Subscription Expiry Sweep (00:00 IST)",
-            replace_existing=True,
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-        logger.info("Subscription expiry cron registered (00:00 IST / 18:30 UTC)")
-    except Exception as exc:
-        logger.error("Failed to register subscription expiry job", error=str(exc))

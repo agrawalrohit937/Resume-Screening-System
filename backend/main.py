@@ -36,11 +36,6 @@ from core.metrics import (
     record_http_request_metrics,
 )
 from core.telemetry import init_telemetry
-from scheduler.job_alerts import (
-    start_job_alert_scheduler,
-    stop_job_alert_scheduler,
-    recover_missed_job_alerts_on_startup,
-)
 from services.multi_tenancy.tenant_context import TenantAccessDeniedError
 from services.multi_tenancy.tenant_middleware import TenantMiddleware
 
@@ -128,17 +123,6 @@ async def lifespan(app: FastAPI):
         FastAPICache.init(InMemoryBackend(), prefix="careershaala-cache")
         logger.info("FastAPICache initialized")
 
-        # Nightly AI Job Alerts Scheduler (Phase D Retention Loops)
-        # Set DISABLE_IN_PROCESS_SCHEDULER=true in Azure App Service env vars when using
-        # an external Azure Logic App or Azure Functions Timer Trigger for job alerts.
-        if os.getenv("DISABLE_IN_PROCESS_SCHEDULER", "false").lower() != "true":
-            start_job_alert_scheduler()
-        else:
-            logger.info(
-                "In-process APScheduler disabled via DISABLE_IN_PROCESS_SCHEDULER=true; "
-                "job alerts are expected to be triggered by an external Azure Logic App / Azure Functions timer."
-            )
-
         # Non-blocking model pre-warmup in background
         async def _warmup_engine():
             try:
@@ -149,23 +133,11 @@ async def lifespan(app: FastAPI):
                 logger.warning("Embedding model warmup skipped", error=str(w_err))
 
         asyncio.create_task(_warmup_engine())
-
-        # Non-blocking startup recovery of eligible missed scheduled job alerts in background
-        async def _recover_missed_job_alerts():
-            try:
-                from config.db import get_database
-                db = get_database()
-                await recover_missed_job_alerts_on_startup(db)
-                logger.info("Startup missed job alerts recovery check completed")
-            except Exception as r_err:
-                logger.warning("Startup missed job alerts recovery check skipped", error=str(r_err))
-
-        asyncio.create_task(_recover_missed_job_alerts())
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise
     yield
-    stop_job_alert_scheduler()
+
     try:
         await disconnect_db()
     except Exception as exc:
