@@ -28,6 +28,7 @@ from pymongo.errors import DuplicateKeyError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from core.config import settings
 from api.deps import (
     get_current_user,
     get_database,

@@ -19,41 +19,10 @@ from bson import ObjectId
 from models.cron_run_model import CronRunStatus, DeliveryStatus
 from scheduler.job_alerts import (
     calculate_slot_id,
-    get_eligible_missed_slot,
-    job_alerts_scheduler,
-    recover_missed_job_alerts_on_startup,
     run_nightly_job_alerts,
-    start_job_alert_scheduler,
-    stop_job_alert_scheduler,
     sweep_stuck_pending_resumes,
 )
 from services.email_service import EmailService, send_job_alert_email
-
-
-@pytest.mark.asyncio
-async def test_afternoon_trigger_hour_is_14():
-    """Verify afternoon cron trigger is registered for 14:00 (2:00 PM IST)."""
-    start_job_alert_scheduler()
-    try:
-        assert job_alerts_scheduler.running is True
-        afternoon_job = job_alerts_scheduler.get_job("afternoon_job_alerts")
-        assert afternoon_job is not None
-        
-        # Verify trigger fields
-        fields = {f.name: str(f) for f in afternoon_job.trigger.fields}
-        assert "hour" in fields
-        assert "14" in str(fields["hour"])
-        assert "minute" in fields
-        assert "0" in str(fields["minute"])
-        assert str(afternoon_job.trigger.timezone) in ("Asia/Kolkata", "Asia/Calcutta")
-
-        morning_job = job_alerts_scheduler.get_job("morning_job_alerts")
-        assert morning_job is not None
-        m_fields = {f.name: str(f) for f in morning_job.trigger.fields}
-        assert "7" in str(m_fields["hour"])
-        assert "30" in str(m_fields["minute"])
-    finally:
-        stop_job_alert_scheduler()
 
 
 def test_slot_id_calculation():
@@ -67,28 +36,6 @@ def test_slot_id_calculation():
     dt_afternoon = datetime(2026, 10, 3, 8, 30, 0, tzinfo=timezone.utc)
     slot_afternoon = calculate_slot_id(dt_afternoon, slot_type="afternoon")
     assert slot_afternoon == "2026-10-03_14:00"
-
-
-def test_missed_slot_recovery_window():
-    """Verify 2-hour recovery window eligibility."""
-    # 08:15 AM IST (02:45 UTC) -> Within 07:30-09:30 morning recovery window
-    dt_morning_eligible = datetime(2026, 10, 3, 2, 45, 0, tzinfo=timezone.utc)
-    res_m = get_eligible_missed_slot(dt_morning_eligible)
-    assert res_m is not None
-    assert res_m["slot_id"] == "2026-10-03_07:30"
-    assert res_m["slot_type"] == "morning"
-
-    # 10:00 AM IST (04:30 UTC) -> Past morning recovery window (expired)
-    dt_morning_expired = datetime(2026, 10, 3, 4, 30, 0, tzinfo=timezone.utc)
-    res_exp = get_eligible_missed_slot(dt_morning_expired)
-    assert res_exp is None
-
-    # 02:30 PM IST (09:00 UTC) -> Within 14:00-16:00 afternoon recovery window
-    dt_afternoon_eligible = datetime(2026, 10, 3, 9, 0, 0, tzinfo=timezone.utc)
-    res_a = get_eligible_missed_slot(dt_afternoon_eligible)
-    assert res_a is not None
-    assert res_a["slot_id"] == "2026-10-03_14:00"
-    assert res_a["slot_type"] == "afternoon"
 
 
 @pytest.mark.asyncio
@@ -245,30 +192,6 @@ async def test_uncertain_outcome_quarantine(monkeypatch):
             for c in update_calls
         )
         assert marked_uncertain is True
-
-
-@pytest.mark.asyncio
-async def test_startup_recovery_execution():
-    """Verify startup recovery triggers execution when missed slot is eligible."""
-    mock_db = MagicMock()
-    mock_db.cron_job_runs.find_one = AsyncMock(return_value=None)
-
-    # Mock morning time within recovery window
-    mock_now = datetime(2026, 10, 3, 2, 45, 0, tzinfo=timezone.utc)
-
-    with patch("scheduler.job_alerts.datetime") as mock_dt:
-        mock_dt.now.return_value = mock_now
-        mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
-
-        with patch("scheduler.job_alerts.run_nightly_job_alerts", new_callable=AsyncMock) as mock_run:
-            mock_run.return_value = {"status": "completed"}
-
-            await recover_missed_job_alerts_on_startup(db=mock_db)
-
-            mock_run.assert_called_once()
-            called_kwargs = mock_run.call_args[1]
-            assert called_kwargs["slot_id"] == "2026-10-03_07:30"
-            assert called_kwargs["triggered_by"] == "recovery_on_startup"
 
 
 @pytest.mark.asyncio
@@ -432,4 +355,39 @@ async def test_stale_claim_recovery_after_15_minutes(monkeypatch):
 
         assert res["emails_delivered"] == 1
         fake_brevo.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_trigger_alerts_authentication():
+    """Verify webhook endpoint enforces X-Cron-Secret authentication and executes run_nightly_job_alerts."""
+    from api.routes.jobs import trigger_job_alerts_manually
+    from fastapi import HTTPException
+
+    mock_db = MagicMock()
+
+    # 1. Must reject request when secret is absent or wrong
+    with pytest.raises(HTTPException) as exc_info:
+        await trigger_job_alerts_manually(
+            x_cron_secret="invalid-secret",
+            cron_secret=None,
+            current_user=None,
+            db=mock_db,
+        )
+    assert exc_info.value.status_code == 403
+
+    # 2. Must succeed and invoke run_nightly_job_alerts when X-Cron-Secret matches
+    with patch("api.routes.jobs.settings") as mock_settings, \
+         patch("scheduler.job_alerts.run_nightly_job_alerts", new_callable=AsyncMock) as mock_run:
+        mock_settings.CRON_SECRET = "CareerShala-Cron-Token-9988!@#"
+        mock_settings.SECRET_KEY = "jwt-secret-key"
+        mock_run.return_value = {"status": "completed", "emails_delivered": 5}
+
+        res = await trigger_job_alerts_manually(
+            x_cron_secret="CareerShala-Cron-Token-9988!@#",
+            current_user=None,
+            db=mock_db,
+        )
+        assert res["success"] is True
+        assert res["result"]["emails_delivered"] == 5
+        mock_run.assert_called_once()
 

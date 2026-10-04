@@ -1,24 +1,19 @@
 """
-Background Schedulers Package for Automated Retention Loops & AI Batch Tasks.
+Retention Loops & AI Batch Tasks Package.
 """
 
 from .job_alerts import (
-    start_job_alert_scheduler,
-    stop_job_alert_scheduler,
     run_nightly_job_alerts,
-    job_alerts_scheduler,
-    recover_missed_job_alerts_on_startup,
     calculate_slot_id,
-    get_eligible_missed_slot,
+    run_external_job_scrape,
+    sweep_stuck_pending_resumes,
 )
+from .subscription_expiry import expire_overdue_subscriptions
 
 __all__ = [
-    "start_job_alert_scheduler",
-    "stop_job_alert_scheduler",
     "run_nightly_job_alerts",
-    "job_alerts_scheduler",
-    "recover_missed_job_alerts_on_startup",
     "calculate_slot_id",
-    "get_eligible_missed_slot",
+    "run_external_job_scrape",
+    "sweep_stuck_pending_resumes",
+    "expire_overdue_subscriptions",
 ]
-

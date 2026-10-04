@@ -53,7 +53,6 @@ structlog==24.1.0
 prometheus-client>=0.20.0
 opentelemetry-api>=1.24.0
 opentelemetry-sdk>=1.24.0
-apscheduler>=3.10.4
 tzdata>=2024.1
 
 

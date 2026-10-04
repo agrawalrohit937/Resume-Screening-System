@@ -1,16 +1,14 @@
 """
-Nightly & Mid-Day AI Job Alert Scheduler — Retention Loop Engine (Phase D).
-===========================================================================
+Nightly & Mid-Day AI Job Alert Engine — Retention Loop (Phase D).
+================================================================
 
-Automated background cron task using APScheduler (AsyncIOScheduler):
-- Twice-daily scheduled digests:
-  * Morning Slot: 07:30 AM IST (02:00 UTC)
-  * Afternoon Slot: 02:00 PM IST (08:30 UTC)
+Serverless Webhook Execution Architecture:
+- Triggered externally via authenticated webhook (Azure Logic App):
+  POST /api/v1/jobs/admin/trigger-alerts (Header: X-Cron-Secret)
 - Deterministic slot-based idempotency (e.g., '2026-10-03_07:30', '2026-10-03_14:00').
 - Atomic per-user delivery claims with safe stale-claim recovery in `job_alert_deliveries`.
 - Structured audit execution tracking in `cron_job_runs`.
-- Non-blocking startup recovery with a strict 2-hour eligibility window.
-- Bounded async concurrency (asyncio.Semaphore) optimized for Azure App Service B1.
+- Bounded async concurrency (asyncio.Semaphore) optimized for Azure App Service.
 """
 
 from __future__ import annotations
@@ -30,17 +28,6 @@ try:
 except Exception:
     IST = timezone(timedelta(hours=5, minutes=30))
 
-try:
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
-    from apscheduler.triggers.cron import CronTrigger
-    from apscheduler.triggers.interval import IntervalTrigger
-    APSCHEDULER_AVAILABLE = True
-except ImportError:
-    AsyncIOScheduler = None
-    CronTrigger = None
-    IntervalTrigger = None
-    APSCHEDULER_AVAILABLE = False
-
 from config.db import get_database
 from models.cron_run_model import CronRunStatus, DeliveryStatus, ensure_cron_indexes
 from models.user_model import UserRole
@@ -51,24 +38,6 @@ from services.locking import distributed_lock
 from utils.pagination import stream_cursor
 
 logger = structlog.get_logger(__name__)
-
-
-class _DummyScheduler:
-    """Fallback dummy scheduler when apscheduler is not installed."""
-    running: bool = False
-
-    def add_job(self, *args: Any, **kwargs: Any) -> None:
-        pass
-
-    def start(self) -> None:
-        pass
-
-    def shutdown(self, *args: Any, **kwargs: Any) -> None:
-        pass
-
-
-# Global singleton AsyncIOScheduler instance (or dummy fallback)
-job_alerts_scheduler: Any = AsyncIOScheduler() if APSCHEDULER_AVAILABLE else _DummyScheduler()
 
 
 def calculate_slot_id(now: Optional[datetime] = None, slot_type: Optional[str] = None) -> str:
@@ -98,41 +67,6 @@ def calculate_slot_id(now: Optional[datetime] = None, slot_type: Optional[str] =
         return f"{date_str}_07:30"
     else:
         return f"{date_str}_14:00"
-
-
-def get_eligible_missed_slot(now: Optional[datetime] = None) -> Optional[Dict[str, str]]:
-    """
-    Evaluates whether the current IST time falls within the 2-hour eligible recovery window
-    for today's morning (07:30 - 09:30 IST) or afternoon (14:00 - 16:00 IST) slot.
-    Returns slot metadata dict if eligible, or None if outside the recovery window.
-    """
-    if now is None:
-        now = datetime.now(timezone.utc)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=timezone.utc)
-    ist_now = now.astimezone(IST)
-    date_str = ist_now.strftime("%Y-%m-%d")
-
-    current_hour_min = ist_now.hour + (ist_now.minute / 60.0)
-
-    # Morning recovery window: 07:30 to 09:30 IST (7.5 to 9.5)
-    if 7.5 <= current_hour_min <= 9.5:
-        return {
-            "slot_id": f"{date_str}_07:30",
-            "slot_type": "morning",
-            "scheduled_time": "07:30 AM IST",
-        }
-
-    # Afternoon recovery window: 14:00 to 16:00 IST (14.0 to 16.0)
-    if 14.0 <= current_hour_min <= 16.0:
-        return {
-            "slot_id": f"{date_str}_14:00",
-            "slot_type": "afternoon",
-            "scheduled_time": "02:00 PM IST",
-        }
-
-    return None
-
 
 async def run_external_job_scrape() -> Dict[str, int]:
     """Run the JSearch import against the active MongoDB connection."""
@@ -629,81 +563,6 @@ async def run_nightly_job_alerts(
         return summary
 
 
-async def recover_missed_job_alerts_on_startup(db: Optional[Any] = None) -> None:
-    """
-    Non-blocking background recovery task invoked during FastAPI lifespan boot:
-    - Inspects if today's morning (07:30 IST) or afternoon (14:00 IST) slot was missed.
-    - If within the 2-hour eligible recovery window, executes the missed slot safely.
-    - If outside the 2-hour window, marks slot as 'expired' to prevent stale alert replay.
-    """
-    if db is None:
-        try:
-            db = get_database()
-        except Exception:
-            return
-
-    try:
-        now_utc = datetime.now(timezone.utc)
-        eligible_meta = get_eligible_missed_slot(now_utc)
-
-        if not eligible_meta:
-            logger.info("Startup check: Current time is outside eligible missed job alert recovery window.")
-            return
-
-        slot_id = eligible_meta["slot_id"]
-        slot_type = eligible_meta["slot_type"]
-
-        # Check if this slot was already processed or marked
-        existing = await db.cron_job_runs.find_one({"slot_id": slot_id, "job_name": "job_alerts"})
-        if existing:
-            run_status = existing.get("status")
-
-            # Slot genuinely completed — never re-execute
-            if run_status == CronRunStatus.COMPLETED.value:
-                logger.info("Startup check: Scheduled slot was already completed.", slot_id=slot_id)
-                return
-
-            # Slot is marked RUNNING — check whether it's an active run or a stale crash artifact
-            if run_status == CronRunStatus.RUNNING.value:
-                started_at = existing.get("started_at")
-                stale = (
-                    started_at is None
-                    or (datetime.now(timezone.utc) - started_at).total_seconds() >= 1200
-                )
-                if not stale:
-                    # Genuinely in-progress on another worker — do not interrupt
-                    logger.info(
-                        "Startup check: Slot is actively running on another process, skipping recovery.",
-                        slot_id=slot_id,
-                    )
-                    return
-                # Stale RUNNING (>20 min): the original process was killed before finishing.
-                # Proceed with recovery so candidates are not permanently skipped.
-                logger.warning(
-                    "Startup check: Stale RUNNING slot detected (>20 min since start). "
-                    "Treating as crashed run and initiating recovery.",
-                    slot_id=slot_id,
-                    started_at=str(started_at),
-                )
-
-        logger.info(
-            "Startup check: Found eligible missed job alert slot within 2-hour window. Initiating recovery.",
-            slot_id=slot_id,
-            slot_type=slot_type,
-        )
-
-        # Trigger recovery run
-        await run_nightly_job_alerts(
-            db=db,
-            slot_id=slot_id,
-            slot_type=slot_type,
-            triggered_by="recovery_on_startup",
-        )
-
-    except Exception as exc:
-        logger.error("Startup job alert recovery encountered an exception", error=str(exc))
-
-
 async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any]:
     """
     Finds resumes stuck in 'pending' or 'processing' older than 10 minutes,
@@ -754,82 +613,3 @@ async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any
     if swept_count > 0:
         logger.info("Completed stuck pending resume sweep", swept_count=swept_count)
     return {"swept": swept_count}
-
-
-def start_job_alert_scheduler() -> None:
-    """
-    Initializes and starts the APScheduler background cron job.
-    Schedules job alerts twice daily:
-    - Morning Slot: 07:30 AM IST (02:00 UTC)
-    - Afternoon Slot: 02:00 PM IST (08:30 UTC) [Corrected from 03:00 PM]
-    Plus periodic stuck-resume sweeps and external job scrapes.
-    """
-    if not APSCHEDULER_AVAILABLE:
-        logger.info("APScheduler package not installed, running without background cron tasks")
-        return
-
-    if job_alerts_scheduler.running:
-        logger.info("Job alerts scheduler is already running")
-        return
-
-    try:
-        # 1. Morning Job Alert Digest (07:30 AM IST)
-        job_alerts_scheduler.add_job(
-            run_nightly_job_alerts,
-            trigger=CronTrigger(hour=7, minute=30, timezone="Asia/Kolkata"),
-            id="morning_job_alerts",
-            name="Morning AI Job Alerts Digest (07:30 AM IST)",
-            replace_existing=True,
-            coalesce=True,
-            misfire_grace_time=3600,
-            kwargs={"slot_type": "morning"},
-        )
-
-        # 2. Afternoon Job Alert Digest (02:00 PM IST) — Corrected to 14:00 IST
-        job_alerts_scheduler.add_job(
-            run_nightly_job_alerts,
-            trigger=CronTrigger(hour=14, minute=0, timezone="Asia/Kolkata"),
-            id="afternoon_job_alerts",
-            name="Afternoon AI Job Alerts Digest (02:00 PM IST)",
-            replace_existing=True,
-            coalesce=True,
-            misfire_grace_time=3600,
-            kwargs={"slot_type": "afternoon"},
-        )
-
-        # 3. Sweep stuck resumes every 5 minutes
-        job_alerts_scheduler.add_job(
-            sweep_stuck_pending_resumes,
-            trigger=IntervalTrigger(minutes=5),
-            id="stuck_resumes_sweep",
-            name="Sweep Stuck Pending Resumes",
-            replace_existing=True,
-            coalesce=True,
-            misfire_grace_time=300,
-        )
-
-        # 4. Twice-daily external job scrape (06:30 AM IST and 01:00 PM IST)
-        job_alerts_scheduler.add_job(
-            run_external_job_scrape,
-            trigger=CronTrigger(hour="6,13", minute=30, timezone="Asia/Kolkata"),
-            id="external_job_scrape",
-            name="Twice-Daily JSearch External Job Scrape",
-            replace_existing=True,
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-
-        job_alerts_scheduler.start()
-        logger.info("Twice-Daily AI Job Alerts (7:30 AM & 2:00 PM IST) & Background schedulers started")
-    except Exception as exc:
-        logger.error("Failed to start job alerts scheduler", error=str(exc))
-
-
-def stop_job_alert_scheduler() -> None:
-    """Safely shuts down the APScheduler background task during application teardown."""
-    if job_alerts_scheduler.running:
-        try:
-            job_alerts_scheduler.shutdown(wait=False)
-            logger.info("Nightly AI Job Alerts scheduler shut down successfully")
-        except Exception as exc:
-            logger.error("Error shutting down job alerts scheduler", error=str(exc))
