@@ -86,6 +86,9 @@ class UserModel(BaseModel):
     # Premium / subscription fields (saved to user document)
     plan: str = "free"  # "free" | "pro" | "premium"
     subscription_active: bool = False
+    subscription_status: str = "expired"
+    subscription_start_date: Optional[datetime] = None
+    subscription_end_date: Optional[datetime] = None
     plan_updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     payment_history: List[Dict[str, Any]] = Field(default_factory=list)
 

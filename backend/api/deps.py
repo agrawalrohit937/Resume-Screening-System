@@ -2,6 +2,7 @@
 Dependency Injection — Auth guards, DB access, service instances
 """
 
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 import structlog
@@ -104,6 +105,33 @@ def get_otp_service(
     return OTPService(otp_repo, email_service)
 
 
+async def _check_and_apply_lazy_expiration(user: UserModel, user_repo: UserRepository) -> UserModel:
+    """
+    Lazy downgrade check: if a user's subscription has expired past its end date,
+    immediately downgrade their document in MongoDB and update the in-memory UserModel.
+    """
+    if user.subscription_active and user.subscription_end_date:
+        end_date = user.subscription_end_date
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if now > end_date:
+            updates = {
+                "plan": "free",
+                "subscription_active": False,
+                "subscription_status": "expired",
+                "subscription_end_date": None,
+                "plan_updated_at": now,
+            }
+            await user_repo.update(str(user.id), updates)
+            user.plan = "free"
+            user.subscription_active = False
+            user.subscription_status = "expired"
+            user.subscription_end_date = None
+            user.plan_updated_at = now
+    return user
+
+
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 async def get_current_user(
@@ -166,6 +194,9 @@ async def get_current_user(
     else:
         set_current_tenant_id(user.tenant_id or "default")
 
+    # Lazy subscription expiration check
+    user = await _check_and_apply_lazy_expiration(user, user_repo)
+
     return user
 
 async def get_current_active_user(
@@ -218,6 +249,8 @@ async def get_optional_current_user(
         else:
             set_current_tenant_id(user.tenant_id or "default")
 
+        user = await _check_and_apply_lazy_expiration(user, user_repo)
+
         return user
     except Exception:
         return None
@@ -261,6 +294,44 @@ def get_recruiter_or_admin(current_user: UserModel = Depends(get_current_user)) 
     return current_user
 
 
+
+
+# ─── Subscription Plan Guards ────────────────────────────────────────────────
+def require_plan(min_tier: str):
+    """
+    Route guard dependency checking if the user has an active subscription
+    meeting or exceeding `min_tier`.
+    Hierarchy: 'free' (0) < 'pro' (1) < 'premium' (2).
+    """
+    tier_levels = {
+        "free": 0,
+        "pro": 1,
+        "premium": 2,
+    }
+    normalized_min = (min_tier or "free").strip().lower()
+    min_level = tier_levels.get(normalized_min, 1)
+
+    async def _plan_guard(current_user: UserModel = Depends(get_current_user)) -> UserModel:
+        user_roles = {r.value if hasattr(r, "value") else str(r).lower() for r in (current_user.roles or [current_user.role])}
+        # Admins bypass plan restrictions
+        if "platform_admin" in user_roles or "admin" in user_roles:
+            return current_user
+
+        if min_level == 0:
+            return current_user
+
+        user_plan = (current_user.plan or "free").strip().lower()
+        user_level = tier_levels.get(user_plan, 0)
+
+        if not current_user.subscription_active or user_level < min_level:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Subscription required. This feature requires an active '{min_tier}' plan.",
+            )
+
+        return current_user
+
+    return _plan_guard
 
 
 # ─── Pagination ───────────────────────────────────────────────────────────────
