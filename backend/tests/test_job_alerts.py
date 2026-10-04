@@ -391,3 +391,63 @@ async def test_webhook_trigger_alerts_authentication():
         assert res["result"]["emails_delivered"] == 5
         mock_run.assert_called_once()
 
+
+@pytest.mark.asyncio
+async def test_webhook_sweep_stuck_resumes_authentication():
+    """Verify POST /resume/admin/sweep-stuck validates X-Cron-Secret and executes sweep."""
+    from api.routes.resume import sweep_stuck_resumes_webhook
+    from fastapi import HTTPException
+
+    mock_db = MagicMock()
+
+    # 1. 401 when invalid
+    with pytest.raises(HTTPException) as exc_info:
+        await sweep_stuck_resumes_webhook(x_cron_secret="wrong", db=mock_db)
+    assert exc_info.value.status_code == 401
+
+    # 2. 200 when valid
+    with patch("api.routes.resume.settings") as mock_settings, \
+         patch("api.routes.resume.sweep_stuck_pending_resumes", new_callable=AsyncMock) as mock_sweep:
+        mock_settings.CRON_SECRET = "CareerShala-Cron-Token-9988!@#"
+        mock_settings.SECRET_KEY = "jwt-secret-key"
+        mock_sweep.return_value = {"swept": 3}
+
+        res = await sweep_stuck_resumes_webhook(
+            x_cron_secret="CareerShala-Cron-Token-9988!@#",
+            db=mock_db,
+        )
+        assert res["status"] == "success"
+        assert res["message"] == "Sweep completed"
+        assert res["result"]["swept"] == 3
+        mock_sweep.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_webhook_expire_subscriptions_authentication():
+    """Verify POST /users/admin/expire-subscriptions validates X-Cron-Secret and executes sweep."""
+    from api.routes.users import expire_subscriptions_webhook
+    from fastapi import HTTPException
+
+    mock_db = MagicMock()
+
+    # 1. 401 when invalid
+    with pytest.raises(HTTPException) as exc_info:
+        await expire_subscriptions_webhook(x_cron_secret="wrong", db=mock_db)
+    assert exc_info.value.status_code == 401
+
+    # 2. 200 when valid
+    with patch("api.routes.users.settings") as mock_settings, \
+         patch("api.routes.users.expire_overdue_subscriptions", new_callable=AsyncMock) as mock_expire:
+        mock_settings.CRON_SECRET = "CareerShala-Cron-Token-9988!@#"
+        mock_settings.SECRET_KEY = "jwt-secret-key"
+        mock_expire.return_value = {"expired_count": 2}
+
+        res = await expire_subscriptions_webhook(
+            x_cron_secret="CareerShala-Cron-Token-9988!@#",
+            db=mock_db,
+        )
+        assert res["status"] == "success"
+        assert res["message"] == "Subscription expiry sweep completed"
+        assert res["result"]["expired_count"] == 2
+        mock_expire.assert_called_once()
+

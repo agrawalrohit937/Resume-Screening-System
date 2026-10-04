@@ -5,12 +5,14 @@ Mount this router at prefix "/users" alongside your existing "/auth" router.
 """
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 from bson import ObjectId
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 
-from api.deps import get_current_user, get_user_repo, get_db
+from api.deps import get_current_user, get_user_repo, get_db, get_database
+from core.config import settings
+from scheduler.subscription_expiry import expire_overdue_subscriptions
 from models.user_model import UserModel
 from repositories.user_repo import UserRepository
 from schemas.user_schema import UserPublicResponse, UpdateProfileRequest, MessageResponse, SetPrimaryResumeRequest
@@ -212,4 +214,36 @@ async def delete_my_account(
     return {
         "success": True,
         "message": "Account successfully deleted and personal data anonymized.",
+    }
+
+
+# ─── POST /users/admin/expire-subscriptions ──────────────────────────────────
+@router.post("/admin/expire-subscriptions")
+async def expire_subscriptions_webhook(
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+    db: Any = Depends(get_database),
+):
+    """
+    Webhook endpoint to auto-downgrade expired paid subscriptions to Free.
+    Triggered daily (e.g. at midnight IST) by external Azure Logic App or admin scheduler.
+    """
+    valid_cron_auth = (
+        x_cron_secret
+        and (
+            (settings.CRON_SECRET and x_cron_secret == settings.CRON_SECRET)
+            or (settings.SECRET_KEY and x_cron_secret == settings.SECRET_KEY)
+        )
+    )
+    if not valid_cron_auth:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing X-Cron-Secret header",
+        )
+
+    raw_db = getattr(db, "_raw_db", db)
+    result = await expire_overdue_subscriptions(raw_db)
+    return {
+        "status": "success",
+        "message": "Subscription expiry sweep completed",
+        "result": result,
     }

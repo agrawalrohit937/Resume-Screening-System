@@ -54,6 +54,9 @@ def user_to_public(user: UserModel) -> UserPublicResponse:
         profile_completion_percent=user.profile_completion_percent,
         plan=user.plan,
         subscription_active=user.subscription_active,
+        subscription_status=getattr(user, "subscription_status", "expired" if not user.subscription_active else "active"),
+        subscription_start_date=getattr(user, "subscription_start_date", None),
+        subscription_end_date=getattr(user, "subscription_end_date", None),
         plan_updated_at=user.plan_updated_at,
         # ── NEW multi-provider fields ──────────────────────────────────────
         auth_methods=user.auth_methods or ([user.auth_method] if user.auth_method else []),

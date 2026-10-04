@@ -105,9 +105,12 @@ class UserPublicResponse(BaseModel):
     portfolio_url: Optional[str] = None
     profile_completion_percent: int = 0
 
-    # ✅ ADD THESE
+    # Subscription fields
     plan: str = "free"
     subscription_active: bool = False
+    subscription_status: str = "expired"
+    subscription_start_date: Optional[datetime] = None
+    subscription_end_date: Optional[datetime] = None
     plan_updated_at: Optional[datetime] = None
 
     # ── NEW multi-provider auth fields ─────────────────────────────────────

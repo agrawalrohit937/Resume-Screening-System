@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -44,6 +44,67 @@ def _normalize(plan: str) -> str:
     raise HTTPException(status_code=400, detail='Invalid plan. Use free | pro | premium')
 
 
+async def activate_user_subscription(
+    user_repo: Any,
+    user_id: str,
+    plan_name: str,
+    days: int = 30,
+) -> Optional[UserModel]:
+    """
+    Bulletproof activation engine for user subscriptions:
+    - Normalizes plan name ('free', 'pro', 'premium').
+    - If plan is 'free', downgrades account and resets active subscription states.
+    - If paid, checks if user currently has active time remaining on their subscription:
+      * Early renewal: appends `days` to their existing `subscription_end_date`.
+      * Fresh activation or expired: sets start_date = now and end_date = now + timedelta(days=days).
+    - Transitions subscription_status = 'active', subscription_active = True.
+    - Persists updates and returns updated UserModel.
+    """
+    user = await user_repo.get_by_id(user_id)
+    if not user:
+        return None
+
+    normalized_plan = (plan_name or "free").strip().lower()
+    now = datetime.now(timezone.utc)
+
+    if normalized_plan == "free":
+        updates = {
+            "plan": "free",
+            "subscription_active": False,
+            "subscription_status": "expired",
+            "subscription_end_date": None,
+            "plan_updated_at": now,
+        }
+        return await user_repo.update(user_id, updates)
+
+    # Paid plan: 'pro' or 'premium'
+    has_future_expiry = (
+        user.subscription_active
+        and user.subscription_end_date
+        and user.subscription_end_date > now
+    )
+
+    if has_future_expiry:
+        # Early renewal: preserve remaining days and extend
+        start_date = user.subscription_start_date or now
+        end_date = user.subscription_end_date + timedelta(days=days)
+    else:
+        # Fresh activation or renewal after expiration
+        start_date = now
+        end_date = now + timedelta(days=days)
+
+    updates = {
+        "plan": normalized_plan,
+        "subscription_active": True,
+        "subscription_status": "active",
+        "subscription_start_date": start_date,
+        "subscription_end_date": end_date,
+        "plan_updated_at": now,
+    }
+
+    return await user_repo.update(user_id, updates)
+
+
 # --- Routes ---
 
 @router.post('/cancel', response_model=MessageResponse)
@@ -69,6 +130,8 @@ async def cancel_subscription(
     updates = {
         'plan': 'free',
         'subscription_active': False,
+        'subscription_status': 'cancelled',
+        'subscription_end_date': None,
         'plan_updated_at': datetime.now(timezone.utc),
     }
 
@@ -123,14 +186,8 @@ async def choose_plan(
     user_repo=Depends(get_user_repo),
 ):
     plan = _normalize(payload.plan)
-
-    updates = {
-        'plan': plan,
-        'subscription_active': (plan != 'free'),
-        'plan_updated_at': datetime.now(timezone.utc),
-    }
-
-    updated = await user_repo.update(str(current_user.id), updates)
+    days = 0 if plan == 'free' else 30
+    updated = await activate_user_subscription(user_repo, str(current_user.id), plan, days=days)
     if not updated:
         raise HTTPException(status_code=404, detail='User not found')
 
@@ -186,14 +243,8 @@ async def verify_payment(
             detail="Payment verification failed. Invalid signature."
         )
         
-    # Apply database persistence changes for the active tier upgrade
-    updates = {
-        'plan': plan,
-        'subscription_active': True,
-        'plan_updated_at': datetime.now(timezone.utc),
-    }
-    
-    updated = await user_repo.update(str(current_user.id), updates)
+    # Apply database persistence changes for the active tier upgrade via bulletproof activation engine
+    updated = await activate_user_subscription(user_repo, str(current_user.id), plan, days=30)
     if not updated:
         raise HTTPException(status_code=404, detail='User not found')
 
@@ -484,25 +535,58 @@ async def razorpay_webhook(
 
     # 2. Handle Payment Success Events
     elif event in ("payment.captured", "order.paid"):
-        user_email = payment_entity.get("email")
-        if user_email:
+        notes = payment_entity.get("notes") or {}
+        user_email = payment_entity.get("email") or notes.get("email")
+        notes_user_id = notes.get("user_id")
+
+        user_doc = None
+        if notes_user_id:
+            user_doc = await user_repo.get_by_id(notes_user_id)
+        if not user_doc and user_email:
             user_doc = await user_repo.get_by_email(user_email)
-            if user_doc:
-                active_case = await recovery_repo.get_active_case_for_user(str(user_doc.id))
-                if active_case:
-                    await recovery_repo.update_case(active_case.case_id, {
-                        "status": RecoveryStatus.RECOVERED.value,
-                        "recovered_at": datetime.now(timezone.utc),
-                        "payment_id": payment_entity.get("id"),
-                    })
-                    await recovery_repo.add_audit_log(
-                        case_id=active_case.case_id,
-                        action="PAYMENT_RECOVERED_WEBHOOK",
-                        actor=ActorType.SYSTEM,
-                        actor_name="Razorpay Webhook",
-                        details={"payment_id": payment_entity.get("id"), "event": event},
-                        reasoning=f"Webhook event '{event}' confirmed payment settlement."
-                    )
+
+        if user_doc:
+            # Map plan from notes, or infer from amount (49900 paise = ₹499 -> premium, else pro)
+            plan_from_notes = notes.get("plan")
+            if plan_from_notes:
+                resolved_plan = plan_from_notes.strip().lower()
+            else:
+                amount_val = float(payment_entity.get("amount", 29900)) / 100.0
+                resolved_plan = "premium" if amount_val >= 499.0 else "pro"
+
+            await activate_user_subscription(user_repo, str(user_doc.id), resolved_plan, days=30)
+
+            # Record in payment_history if not already present
+            payment_id = payment_entity.get("id")
+            order_id = payment_entity.get("order_id")
+            existing_pids = [p.get("payment_id") for p in (user_doc.payment_history or [])]
+            if payment_id and payment_id not in existing_pids:
+                payment_record = {
+                    "order_id": order_id or "webhook_order",
+                    "payment_id": payment_id,
+                    "plan": resolved_plan.capitalize(),
+                    "amount": 299 if resolved_plan == "pro" else 499,
+                    "status": "paid",
+                    "date": datetime.now(timezone.utc).isoformat(),
+                    "source": "razorpay_webhook",
+                }
+                await user_repo.add_payment_history(str(user_doc.id), payment_record)
+
+            active_case = await recovery_repo.get_active_case_for_user(str(user_doc.id))
+            if active_case:
+                await recovery_repo.update_case(active_case.case_id, {
+                    "status": RecoveryStatus.RECOVERED.value,
+                    "recovered_at": datetime.now(timezone.utc),
+                    "payment_id": payment_entity.get("id"),
+                })
+                await recovery_repo.add_audit_log(
+                    case_id=active_case.case_id,
+                    action="PAYMENT_RECOVERED_WEBHOOK",
+                    actor=ActorType.SYSTEM,
+                    actor_name="Razorpay Webhook",
+                    details={"payment_id": payment_entity.get("id"), "event": event, "plan": resolved_plan},
+                    reasoning=f"Webhook event '{event}' confirmed payment settlement and provisioned {resolved_plan} plan."
+                )
 
         return {"status": "processed", "event": event}
 

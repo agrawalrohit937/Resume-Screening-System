@@ -6,10 +6,11 @@ import hashlib
 import os
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 import structlog
 from bson import ObjectId
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, Query, UploadFile, status
 from fastapi.responses import RedirectResponse
 
 from services.tasks import task_manager, execute_resume_parse
@@ -35,6 +36,7 @@ from services.cloudinary_service import upload_resume, delete_file as cloudinary
 from services.gamification_service import GamificationService
 from utils.file_utils import validate_and_save_file, delete_file, sanitize_filename
 from utils.validators import validate_object_id
+from scheduler.job_alerts import sweep_stuck_pending_resumes
 
 
 logger = structlog.get_logger(__name__)
@@ -379,3 +381,35 @@ def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
         created_at=resume.created_at,
         updated_at=resume.updated_at,
     )
+
+
+# ─── POST /resume/admin/sweep-stuck ──────────────────────────────────────────
+@router.post("/admin/sweep-stuck")
+async def sweep_stuck_resumes_webhook(
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+    db: Any = Depends(get_database),
+):
+    """
+    Webhook endpoint to sweep stuck pending/processing resumes older than 10 minutes.
+    Triggered periodically by external Azure Logic App or admin scheduler.
+    """
+    valid_cron_auth = (
+        x_cron_secret
+        and (
+            (settings.CRON_SECRET and x_cron_secret == settings.CRON_SECRET)
+            or (settings.SECRET_KEY and x_cron_secret == settings.SECRET_KEY)
+        )
+    )
+    if not valid_cron_auth:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing X-Cron-Secret header",
+        )
+
+    raw_db = getattr(db, "_raw_db", db)
+    result = await sweep_stuck_pending_resumes(raw_db)
+    return {
+        "status": "success",
+        "message": "Sweep completed",
+        "result": result,
+    }
