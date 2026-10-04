@@ -350,6 +350,21 @@ async def run_nightly_job_alerts(
             candidates = await stream_cursor(candidate_cursor)
         except Exception as exc:
             logger.error("Failed to query candidates for job alert batch", error=str(exc))
+            # Mark the batch as FAILED so it doesn't remain stuck as RUNNING,
+            # which would otherwise permanently block startup recovery on the next restart.
+            if not target_email:
+                try:
+                    await db.cron_job_runs.update_one(
+                        {"slot_id": effective_slot_id, "job_name": "job_alerts"},
+                        {"$set": {
+                            "status": CronRunStatus.FAILED.value,
+                            "completed_at": datetime.now(timezone.utc),
+                            "duration_ms": int((time.perf_counter() - t0) * 1000),
+                            "error_summary": f"Candidate query failed: {str(exc)}",
+                        }},
+                    )
+                except Exception:
+                    pass
             return {"error": str(exc), "sent": 0}
 
         total_candidates = len(candidates)
@@ -640,9 +655,36 @@ async def recover_missed_job_alerts_on_startup(db: Optional[Any] = None) -> None
 
         # Check if this slot was already processed or marked
         existing = await db.cron_job_runs.find_one({"slot_id": slot_id, "job_name": "job_alerts"})
-        if existing and existing.get("status") in (CronRunStatus.COMPLETED.value, CronRunStatus.RUNNING.value):
-            logger.info("Startup check: Scheduled slot was already completed or is running.", slot_id=slot_id)
-            return
+        if existing:
+            run_status = existing.get("status")
+
+            # Slot genuinely completed — never re-execute
+            if run_status == CronRunStatus.COMPLETED.value:
+                logger.info("Startup check: Scheduled slot was already completed.", slot_id=slot_id)
+                return
+
+            # Slot is marked RUNNING — check whether it's an active run or a stale crash artifact
+            if run_status == CronRunStatus.RUNNING.value:
+                started_at = existing.get("started_at")
+                stale = (
+                    started_at is None
+                    or (datetime.now(timezone.utc) - started_at).total_seconds() >= 1200
+                )
+                if not stale:
+                    # Genuinely in-progress on another worker — do not interrupt
+                    logger.info(
+                        "Startup check: Slot is actively running on another process, skipping recovery.",
+                        slot_id=slot_id,
+                    )
+                    return
+                # Stale RUNNING (>20 min): the original process was killed before finishing.
+                # Proceed with recovery so candidates are not permanently skipped.
+                logger.warning(
+                    "Startup check: Stale RUNNING slot detected (>20 min since start). "
+                    "Treating as crashed run and initiating recovery.",
+                    slot_id=slot_id,
+                    started_at=str(started_at),
+                )
 
         logger.info(
             "Startup check: Found eligible missed job alert slot within 2-hour window. Initiating recovery.",

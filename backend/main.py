@@ -3,6 +3,7 @@ AI Career Co-Pilot & Smart ATS + Interview Platform
 FastAPI Application Entry Point & Production Bootstrap
 """
 import asyncio
+import os
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -128,7 +129,15 @@ async def lifespan(app: FastAPI):
         logger.info("FastAPICache initialized")
 
         # Nightly AI Job Alerts Scheduler (Phase D Retention Loops)
-        start_job_alert_scheduler()
+        # Set DISABLE_IN_PROCESS_SCHEDULER=true in Azure App Service env vars when using
+        # an external Azure Logic App or Azure Functions Timer Trigger for job alerts.
+        if os.getenv("DISABLE_IN_PROCESS_SCHEDULER", "false").lower() != "true":
+            start_job_alert_scheduler()
+        else:
+            logger.info(
+                "In-process APScheduler disabled via DISABLE_IN_PROCESS_SCHEDULER=true; "
+                "job alerts are expected to be triggered by an external Azure Logic App / Azure Functions timer."
+            )
 
         # Non-blocking model pre-warmup in background
         async def _warmup_engine():
