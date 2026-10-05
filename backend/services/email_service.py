@@ -855,28 +855,59 @@ async def send_job_alert_email(
     has_resume: bool = True,
 ) -> Dict[str, Any]:
     """
-    Sends a nightly AI Job Alert email to a candidate with high-matching opportunities
-    via Brevo HTTP API v3.
+    Sends a personalized, humanized Job Alert email to a candidate with high-matching opportunities
+    via Brevo HTTP API v3, optimized for Gmail Primary inbox placement.
     """
     if not to_email or not matched_jobs:
         return {"sent": False, "error": "Recipient email and matched jobs are required"}
 
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
+    # 1. Clean first name extraction & deep personalization
+    raw_name = (candidate_name or "").strip()
+    first_name = raw_name.split()[0].title() if raw_name else "there"
     count = len(matched_jobs)
     plural_roles = "roles" if count != 1 else "role"
-    subject = f"New job recommendation{'s' if count != 1 else ''} matching your profile | CareerShala"
 
-    # 1. Construct Premium Modern Job Cards HTML
+    # Extract top role and skills for dynamic conversational personalization
+    top_job = matched_jobs[0] if matched_jobs else {}
+    top_title = str(top_job.get("title") or "").strip()
+
+    skills_collected = []
+    for j in matched_jobs:
+        for s in (j.get("matched_skills") or j.get("required_skills") or j.get("skills") or []):
+            s_clean = str(s).strip()
+            if s_clean and s_clean.lower() not in [x.lower() for x in skills_collected]:
+                skills_collected.append(s_clean)
+    top_skills = skills_collected[:3]
+    skills_text = ", ".join(top_skills) if top_skills else None
+
+    # 2. Conversational human Subject Lines (Bypasses Gmail Promotions Tab)
+    if top_title and has_resume:
+        subject = f"Found some interesting {top_title} roles for you"
+    elif has_resume:
+        subject = f"Thought you might like these openings, {first_name}"
+    else:
+        subject = f"Are you looking for these tech roles, {first_name}?"
+
+    # Contextual conversational intro text
+    if skills_text and has_resume:
+        intro_text = (
+            f"I was reviewing open positions today and found {count} {plural_roles} "
+            f"that line up closely with your experience in {skills_text}:"
+        )
+    elif has_resume:
+        intro_text = (
+            f"I was reviewing open positions today and found {count} {plural_roles} "
+            f"that look like a strong match for your background:"
+        )
+    else:
+        intro_text = (
+            f"I wanted to share a few trending roles open right now that caught my attention:"
+        )
+
+    # 3. Construct Clean, Minimalist Job Cards HTML (1-to-1 letter format)
     job_cards_html = []
-    color_palette = [
-        ("#4f46e5", "#6366f1"),
-        ("#0284c7", "#38bdf8"),
-        ("#0d9488", "#14b8a6"),
-        ("#7c3aed", "#a855f7"),
-        ("#2563eb", "#60a5fa"),
-    ]
-
     for idx, job in enumerate(matched_jobs):
         title = escape(str(job.get("title") or "Software Engineer"))
         raw_company = str(job.get("company_name") or job.get("company") or "CareerShala Partner")
@@ -888,152 +919,105 @@ async def send_job_alert_email(
         job_id = str(job.get("id") or job.get("_id") or "")
         job_url = f"{frontend_url}/jobs?jobId={job_id}" if job_id else f"{frontend_url}/jobs"
 
-        # Company logo resolution: dynamically use employer's company_logo_url
-        raw_logo = (
-            job.get("company_logo_url")
-            or job.get("company_logo")
-            or job.get("logo_url")
-            or job.get("logo")
-        )
-        c_initial = escape(raw_company[:1].upper() if raw_company else "C")
-        c1, c2 = color_palette[abs(hash(raw_company)) % len(color_palette)]
-
-        # Resolve logo to an absolute HTTPS URL if provided by employer
-        logo_url = None
-        if raw_logo:
-            raw_logo_str = str(raw_logo).strip()
-            # Tenant isolation safeguard: If raw_logo points to the platform logo but company is not CareerShala, ignore it
-            if "careershala_logo" in raw_logo_str.lower() and "careershala" not in raw_company.lower():
-                logo_url = None
-            elif raw_logo_str.startswith("http://") or raw_logo_str.startswith("https://"):
-                logo_url = raw_logo_str
-            elif raw_logo_str.startswith("data:image/"):
-                from services.cloudinary_service import upload_base64_company_logo
-                c_id = raw_company.lower().replace(" ", "-") if raw_company else "company"
-                uploaded_url = await upload_base64_company_logo(raw_logo_str, company_id=c_id)
-                if uploaded_url:
-                    logo_url = uploaded_url
-            elif raw_logo_str.startswith("/"):
-                logo_url = f"{frontend_url}/{raw_logo_str.lstrip('/')}"
-            elif "." in raw_logo_str:
-                logo_url = f"{frontend_url}/{raw_logo_str.lstrip('/')}"
-
-        # Template logic: Prioritize image when logo_url exists, fallback to text avatar if missing
-        if logo_url:
-            logo_html = f"""
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 auto;">
-                <tr>
-                    <td style="width:42px;height:42px;text-align:center;vertical-align:middle;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;padding:0;">
-                        <img src="{escape(logo_url)}" alt="{company}" width="40" height="40" style="display:block;margin:0 auto;width:40px;height:40px;border-radius:6px;object-fit:contain;border:0;outline:none;" />
-                    </td>
-                </tr>
-            </table>
-            """
-        else:
-            logo_html = f"""
-            <div style="width:42px;height:42px;border-radius:8px;background:linear-gradient(135deg, {c1} 0%, {c2} 100%);text-align:center;line-height:42px;color:#ffffff;font-size:16px;font-weight:700;">
-                {c_initial}
-            </div>
-            """
-
-        # Metadata badges
-        meta_parts = []
-        if raw_loc and raw_mode and raw_loc.lower() == raw_mode.lower():
-            meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_loc)}</span>')
-        else:
-            if raw_loc:
-                meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_loc)}</span>')
-            if raw_mode:
-                meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_mode)}</span>')
-
+        # Metadata line
+        meta_items = [company]
+        if raw_loc:
+            meta_items.append(raw_loc)
+        if raw_mode and raw_mode.lower() != raw_loc.lower():
+            meta_items.append(raw_mode)
         if salary:
-            meta_parts.append(f'<span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-right:4px;">{salary}</span>')
-
-        meta_line_html = "".join(meta_parts)
+            meta_items.append(f'<span style="color:#047857;font-weight:600;">{salary}</span>')
+        meta_html = " &bull; ".join(meta_items)
 
         # Skills badges HTML
         matched_skills = job.get("matched_skills") or job.get("required_skills") or job.get("skills") or []
         skills_pills = "".join(
-            f'<span style="display:inline-block;padding:3px 8px;margin:2px 4px 2px 0;background-color:#f1f5f9;color:#334155;border-radius:4px;font-size:11px;font-weight:500;">{escape(str(s))}</span>'
+            f'<span style="display:inline-block;padding:2px 7px;margin:2px 4px 2px 0;background-color:#f1f5f9;color:#334155;border-radius:4px;font-size:11px;font-weight:500;">{escape(str(s))}</span>'
             for s in matched_skills[:4]
         )
-
         skills_section = (
-            f'<div style="margin-top:10px;">{skills_pills}</div>'
+            f'<div style="margin-top:6px;">{skills_pills}</div>'
             if skills_pills
             else ""
         )
 
         job_cards_html.append(f"""
-        <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:18px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+        <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:14px 16px;margin-bottom:12px;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                    <td valign="top" style="width:44px;padding-right:12px;">
-                        {logo_html}
-                    </td>
-                    <td valign="top" style="padding-right:10px;">
-                        <a href="{job_url}" target="_blank" style="text-decoration:none;font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;display:inline-block;">
+                    <td valign="top">
+                        <a href="{job_url}" target="_blank" style="text-decoration:none;font-size:15px;font-weight:700;color:#1e40af;line-height:1.3;display:inline-block;">
                             {title}
                         </a>
-                        <div style="font-size:13px;font-weight:500;color:#4b5563;margin-top:2px;">
-                            {company}
+                        <div style="font-size:13px;color:#475569;margin-top:2px;">
+                            {meta_html}
                         </div>
                     </td>
-                    <td valign="top" align="right" style="text-align:right;width:86px;">
-                        <span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">
+                    <td valign="top" align="right" style="text-align:right;white-space:nowrap;padding-left:10px;">
+                        <span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;">
                             {match_score}% Match
                         </span>
                     </td>
                 </tr>
             </table>
-
-            <div style="margin-top:10px;">
-                {meta_line_html}
-            </div>
-
             {skills_section}
-
-            <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                        <td>
-                            <a href="{job_url}" target="_blank" style="display:inline-block;background-color:#4F46E5;color:#ffffff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600;box-shadow:0 1px 2px rgba(79,70,229,0.2);">
-                                View Role &amp; Apply &rarr;
-                            </a>
-                        </td>
-                    </tr>
-                </table>
+            <div style="margin-top:10px;">
+                <a href="{job_url}" target="_blank" style="display:inline-block;color:#4f46e5;text-decoration:none;font-size:12.5px;font-weight:600;">
+                    View Role &amp; Apply &rarr;
+                </a>
             </div>
         </div>
         """)
 
     job_cards_rendered = "\n".join(job_cards_html)
 
-    # 2. Render HTML Email via Jinja2 Template
+    # 4. Render HTML Email via Jinja2 Template
     html_template = _render_template(
         "job_alert.html",
         subject=subject,
         count=count,
         plural_roles=plural_roles,
-        candidate_name=candidate_name or "there",
+        candidate_name=raw_name or "there",
+        first_name=first_name,
+        intro_text=intro_text,
+        skills_text=skills_text,
         job_cards_rendered=job_cards_rendered,
         frontend_url=frontend_url,
         has_resume=has_resume,
     )
 
-    # Plain text alternative
+    # 5. Plain text alternative (Conversational & Engaging)
     text_lines = [
-        f"Hi {candidate_name or 'there'},",
-        f"\nWe found {count} new {plural_roles} matching your profile on CareerShala:\n",
+        f"Hi {first_name},",
+        "",
+        intro_text,
+        "",
     ]
     for j in matched_jobs:
-        text_lines.append(f"- {j.get('title')} at {j.get('company_name')} ({j.get('match_score', 80)}% Match)")
-        text_lines.append(f"  Location: {j.get('location')} ({j.get('work_mode')})")
-        text_lines.append(f"  View: {frontend_url}/jobs\n")
-    text_lines.append(f"View all matches: {frontend_url}/jobs")
+        title = j.get("title", "Role")
+        comp = j.get("company_name", "CareerShala Partner")
+        loc = j.get("location", "Remote")
+        mode = j.get("work_mode", "")
+        score = j.get("match_score", 85)
+        jid = str(j.get("id") or j.get("_id") or "")
+        jurl = f"{frontend_url}/jobs?jobId={jid}" if jid else f"{frontend_url}/jobs"
+
+        loc_str = f"Location: {loc} ({mode})" if mode else f"Location: {loc}"
+        text_lines.append(f"- {title} at {comp} ({score}% Match)")
+        text_lines.append(f"  {loc_str}")
+        if j.get("salary_range") or j.get("salary"):
+            text_lines.append(f"  Salary: {j.get('salary_range') or j.get('salary')}")
+        text_lines.append(f"  View: {jurl}\n")
+
+    text_lines.append(f"Browse all active openings: {frontend_url}/jobs\n")
+    text_lines.append("P.S. - If you want me to look for specific tech stacks or locations, just reply to this email and let me know!\n")
+    text_lines.append("Best regards,\nRohit\nCareerShala")
     plain_text = "\n".join(text_lines)
 
-    # 3. Dispatch via Brevo HTTP API
+    # 6. Dispatch via Brevo HTTP API with Humanized Sender & Reply-To
+    reply_email = getattr(settings, "SUPPORT_EMAIL", "support@careershala.tech") or "support@careershala.tech"
+    sender_email = getattr(settings, "MAIL_FROM_EMAIL", None) or reply_email
+
     email_svc = EmailService()
     brevo_res = await email_svc._send_brevo_email(
         to_email=to_email,
@@ -1041,7 +1025,10 @@ async def send_job_alert_email(
         subject=subject,
         html_body=html_template,
         text_body=plain_text,
-        sender_name="CareerShala Job Alerts",
+        sender_name="Rohit from CareerShala",
+        sender_email=sender_email,
+        reply_to_email=reply_email,
+        reply_to_name="Rohit from CareerShala",
     )
     if brevo_res.get("sent"):
         logger.info("Job alert email dispatched via Brevo", to=to_email, count=count, message_id=brevo_res.get("message_id"))
