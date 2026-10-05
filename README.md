@@ -59,9 +59,11 @@ graph TD
         Brevo[Brevo Transactional Mailer - HTTPS Port 443]
         GmailOAuth[Google Gmail OAuth 2.0 Relay]
         ReportLab[Zero-Network Vector PDF Engine]
+        AzureLogicApps[Azure Logic App Serverless Timers]
     end
 
     ClientLayer --> GatewayLayer
+    AzureLogicApps -->|X-Cron-Secret HTTP POST| GatewayLayer
     GatewayLayer --> Intelligence & Scoring Engines
     GatewayLayer --> Cloud Storage & External Services
 ```
@@ -80,6 +82,8 @@ Every critical subsystem in CareerShala implements a verified **Primary ➔ Fall
 | **🎯 ATS Match Scoring** | Local BGE-M3 (1024-D Multi-Vector) + BGE-Reranker | Google Gemini 2.5 Flash Cloud Vector Embeddings | Deterministic Skill Overlap & Graph Heuristic |
 | **🔒 Distributed Locking** | Distributed Redis Atomic Lock (`SET NX EX`) | MongoDB Atomic Document Lock (`find_one_and_update`) | Fail-safe non-overlapping task abort |
 | **⚡ Embedding Cache** | Redis Embedding Cache (30-day TTL, Int8 Quantization) | Zero-RAM Pass-through Compute | Direct high-throughput batching |
+| **💳 Subscription Activation** | Gateway Verification (`POST /verify`) | Webhook Fallback (`payment.captured` / `order.paid`) | Lazy Request Downgrade Guard (`get_current_user`) |
+| **⏱️ Background Scheduling** | Azure Logic App Cloud Timers (`X-Cron-Secret`) | Admin Webhook Trigger (`/api/v1/*/admin/*`) | Distributed Atomic Lock Abort (`Redis / Mongo`) |
 
 ---
 
@@ -133,6 +137,21 @@ Every critical subsystem in CareerShala implements a verified **Primary ➔ Fall
 ### 8. 🎮 Gamification & Career Quest
 - **28-Day Heatmap Grid**: Visual activity tracking for daily mock interviews, ATS scans, and profile enhancements.
 - **Streaks & XP Levels**: Milestone rewards, daily chest claims, and public candidate leaderboards.
+
+### 9. 💳 Bulletproof SaaS Subscription Lifecycle & Revenue Recovery
+- **Precision Date & Status Tracking**: Explicit `subscription_start_date`, `subscription_end_date`, and `subscription_status` (`active`, `expired`, `cancelled`) persisted on user accounts.
+- **Stackable Early Renewals**: If a user renews before expiration, existing days are preserved and 30 days are appended onto their future `subscription_end_date`.
+- **Failsafe Webhook Activation**: Razorpay `payment.captured` and `order.paid` webhooks act as an automatic backend fallback, provisioning subscriptions even if the user's browser closes before manual `/verify`.
+- **Zero-Lag Lazy Downgrades**: `get_current_user` middleware inspects subscription validity on incoming API requests, performing an atomic MongoDB downgrade to `plan='free'` with immediate in-memory reflection.
+- **Route-Level Plan Guards**: Reusable `require_plan(min_tier)` FastAPI dependency enforcing plan tier access (`free` < `pro` < `premium`) with automatic platform admin bypass.
+- **Hardened Cleanup Sweep**: Daily background cron catches overdue accounts and backfills legacy pre-migration users (`plan_updated_at <= now - 30 days`).
+
+### 10. ⏱️ Serverless Multi-Worker Scheduling (Azure Logic Apps)
+- **Decoupled Cloud Triggers**: Replaced fragile in-process Python thread schedulers with high-availability Azure Logic App Timer Triggers.
+- **Header-Authenticated Webhooks**: Protected via `X-Cron-Secret` header validation against `settings.CRON_SECRET`:
+  - `POST /api/v1/jobs/admin/trigger-alerts`: Automated nightly/hourly candidate job alert matching and Brevo dispatch.
+  - `POST /api/v1/resume/admin/sweep-stuck`: Automated recovery of stuck or orphaned resume parsing jobs.
+  - `POST /api/v1/users/admin/expire-subscriptions`: Automated daily sweep to downgrade expired subscriptions to the free tier.
 
 ---
 
@@ -196,7 +215,7 @@ Resume-Screening-System/
 │   │   └── logging.py                 # Structured JSON logging (structlog)
 │   ├── models/                        # MongoDB Document Models (User, Resume, Job, etc.)
 │   ├── repositories/                  # Clean Architecture Data Access Layer
-│   ├── scheduler/                     # APScheduler cron jobs: job alerts, sync & telemetry
+│   ├── scheduler/                     # Cloud-native scheduled jobs: job alerts, subscription expiry, stuck resume sweep
 │   ├── services/                      # Core Business Logic & Neural Engines
 │   │   ├── scoring_engine.py          # Neural ATS scoring, fresher models & gates
 │   │   ├── document_parser_service.py # 2-Tier Azure DI + pdfplumber document parser
@@ -340,6 +359,9 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
+# ── External Automation & Webhook Cron Security ──
+CRON_SECRET=your_high_entropy_cron_secret_for_azure_logic_apps
+
 # ── File Uploads ──
 MAX_FILE_SIZE_MB=10
 UPLOAD_DIR=./uploads
@@ -391,6 +413,12 @@ Run the comprehensive automated test suite across backend neural scoring engines
 ```bash
 # Run all backend unit and integration tests (397+ tests)
 cd backend && pytest tests/
+
+# Run subscription lifecycle & payment activation tests
+cd backend && pytest tests/test_subscription_lifecycle.py
+
+# Run automated job alerts, stuck resume sweep & webhook auth tests
+cd backend && pytest tests/test_job_alerts.py
 
 # Run specific multi-tenancy and RBAC isolation tests
 cd backend && pytest tests/test_multi_tenancy_and_rbac.py
