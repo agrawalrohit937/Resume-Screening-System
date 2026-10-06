@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 # Add backend to Python path
-BACKEND_DIR = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+BACKEND_DIR = REPO_ROOT / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 from config.db import connect_db, get_database
