@@ -39,9 +39,9 @@ _OTP_DISPATCH = {
 
 def _render_template(filename: str, **context) -> str:
     base_url = settings.FRONTEND_URL.rstrip("/")
-    public_base = "https://careershala.tech" if ("localhost" in base_url or "127.0.0.1" in base_url) else base_url
-    context.setdefault("base_url", base_url)
-    context.setdefault("logo_url", "https://res.cloudinary.com/docxk5qop/image/upload/v1789955361/careerpilot/brand/careershala_logo.png")
+    public_base = "https://www.careershala.tech" if ("localhost" in base_url or "127.0.0.1" in base_url) else base_url
+    context.setdefault("base_url", public_base)
+    context.setdefault("logo_url", f"{public_base}/logo_email.png")
     context.setdefault("support_url", f"{base_url}/support")
     context.setdefault("support_email", getattr(settings, "SUPPORT_EMAIL", "support@careershala.tech") or "support@careershala.tech")
     context.setdefault("careers_email", getattr(settings, "CAREERS_EMAIL", "careers@careershala.tech") or "careers@careershala.tech")
@@ -861,7 +861,8 @@ async def send_job_alert_email(
     if not to_email or not matched_jobs:
         return {"sent": False, "error": "Recipient email and matched jobs are required"}
 
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    raw_frontend = getattr(settings, "FRONTEND_URL", "https://www.careershala.tech").rstrip("/")
+    frontend_url = "https://www.careershala.tech" if ("localhost" in raw_frontend or "127.0.0.1" in raw_frontend) else raw_frontend
 
     # 1. Clean first name extraction & deep personalization
     raw_name = (candidate_name or "").strip()
@@ -869,7 +870,7 @@ async def send_job_alert_email(
     count = len(matched_jobs)
     plural_roles = "roles" if count != 1 else "role"
 
-    # Extract top role and skills for dynamic conversational personalization
+    # Extract top skills & role for real human recruiter personalization
     top_job = matched_jobs[0] if matched_jobs else {}
     top_title = str(top_job.get("title") or "").strip()
 
@@ -882,31 +883,43 @@ async def send_job_alert_email(
     top_skills = skills_collected[:3]
     skills_text = ", ".join(top_skills) if top_skills else None
 
-    # 2. Conversational human Subject Lines (Bypasses Gmail Promotions Tab)
+    # Natural recruiter subject line
     if top_title and has_resume:
-        subject = f"Found some interesting {top_title} roles for you"
+        subject = f"Found {count} {top_title} roles that match your background, {first_name}"
     elif has_resume:
-        subject = f"Thought you might like these openings, {first_name}"
+        subject = f"Handpicked {count} tech roles matching your profile, {first_name}"
     else:
-        subject = f"Are you looking for these tech roles, {first_name}?"
+        subject = f"Thought you might like these {count} open roles, {first_name}"
 
-    # Contextual conversational intro text
+    hero_title = f"{count} handpicked opportunities matching your profile"
+
     if skills_text and has_resume:
-        intro_text = (
-            f"I was reviewing open positions today and found {count} {plural_roles} "
-            f"that line up closely with your experience in {skills_text}:"
+        intro_message = (
+            f"I was reviewing open engineering positions across our hiring partners today and shortlisted "
+            f"<strong>{count} {plural_roles}</strong> that align closely with your experience in "
+            f"<strong>{skills_text}</strong>. Given your background, these teams look like strong potential fits:"
         )
     elif has_resume:
-        intro_text = (
-            f"I was reviewing open positions today and found {count} {plural_roles} "
-            f"that look like a strong match for your background:"
+        intro_message = (
+            f"I reviewed open positions across our partner network this morning and curated "
+            f"<strong>{count} {plural_roles}</strong> that match your background. "
+            f"Thought you might find these worth exploring:"
         )
     else:
-        intro_text = (
-            f"I wanted to share a few trending roles open right now that caught my attention:"
+        intro_message = (
+            f"I wanted to share <strong>{count} trending opportunities</strong> actively hiring right now "
+            f"across our partner network that caught my attention:"
         )
 
-    # 3. Construct Clean, Minimalist Job Cards HTML (1-to-1 letter format)
+    color_palette = [
+        ("#4f46e5", "#6366f1"),
+        ("#0284c7", "#38bdf8"),
+        ("#0d9488", "#14b8a6"),
+        ("#7c3aed", "#a855f7"),
+        ("#2563eb", "#60a5fa"),
+    ]
+
+    # 1. Construct Premium Modern Job Cards HTML with Company Profile Photos
     job_cards_html = []
     for idx, job in enumerate(matched_jobs):
         title = escape(str(job.get("title") or "Software Engineer"))
@@ -919,79 +932,137 @@ async def send_job_alert_email(
         job_id = str(job.get("id") or job.get("_id") or "")
         job_url = f"{frontend_url}/jobs?jobId={job_id}" if job_id else f"{frontend_url}/jobs"
 
-        # Metadata line
-        meta_items = [company]
-        if raw_loc:
-            meta_items.append(raw_loc)
-        if raw_mode and raw_mode.lower() != raw_loc.lower():
-            meta_items.append(raw_mode)
+        # Company logo resolution: dynamically use employer's company_logo_url
+        raw_logo = (
+            job.get("company_logo_url")
+            or job.get("company_logo")
+            or job.get("logo_url")
+            or job.get("logo")
+        )
+        c_initial = escape(raw_company[:1].upper() if raw_company else "C")
+        c1, c2 = color_palette[abs(hash(raw_company)) % len(color_palette)]
+
+        # Resolve logo to an absolute HTTPS URL if provided
+        logo_url = None
+        if raw_logo:
+            raw_logo_str = str(raw_logo).strip()
+            if "careershala_logo" in raw_logo_str.lower() and "careershala" not in raw_company.lower():
+                logo_url = None
+            elif raw_logo_str.startswith("http://") or raw_logo_str.startswith("https://"):
+                logo_url = raw_logo_str
+            elif raw_logo_str.startswith("/"):
+                logo_url = f"{frontend_url}/{raw_logo_str.lstrip('/')}"
+            elif "." in raw_logo_str and not raw_logo_str.startswith("data:"):
+                logo_url = f"{frontend_url}/{raw_logo_str.lstrip('/')}"
+
+        # Template logic: Prioritize image when logo_url exists, fallback to gradient avatar
+        if logo_url:
+            safe_logo_url = str(logo_url).replace('"', '%22')
+            logo_html = f"""
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 auto;">
+                <tr>
+                    <td style="width:42px;height:42px;text-align:center;vertical-align:middle;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;padding:0;">
+                        <img src="{safe_logo_url}" alt="{c_initial}" width="40" height="40" style="display:block;margin:0 auto;width:40px;height:40px;border-radius:6px;object-fit:contain;border:0;outline:none;" />
+                    </td>
+                </tr>
+            </table>
+            """
+        else:
+            logo_html = f"""
+            <div style="width:42px;height:42px;border-radius:8px;background:linear-gradient(135deg, {c1} 0%, {c2} 100%);text-align:center;line-height:42px;color:#ffffff;font-size:16px;font-weight:700;">
+                {c_initial}
+            </div>
+            """
+
+        # Metadata badges
+        meta_parts = []
+        if raw_loc and raw_mode and raw_loc.lower() == raw_mode.lower():
+            meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_loc)}</span>')
+        else:
+            if raw_loc:
+                meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_loc)}</span>')
+            if raw_mode:
+                meta_parts.append(f'<span style="display:inline-block;background-color:#f8fafc;border:1px solid #e2e8f0;color:#475569;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px;">{escape(raw_mode)}</span>')
         if salary:
-            meta_items.append(f'<span style="color:#047857;font-weight:600;">{salary}</span>')
-        meta_html = " &bull; ".join(meta_items)
+            meta_parts.append(f'<span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-right:4px;">{salary}</span>')
+        meta_line_html = "".join(meta_parts)
 
         # Skills badges HTML
         matched_skills = job.get("matched_skills") or job.get("required_skills") or job.get("skills") or []
         skills_pills = "".join(
-            f'<span style="display:inline-block;padding:2px 7px;margin:2px 4px 2px 0;background-color:#f1f5f9;color:#334155;border-radius:4px;font-size:11px;font-weight:500;">{escape(str(s))}</span>'
+            f'<span style="display:inline-block;padding:3px 8px;margin:2px 4px 2px 0;background-color:#f1f5f9;color:#334155;border-radius:4px;font-size:11px;font-weight:500;">{escape(str(s))}</span>'
             for s in matched_skills[:4]
         )
         skills_section = (
-            f'<div style="margin-top:6px;">{skills_pills}</div>'
+            f'<div style="margin-top:10px;">{skills_pills}</div>'
             if skills_pills
             else ""
         )
 
         job_cards_html.append(f"""
-        <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:14px 16px;margin-bottom:12px;">
+        <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:18px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,0.03);">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                    <td valign="top">
-                        <a href="{job_url}" target="_blank" style="text-decoration:none;font-size:15px;font-weight:700;color:#1e40af;line-height:1.3;display:inline-block;">
+                    <td valign="top" style="width:44px;padding-right:12px;">
+                        {logo_html}
+                    </td>
+                    <td valign="top" style="padding-right:10px;">
+                        <a href="{job_url}" target="_blank" style="text-decoration:none;font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;display:inline-block;">
                             {title}
                         </a>
-                        <div style="font-size:13px;color:#475569;margin-top:2px;">
-                            {meta_html}
+                        <div style="font-size:13px;font-weight:500;color:#4b5563;margin-top:2px;">
+                            {company}
                         </div>
                     </td>
-                    <td valign="top" align="right" style="text-align:right;white-space:nowrap;padding-left:10px;">
-                        <span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;">
+                    <td valign="top" align="right" style="text-align:right;width:86px;">
+                        <span style="display:inline-block;background-color:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">
                             {match_score}% Match
                         </span>
                     </td>
                 </tr>
             </table>
-            {skills_section}
+
             <div style="margin-top:10px;">
-                <a href="{job_url}" target="_blank" style="display:inline-block;color:#4f46e5;text-decoration:none;font-size:12.5px;font-weight:600;">
-                    View Role &amp; Apply &rarr;
-                </a>
+                {meta_line_html}
+            </div>
+
+            {skills_section}
+
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td>
+                            <a href="{job_url}" target="_blank" style="display:inline-block;background-color:#4F46E5;color:#ffffff;text-decoration:none;padding:9px 18px;border-radius:6px;font-size:12px;font-weight:600;box-shadow:0 1px 2px rgba(79,70,229,0.2);">
+                                View Role &amp; Apply &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
         """)
 
     job_cards_rendered = "\n".join(job_cards_html)
 
-    # 4. Render HTML Email via Jinja2 Template
+    # 2. Render HTML Email via Jinja2 Template
     html_template = _render_template(
         "job_alert.html",
         subject=subject,
+        hero_title=hero_title,
+        intro_message=intro_message,
         count=count,
         plural_roles=plural_roles,
         candidate_name=raw_name or "there",
         first_name=first_name,
-        intro_text=intro_text,
-        skills_text=skills_text,
         job_cards_rendered=job_cards_rendered,
-        frontend_url=frontend_url,
-        has_resume=has_resume,
+        base_url=frontend_url,
     )
 
-    # 5. Plain text alternative (Conversational & Engaging)
+    # 3. Plain text alternative (Conversational & Personal)
     text_lines = [
         f"Hi {first_name},",
         "",
-        intro_text,
-        "",
+        f"I reviewed open positions across our network and shortlisted {count} {plural_roles} that match your profile:\n",
     ]
     for j in matched_jobs:
         title = j.get("title", "Role")
@@ -1007,14 +1078,14 @@ async def send_job_alert_email(
         text_lines.append(f"  {loc_str}")
         if j.get("salary_range") or j.get("salary"):
             text_lines.append(f"  Salary: {j.get('salary_range') or j.get('salary')}")
-        text_lines.append(f"  View: {jurl}\n")
+        text_lines.append(f"  View & Apply: {jurl}\n")
 
     text_lines.append(f"Browse all active openings: {frontend_url}/jobs\n")
-    text_lines.append("P.S. - If you want me to look for specific tech stacks or locations, just reply to this email and let me know!\n")
-    text_lines.append("Best regards,\nRohit\nCareerShala")
+    text_lines.append("P.S. — Looking for specific tech stacks or locations? Just reply directly to this email and let me know!\n")
+    text_lines.append("Best regards,\nRohit Agrawal\nTalent Intelligence • CareerShala")
     plain_text = "\n".join(text_lines)
 
-    # 6. Dispatch via Brevo HTTP API with Humanized Sender & Reply-To
+    # 4. Dispatch via Brevo HTTP API
     reply_email = getattr(settings, "SUPPORT_EMAIL", "support@careershala.tech") or "support@careershala.tech"
     sender_email = getattr(settings, "MAIL_FROM_EMAIL", None) or reply_email
 
