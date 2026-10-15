@@ -14,8 +14,16 @@ logger = structlog.get_logger(__name__)
 JSEARCH_URL = "https://jsearch.p.rapidapi.com/search-v2"
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
 
-# Target search queries for high-demand tech roles across India
+# Target search queries for high-demand tech roles across India, heavily prioritizing Freshers & Entry-Level candidates
 SEARCH_QUERIES = [
+    # Dedicated Fresher & Entry-Level Tech Queries
+    "Fresher Software Engineer in India",
+    "Junior Frontend Developer React Fresher in India",
+    "Graduate Trainee Engineer Software in India",
+    "Entry Level Python Backend Developer Fresher in India",
+    "AI Machine Learning Intern Fresher in India",
+    "Junior Web Developer Fresher in India",
+    # Core Tech Roles
     "Software Engineer in India",
     "Frontend Developer React in India",
     "Backend Developer Python Node Java in India",
@@ -63,13 +71,6 @@ def resolve_best_apply_url(external_job: Dict[str, Any]) -> Tuple[str, str]:
 
 async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dict[str, int]:
     """Fetch fresh JSearch results (LinkedIn & Naukri prioritized) and upsert them by provider job_id."""
-    # 1. Clean up stale external jobs older than 3 days first
-    try:
-        from services.job_cleanup_service import cleanup_stale_external_jobs
-        await cleanup_stale_external_jobs(db, max_age_days=3)
-    except Exception as exc:
-        logger.warning("Pre-scrape stale job cleanup encountered an issue", error=str(exc))
-
     api_key = os.getenv("RAPIDAPI_KEY", "").strip()
     if not api_key:
         logger.warning("Skipping external job scrape because RAPIDAPI_KEY is not configured")
@@ -96,13 +97,16 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
 
     async with httpx.AsyncClient(timeout=45.0) as client:
         for q in queries_to_run:
+            is_fresher_query = any(k in q.lower() for k in ["fresher", "junior", "trainee", "entry", "intern", "0-1"])
             params = {
                 "query": q,
-                "date_posted": "3days",  # Only fetch fresh, actively open listings posted within the last 72 hours
+                "date_posted": "week",  # Fetch actively open listings posted within the last 7 days
                 "employment_types": "FULLTIME,INTERN",
                 "page": 1,
                 "num_pages": 1,
             }
+            if is_fresher_query:
+                params["job_requirements"] = "under_3_years_experience"
 
             try:
                 response = await client.get(JSEARCH_URL, headers=headers, params=params)
@@ -141,10 +145,33 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
                     total_skipped += 1
                     continue
 
-                # Parse experience requirements
+                # Parse experience requirements accurately
+                title = external_job.get("job_title") or "Software Engineer"
+                jd_text = external_job.get("job_description") or ""
+                title_lower = title.lower()
+
                 exp_data = external_job.get("job_required_experience") or {}
                 min_months = exp_data.get("required_experience_in_months")
-                min_years = round(min_months / 12.0, 1) if min_months else 0.0
+
+                if any(k in title_lower for k in ["lead", "principal", "architect", "staff", "manager", "director", "head"]):
+                    min_years = 7.0
+                elif any(k in title_lower for k in ["senior", "sr.", "sr ", "iii", "iv", "tech lead"]):
+                    min_years = 5.0
+                elif any(k in title_lower for k in ["junior", "jr.", "jr ", "entry", "intern", "trainee", "fresher", "graduate"]):
+                    min_years = 0.0
+                elif min_months:
+                    min_years = round(min_months / 12.0, 1)
+                else:
+                    from utils.nlp_utils import extract_years_of_experience
+                    extracted_exp = extract_years_of_experience(jd_text)
+                    if extracted_exp > 0:
+                        min_years = extracted_exp
+                    elif any(k in jd_text.lower() for k in ["no experience", "freshers welcome", "0-1 year", "fresher", "entry level", "college graduate"]):
+                        min_years = 0.0
+                    elif is_fresher_query:
+                        min_years = 0.0
+                    else:
+                        min_years = 2.0
 
                 # Parse salary if available
                 min_sal = external_job.get("job_min_salary")
@@ -216,6 +243,15 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
                 total_upserted += 1
 
     logger.info("External job scrape completed", fetched=total_fetched, upserted=total_upserted, skipped=total_skipped)
+
+    # Safely clean up truly stale external jobs (older than 5 days) ONLY AFTER fresh jobs are upserted
+    if total_upserted > 0:
+        try:
+            from services.job_cleanup_service import cleanup_stale_external_jobs
+            await cleanup_stale_external_jobs(db, max_age_days=5)
+        except Exception as exc:
+            logger.warning("Post-scrape stale job cleanup encountered an issue", error=str(exc))
+
     return {"fetched": total_fetched, "upserted": total_upserted, "skipped": total_skipped}
 
 

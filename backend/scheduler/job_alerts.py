@@ -174,16 +174,24 @@ async def run_nightly_job_alerts(
         timestamp=now_utc.isoformat(),
     )
 
-    # 2. Clean up stale/closed external jobs older than 3 days before candidate matching
+    # 2. Clean up stale/closed external jobs older than 5 days before candidate matching
     try:
         from services.job_cleanup_service import cleanup_stale_external_jobs
-        await cleanup_stale_external_jobs(db, max_age_days=3)
+        await cleanup_stale_external_jobs(db, max_age_days=5)
     except Exception as exc:
         logger.warning("Pre-digest stale job cleanup encountered an issue", error=str(exc))
 
-    # 3. Cost Optimization: Verify open jobs exist before looping through all candidates
+    # 3. Ensure active jobs exist (auto-scrape fresh jobs if jobs are zero)
     try:
         open_jobs_count = await db.jobs.count_documents({"status": {"$in": ["open", "published"]}})
+        if open_jobs_count == 0:
+            logger.info("No active open jobs in database, attempting external job scrape")
+            try:
+                await run_external_job_scrape()
+                open_jobs_count = await db.jobs.count_documents({"status": {"$in": ["open", "published"]}})
+            except Exception as s_err:
+                logger.warning("Scrape during alert cycle failed", error=str(s_err))
+
         if open_jobs_count == 0:
             logger.info("No active open jobs in database; skipping job alerts retention loop.")
             # Record skipped batch

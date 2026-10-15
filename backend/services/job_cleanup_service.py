@@ -29,10 +29,10 @@ def _get_jobs_collection(db: Any) -> Any:
 
 async def cleanup_stale_external_jobs(
     db: Any,
-    max_age_days: int = 3,
+    max_age_days: int = 5,
 ) -> Dict[str, Any]:
     """
-    Hard-deletes external job listings older than `max_age_days` (default 3 days / 72 hours).
+    Hard-deletes external job listings older than `max_age_days` (default 5 days).
 
     Safety Guarantees:
     1. Strictly targets documents where `is_external` is True (or truthy string/int).

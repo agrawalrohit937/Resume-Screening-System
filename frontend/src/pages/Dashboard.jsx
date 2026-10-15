@@ -171,25 +171,25 @@ export default function Dashboard() {
   const openCopilot = () => window.dispatchEvent(new Event('careershala:open-copilot'))
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full space-y-8 font-sans pb-24 text-slate-800 antialiased">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full space-y-4 sm:space-y-6 lg:space-y-8 font-sans pb-6 sm:pb-12 text-slate-800 antialiased">
       
       {/* ── 1. Hero / Candidate Command Center ────────────────────────────── */}
       <motion.div initial={{ y: 15 }} animate={{ y: 0 }} transition={{ type: "spring", duration: 0.6 }}>
-        <div className="bg-white rounded-3xl p-6 sm:p-8 md:p-10 relative overflow-hidden shadow-xs border border-slate-200/90 flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 md:p-10 relative overflow-hidden shadow-xs border border-slate-200/90 flex flex-col lg:flex-row items-center justify-between gap-4 sm:gap-6 lg:gap-8">
           
           {/* Subtle Ambient Background */}
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/40 pointer-events-none" />
           <div className="hidden sm:block absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
           {/* Left: Candidate Standing Info */}
-          <div className="relative z-10 text-center lg:text-left flex-1 space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60 shadow-2xs">
+          <div className="relative z-10 text-center lg:text-left flex-1 space-y-3 sm:space-y-4">
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] sm:text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
               CareerShala Copilot Active
             </div>
 
-            <div className="space-y-1.5">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            <div className="space-y-1 sm:space-y-1.5">
+              <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Welcome back, <span className="text-indigo-600">{firstName}</span>.
               </h1>
               <p className="text-slate-600 font-medium text-xs sm:text-sm max-w-xl leading-relaxed">
@@ -203,32 +203,32 @@ export default function Dashboard() {
             </div>
 
             {/* Quick Action CTAs */}
-            <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3">
+            <div className="pt-1 sm:pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-2 sm:gap-3">
               <button 
                 onClick={openCopilot} 
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow transition-all flex items-center gap-2 cursor-pointer"
+                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
               >
-                <Sparkles size={16} /> Ask AI Copilot
+                <Sparkles size={15} /> Ask AI Copilot
               </button>
               <button 
                 onClick={() => navigate('/results')} 
-                className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-2 cursor-pointer"
+                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
               >
-                <FileText size={16} className="text-indigo-600" /> Run ATS Resume Scan
+                <FileText size={15} className="text-indigo-600" /> Run ATS Resume Scan
               </button>
               <button 
                 onClick={() => navigate('/live-interview')} 
-                className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-2 cursor-pointer"
+                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
               >
-                <Video size={16} className="text-purple-600" /> Practice Mock Interview
+                <Video size={15} className="text-purple-600" /> Practice Mock Interview
               </button>
             </div>
           </div>
 
           {/* Right: Large Prominent Career Score Circle & Sleek Trophy Pill */}
-          <div className="relative z-10 flex flex-col items-center gap-3 shrink-0">
+          <div className="relative z-10 flex flex-col items-center gap-2 sm:gap-3 shrink-0">
             {/* Large Prominent Career Score Circle */}
-            <div className="relative w-44 h-44 sm:w-48 sm:h-48 md:w-52 md:h-52 bg-white rounded-full shadow-[0_12px_36px_rgba(79,70,229,0.12)] border border-slate-100 flex items-center justify-center p-3">
+            <div className="relative w-32 h-32 sm:w-44 sm:h-44 md:w-52 md:h-52 bg-white rounded-full shadow-[0_12px_36px_rgba(79,70,229,0.12)] border border-slate-100 flex items-center justify-center p-2 sm:p-3">
               {(() => {
                 const clampedScore = Math.max(0, Math.min(100, Number(readiness) || 0))
                 const radius = 45
@@ -266,10 +266,10 @@ export default function Dashboard() {
                 )
               })()}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2 text-center">
-                <span className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 font-display tracking-tight leading-none">
-                  {readiness}<span className="text-2xl sm:text-3xl text-indigo-600 font-extrabold">%</span>
+                <span className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 font-display tracking-tight leading-none">
+                  {readiness}<span className="text-xl sm:text-3xl text-indigo-600 font-extrabold">%</span>
                 </span>
-                <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-slate-400 mt-1.5 whitespace-nowrap select-none">
+                <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-slate-400 mt-1 whitespace-nowrap select-none">
                   Career Score
                 </span>
               </div>
@@ -288,7 +288,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── 2. KPI Metrics Grid ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
         <StatBox 
           label="Best ATS Match" 
           value={`${atsStrength}%`} 
@@ -335,10 +335,10 @@ export default function Dashboard() {
           subtitle="Consolidated high-impact improvements to boost your interview callback rate" 
         />
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
 
           {/* Action 1: Resume Keyword Gaps */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-3 sm:space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
@@ -389,7 +389,7 @@ export default function Dashboard() {
           </div>
 
           {/* Action 2: Mock Interview & Excellence Certificate */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-3 sm:space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
@@ -446,7 +446,7 @@ export default function Dashboard() {
           </div>
 
           {/* Action 3: Profile & Portfolio Strength */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-4">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-3 sm:space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
@@ -500,7 +500,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── 5. Analytics & History: Score Trend & Activity Timeline ──────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start">
         
         {/* Genuine Candidate Verified Skills & GitHub Projects Showcase */}
         <motion.div initial={{ opacity: 0, y: 15 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -509,7 +509,7 @@ export default function Dashboard() {
             subtitle="Skills and project repositories extracted directly from your resume & GitHub"
             action={<Link to="/github" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">Analyze GitHub</Link>}
           />
-          <Card className="p-6 space-y-5">
+          <Card className="p-4 sm:p-6 space-y-3.5 sm:space-y-5">
             {/* Top: GitHub & Project Workspace Connection Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -612,7 +612,7 @@ export default function Dashboard() {
             subtitle="Recent applications, evaluations, and mock sessions"
             action={<Link to="/analytics" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">View All</Link>}
           />
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             {activityList.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mb-2 border border-slate-200">

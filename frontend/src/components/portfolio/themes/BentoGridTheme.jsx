@@ -94,7 +94,7 @@ export default function BentoGridTheme({
   }, [typedText, isDeleting, roleIdx, typingWords]);
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] text-slate-900 font-sans selection:bg-amber-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#f1f5f9] text-slate-900 font-sans selection:bg-amber-500 selection:text-white relative overflow-x-hidden">
       
       {/* --- Ambient Background Glows --- */}
       <div className="fixed top-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-amber-400/20 blur-[120px] pointer-events-none" />

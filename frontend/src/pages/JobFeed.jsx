@@ -64,10 +64,28 @@ export const resolveJobLogo = (job) => {
 const normalizeJob = (job) => {
   const source = job || {}
   const rawId = source.id || source._id || `job_${Math.random().toString(36).substr(2, 9)}`
+  const title = source.title || source.job_title || 'Untitled role'
+  const titleLower = title.toLowerCase()
+
+  let minYears = Number(source.min_years ?? 0)
+  if (minYears === 0) {
+    if (/(lead|principal|architect|staff|manager|director|vp|head\b)/i.test(titleLower)) {
+      minYears = 7
+    } else if (/(senior|sr\.|sr\b|iii|iv|tech\s*lead)/i.test(titleLower)) {
+      minYears = 5
+    } else if (/(mid|intermediate|ii\b)/i.test(titleLower)) {
+      minYears = 2
+    } else if (/(junior|jr\.|jr\b|entry|intern|trainee|fresher|graduate)/i.test(titleLower)) {
+      minYears = 0
+    } else {
+      minYears = 2
+    }
+  }
+
   return {
     ...source,
     id: typeof rawId === 'object' && rawId.$oid ? rawId.$oid : String(rawId),
-    title: source.title || source.job_title || 'Untitled role',
+    title,
     company_name: source.company_name || source.employer_name || 'Unknown company',
     location: source.location || source.job_city || 'Remote',
     work_mode: source.work_mode || 'Remote',
@@ -78,7 +96,7 @@ const normalizeJob = (job) => {
     publisher_source: source.publisher_source || (source.external_apply_url?.includes('linkedin.com') ? 'LinkedIn' : source.external_apply_url?.includes('naukri.com') ? 'Naukri' : 'Direct'),
     required_skills: Array.isArray(source.required_skills) ? source.required_skills : [],
     applicant_count: Number(source.applicant_count || 0),
-    min_years: Number(source.min_years || 0),
+    min_years: minYears,
     status: source.status || 'open',
   }
 }
@@ -1672,7 +1690,7 @@ export function JobCard({
   onShare,
 }) {
   const safeJob = normalizeJob(job)
-  const isFresher = safeJob.min_years === 0 || safeJob.min_years <= 1
+  const isFresher = safeJob.min_years === 0
   const logoUrl = resolveJobLogo(safeJob)
   const companySite = getCompanyWebsiteUrl(safeJob)
   const hasApplied = Boolean(job?.has_applied ?? isApplied)
@@ -1761,7 +1779,7 @@ export function JobCard({
         {/* Experience Pill */}
         <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/60 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-700">
           <User size={11} className="text-slate-400 shrink-0" />
-          <span>{job.min_years === 0 ? 'Fresher (0–1 Yr)' : `${job.min_years}+ Yrs Exp`}</span>
+          <span>{safeJob.min_years === 0 ? 'Fresher (0–1 Yr)' : `${safeJob.min_years}+ Yrs Exp`}</span>
         </span>
 
         {/* Location Pill */}

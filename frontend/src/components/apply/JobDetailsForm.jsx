@@ -1,4 +1,4 @@
-import { Loader2, Sparkles, ScanSearch } from 'lucide-react';
+import { Loader2, Sparkles, ScanSearch, Clipboard } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function JobDetailsForm({ values, setValues, extracting, onSubmit, onCheckATS, isSubmitting }) {
@@ -12,6 +12,28 @@ export default function JobDetailsForm({ values, setValues, extracting, onSubmit
   const handleChange = (field) => (e) => {
     if (typeof setValues === 'function') {
       setValues((prev) => ({ ...(prev || {}), [field]: e.target.value }));
+    }
+  };
+
+  const handlePasteJD = async (e) => {
+    e.preventDefault();
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          const emailMatch = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
+          setValues((prev) => ({
+            ...(prev || {}),
+            hr_email: (prev && prev.hr_email) ? prev.hr_email : (emailMatch ? emailMatch[0] : ''),
+            job_description: text
+          }));
+          toast.success('Job description pasted! 📋✨');
+          return;
+        }
+      }
+      toast.error('No text found in clipboard. Copy job description first.');
+    } catch (err) {
+      toast.error('Clipboard permission blocked. Please paste directly into the box.');
     }
   };
 
@@ -123,9 +145,19 @@ export default function JobDetailsForm({ values, setValues, extracting, onSubmit
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
-              Job Description *
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                Job Description *
+              </label>
+              <button
+                type="button"
+                onClick={handlePasteJD}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 px-2.5 py-0.5 rounded-lg border border-indigo-200 transition-colors shadow-2xs cursor-pointer"
+              >
+                <Clipboard size={12} className="text-indigo-600" />
+                <span>Paste JD</span>
+              </button>
+            </div>
             <textarea
               required
               rows={7}

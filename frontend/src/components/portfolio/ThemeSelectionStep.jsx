@@ -445,16 +445,16 @@ export default function ThemeSelectionStep({
               </div>
 
               {/* Live Render Viewport (Device frame scaled, crystal-sharp scrollable) */}
-              <div className="flex-1 bg-slate-950 overflow-y-auto flex justify-center p-2 sm:p-3">
+              <div className="flex-1 min-h-0 bg-slate-950 flex justify-center p-2 sm:p-3 overflow-hidden">
                 <div
-                  className={`w-full transition-all duration-200 overflow-y-auto bg-white rounded-xl shadow-2xl ${
+                  className={`w-full h-full transition-all duration-200 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-2xl relative ${
                     deviceView === 'desktop'
                       ? 'max-w-full'
                       : deviceView === 'tablet'
                       ? 'max-w-2xl border-4 border-slate-700'
                       : 'max-w-sm border-8 border-slate-700 rounded-[32px]'
                   }`}
-                  style={{ height: '100%' }}
+                  style={{ isolation: 'isolate' }}
                 >
                   {renderThemePreview()}
                 </div>
