@@ -24,6 +24,24 @@
 
 ---
 
+## ⚡ Quick Evaluation Fast-Track (For Recruiters & Evaluators)
+
+Want to evaluate the project locally with **zero configuration friction**? Follow these quick steps:
+
+### 🔑 Pre-Seeded Demo Accounts
+No need to register! Run `python scripts/seed_demo_data.py` in `backend/` to instantly unlock:
+
+| Role | Demo Email | Password | Features Unlocked |
+| :--- | :--- | :--- | :--- |
+| **Candidate** | `candidate@careershala.com` | `Candidate123!` | ATS resume score, radar charts, live mock interview, portfolio studio |
+| **Recruiter / HR** | `recruiter@careershala.com` | `Recruiter123!` | Multi-tenant ATS, Kanban hiring pipeline, requisitions, scorecard rubrics |
+| **Platform Admin** | `admin@careershala.com` | `Admin123!` | Tenant management, system health, telemetry drift, ontology controls |
+
+> [!TIP]
+> **Zero-Dependency Resilience**: The platform includes 2-tier graceful fallbacks. If external Groq/Gemini API keys or Brevo mail keys are omitted, the application automatically uses local neural heuristics and mock templates without crashing.
+
+---
+
 ## 📖 System Architecture & Overview
 
 CareerShala is architected as an ultra-responsive decoupled Single-Page Application (SPA) backed by asynchronous, resilient Python microservices:
@@ -258,15 +276,28 @@ Resume-Screening-System/
 ### Prerequisites
 - **Node.js** `v18.x` or higher
 - **Python** `3.10` or higher
-- **MongoDB** instance running locally (`mongodb://localhost:27017`) or a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster URI
+- **MongoDB** instance running locally (`mongodb://localhost:27017`), via Docker, or a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster URI
 
 ---
 
-### Step 1: Clone the Repository
+### ⚡ 1-Click Launcher (Fastest Way)
+
+Once you've cloned the repository and installed dependencies:
+- **Windows**: Double-click `run_dev.bat` (or run in CMD / PowerShell)
+- **Linux / macOS**: Run `chmod +x run_dev.sh && ./run_dev.sh`
+
+*(The launcher automatically verifies `.env` configurations and boots up both the FastAPI backend and Vite frontend).*
+
+---
+
+### Step 1: Clone the Repository & Start Database
 
 ```bash
 git clone https://github.com/agrawalrohit937/Resume-Screening-System.git
 cd Resume-Screening-System
+
+# Optional: Spin up local MongoDB & Redis in Docker with 1 command
+docker compose up -d
 ```
 
 ---
@@ -298,9 +329,14 @@ cd Resume-Screening-System
    ```bash
    cp .env.example .env
    ```
-   *(Configure your database and API keys as described in the Environment Variables section).*
+   *(Only `MONGO_URI` is required. The system includes built-in fallbacks for all external services).*
 
-5. Start the FastAPI development server:
+5. Seed demo accounts & sample jobs (Optional but Recommended):
+   ```bash
+   python scripts/seed_demo_data.py
+   ```
+
+6. Start the FastAPI development server:
    ```bash
    # Windows (PowerShell)
    $env:PYTHONPATH="."
@@ -331,6 +367,7 @@ cd Resume-Screening-System
    npm run dev
    ```
    - **Local Web App**: `http://localhost:5173`
+   *(In local dev, Vite automatically proxies all `/api/v1` traffic to `http://127.0.0.1:8000`).*
 
 ---
 
