@@ -59,20 +59,29 @@ export default function MobileBottomNav({ onMenuToggle }) {
             <NavLink
               key={item.to}
               to={item.to}
-              className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all duration-200 select-none touch-manipulation ${
+              className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all duration-200 select-none touch-manipulation relative group ${
                 isActive
                   ? 'text-[#2E9BDA] font-bold'
                   : 'text-slate-500 hover:text-slate-700 font-medium'
               }`}
             >
-              <div className={`p-1 rounded-xl transition-all duration-200 ${
-                isActive ? 'bg-[#2E9BDA]/10 text-[#2E9BDA] scale-105' : 'text-slate-500'
+              <div className={`p-1.5 rounded-xl transition-all duration-200 ${
+                isActive ? 'bg-[#2E9BDA]/12 text-[#2E9BDA] scale-105 shadow-xs shadow-[#2E9BDA]/20' : 'text-slate-500'
               }`}>
                 <Icon className="w-5 h-5" strokeWidth={isActive ? 2.3 : 1.8} />
               </div>
               <span className="text-[10px] mt-0.5 tracking-tight leading-none truncate max-w-[62px]">
                 {item.label}
               </span>
+              
+              {/* Active Underline Indicator Bar */}
+              <span
+                className={`w-8 h-[3px] rounded-full mt-1.5 transition-all duration-300 ${
+                  isActive
+                    ? 'bg-[#2E9BDA] shadow-[0_1px_8px_rgba(46,155,218,0.85)] scale-100 opacity-100'
+                    : 'bg-transparent scale-0 opacity-0'
+                }`}
+              />
             </NavLink>
           )
         })}
@@ -84,12 +93,13 @@ export default function MobileBottomNav({ onMenuToggle }) {
           className="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl text-slate-500 hover:text-slate-800 transition-all duration-200 select-none touch-manipulation cursor-pointer"
           aria-label="Open full menu"
         >
-          <div className="p-1 rounded-xl text-slate-500">
+          <div className="p-1.5 rounded-xl text-slate-500">
             <Menu className="w-5 h-5" strokeWidth={1.8} />
           </div>
           <span className="text-[10px] mt-0.5 font-medium tracking-tight leading-none text-slate-500">
             More
           </span>
+          <span className="w-8 h-[3px] rounded-full mt-1.5 bg-transparent" />
         </button>
       </div>
     </nav>

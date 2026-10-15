@@ -13,15 +13,15 @@ const StatBox = memo(function StatBox({ label, value, pct, icon: Icon, colorThem
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay, type: "spring" }}>
-      <Card hover className="p-5 h-full flex flex-col justify-between group">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${theme.bg} ${theme.text} transition-transform group-hover:scale-110`}>
-            <Icon size={22} strokeWidth={2.5} />
+      <Card hover className="p-3.5 sm:p-5 h-full flex flex-col justify-between group">
+        <div className="flex items-start justify-between mb-2 sm:mb-4">
+          <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center ${theme.bg} ${theme.text} transition-transform group-hover:scale-110`}>
+            <Icon size={18} className="sm:w-[22px] sm:h-[22px]" strokeWidth={2.5} />
           </div>
         </div>
         <div>
-          <p className="text-3xl font-black text-slate-900 font-display tracking-tight">{value}</p>
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 mt-1 mb-3">{label}</p>
+          <p className="text-2xl sm:text-3xl font-black text-slate-900 font-display tracking-tight">{value}</p>
+          <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mt-0.5 sm:mt-1 mb-2 sm:mb-3 truncate">{label}</p>
           <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
              <motion.div 
                initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, delay: delay + 0.2 }}

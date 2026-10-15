@@ -401,6 +401,12 @@ async def list_jobs(
             )
             docs = await stream_cursor(fallback_cursor)
             total = len(docs)
+        else:
+            try:
+                from scheduler.job_alerts import run_external_job_scrape
+                asyncio.create_task(run_external_job_scrape())
+            except Exception as e:
+                logger.warning("Could not auto-trigger background job scrape", error=str(e))
 
     # Strictly calculate has_applied by querying db.applications
     applied_job_ids = set()

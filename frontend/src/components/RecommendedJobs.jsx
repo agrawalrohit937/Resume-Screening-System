@@ -78,11 +78,11 @@ export default function RecommendedJobs() {
   // ── Pre-fetch CTA: BGE never runs until the user clicks this ────────────
   if (!fetched) {
     return (
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-              <Sparkles size={22} />
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-7 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="flex items-start gap-3 sm:gap-3.5">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <Sparkles size={20} className="sm:w-[22px] sm:h-[22px]" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -104,7 +104,7 @@ export default function RecommendedJobs() {
           <button
             type="button"
             onClick={fetchRecommendations}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm transition shrink-0 cursor-pointer whitespace-nowrap"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm transition shrink-0 cursor-pointer whitespace-nowrap"
           >
             <Sparkles size={14} />
             Find My Matches
@@ -117,11 +117,11 @@ export default function RecommendedJobs() {
   // Fallback: Candidate has not uploaded/parsed a resume yet
   if (!loading && !hasResume) {
     return (
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-              <Sparkles size={22} />
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-7 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="flex items-start gap-3 sm:gap-3.5">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <Sparkles size={20} className="sm:w-[22px] sm:h-[22px]" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">

@@ -15,7 +15,7 @@
 
 ## 🌟 Live Demo & Quick Links
 
-- 🌐 **Production Web Application**: [CareerShala Web App](https://resume-screening-system-lyart.vercel.app)
+- 🌐 **Production Web Application**: [CareerShala Web App](https://www.careershala.tech)
 - ⚙️ **Interactive OpenAPI Swagger Docs**: `http://localhost:8000/docs`
 - 📚 **Alternative ReDoc API Specs**: `http://localhost:8000/redoc`
 - 📜 **Public Skill Certificate Verification**: `/verify/:certificateId`

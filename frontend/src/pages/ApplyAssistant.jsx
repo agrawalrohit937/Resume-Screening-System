@@ -425,6 +425,14 @@ export default function ApplyAssistant() {
                               setExtractingDetails(false);
                             }}
                             onExtractError={() => setExtractingDetails(false)}
+                            onTextPasted={(pastedText) => {
+                              const emailMatch = pastedText.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
+                              setFormValues((prev) => ({
+                                ...prev,
+                                hr_email: prev.hr_email || (emailMatch ? emailMatch[0] : ''),
+                                job_description: pastedText
+                              }));
+                            }}
                           />
                         </div>
                       </div>

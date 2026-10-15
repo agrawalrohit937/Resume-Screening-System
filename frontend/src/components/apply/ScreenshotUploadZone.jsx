@@ -4,21 +4,10 @@ import toast from 'react-hot-toast';
 import { Sparkles, UploadCloud, Image as ImageIcon, Loader2, CheckCircle2, X, Clipboard } from 'lucide-react';
 import { applyAssistantApi } from '../../services/applyAssistantApi';
 
-export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess, onExtractError }) {
+export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess, onExtractError, onTextPasted }) {
   const [extracting, setExtracting] = useState(false);
   const [previews, setPreviews] = useState([]);
   const [extractedSuccess, setExtractedSuccess] = useState(false);
-  const [canPasteClipboard, setCanPasteClipboard] = useState(false);
-
-  useEffect(() => {
-    if (
-      typeof navigator !== 'undefined' &&
-      navigator.clipboard &&
-      typeof navigator.clipboard.read === 'function'
-    ) {
-      setCanPasteClipboard(true);
-    }
-  }, []);
 
   const processFiles = useCallback(
     async (files) => {
@@ -93,7 +82,7 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
     multiple: true,
   });
 
-  // ── 2. Ctrl+V / Cmd+V Clipboard Paste Listener (Desktop) ─────────────────
+  // ── 2. Ctrl+V / Cmd+V Clipboard Paste Listener (Desktop & Mobile Keyboard) ──
   useEffect(() => {
     const handlePaste = (e) => {
       // Don't intercept if user is typing inside an input/textarea
@@ -121,51 +110,76 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
       if (imageFiles.length > 0) {
         e.preventDefault();
         processFiles(imageFiles);
+      } else {
+        // Fallback: If text was pasted outside an input, send it to onTextPasted
+        const text = e.clipboardData.getData('text');
+        if (text && text.trim() && onTextPasted) {
+          e.preventDefault();
+          onTextPasted(text);
+          toast.success('Pasted job details from clipboard! 📋✨');
+        }
       }
     };
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [processFiles]);
+  }, [processFiles, onTextPasted]);
 
-  // ── 3. Paste from Clipboard Action (Mobile & Supported Browsers) ────────
+  // ── 3. Paste from Clipboard Action (Mobile 1-Tap & Supported Browsers) ────
   const handlePasteFromClipboard = async (e) => {
     e?.stopPropagation?.();
-    if (!navigator.clipboard || !navigator.clipboard.read) {
-      toast.error('Clipboard image access is not supported by your browser.');
-      return;
+    let pastedImage = false;
+
+    // A. Attempt Async Clipboard image reading
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+      try {
+        const items = await navigator.clipboard.read();
+        const imageFiles = [];
+
+        for (const item of items) {
+          const imageType = item.types.find((t) => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const ext = imageType.split('/')[1] || 'png';
+            const file = new File(
+              [blob],
+              `clipboard_screenshot_${Date.now()}.${ext}`,
+              { type: imageType }
+            );
+            imageFiles.push(file);
+          }
+        }
+
+        if (imageFiles.length > 0) {
+          pastedImage = true;
+          processFiles(imageFiles);
+          return;
+        }
+      } catch (err) {
+        console.debug('[ScreenshotUploadZone] Async clipboard image read error:', err);
+      }
     }
 
-    try {
-      const items = await navigator.clipboard.read();
-      const imageFiles = [];
-
-      for (const item of items) {
-        const imageType = item.types.find((t) => t.startsWith('image/'));
-        if (imageType) {
-          const blob = await item.getType(imageType);
-          const ext = imageType.split('/')[1] || 'png';
-          const file = new File(
-            [blob],
-            `clipboard_screenshot_${Date.now()}.${ext}`,
-            { type: imageType }
-          );
-          imageFiles.push(file);
+    // B. Fallback: If no image found or permission error, try reading text (e.g. copied job post / JD)
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          if (onTextPasted) {
+            onTextPasted(text);
+            toast.success('Pasted job text from clipboard! 📄✨');
+            return;
+          }
         }
+      } catch (err) {
+        console.debug('[ScreenshotUploadZone] Clipboard text read error:', err);
       }
+    }
 
-      if (imageFiles.length > 0) {
-        processFiles(imageFiles);
-      } else {
-        toast.error('No image found in clipboard. Copy a screenshot first.');
-      }
-    } catch (err) {
-      console.error('[ScreenshotUploadZone] Clipboard read error:', err);
-      if (err.name === 'NotAllowedError') {
-        toast.error('Clipboard permission denied. Please allow access.');
-      } else {
-        toast.error('Could not read image from clipboard.');
-      }
+    // C. Fallback: If clipboard has no valid content or access is denied by mobile sandbox
+    if (!pastedImage) {
+      toast('Select a screenshot from your photo library or files 📸', { icon: '📷' });
+      open();
     }
   };
 
@@ -183,10 +197,18 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
           <Sparkles size={16} className="text-indigo-600 shrink-0" />
           <h3 className="text-sm font-extrabold text-slate-900">Job Posting Screenshot</h3>
         </div>
-        {/* Desktop-only: "Ctrl + V to Paste" badge */}
+        {/* Desktop: "Ctrl + V to Paste" badge */}
         <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
           <Clipboard size={10} /> Ctrl + V to Paste
         </span>
+        {/* Mobile: 1-Tap "Paste Clipboard" action button */}
+        <button
+          type="button"
+          onClick={handlePasteFromClipboard}
+          className="sm:hidden inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 active:bg-indigo-100 px-2.5 py-1 rounded-full border border-indigo-200 transition-colors shadow-2xs cursor-pointer"
+        >
+          <Clipboard size={12} /> Paste Clipboard
+        </button>
       </div>
 
       <div
@@ -301,16 +323,14 @@ export default function ScreenshotUploadZone({ onExtractStart, onExtractSuccess,
                 <span>Upload Screenshot</span>
               </button>
 
-              {canPasteClipboard && (
-                <button
-                  type="button"
-                  onClick={handlePasteFromClipboard}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-white active:bg-slate-100 text-slate-700 border border-slate-200 active:border-indigo-300 text-xs font-bold rounded-xl shadow-sm transition-all"
-                >
-                  <Clipboard size={14} className="text-indigo-600" />
-                  <span>Paste from Clipboard</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handlePasteFromClipboard}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-white active:bg-slate-100 text-slate-700 border border-slate-200 active:border-indigo-300 text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
+              >
+                <Clipboard size={14} className="text-indigo-600" />
+                <span>Paste from Clipboard</span>
+              </button>
             </div>
 
             <p className="sm:hidden text-[10px] text-slate-400 font-medium mt-2.5">
