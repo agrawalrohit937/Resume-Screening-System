@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     MONGO_MIN_CONNECTIONS: int = 10
 
     # ── 3. Security & JWT ─────────────────────────────────────────────────────
-    SECRET_KEY: str = Field(..., min_length=32)
+    SECRET_KEY: str = Field(
+        default="careershala-dev-secret-key-minimum-32-chars-long-for-local-recruiter-preview",
+        min_length=32
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -119,7 +122,7 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = None
 
     # ── 10. OAuth Integrations ────────────────────────────────────────────────
-    GOOGLE_CLIENT_ID: str = Field(...)
+    GOOGLE_CLIENT_ID: str = Field(default="dev-google-client-id.apps.googleusercontent.com")
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_GMAIL_REDIRECT_URI: Optional[str] = None
 
@@ -156,6 +159,15 @@ class Settings(BaseSettings):
     def _finalize_settings(self) -> "Settings":
         if self.FRONTEND_URL:
             self.FRONTEND_URL = self.FRONTEND_URL.strip().rstrip("/")
+        if not self.ALLOWED_ORIGINS:
+            self.ALLOWED_ORIGINS = [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://localhost:8000",
+            ]
+        if self.FRONTEND_URL and self.FRONTEND_URL not in self.ALLOWED_ORIGINS:
+            self.ALLOWED_ORIGINS.append(self.FRONTEND_URL)
         return self
 
     # ── Helper Properties ─────────────────────────────────────────────────────

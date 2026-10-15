@@ -14,6 +14,7 @@ htmlcov/
 .env
 backend/.env
 backend/.env.*
+!backend/.env.example
 uploads/
 backend/uploads/**/*
 !backend/uploads/**/.gitkeep
@@ -29,6 +30,7 @@ frontend/.vite/
 frontend/.env      
 frontend/.env.local
 frontend/.env.*.local
+!frontend/.env.example
 # Logs
 *.log
 npm-debug.log*
