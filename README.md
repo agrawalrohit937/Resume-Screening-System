@@ -207,7 +207,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 
 1. **Multi-Tenant Organization Workspaces**:
    - Create separate company workspaces where team members can collaborate without mixing data.
-   - Supports 6 distinct permission levels: *Owner*, *Admin*, *Recruiter*, *Hiring Manager*, *Interviewer*, and *Executive*.
+   - Supports enterprise workspace roles: *Executive / Employer* (Company Lead), *Admin*, *Recruiter*, *Hiring Manager*, *Interviewer*, and *Coordinator*.
 
 2. **Visual Candidate Kanban Pipeline**:
    - Manage job openings with a 6-stage drag-and-drop board:
