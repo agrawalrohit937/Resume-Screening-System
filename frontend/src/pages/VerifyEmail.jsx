@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import { ShieldCheck, ArrowRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { getSmartRedirectPath } from './Login'
 
 const RESEND_COOLDOWN = 60
 
@@ -70,13 +71,17 @@ export default function VerifyEmail() {
     setLoading(true)
     try {
       if (mode === 'login') {
-        await verifyLoginOtp(challengeToken, code)
+        const res = await verifyLoginOtp(challengeToken, code)
         toast.success('Welcome back! 🚀')
+        const userRoles = (Array.isArray(res?.user?.roles) && res?.user?.roles?.length > 0)
+          ? res.user.roles.map((r) => String(r).toLowerCase())
+          : [String(res?.user?.role || 'candidate').toLowerCase()]
+        navigate(getSmartRedirectPath(userRoles))
       } else {
         await verifyEmail(email, code)
         toast.success('Email verified! 🎉')
+        navigate('/dashboard')
       }
-      navigate('/dashboard')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Invalid code')
     } finally {

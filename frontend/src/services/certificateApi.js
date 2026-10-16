@@ -64,3 +64,13 @@ export async function getMyCertificates() {
     const { data } = await api.get('/certificates/my')
     return data
 }
+
+export async function resendCertificate(certificateId) {
+    const { data } = await api.post(`/certificates/resend/${certificateId}`)
+    return data
+}
+
+export async function checkCertificateStatus(topic) {
+    const { data } = await api.get('/certificates/check', { params: { topic } })
+    return data
+}

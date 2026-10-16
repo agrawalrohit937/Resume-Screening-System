@@ -7,7 +7,6 @@ import {
   Sparkles,
   HelpCircle,
   ChevronDown,
-  Command,
   FileText,
   Video,
   Zap,
@@ -117,7 +116,17 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   const activeSearchRoutes = isRecruiter ? RECRUITER_SEARCH_ROUTES : SEARCH_ROUTES
 
   // Dynamically get current page name for the breadcrumb
-  const currentRouteName = activeSearchRoutes.find(r => r.path === location.pathname)?.name || (isRecruiter ? 'Recruiting Overview' : 'Dashboard')
+  const currentRouteName = (() => {
+    if (location.pathname.startsWith('/support/')) return 'Support Ticket Details'
+    if (location.pathname === '/support') return 'Support Tickets'
+    if (location.pathname.startsWith('/recruiter/jobs/')) return 'Jobs & Applicants Pipeline'
+    if (location.pathname.startsWith('/jobs/')) return 'Marketplace Jobs'
+    const found = activeSearchRoutes.find(r => r.path === location.pathname)
+    if (found) return found.name
+    const prefix = activeSearchRoutes.find(r => r.path !== '/' && location.pathname.startsWith(r.path))
+    if (prefix) return prefix.name
+    return isRecruiter ? 'Recruiting Overview' : 'Dashboard'
+  })()
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -231,7 +240,15 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
         <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-500 select-none">
           <span className="hover:text-slate-700 transition-colors cursor-pointer" onClick={() => navigate('/')}>Home</span>
           <span>/</span>
-          <span className="text-slate-800 tracking-tight">{currentRouteName}</span>
+          {location.pathname.startsWith('/support/') ? (
+            <>
+              <span className="hover:text-slate-700 transition-colors cursor-pointer" onClick={() => navigate('/support')}>Support</span>
+              <span>/</span>
+              <span className="text-slate-800 tracking-tight">Ticket Details</span>
+            </>
+          ) : (
+            <span className="text-slate-800 tracking-tight">{currentRouteName}</span>
+          )}
         </div>
       </div>
 
@@ -253,10 +270,10 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             onKeyDown={handleInputKeyDown}
             placeholder="Search ATS, Mock Interviews, or settings..."
             aria-label="Search ATS, Mock Interviews, or settings"
-            className="w-full h-11 pl-11 pr-16 rounded-2xl bg-white border border-slate-200/80 focus:border-indigo-400 focus:ring-[4px] focus:ring-indigo-500/10 outline-none text-sm font-semibold text-slate-900 placeholder-slate-500 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] group-focus-within:shadow-[0_8px_30px_rgba(99,102,241,0.1)]"
+            className="w-full h-11 pl-11 pr-10 rounded-2xl bg-white border border-slate-200/80 focus:border-indigo-400 focus:ring-[4px] focus:ring-indigo-500/10 outline-none text-sm font-semibold text-slate-900 placeholder-slate-500 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] group-focus-within:shadow-[0_8px_30px_rgba(99,102,241,0.1)]"
           />
           
-          {Boolean(searchQuery) ? (
+          {Boolean(searchQuery) && (
             <button
               type="button"
               onClick={() => {
@@ -274,18 +291,6 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             >
               <X size={15} strokeWidth={2.5} />
             </button>
-          ) : (
-            <AnimatePresence>
-              {!isSearchFocused && (
-                <motion.div 
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 shadow-sm pointer-events-none"
-                >
-                  <Command size={10} className="text-slate-500" strokeWidth={3} />
-                  <span className="text-[10px] font-extrabold text-slate-500">K</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
           )}
         </motion.div>
 

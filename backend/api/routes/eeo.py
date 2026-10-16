@@ -2,10 +2,10 @@
 CareerShala ATS v2.0.0 - Enterprise Surface.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.deps import get_database, get_current_user
+from api.deps import get_database, get_current_user, get_optional_current_user
 from models.user_model import UserModel
 from models.eeo import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
 from services.eeo_service import EEOService
@@ -14,9 +14,10 @@ router = APIRouter()
 
 
 @router.post("/self-identify", response_model=EEOSelfIdentificationRecord, status_code=status.HTTP_201_CREATED)
+@router.post("/self-id", response_model=EEOSelfIdentificationRecord, status_code=status.HTTP_201_CREATED)
 async def submit_eeo_self_id_route(
     payload: EEOSelfIdentificationPayload,
-    current_user: UserModel = Depends(get_current_user),
+    current_user: Optional[UserModel] = Depends(get_optional_current_user),
     db: Any = Depends(get_database),
 ):
     """
@@ -25,7 +26,8 @@ async def submit_eeo_self_id_route(
     """
     service = EEOService(db)
     raw_db = getattr(db, "raw_db", db)
-    tenant_id = getattr(current_user, "tenant_id", "default") or "default"
+    tenant_id = getattr(current_user, "tenant_id", "default") if current_user else "default"
+    tenant_id = tenant_id or "default"
 
     # If job_id or application_id provided, resolve employer's tenant_id
     if payload.job_id:
@@ -45,8 +47,14 @@ async def submit_eeo_self_id_route(
         except Exception:
             pass
 
+    cand_id = "candidate_user"
+    if current_user and getattr(current_user, "id", None):
+        cand_id = str(current_user.id)
+    elif payload.application_id:
+        cand_id = f"app_{payload.application_id}"
+
     return await service.record_self_identification(
-        candidate_id=str(current_user.id or "candidate_user"),
+        candidate_id=cand_id,
         payload=payload,
         tenant_id=tenant_id,
     )

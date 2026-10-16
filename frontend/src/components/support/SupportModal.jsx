@@ -3,6 +3,7 @@
  * Orchestrates the flow: Category Selection → Ticket Form → Success Screen
  */
 import { useState, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LifeBuoy, MessageCircle } from 'lucide-react'
@@ -13,7 +14,7 @@ import SuccessScreen from './SuccessScreen'
 import PremiumSupportCard from './PremiumSupportCard'
 import HelpCenterLinks from './HelpCenterLinks'
 
-export default function SupportModal({ isOpen, onClose }) {
+export default function SupportModal({ isOpen, onClose, onTicketCreated }) {
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -23,13 +24,19 @@ export default function SupportModal({ isOpen, onClose }) {
   const [selectedSubcategory, setSelectedSubcategory] = useState(null)
   const [ticketResult, setTicketResult] = useState(null)
 
-  // Reset on open
+  // Reset on open & lock background scroll
   useEffect(() => {
     if (isOpen) {
       setStep('categories')
       setSelectedCategory(null)
       setSelectedSubcategory(null)
       setTicketResult(null)
+
+      const originalOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = originalOverflow
+      }
     }
   }, [isOpen])
 
@@ -41,7 +48,17 @@ export default function SupportModal({ isOpen, onClose }) {
   const handleFormSuccess = useCallback((result) => {
     setTicketResult(result)
     setStep('success')
-  }, [])
+
+    // 1. Notify parent via callback
+    if (typeof onTicketCreated === 'function') {
+      try { onTicketCreated(result?.ticket || result) } catch (_) {}
+    }
+
+    // 2. Dispatch global event so all listening tables refresh immediately
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('careershala:ticket-created', { detail: result }))
+    }
+  }, [onTicketCreated])
 
   const handleBack = useCallback(() => {
     if (step === 'form') {
@@ -56,7 +73,8 @@ export default function SupportModal({ isOpen, onClose }) {
   }, [onClose, navigate])
 
   const handleGetSupport = useCallback(() => {
-    setStep('categories')
+    setSelectedCategory('other')
+    setStep('form')
   }, [])
 
   // Animation variants
@@ -88,10 +106,10 @@ export default function SupportModal({ isOpen, onClose }) {
     },
   }
 
-  return (
+  const modalContent = (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
           {/* Backdrop */}
           <motion.div
             key="support-modal-backdrop"
@@ -101,11 +119,11 @@ export default function SupportModal({ isOpen, onClose }) {
             exit="hidden"
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm pointer-events-auto"
           />
 
           {/* Desktop Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 md:p-8 pointer-events-none">
             <motion.div
               key="support-modal-desktop"
               variants={desktopVariants}
@@ -113,29 +131,30 @@ export default function SupportModal({ isOpen, onClose }) {
               animate="visible"
               exit="exit"
               onClick={(e) => e.stopPropagation()}
-              className="hidden sm:flex w-full max-w-lg max-h-[85vh] flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden pointer-events-auto"
+              className="hidden sm:flex w-full sm:max-w-xl md:max-w-2xl max-h-[85vh] my-auto flex-col bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden pointer-events-auto"
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className="flex items-center justify-between px-6 sm:px-7 py-4 border-b border-slate-100 shrink-0 bg-slate-50/70">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
                     <LifeBuoy size={18} strokeWidth={2} />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-black text-slate-900">Support Center</h2>
-                    <p className="text-[10px] font-medium text-slate-500">We're here to help</p>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-black text-slate-900 font-poppins truncate">Support Center</h2>
+                    <p className="text-[11px] font-medium text-slate-500 truncate">We're here to help & resolve any issues</p>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-all cursor-pointer shrink-0 ml-2"
+                  aria-label="Close modal"
                 >
                   <X size={18} strokeWidth={2} />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-thin">
+              <div className="flex-1 overflow-y-auto px-6 sm:px-7 py-5 scrollbar-thin">
                 <AnimatePresence mode="wait">
                   {step === 'categories' && (
                     <motion.div
@@ -203,7 +222,7 @@ export default function SupportModal({ isOpen, onClose }) {
             animate="visible"
             exit="exit"
             onClick={(e) => e.stopPropagation()}
-            className="fixed sm:hidden bottom-0 left-0 right-0 z-50 flex flex-col max-h-[90dvh] bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 overflow-hidden pointer-events-auto pb-safe"
+            className="fixed sm:hidden bottom-0 left-0 right-0 z-[10000] flex flex-col max-h-[90dvh] bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 overflow-hidden pointer-events-auto pb-safe"
           >
             {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -285,9 +304,12 @@ export default function SupportModal({ isOpen, onClose }) {
               </AnimatePresence>
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(modalContent, document.body)
 }
 

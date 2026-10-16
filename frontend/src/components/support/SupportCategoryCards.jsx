@@ -102,7 +102,7 @@ export default function SupportCategoryCards({ selectedCategory, onSelect, onBac
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:gap-2.5 max-h-[360px] sm:max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {CATEGORIES.map((cat, idx) => {
           const Icon = cat.icon
           const isSelected = selectedCategory === cat.id

@@ -77,9 +77,10 @@ class EEOService:
         )
 
         if active_db is not None:
+            raw_target = getattr(active_db, "raw_db", active_db)
             doc = record.model_dump(by_alias=True, exclude={"id"})
             doc["_id"] = ObjectId()
-            await active_db.eeo_responses.insert_one(doc)
+            await raw_target.eeo_responses.insert_one(doc)
             record.id = str(doc["_id"])
 
         logger.info(

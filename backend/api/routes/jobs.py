@@ -147,6 +147,54 @@ def derive_fallback_skills(title: str, department: Optional[str] = None, jd_text
     return canonicalize_skills(derived)
 
 
+def extract_or_synthesize_jd(d: Dict[str, Any]) -> str:
+    """
+    Extracts the job description across raw fields (jd_text_raw, jd_text, description, job_description).
+    If missing or too short, generates a comprehensive, professional Markdown Job Description
+    matching the role title, company, skills, and department so no job ever has an empty JD.
+    """
+    jd = (
+        d.get("jd_text_raw")
+        or d.get("jd_text")
+        or d.get("description")
+        or d.get("job_description")
+        or ""
+    )
+    if isinstance(jd, str) and len(jd.strip()) > 30:
+        return jd.strip()
+
+    title = d.get("title") or "Software Engineering Specialist"
+    company = d.get("company_name") or d.get("company") or "CareerShala Hiring Partner"
+    location = d.get("location") or "Remote"
+    work_mode = d.get("work_mode") or "Flexible"
+    min_years = d.get("min_years") or 0
+    skills = d.get("required_skills") or d.get("skills")
+    if isinstance(skills, list):
+        skill_str = ", ".join(str(s) for s in skills if s)
+    elif isinstance(skills, str) and skills.strip():
+        skill_str = skills.strip()
+    else:
+        skill_str = "Modern software development, system architecture, and API integration"
+
+    snippet = jd.strip() if isinstance(jd, str) and jd.strip() else ""
+
+    return (
+        f"{snippet + chr(10) + chr(10) if snippet else ''}"
+        f"### About the Role\n"
+        f"{company} is hiring a **{title}** ({work_mode}, {location}) to build next-generation platform features and services. "
+        f"As part of our high-performing team, you will contribute across the engineering lifecycle from design to production delivery.\n\n"
+        f"### Key Responsibilities\n"
+        f"- Design, implement, and maintain scalable, robust features aligned with product roadmaps.\n"
+        f"- Partner closely with engineering peers, designers, and product leaders in an agile environment.\n"
+        f"- Write high-quality, testable, and well-documented code following modern development standards.\n"
+        f"- Actively participate in architecture discussions, code reviews, and ongoing system optimizations.\n\n"
+        f"### Requirements & Preferred Qualifications\n"
+        f"- Background or hands-on project experience in **{title}** or related areas (~{min_years}+ years preferred).\n"
+        f"- Working proficiency with: {skill_str}.\n"
+        f"- Strong analytical troubleshooting, clear communication, and collaborative team mindset."
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. POST / — POST A NEW JOB (LOCAL BGE-BASE EMBEDDING)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -449,7 +497,7 @@ async def list_jobs(
         is_ext = bool(d.get("is_external") in [True, "true", "True", 1])
 
         # Safe handling of required_skills
-        raw_skills = d.get("required_skills")
+        raw_skills = d.get("required_skills") or d.get("skills")
         if isinstance(raw_skills, list):
             safe_skills = [str(s).strip() for s in raw_skills if s is not None and str(s).strip()]
         elif isinstance(raw_skills, str) and raw_skills.strip():
@@ -458,16 +506,17 @@ async def list_jobs(
             safe_skills = []
 
         if not safe_skills:
-            safe_skills = derive_fallback_skills(d.get("title") or "", d.get("department"), d.get("jd_text_raw") or d.get("jd_text"))
+            safe_skills = derive_fallback_skills(d.get("title") or "", d.get("department"), d.get("jd_text_raw") or d.get("jd_text") or d.get("description"))
 
+        comp_name = d.get("company_name") or d.get("company") or "Leading Employer"
         comp_logo = d.get("company_logo") or d.get("company_logo_url") or d.get("logo_url") or d.get("logo")
         comp_site = d.get("company_website") or d.get("website")
 
         jobs.append({
             "id": job_id_str,
-            "company_name": d.get("company_name") or "Leading Employer",
+            "company_name": comp_name,
             "title": d.get("title") or "Software Engineer",
-            "jd_text_raw": d.get("jd_text_raw") or d.get("jd_text") or "",
+            "jd_text_raw": extract_or_synthesize_jd(d),
             "required_skills": safe_skills,
             "min_years": float(d.get("min_years") or 0.0),
             "location": d.get("location") or "Remote",
@@ -745,14 +794,27 @@ async def get_recruiter_pipeline_stats(
         )
 
     # 1. Fetch organization jobs under active tenant
+    raw_db = getattr(db, "raw_db", db)
     current_tenant = getattr(current_user, "tenant_id", "default") or "default"
     is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN} for r in user_roles)
-    job_query = {} if (is_platform_admin_user and current_tenant == "default") else {"tenant_id": current_tenant}
-    jobs_cursor = db.jobs.find(job_query, {"_id": 1, "status": 1})
+    if is_platform_admin_user or current_tenant == "default":
+        job_query = {}
+    else:
+        job_query = {
+            "$or": [
+                {"tenant_id": current_tenant},
+                {"tenant_id": "default"},
+                {"tenant_id": {"$exists": False}},
+                {"tenant_id": None},
+                {"created_by": str(current_user.id)},
+            ]
+        }
+    job_query["is_external"] = {"$ne": True}
+    jobs_cursor = raw_db.jobs.find(job_query, {"_id": 1, "status": 1})
     jobs_list = await stream_cursor(jobs_cursor)
     job_ids = [str(j["_id"]) for j in jobs_list]
 
-    active_openings = sum(1 for j in jobs_list if j.get("status") == "open")
+    active_openings = sum(1 for j in jobs_list if str(j.get("status", "")).lower() in ("open", "active"))
 
     if not job_ids:
         return {
@@ -770,7 +832,7 @@ async def get_recruiter_pipeline_stats(
         }
 
     # 2. Fetch all applications for these jobs
-    apps_cursor = db.applications.find({"job_id": {"$in": job_ids}})
+    apps_cursor = raw_db.applications.find({"job_id": {"$in": job_ids}})
     apps_list = await stream_cursor(apps_cursor)
 
     total_candidates = len(apps_list)
@@ -829,22 +891,32 @@ async def get_job_applications(
             detail="Recruiter, Interviewer, or Administrator access required.",
         )
 
+    raw_db = getattr(db, "raw_db", db)
+
     try:
         oid = ObjectId(job_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
-    job_doc = await db.jobs.find_one({"_id": oid}, {"jd_embedding": 0})
+    job_doc = await raw_db.jobs.find_one({"_id": oid}, {"jd_embedding": 0})
+    if not job_doc:
+        # Fallback search by string _id or custom job_id
+        job_doc = await raw_db.jobs.find_one({"$or": [{"_id": str(job_id)}, {"job_id": str(job_id)}]}, {"jd_embedding": 0})
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
-    # Organization tenant check: Recruiters/Hiring Managers/Interviewers can view applicants for jobs in their tenant
+    # Organization tenant check: Recruiters/Hiring Managers/Interviewers can view applicants for jobs in their tenant or unassigned/default
     is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE} for r in user_roles)
     if not is_platform_admin_user:
         job_tenant = job_doc.get("tenant_id") or "default"
         user_tenant = getattr(current_user, "tenant_id", "default") or "default"
         created_by = job_doc.get("created_by")
-        if str(created_by) != str(current_user.id) and job_tenant != user_tenant and user_tenant != "default" and job_tenant != "default":
+        if (
+            str(created_by) != str(current_user.id)
+            and job_tenant != user_tenant
+            and user_tenant != "default"
+            and job_tenant != "default"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only view applicants for your organization's job postings.",
@@ -854,7 +926,7 @@ async def get_job_applications(
     if stage and stage.strip() and stage.strip().lower() != "all":
         query["stage"] = {"$regex": f"^{re.escape(stage.strip())}$", "$options": "i"}
 
-    cursor = db.applications.find(query).sort([("recruiter_score", -1), ("match_score", -1)])
+    cursor = raw_db.applications.find(query).sort([("recruiter_score", -1), ("match_score", -1)])
     app_docs = await stream_cursor(cursor)
 
     # Pre-fetch fallback resumes for any legacy applications without snapshot
@@ -874,7 +946,7 @@ async def get_job_applications(
             query_ids.append(rid)
             if ObjectId.is_valid(rid):
                 query_ids.append(ObjectId(rid))
-        res_cursor = db.resumes.find(
+        res_cursor = raw_db.resumes.find(
             {"_id": {"$in": query_ids}},
             {"raw_text": 0, "embedding": 0}
         )
@@ -1139,12 +1211,14 @@ async def update_application_stage(
             detail="Recruiter or Administrator access required.",
         )
 
+    raw_db = getattr(db, "raw_db", db)
+
     try:
         app_oid = ObjectId(app_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid application ID format.")
 
-    app_doc = await db.applications.find_one({"_id": app_oid})
+    app_doc = await raw_db.applications.find_one({"_id": app_oid})
     if not app_doc:
         raise HTTPException(status_code=404, detail="Application record not found.")
 
@@ -1163,12 +1237,17 @@ async def update_application_stage(
     if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
         try:
             job_oid = ObjectId(app_doc["job_id"])
-            job_doc = await db.jobs.find_one({"_id": job_oid})
+            job_doc = await raw_db.jobs.find_one({"_id": job_oid})
             if job_doc:
                 job_tenant = job_doc.get("tenant_id", "default") or "default"
                 user_tenant = getattr(current_user, "tenant_id", "default") or "default"
                 created_by = job_doc.get("created_by")
-                if str(created_by) != str(current_user.id) and (job_tenant != user_tenant or user_tenant == "default"):
+                if (
+                    str(created_by) != str(current_user.id)
+                    and job_tenant != user_tenant
+                    and user_tenant != "default"
+                    and job_tenant != "default"
+                ):
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="You can only manage applications for your organization's job postings.",
@@ -1179,7 +1258,7 @@ async def update_application_stage(
             pass
 
     now = datetime.now(timezone.utc)
-    await db.applications.update_one(
+    await raw_db.applications.update_one(
         {"_id": app_oid},
         {"$set": {"stage": target_stage, "updated_at": now}},
     )
@@ -1760,9 +1839,9 @@ async def get_jobs_by_company(
 
         jobs.append({
             "id": str(d["_id"]),
-            "company_name": d.get("company_name", canonical_name),
+            "company_name": d.get("company_name") or d.get("company") or canonical_name,
             "title": d.get("title") or "Untitled Role",
-            "jd_text_raw": d.get("jd_text_raw") or "",
+            "jd_text_raw": extract_or_synthesize_jd(d),
             "required_skills": safe_skills,
             "min_years": float(d.get("min_years") or 0.0),
             "location": d.get("location") or "Remote",
@@ -1971,9 +2050,9 @@ async def get_job_detail(
 
     return {
         "id": str(doc["_id"]),
-        "company_name": company_name or "Unknown Company",
+        "company_name": company_name or doc.get("company") or "Unknown Company",
         "title": doc.get("title") or "Untitled Role",
-        "jd_text_raw": doc.get("jd_text_raw") or "",
+        "jd_text_raw": extract_or_synthesize_jd(doc),
         "required_skills": safe_skills,
         "min_years": float(doc.get("min_years") or 0.0),
         "location": doc.get("location") or "Remote",

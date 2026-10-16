@@ -29,6 +29,8 @@ const PAGE_TITLES = {
   '/recruiter/settings': { title: 'Recruiter Settings', sub: 'Hiring lead preferences, alerts & security' },
   '/jobs': { title: 'Job Marketplace', sub: 'Explore opportunities with AI vector matching' },
   '/applications': { title: 'Application Tracker', sub: 'Track your hiring stages and match feedback' },
+  '/profile': { title: 'Profile & Assets', sub: 'Personal identity, portfolio & resume' },
+  '/settings': { title: 'Account Settings', sub: 'Security, privacy & talent pool preferences' },
 }
 
 function MobileHeader({ onMenuToggle }) {

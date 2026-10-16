@@ -1199,7 +1199,7 @@ What We Are Looking For:
                     Role Description
                   </h4>
                   <div className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50/70 p-4 rounded-2xl border border-slate-100 font-sans">
-                    {activeJobDetail.jd_text_raw}
+                    {activeJobDetail.jd_text_raw || activeJobDetail.description || 'Detailed specifications, requirements, and responsibilities for this role are being updated by the hiring team.'}
                   </div>
                 </div>
 
@@ -1804,9 +1804,9 @@ export function JobCard({
       </div>
 
       {/* ── 3. Snippet Preview ── */}
-      {job.jd_text_raw && (
+      {(job.jd_text_raw || job.description) && (
         <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed">
-          {job.jd_text_raw}
+          {job.jd_text_raw || job.description}
         </p>
       )}
 

@@ -9,7 +9,14 @@ import { RESPONSE_TIMES } from '../../services/supportApi'
 
 export default function SuccessScreen({ ticketData, onClose, onViewTickets }) {
   const { user } = useAuth()
-  const plan = (user?.plan || 'free').toLowerCase()
+  const userRoles = [
+    ...(Array.isArray(user?.roles) ? user.roles : []),
+    user?.role,
+  ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+  const isEnterprise =
+    user?.plan === 'enterprise' ||
+    userRoles.some((r) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(r))
+  const plan = isEnterprise ? 'enterprise' : (user?.plan || 'free').toLowerCase()
   const responseTime = RESPONSE_TIMES[plan] || '24-48 Hours'
   const ticket = ticketData?.ticket || {}
   const ticketId = ticket.ticket_id || 'CS-2026-000000'

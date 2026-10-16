@@ -27,6 +27,36 @@ export default function Dashboard() {
   const [resumeCount, setResumeCount] = useState(0)
   const [scoreTrend, setScoreTrend] = useState([])
 
+  // ── Enterprise Role Redirection ──────────────────────────────────────────────
+  // If an employer (recruiter, interviewer, hiring manager, admin) lands on /dashboard,
+  // immediately redirect them to their dedicated enterprise dashboard unless they explicitly
+  // switched to candidate view context.
+  useEffect(() => {
+    if (!user) return
+    const userRoles = [
+      ...(Array.isArray(user?.roles) ? user.roles : []),
+      user?.role,
+    ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+
+    const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
+    const hasEnterpriseRole = userRoles.some((r) => ENTERPRISE_ROLES.includes(r))
+    const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
+
+    if (hasEnterpriseRole && savedCtx !== 'candidate') {
+      if (userRoles.includes('admin') || userRoles.includes('platform_admin')) {
+        navigate('/admin', { replace: true })
+      } else if (userRoles.includes('executive') || userRoles.includes('exec')) {
+        navigate('/exec/dashboard', { replace: true })
+      } else if (userRoles.includes('hiring_manager')) {
+        navigate('/hiring-manager/dashboard', { replace: true })
+      } else if (userRoles.includes('interviewer')) {
+        navigate('/interviewer/dashboard', { replace: true })
+      } else {
+        navigate('/recruiter/dashboard', { replace: true })
+      }
+    }
+  }, [user, navigate])
+
   useEffect(() => {
     let mounted = true
     const controller = new AbortController()

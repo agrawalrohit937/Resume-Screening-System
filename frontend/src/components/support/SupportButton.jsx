@@ -13,6 +13,7 @@ const SupportButton = forwardRef(function SupportButton(
     className = '',
     label = 'Get Support',
     showIcon = true,
+    onTicketCreated,
     ...props
   },
   ref
@@ -48,7 +49,11 @@ const SupportButton = forwardRef(function SupportButton(
         {label}
       </button>
 
-      <SupportModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <SupportModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onTicketCreated={onTicketCreated}
+      />
     </>
   )
 })

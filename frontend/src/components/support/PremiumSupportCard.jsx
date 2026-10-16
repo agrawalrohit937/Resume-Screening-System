@@ -1,122 +1,135 @@
 /**
  * PremiumSupportCard — Plan-specific support card with gradient styling
- * Gold for Premium, Blue for Pro, Gray for Free
+ * Enterprise for Recruiters/Admins, Gold for Premium, Blue for Pro, Slate for Free
  */
 import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
+import { Sparkles, Zap, ShieldCheck, Clock, ArrowRight, Check } from 'lucide-react'
 
 const PLAN_CONFIGS = {
+  enterprise: {
+    gradient: 'from-indigo-600/15 via-violet-500/10 to-indigo-950/20',
+    border: 'border-indigo-300/60',
+    badge: 'bg-indigo-600 text-white',
+    badgeLabel: 'Enterprise VIP Support',
+    title: 'Enterprise Dedicated Support',
+    responseTime: '< 30 Minutes',
+    accentText: 'text-indigo-600',
+    features: ['Dedicated Account Lead', '24/7 Priority SLA', 'Direct Tech Escalation'],
+    glowColor: 'rgba(99,102,241,0.18)',
+    buttonBg: 'bg-indigo-600 hover:bg-indigo-700 text-white',
+  },
   premium: {
-    gradient: 'from-amber-600/20 via-amber-500/10 to-amber-900/20',
-    border: 'border-amber-500/30',
-    ring: 'ring-amber-500/20',
+    gradient: 'from-amber-600/15 via-amber-500/10 to-amber-900/20',
+    border: 'border-amber-400/40',
     badge: 'bg-amber-500 text-amber-950',
     badgeLabel: 'Priority Support',
-    title: 'Premium Support',
-    responseTime: '<2 Hours',
-    accent: 'bg-gradient-to-r from-amber-400 to-orange-500',
-    accentText: 'text-amber-100',
-    features: ['Dedicated Support', 'Fast Resolution', 'Priority Queue'],
-    glowColor: 'rgba(245,158,11,0.15)',
+    title: 'Premium Priority Support',
+    responseTime: '< 2 Hours',
+    accentText: 'text-amber-700',
+    features: ['Dedicated Support Queue', 'Fast SLA Resolution', 'Direct Email Access'],
+    glowColor: 'rgba(245,158,11,0.18)',
+    buttonBg: 'bg-amber-600 hover:bg-amber-700 text-white',
   },
   pro: {
-    gradient: 'from-blue-600/20 via-blue-500/10 to-indigo-900/20',
-    border: 'border-blue-500/30',
-    ring: 'ring-blue-500/20',
-    badge: 'bg-blue-500 text-white',
+    gradient: 'from-blue-600/15 via-blue-500/10 to-indigo-900/20',
+    border: 'border-blue-400/40',
+    badge: 'bg-blue-600 text-white',
     badgeLabel: 'Fast Support',
-    title: 'Pro Support',
-    responseTime: '8 Hours',
-    accent: 'bg-gradient-to-r from-blue-400 to-indigo-500',
-    accentText: 'text-blue-100',
-    features: ['Priority Email', 'Faster Response', 'Dedicated Queue'],
+    title: 'Pro Member Support',
+    responseTime: '< 8 Hours',
+    accentText: 'text-blue-700',
+    features: ['Priority Email', 'Same-Day Response', 'Dedicated Ticket Queue'],
     glowColor: 'rgba(59,130,246,0.15)',
+    buttonBg: 'bg-blue-600 hover:bg-blue-700 text-white',
   },
   free: {
-    gradient: 'from-slate-600/20 via-slate-500/10 to-slate-800/20',
-    border: 'border-slate-500/20',
-    ring: 'ring-slate-500/10',
-    badge: 'bg-slate-500 text-white',
-    badgeLabel: 'Standard',
-    title: 'Standard Support',
+    gradient: 'from-slate-600/10 via-slate-500/5 to-slate-800/10',
+    border: 'border-slate-200',
+    badge: 'bg-slate-100 text-slate-700 border border-slate-200',
+    badgeLabel: 'Standard Support',
+    title: 'Community & Standard Help',
     responseTime: '24-48 Hours',
-    accent: 'bg-gradient-to-r from-slate-400 to-slate-500',
-    accentText: 'text-slate-300',
-    features: ['Email Support', 'Knowledge Base', 'Community Access'],
+    accentText: 'text-slate-600',
+    features: ['Email Support', 'Help Center Documentation', 'Community Forum'],
     glowColor: 'rgba(100,116,139,0.1)',
+    buttonBg: 'bg-slate-900 hover:bg-slate-800 text-white',
   },
 }
 
 export default function PremiumSupportCard({ onGetSupport }) {
   const { user } = useAuth()
-  const plan = (user?.plan || 'free').toLowerCase()
-  const config = PLAN_CONFIGS[plan] || PLAN_CONFIGS.free
+  
+  const userRoles = [
+    ...(Array.isArray(user?.roles) ? user.roles : []),
+    user?.role,
+  ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+
+  const isEnterprise =
+    user?.plan === 'enterprise' ||
+    userRoles.some((r) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(r))
+
+  const planKey = isEnterprise
+    ? 'enterprise'
+    : (user?.plan || 'free').toLowerCase()
+
+  const config = PLAN_CONFIGS[planKey] || PLAN_CONFIGS.free
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.1 }}
-      className="relative overflow-hidden rounded-2xl border p-4 sm:p-6"
-      style={{
-        background: `linear-gradient(135deg, ${config.glowColor}, transparent)`,
-        borderColor: config.border,
-      }}
+      transition={{ duration: 0.3 }}
+      className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 bg-gradient-to-br ${config.gradient} ${config.border} shadow-xs`}
     >
-      {/* Glow effect */}
+      {/* Decorative Glow */}
       <div
-        className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none"
-        style={{ background: config.glowColor }}
-      />
-      <div
-        className="absolute -bottom-10 -left-10 w-24 h-24 rounded-full blur-2xl pointer-events-none"
+        className="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-2xl pointer-events-none"
         style={{ background: config.glowColor }}
       />
 
-      <div className="relative">
-        {/* Badge */}
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${config.badge}`}>
-            {config.badgeLabel}
-          </span>
-          <span className={`text-[10px] sm:text-[11px] font-bold ${config.accentText} opacity-80`}>
-            Avg. {config.responseTime}
-          </span>
+      <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Left Side: Header, Title, Features */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider ${config.badge}`}>
+              {config.badgeLabel}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-white/80 px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+              <Clock size={11} className={config.accentText} />
+              <span>SLA: {config.responseTime}</span>
+            </span>
+          </div>
+
+          <h3 className="text-base sm:text-lg font-black text-slate-900 font-poppins leading-tight">
+            {config.title}
+          </h3>
+
+          {/* Feature Badges */}
+          <div className="flex items-center gap-x-3 gap-y-1 mt-2.5 flex-wrap">
+            {config.features.map((feat) => (
+              <span key={feat} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Check size={10} strokeWidth={3} />
+                </span>
+                {feat}
+              </span>
+            ))}
+          </div>
         </div>
 
-        {/* Title */}
-        <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-1">{config.title}</h3>
-        <p className="text-xs sm:text-sm font-medium text-slate-500 mb-3 sm:mb-4">Average response time: <span className="font-bold text-slate-800">{config.responseTime}</span></p>
-
-        {/* Features */}
-        <div className="space-y-2 sm:space-y-2.5 mb-4 sm:mb-5">
-          {config.features.map((feat) => (
-            <div key={feat} className="flex items-center gap-2.5">
-              <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shrink-0 ${config.accent}`}>
-                <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-xs sm:text-sm font-semibold text-slate-700">{feat}</span>
-            </div>
-          ))}
+        {/* Right Side: CTA Button */}
+        <div className="shrink-0 flex items-center">
+          <button
+            type="button"
+            onClick={onGetSupport}
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all cursor-pointer active:scale-95 ${config.buttonBg}`}
+          >
+            <span>Create Ticket</span>
+            <ArrowRight size={14} />
+          </button>
         </div>
-
-        {/* CTA */}
-        <button
-          onClick={onGetSupport}
-          className="w-full flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md hover:shadow-lg active:scale-[0.98] transition-all"
-          style={{
-            background: `linear-gradient(135deg, ${plan === 'premium' ? '#F59E0B, #D97706' : plan === 'pro' ? '#3B82F6, #6366F1' : '#64748B, #475569'})`,
-          }}
-        >
-          Get Support
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </button>
       </div>
     </motion.div>
   )
 }
-
