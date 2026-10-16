@@ -183,5 +183,6 @@ export const RESPONSE_TIMES = {
   free: '24-48 Hours',
   pro: '8 Hours',
   premium: '2 Hours',
+  enterprise: '< 30 Minutes',
 }
 

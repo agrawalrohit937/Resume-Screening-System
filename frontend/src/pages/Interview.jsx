@@ -24,7 +24,7 @@ import {
     Cpu
 } from 'lucide-react'
 import api from '../services/api'
-import { issueCertificate } from '../services/certificateApi'
+import { issueCertificate, resendCertificate, checkCertificateStatus } from '../services/certificateApi'
 
 // ─── Color Helpers ───────────────────────────────────────────────────────────
 const DIFF_COLOR = {
@@ -158,23 +158,66 @@ export function QuizSummary({ score, total, topic, difficulty, onRetry }) {
         : pct >= 50 ? { label: 'Good Effort!', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', Icon: BookOpen }
         : { label: 'Keep Practicing!', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', Icon: Zap }
 
-    // Certificate state
+    // Certificate state & existing check
     const isEligible = pct >= 80
     const [certStatus, setCertStatus] = useState('idle')
+    const [existingCert, setExistingCert] = useState(null)
+    const [resending, setResending] = useState(false)
+
+    useEffect(() => {
+        let isMounted = true
+        async function fetchExistingCert() {
+            try {
+                const res = await checkCertificateStatus(topic)
+                if (isMounted && res.has_certificate) {
+                    setExistingCert(res.certificate)
+                }
+            } catch (err) {
+                // Ignore silent fetch errors
+            }
+        }
+        if (topic) {
+            fetchExistingCert()
+        }
+        return () => { isMounted = false }
+    }, [topic])
 
     const handleClaimCertificate = async () => {
         setCertStatus('loading')
         try {
-            await issueCertificate({
+            const res = await issueCertificate({
                 assessmentName: topic,
                 score: pct,
                 difficulty,
             })
             setCertStatus('success')
-            toast.success('Certificate dispatched to your registered email!')
+            if (res.is_update) {
+                toast.success('✨ Updated certificate dispatched to your registered email!')
+                setExistingCert({
+                    certificate_id: res.certificate_id,
+                    score: pct,
+                    grade: res.grade,
+                    topic,
+                })
+            } else {
+                toast.success('🎉 Official certificate dispatched to your registered email!')
+            }
         } catch (error) {
             setCertStatus('error')
             toast.error(error.response?.data?.detail || 'Issuance failed. Please try again.')
+        }
+    }
+
+    const handleResendExisting = async (certId) => {
+        if (!certId) return
+        setResending(true)
+        try {
+            await resendCertificate(certId)
+            toast.success('Certificate re-sent to your registered email!')
+        } catch (error) {
+            toast.error(error.response?.data?.detail || 'Failed to re-send certificate.')
+        } finally {
+            setResending(false)
         }
     }
 
@@ -217,36 +260,90 @@ export function QuizSummary({ score, total, topic, difficulty, onRetry }) {
                 ))}
             </div>
 
-            {/* E-Certificate Section */}
+            {/* E-Certificate Section (Eligible Score OR Existing Certificate Holder) */}
             <AnimatePresence>
-                {isEligible && (
+                {(isEligible || existingCert) && (
                     <motion.div 
                         initial={{ opacity: 0, height: 0 }} 
                         animate={{ opacity: 1, height: 'auto' }}
                         className="w-full overflow-hidden"
                     >
-                        <div className={`p-5 rounded-2xl border ${grade.border} ${grade.bg} text-center`}>
-                            <div className="flex items-center justify-center gap-2 mb-2">
+                        <div className={`p-5 rounded-2xl border ${grade.border} ${grade.bg} text-center space-y-3`}>
+                            <div className="flex items-center justify-center gap-2">
                                 <Award className={`h-5 w-5 ${grade.color}`} />
-                                <h3 className={`font-bold text-base ${grade.color}`}>Official Achievement Certificate</h3>
+                                <h3 className={`font-bold text-base ${grade.color}`}>
+                                    {existingCert && isEligible ? 'Updated Achievement Certificate' : 'Official Achievement Certificate'}
+                                </h3>
                             </div>
+
+                            {/* Badge if user already had a previous certificate */}
+                            {existingCert && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 text-slate-700 text-xs font-medium shadow-2xs">
+                                    <Sparkles size={13} className="text-amber-500" />
+                                    <span>Previously Earned: <strong>{existingCert.score}% ({existingCert.grade})</strong></span>
+                                </div>
+                            )}
                             
-                            <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-                                You scored 80%+! Claim your verified digital certificate delivered directly to your email inbox.
+                            <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+                                {isEligible
+                                    ? (existingCert
+                                        ? `You achieved a fresh score of ${pct}%! Claim your refreshed, updated digital certificate delivered directly to your email.`
+                                        : 'You scored 80%+! Claim your verified digital certificate delivered directly to your email inbox.')
+                                    : `You already hold an official certificate for ${topic} (${existingCert.score}%). You can re-send it to your registered email anytime.`}
                             </p>
                             
                             {certStatus === 'success' ? (
-                                <div className="flex items-center justify-center gap-2 p-3 bg-white rounded-xl border border-emerald-100 text-emerald-700 text-xs font-bold">
-                                    <CheckCircle2 className="h-4 w-4" /> Certificate Emailed Successfully!
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-center gap-2 p-3 bg-white rounded-xl border border-emerald-200 text-emerald-700 text-xs font-bold shadow-2xs">
+                                        <CheckCircle2 className="h-4 w-4" /> Certificate Dispatched to Email!
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleResendExisting(existingCert?.certificate_id)}
+                                        disabled={resending}
+                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer"
+                                    >
+                                        {resending ? 'Sending...' : 'Didn’t get it? Re-send to my email'}
+                                    </button>
+                                </div>
+                            ) : isEligible ? (
+                                <div className="space-y-2">
+                                    <button 
+                                        onClick={handleClaimCertificate} 
+                                        disabled={certStatus === 'loading'}
+                                        className="w-full flex items-center justify-center gap-2 bg-[#2E9BDA] hover:bg-[#2585bd] text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all active:scale-[0.99] disabled:opacity-50 text-sm cursor-pointer"
+                                    >
+                                        {certStatus === 'loading' ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Mail className="h-4 w-4" />
+                                        )}
+                                        {certStatus === 'loading'
+                                            ? 'Generating & Dispatching...'
+                                            : existingCert
+                                                ? `Send Updated Certificate (${pct}%)`
+                                                : 'Claim My Certificate'}
+                                    </button>
+
+                                    {existingCert && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleResendExisting(existingCert.certificate_id)}
+                                            disabled={resending}
+                                            className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer underline"
+                                        >
+                                            {resending ? 'Sending...' : 'Or re-send previous certificate copy'}
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <button 
-                                    onClick={handleClaimCertificate} 
-                                    disabled={certStatus === 'loading'}
-                                    className="w-full flex items-center justify-center gap-2 bg-[#2E9BDA] hover:bg-[#2585bd] text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all active:scale-[0.99] disabled:opacity-50 text-sm cursor-pointer"
+                                    onClick={() => handleResendExisting(existingCert.certificate_id)} 
+                                    disabled={resending}
+                                    className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl shadow-2xs transition-all active:scale-[0.99] disabled:opacity-50 text-xs sm:text-sm cursor-pointer"
                                 >
-                                    {certStatus === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                                    {certStatus === 'loading' ? 'Generating...' : 'Claim My Certificate'}
+                                    {resending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 text-indigo-600" />}
+                                    {resending ? 'Sending...' : 'Re-send My Certificate to Email'}
                                 </button>
                             )}
                         </div>

@@ -96,15 +96,18 @@ function PublicRoute({ children }) {
   const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
   const ENTERPRISE = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
   const hasEnterprise = userRoles.some((r) => ENTERPRISE.includes(r))
+  const isPureCandidate = !hasEnterprise
+  const isDualRoleCandidate = hasEnterprise && userRoles.includes('candidate') && savedCtx === 'candidate'
 
   const getPath = () => {
-    if (savedCtx === 'candidate') return '/dashboard'
+    if (isPureCandidate || isDualRoleCandidate) return '/dashboard'
     if (hasEnterprise) {
       if (userRoles.includes('admin') || userRoles.includes('platform_admin')) return '/admin'
       if (userRoles.includes('executive') || userRoles.includes('exec')) return '/exec/dashboard'
       if (userRoles.includes('recruiter')) return '/recruiter/dashboard'
       if (userRoles.includes('hiring_manager')) return '/hiring-manager/dashboard'
       if (userRoles.includes('interviewer')) return '/interviewer/dashboard'
+      return '/recruiter/dashboard'
     }
     return '/dashboard'
   }

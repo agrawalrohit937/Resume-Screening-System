@@ -94,7 +94,15 @@ function Skeleton({ className = '' }) {
 export default function SupportTickets() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const plan = (user?.plan || 'free').toLowerCase()
+
+  const userRoles = [
+    ...(Array.isArray(user?.roles) ? user.roles : []),
+    user?.role,
+  ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+  const isEnterprise =
+    user?.plan === 'enterprise' ||
+    userRoles.some((r) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(r))
+  const plan = isEnterprise ? 'enterprise' : (user?.plan || 'free').toLowerCase()
   const responseTime = RESPONSE_TIMES[plan] || '24-48 Hours'
 
   const [tickets, setTickets] = useState([])
@@ -122,9 +130,17 @@ export default function SupportTickets() {
     }
   }, [statusFilter])
 
+  // Instant synchronization when a new ticket is created anywhere (zero refresh required)
   useEffect(() => {
     fetchTickets()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleTicketCreated = () => {
+      setStatusFilter('')
+      fetchTickets('')
+    }
+    window.addEventListener('careershala:ticket-created', handleTicketCreated)
+    return () => window.removeEventListener('careershala:ticket-created', handleTicketCreated)
+  }, [fetchTickets])
 
   const handleFilterChange = (newStatus) => {
     setStatusFilter(newStatus)
@@ -181,7 +197,15 @@ export default function SupportTickets() {
               <RefreshCw size={16} strokeWidth={2.5} />
             </button>
             <div className="flex-1 sm:flex-none">
-              <SupportButton variant="primary" label="New Ticket" className="w-full sm:w-auto" />
+              <SupportButton
+                variant="primary"
+                label="New Ticket"
+                className="w-full sm:w-auto"
+                onTicketCreated={() => {
+                  setStatusFilter('')
+                  fetchTickets('')
+                }}
+              />
             </div>
           </div>
         </div>
@@ -281,7 +305,16 @@ export default function SupportTickets() {
                   ? `No ${STATUS_FILTERS.find((f) => f.value === statusFilter)?.label?.toLowerCase()} tickets found.`
                   : "You haven't created any support tickets. We're here to help!"}
             </p>
-            {!searchQuery && <SupportButton variant="primary" label="Create Your First Ticket" />}
+            {!searchQuery && (
+              <SupportButton
+                variant="primary"
+                label="Create Your First Ticket"
+                onTicketCreated={() => {
+                  setStatusFilter('')
+                  fetchTickets('')
+                }}
+              />
+            )}
           </div>
         ) : (
           <div className="space-y-2.5 sm:space-y-3">

@@ -773,40 +773,27 @@ export default function ManageCompany() {
           </div>
         </div>
 
-        {/* ── 6. Bottom Action Bar (Floating Sticky Footer Dock) ──────────── */}
-        <div className="sticky bottom-6 z-40 mx-auto bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl px-6 py-4 mt-8 flex items-center justify-between gap-4 transition-all">
-          {isReadOnly ? (
-            <>
-              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                <Lock size={14} className="text-amber-600" />
-                <span>Organization branding is read-only for invited team roles.</span>
-              </div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold">
-                <Lock size={13} className="text-slate-400" />
-                <span>Editing Disabled</span>
-              </div>
-            </>
-          ) : (
-            <div className="w-full flex items-center justify-end gap-4">
-              <button
-                type="button"
-                onClick={(e) => handleSave(e, true)}
-                className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-sm transition-colors cursor-pointer"
-              >
-                Save as Draft
-              </button>
+        {/* ── 6. Bottom Action Bar (Floating Sticky Footer Dock for Editors) ── */}
+        {!isReadOnly && (
+          <div className="sticky bottom-6 z-40 mx-auto bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl px-6 py-4 mt-8 flex items-center justify-end gap-4 transition-all">
+            <button
+              type="button"
+              onClick={(e) => handleSave(e, true)}
+              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+            >
+              Save as Draft
+            </button>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <span>{saving ? 'Saving...' : 'Save & Publish Profile'}</span>
-                <ArrowRight size={15} />
-              </button>
-            </div>
-          )}
-        </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <span>{saving ? 'Saving...' : 'Save & Publish Profile'}</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
 
       </form>
     </div>

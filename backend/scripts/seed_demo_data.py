@@ -241,12 +241,53 @@ async def seed_data(mongo_uri: str, db_name: str) -> None:
     print(f"    Current jobs in database: {existing_jobs_count}")
 
     inserted_jobs = 0
+    recruiter_user = await db.users.find_one({"email": "recruiter@careershala.com"})
+    recruiter_id = str(recruiter_user["_id"]) if recruiter_user else None
+    recruiter_tenant = (recruiter_user.get("tenant_id") if recruiter_user else None) or "tenant_careershala_talent"
+
     for job in DEMO_JOBS:
+        # Standardize schema fields for both legacy and enterprise ATS pipelines
+        job_doc = dict(job)
+        job_doc["tenant_id"] = recruiter_tenant
+        job_doc["created_by"] = recruiter_id
+        job_doc["company_name"] = "CareerShala Cloud Technologies"
+        job_doc["company"] = "CareerShala Cloud Technologies"
+        job_doc["required_skills"] = job.get("required_skills") or job.get("skills") or []
+        job_doc["jd_text_raw"] = job.get("jd_text_raw") or job.get("description") or ""
+        job_doc["jd_text"] = job_doc["jd_text_raw"]
+
         # Avoid duplicate title + company
-        existing = await db.jobs.find_one({"title": job["title"], "company": job["company"]})
+        existing = await db.jobs.find_one({
+            "title": job["title"], 
+            "$or": [
+                {"company": job.get("company")},
+                {"company_name": job_doc["company_name"]},
+                {"company": "CareerShala Cloud Technologies"},
+            ]
+        })
         if not existing:
-            await db.jobs.insert_one(job)
+            await db.jobs.insert_one(job_doc)
             inserted_jobs += 1
+        else:
+            # Backfill any missing jd_text_raw, company_name, tenant_id, or created_by
+            await db.jobs.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {
+                    "tenant_id": recruiter_tenant,
+                    "created_by": recruiter_id,
+                    "company_name": "CareerShala Cloud Technologies",
+                    "company": "CareerShala Cloud Technologies",
+                    "required_skills": existing.get("required_skills") or job_doc["required_skills"],
+                    "jd_text_raw": existing.get("jd_text_raw") or job_doc["jd_text_raw"],
+                    "jd_text": existing.get("jd_text") or job_doc["jd_text_raw"],
+                }}
+            )
+
+    # Global backfill for any existing scraped or dummy jobs without jd_text_raw
+    await db.jobs.update_many(
+        {"$or": [{"jd_text_raw": {"$exists": False}}, {"jd_text_raw": ""}, {"jd_text_raw": None}]},
+        [{"$set": {"jd_text_raw": {"$ifNull": ["$description", "$jd_text", ""]}}}]
+    )
 
     print(f"    Added {inserted_jobs} new curated job listings (Total now: {existing_jobs_count + inserted_jobs}).")
 
@@ -289,7 +330,7 @@ async def seed_data(mongo_uri: str, db_name: str) -> None:
             "user_id": user_id,
             "type": "job_application",
             "title": "Application submitted for Full Stack Software Engineer",
-            "company": "HyperScale Labs",
+            "company": "CareerShala Cloud Technologies",
             "created_at": datetime.now(timezone.utc)
         }
         await db.activities.update_one(
@@ -298,6 +339,139 @@ async def seed_data(mongo_uri: str, db_name: str) -> None:
             upsert=True
         )
         print("    Attached sample parsed resume and activity to candidate@careershala.com.")
+
+    # 4. Seed Multi-Stage Pipeline Candidates into db.applications
+    print("\n[+] Seeding Rich Applicant Kanban Pipeline...")
+    full_stack_job = await db.jobs.find_one({"title": "Full Stack Software Engineer (React + FastAPI)"})
+    ml_job = await db.jobs.find_one({"title": "AI / Machine Learning Engineer (BGE & RAG Pipelines)"})
+
+    pipeline_target_jobs = [j for j in [full_stack_job, ml_job] if j]
+    if not pipeline_target_jobs:
+        # Fallback to any job
+        first_job = await db.jobs.find_one({"created_by": recruiter_id}) or await db.jobs.find_one({})
+        if first_job:
+            pipeline_target_jobs = [first_job]
+
+    now = datetime.now(timezone.utc)
+    demo_applicants = [
+        {
+            "name": "Alex Carter",
+            "email": "candidate@careershala.com",
+            "stage": "Applied",
+            "match_score": 92.5,
+            "recruiter_score": 92.5,
+            "experience_years": 2.5,
+            "skills": ["react", "fastapi", "python", "mongodb", "docker", "tailwind css", "redis"],
+            "education": [{"degree": "B.Tech Computer Science", "institution": "State University", "year": 2023}],
+            "work_experience": [{"title": "Full Stack Developer", "company": "TechNova Solutions", "duration": "2023 - Present"}],
+            "phone": "+1-555-0199",
+            "github": "alexcarter-dev",
+            "linkedin": "https://linkedin.com/in/alexcarter-demo",
+        },
+        {
+            "name": "Priya Sharma",
+            "email": "priya.sharma@example.com",
+            "stage": "Under Review",
+            "match_score": 87.0,
+            "recruiter_score": 87.0,
+            "experience_years": 4.0,
+            "skills": ["python", "fastapi", "postgresql", "docker", "redis", "kubernetes", "aws"],
+            "education": [{"degree": "M.S. Software Systems", "institution": "National Institute", "year": 2021}],
+            "work_experience": [{"title": "Backend Infrastructure Engineer", "company": "CloudNative Systems", "duration": "2021 - Present"}],
+            "phone": "+91-98765-43210",
+            "github": "priyasharma-code",
+            "linkedin": "https://linkedin.com/in/priya-sharma-tech",
+        },
+        {
+            "name": "Devon Vance",
+            "email": "devon.vance@example.com",
+            "stage": "Shortlisted",
+            "match_score": 95.0,
+            "recruiter_score": 95.0,
+            "experience_years": 5.5,
+            "skills": ["react", "typescript", "fastapi", "graphql", "microservices", "docker", "tailwind css"],
+            "education": [{"degree": "B.S. Computer Engineering", "institution": "Tech Institute", "year": 2020}],
+            "work_experience": [{"title": "Senior Frontend / Fullstack", "company": "HyperScale Labs", "duration": "2020 - Present"}],
+            "phone": "+1-555-0842",
+            "github": "devonvance",
+            "linkedin": "https://linkedin.com/in/devon-vance",
+        },
+        {
+            "name": "Marcus Thorne",
+            "email": "marcus.thorne@example.com",
+            "stage": "Interview",
+            "match_score": 89.5,
+            "recruiter_score": 89.5,
+            "experience_years": 3.5,
+            "skills": ["python", "fastapi", "react", "next.js", "ci/cd", "mongodb", "docker"],
+            "education": [{"degree": "B.Tech Information Technology", "institution": "Metro University", "year": 2022}],
+            "work_experience": [{"title": "Full Stack Engineer", "company": "Vertex Digital", "duration": "2022 - Present"}],
+            "phone": "+44-20-7946-0912",
+            "github": "marcusthorne",
+            "linkedin": "https://linkedin.com/in/marcus-thorne",
+        },
+        {
+            "name": "Ananya Iyer",
+            "email": "ananya.iyer@example.com",
+            "stage": "Rejected",
+            "match_score": 46.0,
+            "recruiter_score": 46.0,
+            "experience_years": 1.0,
+            "skills": ["c++", "embedded systems", "matlab"],
+            "education": [{"degree": "B.E. Electronics", "institution": "City College", "year": 2024}],
+            "work_experience": [{"title": "Hardware Intern", "company": "ChipTech Labs", "duration": "2024"}],
+            "phone": "+91-98111-22334",
+            "github": "ananyaiyer",
+            "linkedin": "https://linkedin.com/in/ananya-iyer",
+        },
+    ]
+
+    total_apps_seeded = 0
+    for target_job in pipeline_target_jobs:
+        job_id_str = str(target_job["_id"])
+        job_title = target_job.get("title", "")
+        
+        for cand in demo_applicants:
+            app_filter = {"job_id": job_id_str, "candidate_email": cand["email"]}
+            app_doc = {
+                "job_id": job_id_str,
+                "candidate_name": cand["name"],
+                "candidate_email": cand["email"],
+                "stage": cand["stage"],
+                "match_score": cand["match_score"],
+                "recruiter_score": cand["recruiter_score"],
+                "tenant_id": recruiter_tenant,
+                "knockout_status": {"passed": cand["match_score"] >= 50.0, "reasons": []},
+                "resume_snapshot": {
+                    "filename": f"{cand['name'].replace(' ', '_')}_Resume.pdf",
+                    "parsed_data": {
+                        "name": cand["name"],
+                        "email": cand["email"],
+                        "skills": cand["skills"],
+                        "total_experience_years": cand["experience_years"],
+                        "education": cand["education"],
+                        "work_experience": cand["work_experience"],
+                        "contact_info": {
+                            "phone": cand["phone"],
+                            "github": cand["github"],
+                            "linkedin": cand["linkedin"],
+                            "email": cand["email"],
+                        },
+                    },
+                },
+                "created_at": now,
+                "updated_at": now,
+            }
+
+            await db.applications.update_one(app_filter, {"$set": app_doc}, upsert=True)
+            total_apps_seeded += 1
+
+        # Synchronize live applicant count on job
+        actual_cnt = await db.applications.count_documents({"job_id": job_id_str})
+        await db.jobs.update_one({"_id": target_job["_id"]}, {"$set": {"applicant_count": actual_cnt}})
+        print(f"    Seeded {len(demo_applicants)} applicants for role: '{job_title}' (Total on job: {actual_cnt})")
+
+    print(f"    [OK] Successfully synchronized {total_apps_seeded} applicants across pipeline.")
 
     client.close()
     print("\n[OK] Demo data seeding complete! Ready for evaluation.")

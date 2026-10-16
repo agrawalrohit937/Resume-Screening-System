@@ -13,6 +13,7 @@ async def dispatch_certificate_email(
     issued_at: datetime,
     public_url: str,
     pdf_bytes: bytes,
+    is_update: bool = False,
 ):
     """Dispatches a certificate email using Brevo HTTP API."""
     title = snapshot.get("assessment_name", "your assessment")
@@ -33,6 +34,7 @@ async def dispatch_certificate_email(
             issued_at=issued_at,
             public_url=public_url,
             pdf_bytes=pdf_bytes,
+            is_update=is_update,
         )
     except Exception as exc:
         logger.warning(

@@ -17,17 +17,15 @@ const LINKEDIN_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_LINKEDIN_
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || 'Ov23liO6t7Tun6tzlpYq';
 const GITHUB_REDIRECT_URI = getOAuthRedirectUri(import.meta.env.VITE_GITHUB_REDIRECT_URI, '/github-callback');
 
-// ─── Smart redirect: respect the user's last-active view context ──────────────
-// Priority order:
-//   1. If saved context is 'employer' AND user has an enterprise role → enterprise dashboard
-//   2. If saved context is 'candidate' → /dashboard
-//   3. No saved context → fall back to role-based default (enterprise first if available)
-function getSmartRedirectPath(userRoles) {
-  const normalised = userRoles.map((r) => String(r).toLowerCase().trim())
-  const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context') // 'employer' | 'candidate' | null
+// ─── Smart redirect: respect the user's role and view context ──────────────
+export function getSmartRedirectPath(userRoles, preferredRole = null) {
+  const normalised = (Array.isArray(userRoles) ? userRoles : [userRoles])
+    .filter(Boolean)
+    .map((r) => String(r).toLowerCase().trim())
 
   const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
   const hasEnterpriseRole = normalised.some((r) => ENTERPRISE_ROLES.includes(r))
+  const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
 
   const getEnterprisePath = () => {
     if (normalised.includes('admin') || normalised.includes('platform_admin')) return '/admin'
@@ -38,15 +36,21 @@ function getSmartRedirectPath(userRoles) {
     return '/recruiter/dashboard'
   }
 
-  // Saved preference: employer view
-  if (savedCtx === 'employer' && hasEnterpriseRole) return getEnterprisePath()
+  // 1. If user has an enterprise role:
+  if (hasEnterpriseRole) {
+    // Only return candidate dashboard if user specifically logged in as candidate on a dual-role account
+    if (preferredRole === 'candidate' && normalised.includes('candidate') && savedCtx === 'candidate') {
+      try { localStorage.setItem('careershala_view_context', 'candidate') } catch (_) {}
+      return '/dashboard'
+    }
 
-  // Saved preference: candidate view
-  if (savedCtx === 'candidate') return '/dashboard'
+    // Default for any enterprise account is ALWAYS their enterprise dashboard
+    try { localStorage.setItem('careershala_view_context', 'employer') } catch (_) {}
+    return getEnterprisePath()
+  }
 
-  // No saved preference → enterprise users go to enterprise dashboard by default
-  if (hasEnterpriseRole) return getEnterprisePath()
-
+  // 2. Pure candidate user
+  try { localStorage.setItem('careershala_view_context', 'candidate') } catch (_) {}
   return '/dashboard'
 }
 
@@ -91,7 +95,7 @@ export default function Login() {
         const userRoles = (Array.isArray(data?.user?.roles) && data?.user?.roles?.length > 0)
           ? data.user.roles.map((r) => String(r).toLowerCase())
           : [String(data?.user?.role || selectedRole).toLowerCase()]
-        navigate(getSmartRedirectPath(userRoles))
+        navigate(getSmartRedirectPath(userRoles, selectedRole))
       } catch (err) {
         console.error('Google Auth Backend Error:', err)
         toast.error(formatError(err, 'Google login failed'))
@@ -123,7 +127,7 @@ export default function Login() {
         ? result.user.roles.map((r) => String(r).toLowerCase())
         : [String(result?.user?.role || selectedRole).toLowerCase()]
 
-      navigate(getSmartRedirectPath(userRoles))
+      navigate(getSmartRedirectPath(userRoles, selectedRole))
     } catch (err) {
       toast.error(formatError(err, 'Invalid credentials'))
     } finally {

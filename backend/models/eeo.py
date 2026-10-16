@@ -63,3 +63,5 @@ class EEOSelfIdentificationRecord(BaseModel):
     application_id: Optional[str] = None
     job_id: Optional[str] = None
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = {"populate_by_name": True}

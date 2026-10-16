@@ -347,11 +347,15 @@ class EmailService:
         issued_at: Any,
         public_url: str,
         pdf_bytes: bytes,
+        is_update: bool = False,
     ) -> bool:
         """2. Certificate Delivery with PDF attachment"""
         verification_url = f"{settings.cert_verify_base_url}/{cert_id}"
         issued_str = issued_at.strftime("%d %B %Y") if hasattr(issued_at, "strftime") else str(issued_at)
-        subject = f"🎉 Congratulations {recipient_name}! Your CareerShala Certificate is Ready"
+        if is_update:
+            subject = f"✨ Updated CareerShala Certificate: {topic} ({grade_label} • {int(score)}%)"
+        else:
+            subject = f"🎉 Congratulations {recipient_name}! Your CareerShala Certificate is Ready"
 
         # Generate LinkedIn 'Add Certification' URL with proper encoding
         issue_year = str(issued_at.year) if hasattr(issued_at, "year") else str(datetime.now().year)
@@ -385,6 +389,7 @@ class EmailService:
             public_url=public_url,
             linkedin_url=linkedin_url,
             verification_url=verification_url,
+            is_update=is_update,
         )
 
         pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
