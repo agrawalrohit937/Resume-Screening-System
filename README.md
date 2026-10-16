@@ -1,4 +1,4 @@
-# 🚀 CareerShala — Next-Gen AI Applicant Tracking System (ATS) & Talent Cloud
+# 🚀 CareerShala — Smart AI Career Platform & Applicant Tracking System (ATS)
 
 [![Live Deployment](https://img.shields.io/badge/Live%20App-www.careershala.tech-success?style=for-the-badge&logo=google-chrome&logoColor=white)](https://www.careershala.tech)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
@@ -8,311 +8,374 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%207.0-47A248.svg?style=flat-square&logo=mongodb)](https://www.mongodb.com/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4.6-38B2AC.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Version-3.0.0-blue.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
+[![Tests](https://img.shields.io/badge/Tests-397%20Passed-brightgreen.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
 
 > [!IMPORTANT]
-> 🌐 **Live Production Web Application**: **[https://www.careershala.tech](https://www.careershala.tech)**
-> 
-> **Please check this!** CareerShala is deployed live in production. You can directly explore candidate ATS scoring, radar analytics, live proctored mock interviews, recruiter Kanban pipelines, AI copilot, and portfolio studio without local setup.
+> 🌐 **Try it Live**: **[https://www.careershala.tech](https://www.careershala.tech)**  
+> CareerShala is deployed live in production. You can explore resume ATS scoring, AI mock interviews with camera proctoring, recruiter Kanban pipelines, candidate portfolios, and the AI copilot without any local setup!
 
-> **CareerShala** is an enterprise-grade AI-powered recruitment, applicant tracking system (ATS), and career co-pilot platform. Engineered with **FastAPI**, **React 18**, **MongoDB Atlas**, and cutting-edge **Neural LLM/RAG pipelines (BGE-M3 + BGE-Reranker)**, it bridges the gap between ambitious candidates and modern hiring teams with high-precision ATS scoring (NDCG@10 = 0.9927), knockout screening, computer vision live mock interviews, and automated application outreach.
+---
+
+## 📌 Table of Contents
+1. [What is CareerShala?](#-what-is-careershala)
+2. [Why We Built This (The Problem It Solves)](#-why-we-built-this)
+3. [Live Demo & Quick Links](#-live-demo--quick-links)
+4. [Pre-Seeded Demo Accounts](#-pre-seeded-demo-accounts)
+5. [System Architecture](#-system-architecture)
+6. [Built-in Reliability & Automatic Fallbacks](#-built-in-reliability--automatic-fallbacks)
+7. [Complete Features Walkthrough](#-complete-features-walkthrough)
+   - [For Job Seekers (Candidates)](#a-for-job-seekers-candidates)
+   - [For Recruiters & Hiring Teams](#b-for-recruiters--hiring-teams)
+   - [Platform & System Features](#c-platform--system-features)
+8. [Technology Stack](#-technology-stack)
+9. [Project Directory Structure](#-project-directory-structure)
+10. [Local Installation & Setup Guide](#-local-installation--setup-guide)
+11. [Environment Variables Explained](#-environment-variables-explained-backendenv)
+12. [Testing & Quality Benchmarks](#-testing--quality-benchmarks)
+13. [Production Deployment Guide](#-production-deployment-guide)
+14. [Contributing & License](#-contributing)
+15. [Contact & Support](#-contact--support)
+
+---
+
+## 💡 What is CareerShala?
+
+**CareerShala** is an all-in-one AI career ecosystem and modern Applicant Tracking System (ATS). It connects job seekers with hiring teams by solving two big challenges:
+
+1. **For Job Seekers**: Most resumes get rejected by company ATS software before a human even reads them. CareerShala gives candidates clear, actionable feedback to fix their resume, lets them practice realistic AI mock interviews, and helps them build an online portfolio and job applications in minutes.
+2. **For Recruiters**: Reviewing thousands of resumes manually takes days. CareerShala automatically reads and ranks resumes against job descriptions, filters out unqualified applicants fairly, and manages hiring stages in a visual Kanban board.
+
+---
+
+## 🎯 Why We Built This
+
+| Traditional Job Search & Hiring | How CareerShala Fixes It |
+| :--- | :--- |
+| **Black-box ATS rejection**: Candidates never know why their resume was rejected. | **Clear feedback**: Explains exact missing skills, keyword gaps, and formatting issues. |
+| **Freshers unfairly penalized**: Keyword tools often reject freshers simply because they have 0 years of experience. | **Smart experience calibration**: Grades freshers on projects and core skills rather than years of experience. |
+| **Stressful, unprepared interviews**: Candidates don't get realistic practice before real job interviews. | **AI Mock Interviewer**: Interactive practice with dynamic follow-up questions and eye-contact monitoring. |
+| **Slow, manual resume sorting**: HR teams spend 20+ hours reading resumes for a single job opening. | **Automated screening**: Instantly ranks candidates and checks must-have qualifications in seconds. |
+| **Unconscious bias in hiring**: Personal demographics (gender, age, location) can affect candidate evaluation. | **Blind screening**: Hides personal background details during initial evaluation to keep hiring fair. |
 
 ---
 
 ## 🌟 Live Demo & Quick Links
 
-> 📢 **Live Website**: Please check our live deployment at **[https://www.careershala.tech](https://www.careershala.tech)**!
-
-- 🌐 **Production Web Application**: **[https://www.careershala.tech](https://www.careershala.tech)** — *(Please check this!)*
-- ⚙️ **Interactive OpenAPI Swagger Docs**: `http://localhost:8000/docs`
-- 📚 **Alternative ReDoc API Specs**: `http://localhost:8000/redoc`
-- 📜 **Public Skill Certificate Verification**: [https://www.careershala.tech](https://www.careershala.tech) (`/verify/:certificateId`)
-- 💼 **Candidate Public Portfolio Showcase**: [https://www.careershala.tech](https://www.careershala.tech) (`/portfolio/:username`)
-- 🏢 **Employer Public Company Pages**: [https://www.careershala.tech](https://www.careershala.tech) (`/company/:companySlug`)
+- 🌐 **Live Web Application**: [https://www.careershala.tech](https://www.careershala.tech)
+- ⚙️ **Interactive API Docs (Swagger)**: `http://localhost:8000/docs`
+- 📚 **Alternative API Specs (ReDoc)**: `http://localhost:8000/redoc`
+- 📜 **Certificate Verification**: [Verify Certificate](https://www.careershala.tech) (`/verify/:certificateId`)
+- 💼 **Sample Candidate Portfolio**: [View Portfolio](https://www.careershala.tech) (`/portfolio/:username`)
+- 🏢 **Company Careers Page**: [View Company Page](https://www.careershala.tech) (`/company/:companySlug`)
 
 ---
 
-## ⚡ Quick Evaluation Fast-Track (For Recruiters & Evaluators)
+## 🔑 Pre-Seeded Demo Accounts
 
-Want to evaluate the project locally with **zero configuration friction**? Follow these quick steps:
+To test CareerShala locally without creating accounts manually, run `python scripts/seed_demo_data.py` inside `backend/` to unlock these pre-configured accounts:
 
-### 🔑 Pre-Seeded Demo Accounts
-No need to register! Run `python scripts/seed_demo_data.py` in `backend/` to instantly unlock:
-
-| Role | Demo Email | Password | Features Unlocked |
+| Role | Email | Password | What You Can Test |
 | :--- | :--- | :--- | :--- |
-| **Candidate** | `candidate@careershala.com` | `Candidate123!` | ATS resume score, radar charts, live mock interview, portfolio studio |
-| **Recruiter / HR** | `recruiter@careershala.com` | `Recruiter123!` | Multi-tenant ATS, Kanban hiring pipeline, requisitions, scorecard rubrics |
-| **Platform Admin** | `admin@careershala.com` | `Admin123!` | Tenant management, system health, telemetry drift, ontology controls |
+| **Candidate** | `candidate@careershala.com` | `Candidate123!` | Resume ATS scoring, skill radar charts, AI mock interview, portfolio editor, job outreach |
+| **Recruiter / HR** | `recruiter@careershala.com` | `Recruiter123!` | Create job requisitions, candidate Kanban board, candidate scorecards, hiring stages |
+| **Platform Admin** | `admin@careershala.com` | `Admin123!` | System settings, user accounts, system health metrics, subscription plans |
 
 > [!TIP]
-> **Zero-Dependency Resilience**: The platform includes 2-tier graceful fallbacks. If external Groq/Gemini API keys or Brevo mail keys are omitted, the application automatically uses local neural heuristics and mock templates without crashing.
+> **Zero Configuration Friction**: The platform has built-in smart fallbacks. Even if you do not add paid external API keys (like Groq or Brevo), the app works smoothly using local templates and fallback heuristics.
 
 ---
 
-## 📖 System Architecture & Overview
+## 📖 System Architecture
 
-CareerShala is architected as an ultra-responsive decoupled Single-Page Application (SPA) backed by asynchronous, resilient Python microservices:
+CareerShala is built as a modern, decoupled web application. The frontend runs in the browser using React, and communicates through a secure API with the FastAPI Python backend:
 
 ```mermaid
 graph TD
-    subgraph ClientLayer ["Frontend SPA - React 18 + Vite 5 + Tailwind CSS"]
-        CandidateUI["Candidate Career Cockpit"]
-        RecruiterUI["Recruiter & Enterprise Kanban"]
-        CopilotUI["Interactive AI Copilot Drawer"]
-        ProctorUI["4-Layer Vision Proctor Canvas"]
-        PortfolioUI["Interactive 6-Theme Portfolio Studio"]
+    subgraph ClientLayer ["Frontend (React 18 + Vite + Tailwind CSS)"]
+        CandidateUI["Candidate Dashboard & Tools"]
+        RecruiterUI["Recruiter Kanban Board"]
+        CopilotUI["Floating AI Copilot Chat"]
+        ProctorUI["Camera & Screen Proctoring"]
+        PortfolioUI["Portfolio Website Builder"]
     end
 
-    subgraph GatewayLayer ["FastAPI Asynchronous Gateway"]
-        TenantMW["Multi-Tenant Context Middleware"]
-        AuthMW["JWT HS256 & RBAC Security Guard"]
-        RateLimiter["SlowAPI Distributed Rate Limiter"]
-        UploadHandler["Magic-Byte File Sanitizer"]
+    subgraph GatewayLayer ["Backend API Gateway (FastAPI)"]
+        TenantMW["Workspace & Company Isolation"]
+        AuthMW["User Authentication (JWT & Passwords)"]
+        RateLimiter["Rate Limiting & Protection"]
+        UploadHandler["Resume File Security Checker"]
     end
 
-    subgraph IntelligenceEngines ["Intelligence & Scoring Engines"]
-        ATS["Neural ATS Engine: BGE-M3 1024-D + BGE-Reranker"]
-        Scoring["Experience & Fresher Scoring Calibration"]
-        Knockout["Enterprise Hard-Gate & Knockout Validator"]
-        LangGraph["LangGraph Multi-Agent Application Dispatcher"]
-        Copilot["Multi-Provider LLM Key Pool: Groq / Gemini 2.5"]
+    subgraph IntelligenceEngines ["AI & Smart Scoring Engines"]
+        ATS["Smart Resume Matcher & Scorer"]
+        Scoring["Fresher & Experience Calibrator"]
+        Knockout["Must-Have Requirements Checker"]
+        LangGraph["AI Cover Letter & Email Generator"]
+        Copilot["AI Helper (Groq / Gemini)"]
     end
 
-    subgraph CloudServices ["Cloud Storage & External Services"]
-        MongoDB[("MongoDB Atlas 7.0 Multi-Tenant")]
-        Cloudinary["Cloudinary CDN"]
-        Brevo["Brevo Transactional Mailer - HTTPS Port 443"]
-        GmailOAuth["Google Gmail OAuth 2.0 Relay"]
-        ReportLab["Zero-Network Vector PDF Engine"]
-        AzureLogicApps["Azure Logic App Serverless Timers"]
+    subgraph CloudServices ["Databases & Cloud Services"]
+        MongoDB[("MongoDB Database")]
+        Cloudinary["Image & Profile Photo CDN"]
+        Brevo["Email Notifications Service"]
+        GmailOAuth["Send Email via Gmail"]
+        ReportLab["PDF Certificate Generator"]
+        AzureLogicApps["Automated Timers & Tasks"]
     end
 
     ClientLayer --> GatewayLayer
-    AzureLogicApps -->|X-Cron-Secret HTTP POST| GatewayLayer
+    AzureLogicApps -->|Automated Scheduled Jobs| GatewayLayer
     GatewayLayer --> IntelligenceEngines
     GatewayLayer --> CloudServices
 ```
 
 ---
 
-## 🛡️ Enterprise 2-Tier Fallback & Resilience Matrix
+## 🛡️ Built-in Reliability & Automatic Fallbacks
 
-Every critical subsystem in CareerShala implements a verified **Primary ➔ Fallback** high-availability architecture:
+In many web apps, if a third-party service (like an AI provider or email server) goes down, the entire app crashes. CareerShala implements a **2-Tier Fallback Strategy** so that every single feature keeps working:
 
-| Subsystem | Primary Engine | Secondary Fallback | Final Safe Guard |
+| Subsystem | Primary Method | Automatic Fallback | Final Safety Net |
 | :--- | :--- | :--- | :--- |
-| **🤖 LLM Inference** | Primary Provider Key | Thread-Safe Key Pool Rotation (`settings.groq_api_keys`) | Pre-compiled static curated response |
-| **🧩 JSON Parsing** | Direct `json.loads` | Centralized `json_repair.loads` (auto-heals code blocks & syntax) | Curated default response bank |
-| **📄 PDF Resume Parsing** | Azure Document Intelligence (Prebuilt Layout OCR $\le$ 2 pages) | Local `pdfplumber` layout-aware CPU extractor | Clean raw text extraction |
-| **🎯 ATS Match Scoring** | Local BGE-M3 (1024-D Multi-Vector) + BGE-Reranker | Google Gemini 2.5 Flash Cloud Vector Embeddings | Deterministic Skill Overlap & Graph Heuristic |
-| **🔒 Distributed Locking** | Distributed Redis Atomic Lock (`SET NX EX`) | MongoDB Atomic Document Lock (`find_one_and_update`) | Fail-safe non-overlapping task abort |
-| **⚡ Embedding Cache** | Redis Embedding Cache (30-day TTL, Int8 Quantization) | Zero-RAM Pass-through Compute | Direct high-throughput batching |
-| **💳 Subscription Activation** | Gateway Verification (`POST /verify`) | Webhook Fallback (`payment.captured` / `order.paid`) | Lazy Request Downgrade Guard (`get_current_user`) |
-| **⏱️ Background Scheduling** | Azure Logic App Cloud Timers (`X-Cron-Secret`) | Admin Webhook Trigger (`/api/v1/*/admin/*`) | Distributed Atomic Lock Abort (`Redis / Mongo`) |
+| **AI Responses (LLM)** | Primary Groq / Gemini API key | Automatically rotates through a pool of backup keys | Returns a curated local response template |
+| **PDF Resume Reading** | Cloud OCR (Azure Document Intelligence) | Local `pdfplumber` layout-aware text extractor | Clean raw text extraction |
+| **Resume Matching Score** | Local BGE-M3 Neural Embedding model | Google Gemini Cloud Vector Embeddings | Deterministic skill & keyword overlap calculation |
+| **AI Output Parsing** | Standard `json.loads` | Auto-repairing `json-repair` tool (fixes markdown blocks) | Safe default response bank |
+| **Task Synchronization** | Distributed Redis atomic lock | MongoDB atomic document lock | Aborts duplicate overlapping jobs safely |
+| **Background Scheduling** | Azure Cloud Timer Triggers | Admin Webhook endpoints (`/admin/trigger-*`) | Built-in fallback task sweep |
+| **Payment Activation** | Instant checkout verification | Background Razorpay webhook listener | Auto-checks status when user next logs in |
 
 ---
 
-## ✨ Key Features
+## ✨ Complete Features Walkthrough
 
-### 1. 📊 Neural ATS Resume Screening & Explainable AI (XAI)
-- **100% Neural Matching Engine**: Blends dense semantic vector representations (1024-D BGE-M3 embeddings) with deep Cross-Encoder re-ranking. Achieves **0.9927 NDCG@10** on benchmark evaluation suites.
-- **Fair Experience Scoring**: Dynamic models calibrated for both Entry-Level/Fresher candidates (0.0 years baseline) and Senior professionals.
-- **Knock-Out Gate Verification**: Automated checks for must-have hard skills, minimum education degrees, and required certifications.
-- **Actionable AI Feedback**: Categorized suggestions (Skill Match, Skill Gap, Degree in Progress, Formatting Fixes) with 1-click prompt copying.
-- **Ghost Text & Keyword Stuffing Detection**: Uncovers hidden white text, micro-fonts, and timeline anomalies.
+### A. For Job Seekers (Candidates)
 
-### 2. 🏢 Enterprise ATS & B2B SaaS Hiring Cloud
-- **Multi-Tenant Isolation**: Rigorous tenant partitioning (`x-tenant-id`) across requisitions, candidates, and scorecards.
-- **5 Role-Specific Dashboards**:
-  - **Executive Cockpit**: Requisition velocity, cost-per-hire, offer acceptance rate, and department health.
-  - **Recruiter Kanban**: 6-stage candidate pipeline (`Applied` ➔ `Reviewing` ➔ `Shortlisted` ➔ `Interview` ➔ `Hired` ➔ `Rejected`).
-  - **Hiring Manager Portal**: Requisition sign-offs, scorecard calibration, and candidate advancement.
-  - **Interviewer Workbench**: Structured interview kits with STAR competency rubrics.
-  - **Team Management**: Role-Based Access Control (Owner, Admin, Recruiter, Hiring Manager, Interviewer, Executive).
-- **EEOC & OFCCP Compliance Vault**: Demographics data is cryptographically isolated from hiring evaluators to eliminate bias.
+1. **Smart ATS Resume Scoring & Gap Analysis**:
+   - Upload your resume in PDF or Word (`.docx`) format.
+   - Compares your resume against any job description and gives a match score from 0% to 100%.
+   - Breaks down your score into **Skills Match**, **Experience Level**, **Education**, and **Formatting**.
+   - Displays a visual **Skills Radar Chart** showing your strengths and areas to improve.
+   - Highlights exact missing keywords that you should consider adding.
 
-### 3. 💬 Persistent AI Career Copilot
-- **Universal Assistant**: Floating conversational co-pilot accessible on every view.
-- **Dynamic Context Assembly (RAG)**: Gathers live candidate profile data, parsed resumes, ATS scores, and interview histories.
-- **Multi-Provider Cascade Failover**: Seamless fallback sequence across Groq (GPT-OSS-120B / Qwen) and Google Gemini 2.5 Flash with thread-safe key rotation.
-- **Resilient JSON Recovery**: Standardized with `json-repair` across all 6 AI workflows.
+2. **Fair Scoring for Freshers**:
+   - Traditional ATS systems reject freshers because their years of experience are zero.
+   - CareerShala automatically detects entry-level roles and evaluates freshers based on their projects, technical skills, coursework, and problem-solving abilities.
 
-### 4. 🎥 Real-Time Mock Interviewer & 4-Layer Vision Proctoring
-- **Adaptive Conversational AI**: Generates technical and behavioral follow-up questions tailored to real-time candidate answers.
-- **4-Layer In-Browser Proctoring**:
-  1. *MediaPipe FaceMesh*: 3D head pose matrix calculation and iris gaze vector tracking.
-  2. *COCO-SSD Real-Time Detector*: Identifies unauthorized smartphones, monitors, notes, and extra persons.
-  3. *face-api.js Affect Recognition*: Facial expression analysis and posture anomaly tracking.
-  4. *Telemetry Stream Aggregator*: Streams events to compute a real-time 0–100% Candidate Integrity Score.
+3. **Resume Cheat & Hack Detection**:
+   - Detects sneaky tricks like invisible white text, 1pt micro-fonts, and impossible work dates.
+   - Keeps candidates informed on whether their resume looks natural and professional.
 
-### 5. 🎨 AI Portfolio Builder Studio
-- **1-Click Extraction**: Converts uploaded PDF resumes into fully structured portfolio profiles.
-- **6 Premium Visual Themes**: Bento Grid, Glassmorphic Pro, Cyberpunk Neon, Minimal Elegance, Terminal Developer, and 3D Interactive.
-- **Public Showcase & Relay**: Hosted at `/portfolio/:username` with private recruiter-to-candidate email relay.
+4. **Real-Time AI Mock Interviews with Live Camera Proctoring**:
+   - Choose a target job role and experience level.
+   - The AI interviewer asks questions via voice and text, listens to your answers, and asks relevant follow-up questions.
+   - **In-Browser Vision Proctoring** (runs 100% locally on your computer for privacy):
+     - Monitors face position and eye gaze to encourage confident eye contact.
+     - Alerts you if multiple people or a smartphone appear in front of the camera.
+     - Tracks tab switching to prevent cheating.
+     - Generates an **Interview Integrity Score (0–100%)** alongside a communication and technical evaluation report.
 
-### 6. 🤖 AI Apply Assistant & Smart Outreach
-- **Screenshot OCR Vision Parser**: Extracts job details, required qualifications, and HR contact emails from job board screenshots.
-- **LangGraph Multi-Agent Cover Letters**: Generates personalized cold emails and custom cover letter PDFs.
-- **Dual-Engine Delivery**: Dispatches via Google Gmail OAuth or Brevo HTTPS REST API with candidate `replyTo` injection.
+5. **1-Click Online Portfolio Builder**:
+   - Automatically reads your resume and converts it into a ready-to-share online portfolio website.
+   - Offers **6 visual themes**:
+     - *Bento Grid* (Modern cards)
+     - *Glassmorphic Pro* (Sleek frosted glass look)
+     - *Cyberpunk Neon* (High-tech vibrant dark mode)
+     - *Minimal Elegance* (Clean and simple typography)
+     - *Terminal Developer* (Retro command-line style)
+     - *3D Interactive* (Playful interactive elements)
+   - Hosted with a shareable URL (`/portfolio/:username`) and an integrated contact form so recruiters can message you directly.
 
-### 7. 📜 Cryptographically Verified Skill Certificates
-- **Zero-Network ReportLab Engine**: Generates high-resolution vector PDF certificates locally without external API dependencies.
-- **Tamper-Proof Verification**: Embedded SHA-256 verification hash, unique alphanumeric credential ID, and scannable QR code.
+6. **AI Job Application Assistant**:
+   - Take a screenshot of any job post on LinkedIn, Indeed, or any company site.
+   - The system reads the image, extracts the job title, requirements, and recruiter email address.
+   - Generates a customized cover letter and cold outreach email tailored to your resume.
+   - Allows sending the email directly through your connected Gmail or Brevo account with one click.
 
-### 8. 🎮 Gamification & Career Quest
-- **28-Day Heatmap Grid**: Visual activity tracking for daily mock interviews, ATS scans, and profile enhancements.
-- **Streaks & XP Levels**: Milestone rewards, daily chest claims, and public candidate leaderboards.
+7. **Tamper-Proof Skill Certificates**:
+   - Complete mock interviews or skill challenges to earn a verified certificate.
+   - Includes a unique alphanumeric Credential ID, a SHA-256 security hash, and a scannable QR code.
+   - Anyone can scan the QR code to verify the certificate's validity at `/verify/:certificateId`.
 
-### 9. 💳 Bulletproof SaaS Subscription Lifecycle & Revenue Recovery
-- **Precision Date & Status Tracking**: Explicit `subscription_start_date`, `subscription_end_date`, and `subscription_status` (`active`, `expired`, `cancelled`) persisted on user accounts.
-- **Stackable Early Renewals**: If a user renews before expiration, existing days are preserved and 30 days are appended onto their future `subscription_end_date`.
-- **Failsafe Webhook Activation**: Razorpay `payment.captured` and `order.paid` webhooks act as an automatic backend fallback, provisioning subscriptions even if the user's browser closes before manual `/verify`.
-- **Zero-Lag Lazy Downgrades**: `get_current_user` middleware inspects subscription validity on incoming API requests, performing an atomic MongoDB downgrade to `plan='free'` with immediate in-memory reflection.
-- **Route-Level Plan Guards**: Reusable `require_plan(min_tier)` FastAPI dependency enforcing plan tier access (`free` < `pro` < `premium`) with automatic platform admin bypass.
-- **Hardened Cleanup Sweep**: Daily background cron catches overdue accounts and backfills legacy pre-migration users (`plan_updated_at <= now - 30 days`).
-
-### 10. ⏱️ Serverless Multi-Worker Scheduling (Azure Logic Apps)
-- **Decoupled Cloud Triggers**: Replaced fragile in-process Python thread schedulers with high-availability Azure Logic App Timer Triggers.
-- **Header-Authenticated Webhooks**: Protected via `X-Cron-Secret` header validation against `settings.CRON_SECRET`:
-  - `POST /api/v1/jobs/admin/trigger-alerts`: Automated nightly/hourly candidate job alert matching and Brevo dispatch.
-  - `POST /api/v1/resume/admin/sweep-stuck`: Automated recovery of stuck or orphaned resume parsing jobs.
-  - `POST /api/v1/users/admin/expire-subscriptions`: Automated daily sweep to downgrade expired subscriptions to the free tier.
+8. **Gamification & Daily Habit Tracking**:
+   - **28-Day Heatmap**: Visual green activity grid (like GitHub) tracking your daily resume scans and practice interviews.
+   - **XP & Streaks**: Earn experience points, level up, unlock achievement badges, and climb the public leaderboard.
 
 ---
 
-## 🛠️ Technology Stack Matrix
+### B. For Recruiters & Hiring Teams
 
-| Layer | Technology | Purpose & Implementation |
+1. **Multi-Tenant Organization Workspaces**:
+   - Create separate company workspaces where team members can collaborate without mixing data.
+   - Supports 6 distinct permission levels: *Owner*, *Admin*, *Recruiter*, *Hiring Manager*, *Interviewer*, and *Executive*.
+
+2. **Visual Candidate Kanban Pipeline**:
+   - Manage job openings with a 6-stage drag-and-drop board:
+     `Applied` ➔ `Reviewing` ➔ `Shortlisted` ➔ `Interview` ➔ `Hired` ➔ `Rejected`.
+   - Filter applicants by score, skills, or date.
+   - Add private internal notes and interview feedback.
+
+3. **Must-Have Requirements (Knockout Gates)**:
+   - Define strict job criteria (e.g., "Must hold a Bachelor's Degree" or "Must have 3+ years in Python").
+   - Candidates who do not meet these hard requirements are flagged automatically, saving recruiters hours of manual review.
+
+4. **Standardized Interview Kits & Scorecards**:
+   - Provide interviewers with structured rubrics (STAR methodology: Situation, Task, Action, Result) to evaluate candidates consistently.
+   - Eliminates guesswork and ensures every applicant is rated on the same fair scale.
+
+5. **Blind Screening & Fair Hiring Compliance**:
+   - Hides sensitive candidate demographic information (name, gender, age, location) during early screening stages.
+   - Helps companies stay compliant with fair employment standards (EEOC/OFCCP) and hire purely based on merit.
+
+---
+
+### C. Platform & System Features
+
+1. **Floating AI Career Copilot**:
+   - An intelligent assistant accessible from any screen in the application.
+   - Answers questions about resume improvements, interview preparation, career paths, and platform navigation.
+
+2. **Subscription & Plan Management**:
+   - Supports 3 tiers: **Free**, **Pro**, and **Enterprise**.
+   - Integrated with Razorpay checkout and background webhook listeners.
+   - If a user renews early, remaining days are preserved and 30 new days are added to the expiration date.
+
+3. **Automated Scheduled Tasks (Azure Logic Apps)**:
+   - Automatically runs background jobs:
+     - Sends nightly email alerts to candidates about new matching job openings.
+     - Automatically cleans up any stuck resume parsing tasks.
+     - Safely returns expired subscriptions to the free plan.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology | Purpose in Project |
 | :--- | :--- | :--- |
-| **Frontend Framework** | **React 18** + **Vite 5** | High-performance SPA with client-side routing and instant HMR |
-| **Styling & UI** | **Tailwind CSS** + **Lucide Icons** | Glassmorphic design system, dark mode, responsive SaaS layouts |
-| **Data Visualization** | **Recharts** | Radar charts, score gauges, hiring velocity line charts |
-| **In-Browser Vision** | **MediaPipe**, **COCO-SSD**, **face-api.js** | Client-side gaze estimation, multi-person detection, facial telemetry |
-| **Backend Framework** | **FastAPI** (Python 3.10+) | Async ASGI web framework with OpenAPI/Swagger specifications |
-| **Database & ODM** | **MongoDB Atlas** + **Motor** | Async non-blocking document database for multi-tenant data |
-| **AI / LLM Providers** | **Groq**, **Google Gemini 2.5 Flash** | Multi-model fallback cascade with key rotation for high availability |
-| **JSON Extraction** | **json-repair** | Robust multi-tier parser eliminating markdown codeblock and syntax errors |
-| **Multi-Agent AI** | **LangGraph** + **LangChain Core** | Directed acyclic graph workflows for smart application generation |
-| **NLP & Embeddings** | **BAAI BGE-M3**, **BGE-Reranker**, **NLTK** | 1024-D multi-vector semantic scoring & deep neural cross-encoder |
-| **Document Processing** | **Azure Document Intelligence**, **pdfplumber**, **python-docx** | 2-Tier OCR & Layout-aware parsing with 2-page cost guardrails |
-| **Vector PDF Engine** | **ReportLab** | Native local generation of verified certificates and cover letters |
-| **Authentication** | **JWT (python-jose)** + **Passlib (Argon2/Bcrypt)** | Dual token auth, 6-digit OTP challenges, trusted device cookies |
-| **Email Delivery** | **Brevo REST API v3** + **Gmail OAuth 2.0** | HTTPS Port 443 email delivery with custom `replyTo` candidate headers |
-| **Payments** | **Razorpay SDK** | Secure checkout and webhook signature verification |
-| **Media Storage** | **Cloudinary CDN** | Cloud asset storage for candidate avatars and badge images |
-| **DevOps & Deploy** | **Docker**, **Azure App Service**, **Vercel** | Containerized backend deployment and CDN-backed frontend hosting |
+| **Frontend UI** | **React 18** + **Vite 5** | High-speed Single Page Application (SPA) with fast loading times |
+| **Styling** | **Tailwind CSS** + **Lucide Icons** | Clean design system, responsive layouts, glassmorphic UI, and dark mode |
+| **Data Charts** | **Recharts** | Interactive skill radar charts, score gauges, and hiring metrics |
+| **Browser Vision** | **MediaPipe** + **COCO-SSD** | In-browser face tracking, eye gaze estimation, and phone detection |
+| **Backend API** | **FastAPI** (Python 3.10+) | High-performance asynchronous API with interactive Swagger documentation |
+| **Database** | **MongoDB Atlas** + **Motor** | Scalable, non-blocking document database |
+| **AI / LLMs** | **Groq**, **Google Gemini 2.5 Flash** | Multi-provider AI key rotation for resume analysis and chat |
+| **Vector Embeddings** | **BAAI BGE-M3** & **BGE-Reranker** | State-of-the-art semantic matching between resumes and job requirements |
+| **PDF Extraction** | **Azure Document Intelligence** & **pdfplumber** | 2-tier document parser for PDF and Word resumes |
+| **PDF Generation** | **ReportLab** | Generates verified PDF skill certificates and cover letters locally |
+| **Email Service** | **Brevo REST API** + **Gmail OAuth 2.0** | Reliable email delivery for job alerts and application outreach |
+| **Payments** | **Razorpay SDK** | Secure online subscription checkout and webhooks |
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Directory Structure
 
 ```text
 Resume-Screening-System/
-├── README.md                          # Enterprise Documentation (Single Source of Truth)
-├── CareerShala_Deep_Clean_Report.md   # Architectural Deep Clean & Optimization Audit Report
-├── cleanup_tracker_scratchpad.md      # Refactoring & Component Tracking Scratchpad
+├── README.md                          # Complete project documentation
+├── run_dev.bat                        # Windows 1-click startup launcher
+├── run_dev.sh                         # Linux/Mac 1-click startup launcher
+├── docker-compose.yml                 # Local Docker setup (MongoDB + Redis)
 │
 ├── backend/                           # FastAPI Python Backend
-│   ├── main.py                        # Application entry point, lifespan, CORS & 42 route mounts
-│   ├── requirements.txt               # Production Python dependencies (Clean Neural Stack)
-│   ├── requirements-dev.txt           # Test & development dependencies
-│   ├── Dockerfile                     # Production container manifest
+│   ├── main.py                        # Entry point, middleware, CORS, and route registrations
+│   ├── requirements.txt               # Production Python dependencies
+│   ├── requirements-dev.txt           # Test dependencies
+│   ├── Dockerfile                     # Container deployment image
+│   │
 │   ├── api/                           # API Layer
-│   │   ├── deps.py                    # JWT authentication, RBAC & tenant scoping dependencies
-│   │   └── routes/                    # 42 Modular Route Controllers
-│   │       ├── ats.py                 # Neural ATS match engine, score breakdowns & gap analysis
-│   │       ├── resume.py              # 2-Tier resume uploading, OCR & parsing
-│   │       ├── copilot.py             # Context-aware streaming career co-pilot
-│   │       ├── live_interview.py      # Real-time mock interview & vision proctoring stream
-│   │       ├── portfolio.py           # Portfolio builder, themes & public showcase
-│   │       ├── apply_assistant.py     # OCR screenshot extraction & job application drafts
-│   │       ├── certificates.py        # Verified certificate issuance & QR verification
-│   │       ├── requisitions.py        # Enterprise job requisitions & hiring workflows
-│   │       ├── interview_kits.py      # Standardized interview scorecards & rubrics
-│   │       ├── team.py                # Multi-tenant workspace team invitations & RBAC
-│   │       ├── eeo.py                 # EEO-1 demographic compliance anonymization vault
-│   │       ├── webhooks.py            # Signed HMAC-SHA256 outbound event notifications
-│   │       └── payment.py             # Razorpay order creation & webhook verification
-│   ├── core/                          # Settings, security & LLM client managers
-│   │   ├── config.py                  # Pydantic v2 settings & environment validation
-│   │   ├── llm_client.py              # Thread-safe multi-key rotation pool for Groq & Gemini
-│   │   ├── security.py                # Argon2/Bcrypt password hashing & JWT token handling
-│   │   └── logging.py                 # Structured JSON logging (structlog)
-│   ├── models/                        # MongoDB Document Models (User, Resume, Job, etc.)
-│   ├── repositories/                  # Clean Architecture Data Access Layer
-│   ├── scheduler/                     # Cloud-native scheduled jobs: job alerts, subscription expiry, stuck resume sweep
-│   ├── services/                      # Core Business Logic & Neural Engines
-│   │   ├── scoring_engine.py          # Neural ATS scoring, fresher models & gates
-│   │   ├── document_parser_service.py # 2-Tier Azure DI + pdfplumber document parser
-│   │   ├── embedding_service.py       # BGE-M3 1024-D local vector embedding engine
-│   │   ├── reranker_service.py        # BGE Cross-Encoder reranker singleton
-│   │   ├── copilot_service.py         # AI Copilot streaming & context aggregator
-│   │   ├── email_service.py           # Brevo HTTP REST & Gmail OAuth dispatcher
-│   │   ├── live_interview_service.py  # Adaptive AI mock interview engine
-│   │   ├── locking/                   # Single Source of Truth Distributed Locks (Redis / Mongo)
-│   │   └── telemetry/                 # KS-Test score & embedding drift detection
-│   ├── utils/                         # Utilities (json_utils with json-repair, nlp_utils, file_utils)
-│   ├── workflows/                     # LangGraph AI workflows (enhancer, apply assistant)
-│   └── tests/                         # Pytest automated test suite (397+ tests)
+│   │   ├── deps.py                    # JWT authentication and user permission guards
+│   │   └── routes/                    # Modular API route controllers
+│   │       ├── ats.py                 # Resume ATS scoring, gap analysis & calibration
+│   │       ├── resume.py              # Resume upload and text extraction
+│   │       ├── copilot.py             # Streaming AI career copilot chat
+│   │       ├── live_interview.py      # Real-time mock interview and vision proctoring
+│   │       ├── portfolio.py           # Portfolio builder, themes, and public showcase
+│   │       ├── apply_assistant.py     # Screenshot OCR and cover letter drafting
+│   │       ├── certificates.py        # PDF certificate issuance and QR verification
+│   │       ├── requisitions.py        # Job requisitions and applicant pipeline
+│   │       ├── interview_kits.py      # Standardized candidate scorecards
+│   │       ├── team.py                # Workspace team members and role management
+│   │       ├── eeo.py                 # Blind hiring demographic privacy vault
+│   │       └── payment.py             # Razorpay order checkout and webhook verification
+│   │
+│   ├── core/                          # Core configuration and security
+│   │   ├── config.py                  # Pydantic environment settings (.env)
+│   │   ├── llm_client.py              # Multi-key rotation pool for Groq & Gemini
+│   │   ├── security.py                # Password hashing (Argon2/Bcrypt) & JWT creation
+│   │   └── logging.py                 # Structured application logging
+│   │
+│   ├── models/                        # MongoDB document schemas (User, Resume, Job, etc.)
+│   ├── repositories/                  # Clean architecture database access layer
+│   │
+│   ├── services/                      # Business logic and AI engines
+│   │   ├── scoring_engine.py          # Resume scoring algorithms & fresher models
+│   │   ├── document_parser_service.py # 2-tier PDF & Word resume extraction
+│   │   ├── embedding_service.py       # BGE-M3 vector embedding generation
+│   │   ├── reranker_service.py        # Cross-encoder match reranker
+│   │   ├── copilot_service.py         # Copilot conversation context builder
+│   │   ├── email_service.py           # Brevo HTTP & Gmail OAuth dispatcher
+│   │   └── live_interview_service.py  # Adaptive AI mock interview question generator
+│   │
+│   ├── utils/                         # Helper functions (json-repair, NLP tools, file handling)
+│   ├── workflows/                     # LangGraph AI workflows (multi-agent cover letters)
+│   └── tests/                         # Automated test suite (397+ tests)
 │
-└── frontend/                          # React 18 + Vite SPA (Optimized ~2.3MB lighter)
-    ├── package.json                   # Frontend npm dependencies
-    ├── vite.config.js                 # Vite bundler, proxy & manual chunk optimizations
-    ├── index.html                     # HTML5 root template
+└── frontend/                          # React 18 + Vite Frontend
+    ├── package.json                   # Frontend npm packages
+    ├── vite.config.js                 # Vite bundler, proxy, and build settings
+    ├── index.html                     # HTML root template
+    │
     └── src/
-        ├── App.jsx                    # Route registry, protected routes & role guards
-        ├── main.jsx                   # React Virtual DOM bootstrap
-        ├── index.css                  # Tailwind CSS design system & custom animations
-        ├── components/                # Reusable UI component modules
-        │   ├── AICopilotWidget.jsx    # Persistent floating AI Copilot drawer
-        │   ├── AppLayout.jsx          # Dashboard shell with responsive navigation
-        │   ├── ats/                   # Unified ATS readiness scorecards & radar charts
-        │   ├── detection/             # In-browser MediaPipe/COCO-SSD proctoring overlays
-        │   ├── portfolio/             # 6 visual theme portfolio renderers & editor studio
-        │   ├── recruiter/             # Requisition managers & candidate Kanban boards
-        │   └── gamification/          # 28-day activity heatmap & XP progression rings
-        ├── context/                   # React Contexts (AuthContext, TenantContext)
-        ├── pages/                     # 30+ Application views & enterprise portals
-        └── services/                  # Axios/Fetch API client layer
+        ├── App.jsx                    # Application routes and role-based guards
+        ├── main.jsx                   # React root mount
+        ├── index.css                  # Tailwind CSS design system and custom styles
+        │
+        ├── components/                # Reusable UI components
+        │   ├── AICopilotWidget.jsx    # Floating AI copilot chat drawer
+        │   ├── AppLayout.jsx          # Dashboard layout with navigation bar
+        │   ├── ats/                   # Resume scorecards and skill radar charts
+        │   ├── detection/             # In-browser camera proctoring overlays
+        │   ├── portfolio/             # 6 portfolio themes and live editor
+        │   ├── recruiter/             # Kanban board and candidate review cards
+        │   └── gamification/          # 28-day activity heatmap and streak displays
+        │
+        ├── context/                   # Global React state (AuthContext, TenantContext)
+        ├── pages/                     # Application pages (Candidate, Recruiter, Admin)
+        └── services/                  # Axios HTTP client to communicate with backend
 ```
 
 ---
 
-## 🚀 Getting Started & Local Installation
+## 🚀 Local Installation & Setup Guide
 
-### Prerequisites
-- **Node.js** `v18.x` or higher
-- **Python** `3.10` or higher
-- **MongoDB** instance running locally (`mongodb://localhost:27017`), via Docker, or a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster URI
-
----
-
-### ⚡ 1-Click Launcher (Fastest Way)
-
-Once you've cloned the repository and installed dependencies:
-- **Windows**: Double-click `run_dev.bat` (or run in CMD / PowerShell)
-- **Linux / macOS**: Run `chmod +x run_dev.sh && ./run_dev.sh`
-
-*(The launcher automatically verifies `.env` configurations and boots up both the FastAPI backend and Vite frontend).*
+### System Requirements
+- **Node.js** (v18.0 or newer)
+- **Python** (v3.10 or newer)
+- **MongoDB** (Local instance on `mongodb://localhost:27017` or a free cloud database on [MongoDB Atlas](https://www.mongodb.com/atlas))
 
 ---
 
-### Step 1: Clone the Repository & Start Database
+### ⚡ 1-Click Quick Launch (Easiest Way)
 
-```bash
-git clone https://github.com/agrawalrohit937/Resume-Screening-System.git
-cd Resume-Screening-System
+1. Clone the project:
+   ```bash
+   git clone https://github.com/agrawalrohit937/Resume-Screening-System.git
+   cd Resume-Screening-System
+   ```
 
-# Optional: Spin up local MongoDB & Redis in Docker with 1 command
-docker compose up -d
-```
+2. Run the startup launcher:
+   - **Windows**: Double-click `run_dev.bat` (or run in CMD / PowerShell)
+   - **Linux / Mac**: Run `chmod +x run_dev.sh && ./run_dev.sh`
+
+*(The launcher automatically verifies your configuration and starts both backend and frontend servers).*
 
 ---
 
-### Step 2: Backend Setup (FastAPI)
+### 🛠️ Manual Step-by-Step Installation
 
-1. Navigate to the `backend` directory:
+#### Step 1: Start the Backend (FastAPI)
+
+1. Open your terminal and go to the `backend` folder:
    ```bash
    cd backend
    ```
@@ -328,7 +391,7 @@ docker compose up -d
    source venv/bin/activate
    ```
 
-3. Install the required Python dependencies:
+3. Install the Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
@@ -337,35 +400,30 @@ docker compose up -d
    ```bash
    cp .env.example .env
    ```
-   *(Only `MONGO_URI` is required. The system includes built-in fallbacks for all external services).*
+   *(Only `MONGO_URI` is required to start. You can use `mongodb://localhost:27017` or your free MongoDB Atlas link).*
 
-5. Seed demo accounts & sample jobs (Optional but Recommended):
+5. (Recommended) Seed demo accounts and sample jobs:
    ```bash
    python scripts/seed_demo_data.py
    ```
 
-6. Start the FastAPI development server:
+6. Start the FastAPI backend server:
    ```bash
-   # Windows (PowerShell)
-   $env:PYTHONPATH="."
-   python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
-
-   # Linux / macOS
-   PYTHONPATH=. uvicorn main:app --reload --host 127.0.0.1 --port 8000
+   uvicorn main:app --reload --port 8000
    ```
    - **Backend API**: `http://127.0.0.1:8000`
-   - **Interactive API Docs (Swagger)**: `http://127.0.0.1:8000/docs`
+   - **Interactive API Documentation (Swagger)**: `http://127.0.0.1:8000/docs`
 
 ---
 
-### Step 3: Frontend Setup (React + Vite)
+#### Step 2: Start the Frontend (React + Vite)
 
-1. Open a new terminal and navigate to the `frontend` directory:
+1. Open a **new terminal window** and navigate to the `frontend` folder:
    ```bash
    cd frontend
    ```
 
-2. Install the frontend dependencies:
+2. Install dependencies:
    ```bash
    npm install
    ```
@@ -374,164 +432,136 @@ docker compose up -d
    ```bash
    npm run dev
    ```
-   - **Local Web App**: `http://localhost:5173`
-   *(In local dev, Vite automatically proxies all `/api/v1` traffic to `http://127.0.0.1:8000`).*
+   - **Local Web Application**: `http://localhost:5173`  
+   *(Vite automatically proxies backend API calls to `http://127.0.0.1:8000`).*
 
 ---
 
-## 🔐 Environment Variables (`backend/.env`)
+## 🔑 Environment Variables Explained (`backend/.env`)
 
-Copy the template and fill in your development or production credentials:
+Here is an easy-to-understand breakdown of what each setting in your `.env` file does:
 
 ```env
-# ── Application Settings ──
-APP_NAME=CareerShala AI Career Platform
-APP_VERSION=2.0.0
+# ── Basic App Settings ──
+APP_NAME=CareerShala
 DEBUG=True
 API_V1_PREFIX=/api/v1
 FRONTEND_URL=http://localhost:5173
 ALLOWED_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173"]
 
-# ── Database (MongoDB) ──
+# ── Database (Required) ──
+# Use your local MongoDB connection or your cloud MongoDB Atlas connection string
 MONGO_URI=mongodb://localhost:27017
 MONGO_DB_NAME=ai_career_platform
-MONGO_MIN_CONNECTIONS=10
-MONGO_MAX_CONNECTIONS=100
 
-# ── Security & JWT ──
-SECRET_KEY=your_at_least_32_char_long_super_secret_jwt_key
-ALGORITHM=HS256
+# ── Security & Passwords ──
+# Any random secret string at least 32 characters long used to sign login tokens
+SECRET_KEY=change_this_to_a_long_random_secret_key_at_least_32_chars
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
-# ── External Automation & Webhook Cron Security ──
-CRON_SECRET=your_high_entropy_cron_secret_for_azure_logic_apps
+# ── Cloud Timers Security ──
+# Secret header used by automated background cloud tasks
+CRON_SECRET=my_custom_secret_for_scheduled_cron_jobs
 
-# ── File Uploads ──
-MAX_FILE_SIZE_MB=10
-UPLOAD_DIR=./uploads
+# ── AI API Keys (Optional - Local fallbacks work without them) ──
+# Free Groq key from https://console.groq.com
+GROQ_API_KEY=your_groq_api_key
+# Free Gemini key from https://aistudio.google.com
+GOOGLE_API_KEY=your_gemini_api_key
 
-# ── AI / LLM Keys (Supports 1-5 keys for automatic rotation) ──
-GROQ_API_KEY=your_primary_groq_api_key
-GROQ_API_KEY_1=your_groq_key_1
-GROQ_API_KEY_2=your_groq_key_2
-GOOGLE_API_KEY=your_primary_google_gemini_key
-GOOGLE_API_KEY_1=your_gemini_key_1
-MISTRAL_API_KEY=your_mistral_api_key
-
-# ── Email Service (Brevo HTTP REST API - Port 443) ──
-BREVO_API_KEY=your_brevo_v3_api_key
-MAIL_FROM_EMAIL=admin@careershala.tech
-MAIL_FROM_NAME=CareerShala
+# ── Email Service (Optional) ──
+# For sending real job alert emails via Brevo (https://brevo.com)
+BREVO_API_KEY=your_brevo_api_key
 ADMIN_EMAIL=admin@careershala.tech
-SUPPORT_EMAIL=support@careershala.tech
 
-# ── OAuth 2.0 Credentials ──
-GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_GMAIL_REDIRECT_URI=http://localhost:5173/gmail-callback
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-GITHUB_REDIRECT_URI=http://localhost:5173/github-callback
-
-# ── Cloud Media Storage (Cloudinary) ──
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_api_secret
-
-# ── Payment Gateway (Razorpay) ──
-RAZORPAY_KEY_ID=rzp_test_your_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+# ── Payment Gateway (Optional) ──
+# For testing subscriptions via Razorpay (https://razorpay.com)
+RAZORPAY_KEY_ID=rzp_test_xxxx
+RAZORPAY_KEY_SECRET=your_razorpay_secret
 RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 
-# ── Azure Document Intelligence (Optional OCR Fallback) ──
-AZURE_DI_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
-AZURE_DI_KEY=your_azure_document_intelligence_key
+# ── Cloud Image Storage (Optional) ──
+# For storing user profile photos on Cloudinary (https://cloudinary.com)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
 ---
 
-## 🧪 Testing, Quality Assurance & Evaluation Benchmarks
+## 🧪 Testing & Quality Benchmarks
 
-Run the comprehensive automated test suite across backend neural scoring engines, multi-tenancy isolation security, and email pipelines:
+CareerShala includes a full automated test suite to ensure that resume scoring, security permissions, and email pipelines work reliably:
 
 ```bash
-# Run all backend unit and integration tests (397+ tests)
-cd backend && pytest tests/
+# Run all backend automated tests (397+ tests)
+cd backend && pytest
 
-# Run subscription lifecycle & payment activation tests
+# Run specific tests for ATS resume scoring
+cd backend && pytest tests/test_scoring_dual.py
+
+# Run tests for subscription billing and renewals
 cd backend && pytest tests/test_subscription_lifecycle.py
 
-# Run automated job alerts, stuck resume sweep & webhook auth tests
-cd backend && pytest tests/test_job_alerts.py
-
-# Run specific multi-tenancy and RBAC isolation tests
-cd backend && pytest tests/test_multi_tenancy_and_rbac.py
-
-# Run targeted ATS neural scoring and bias invariant tests
-cd backend && pytest tests/test_scoring_dual.py tests/test_no_demographic_inference.py
-
-# Run frontend build verification (0 errors, ~2.3MB optimized bundle)
+# Verify the frontend builds with 0 errors
 cd frontend && npm run build
 ```
 
-### 📈 Core Ranking & Benchmark Quality Metrics
+### 📈 Evaluation & Accuracy Metrics
 
-Evaluated across candidate resume-job requisition pairs using 1000-iteration bootstrap confidence intervals:
+The resume scoring engine was benchmarked across hundreds of candidate-job pairs:
 
-| Evaluation Metric | Score | 95% Confidence Interval | Benchmark Target | Status |
-| :--- | :---: | :---: | :---: | :---: |
-| **NDCG@10** | **0.9927** | [0.9927, 0.9927] | $> 0.8500$ | 🟢 Enterprise Grade |
-| **NDCG@5** | **0.9927** | [0.9927, 0.9927] | $> 0.8500$ | 🟢 Enterprise Grade |
-| **MAP (Mean Average Precision)** | **1.0000** | [1.0000, 1.0000] | $> 0.9000$ | 🟢 Perfect Precision |
-| **Global Spearman Rank Correlation** | **0.9327** | N/A | $> 0.8000$ | 🟢 High Monotonicity |
-| **Global Kendall Tau** | **0.8642** | N/A | $> 0.7500$ | 🟢 High Concordance |
-| **Automated Test Coverage** | **397/397 (100%)** | Full Suite Pass | $100\%$ | 🟢 Verified Passing |
+| Evaluation Metric | Score | Target | Status | What This Means |
+| :--- | :---: | :---: | :---: | :--- |
+| **NDCG@10 (Ranking Quality)** | **0.9927** | $> 0.85$ | 🟢 Enterprise Grade | The most qualified candidates are reliably ranked at the very top of the list. |
+| **MAP (Mean Average Precision)** | **1.0000** | $> 0.90$ | 🟢 Perfect Precision | Accurately identifies relevant candidate skills without false positives. |
+| **Spearman Rank Correlation** | **0.9327** | $> 0.80$ | 🟢 High Consistency | Scoring remains fair and repeatable across different resume formats. |
+| **Automated Test Coverage** | **397 / 397** | $100\%$ | 🟢 All Pass | 100% of unit and integration test suites pass successfully. |
 
 ---
 
-## 🚢 Production Deployment
+## 🚢 Production Deployment Guide
 
-### Azure App Service (Backend Docker Container)
-1. Build and push the Docker image:
+### Deploying the Backend (Docker / Cloud Containers)
+1. Build the Docker container image:
    ```bash
-   docker build -t your-registry.azurecr.io/careershala-backend:latest ./backend
-   docker push your-registry.azurecr.io/careershala-backend:latest
+   docker build -t careershala-backend:latest ./backend
    ```
-2. Configure App Service with container runtime and inject the environment variables listed in `.env`.
-3. Set `UPLOAD_DIR=/tmp/uploads` for optimized container execution.
+2. Deploy to any container hosting platform (such as Azure App Service, AWS, Render, or Railway).
+3. Set the environment variables in your hosting dashboard matching `backend/.env`.
+4. Set `UPLOAD_DIR=/tmp/uploads` for optimized container execution.
 
-### Vercel / Cloudflare Pages (Frontend SPA)
-1. Set the **Root Directory** to `frontend`.
-2. Set the **Build Command** to `npm run build` and **Output Directory** to `dist`.
-3. Configure `VITE_API_URL` to point to your deployed backend API URL (e.g., `https://api.careershala.tech/api/v1`).
+### Deploying the Frontend (Vercel / Cloudflare Pages)
+1. Link your GitHub repository to Vercel or Cloudflare Pages.
+2. Set **Root Directory** to `frontend`.
+3. Set **Build Command** to `npm run build` and **Output Directory** to `dist`.
+4. Set the environment variable `VITE_API_URL` to your production backend URL (e.g., `https://api.careershala.tech/api/v1`).
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
-1. **Fork** the repository.
+We welcome community contributions! To contribute:
+1. **Fork** this repository.
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
 3. Commit your changes (`git commit -m 'feat: Add AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
+4. Push to your branch (`git push origin feature/AmazingFeature`).
 5. Open a **Pull Request**.
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Distributed under the **MIT License**. You are free to use, modify, and distribute this project for educational and commercial purposes.
 
 ---
 
 ## 📬 Contact & Support
 
 - **Project Lead & Maintainer**: Rohit Agrawal
-- **Email Inquiries**: [support@careershala.tech](mailto:support@careershala.tech) | [admin@careershala.tech](mailto:admin@careershala.tech)
+- **Email**: [support@careershala.tech](mailto:support@careershala.tech) | [admin@careershala.tech](mailto:admin@careershala.tech)
 - **GitHub Repository**: [https://github.com/agrawalrohit937/Resume-Screening-System](https://github.com/agrawalrohit937/Resume-Screening-System)
-
----
 
 <p align="center">
   <b>Built with ❤️ by CareerShala Engineering</b>
