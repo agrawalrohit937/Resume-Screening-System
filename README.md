@@ -1,5 +1,6 @@
 # 🚀 CareerShala — Next-Gen AI Applicant Tracking System (ATS) & Talent Cloud
 
+[![Live Deployment](https://img.shields.io/badge/Live%20App-www.careershala.tech-success?style=for-the-badge&logo=google-chrome&logoColor=white)](https://www.careershala.tech)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg?style=flat-square&logo=react)](https://reactjs.org/)
@@ -9,18 +10,25 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/Version-3.0.0-blue.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
 
+> [!IMPORTANT]
+> 🌐 **Live Production Web Application**: **[https://www.careershala.tech](https://www.careershala.tech)**
+> 
+> **Please check this!** CareerShala is deployed live in production. You can directly explore candidate ATS scoring, radar analytics, live proctored mock interviews, recruiter Kanban pipelines, AI copilot, and portfolio studio without local setup.
+
 > **CareerShala** is an enterprise-grade AI-powered recruitment, applicant tracking system (ATS), and career co-pilot platform. Engineered with **FastAPI**, **React 18**, **MongoDB Atlas**, and cutting-edge **Neural LLM/RAG pipelines (BGE-M3 + BGE-Reranker)**, it bridges the gap between ambitious candidates and modern hiring teams with high-precision ATS scoring (NDCG@10 = 0.9927), knockout screening, computer vision live mock interviews, and automated application outreach.
 
 ---
 
 ## 🌟 Live Demo & Quick Links
 
-- 🌐 **Production Web Application**: [CareerShala Web App](https://www.careershala.tech)
+> 📢 **Live Website**: Please check our live deployment at **[https://www.careershala.tech](https://www.careershala.tech)**!
+
+- 🌐 **Production Web Application**: **[https://www.careershala.tech](https://www.careershala.tech)** — *(Please check this!)*
 - ⚙️ **Interactive OpenAPI Swagger Docs**: `http://localhost:8000/docs`
 - 📚 **Alternative ReDoc API Specs**: `http://localhost:8000/redoc`
-- 📜 **Public Skill Certificate Verification**: `/verify/:certificateId`
-- 💼 **Candidate Public Portfolio Showcase**: `/portfolio/:username`
-- 🏢 **Employer Public Company Pages**: `/company/:companySlug`
+- 📜 **Public Skill Certificate Verification**: [https://www.careershala.tech](https://www.careershala.tech) (`/verify/:certificateId`)
+- 💼 **Candidate Public Portfolio Showcase**: [https://www.careershala.tech](https://www.careershala.tech) (`/portfolio/:username`)
+- 🏢 **Employer Public Company Pages**: [https://www.careershala.tech](https://www.careershala.tech) (`/company/:companySlug`)
 
 ---
 
