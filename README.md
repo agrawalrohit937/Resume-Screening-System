@@ -56,42 +56,42 @@ CareerShala is architected as an ultra-responsive decoupled Single-Page Applicat
 
 ```mermaid
 graph TD
-    subgraph Client Layer [Frontend SPA - React 18 + Vite 5 + Tailwind CSS]
-        CandidateUI[Candidate Career Cockpit]
-        RecruiterUI[Recruiter & Enterprise Kanban]
-        CopilotUI[Interactive AI Copilot Drawer]
-        ProctorUI[4-Layer Vision Proctor Canvas]
-        PortfolioUI[Interactive 6-Theme Portfolio Studio]
+    subgraph ClientLayer ["Frontend SPA - React 18 + Vite 5 + Tailwind CSS"]
+        CandidateUI["Candidate Career Cockpit"]
+        RecruiterUI["Recruiter & Enterprise Kanban"]
+        CopilotUI["Interactive AI Copilot Drawer"]
+        ProctorUI["4-Layer Vision Proctor Canvas"]
+        PortfolioUI["Interactive 6-Theme Portfolio Studio"]
     end
 
-    subgraph Gateway Layer [FastAPI Asynchronous Gateway]
-        TenantMW[Multi-Tenant Context Middleware]
-        AuthMW[JWT HS256 & RBAC Security Guard]
-        RateLimiter[SlowAPI Distributed Rate Limiter]
-        UploadHandler[Magic-Byte File Sanitizer]
+    subgraph GatewayLayer ["FastAPI Asynchronous Gateway"]
+        TenantMW["Multi-Tenant Context Middleware"]
+        AuthMW["JWT HS256 & RBAC Security Guard"]
+        RateLimiter["SlowAPI Distributed Rate Limiter"]
+        UploadHandler["Magic-Byte File Sanitizer"]
     end
 
-    subgraph Intelligence & Scoring Engines
-        ATS[Neural ATS Engine: BGE-M3 1024-D + BGE-Reranker]
-        Scoring[Experience & Fresher Scoring Calibration]
-        Knockout[Enterprise Hard-Gate & Knockout Validator]
-        LangGraph[LangGraph Multi-Agent Application Dispatcher]
-        Copilot[Multi-Provider LLM Key Pool: Groq / Gemini 2.5]
+    subgraph IntelligenceEngines ["Intelligence & Scoring Engines"]
+        ATS["Neural ATS Engine: BGE-M3 1024-D + BGE-Reranker"]
+        Scoring["Experience & Fresher Scoring Calibration"]
+        Knockout["Enterprise Hard-Gate & Knockout Validator"]
+        LangGraph["LangGraph Multi-Agent Application Dispatcher"]
+        Copilot["Multi-Provider LLM Key Pool: Groq / Gemini 2.5"]
     end
 
-    subgraph Cloud Storage & External Services
-        MongoDB[(MongoDB Atlas 7.0 Multi-Tenant)]
-        Cloudinary[Cloudinary CDN]
-        Brevo[Brevo Transactional Mailer - HTTPS Port 443]
-        GmailOAuth[Google Gmail OAuth 2.0 Relay]
-        ReportLab[Zero-Network Vector PDF Engine]
-        AzureLogicApps[Azure Logic App Serverless Timers]
+    subgraph CloudServices ["Cloud Storage & External Services"]
+        MongoDB[("MongoDB Atlas 7.0 Multi-Tenant")]
+        Cloudinary["Cloudinary CDN"]
+        Brevo["Brevo Transactional Mailer - HTTPS Port 443"]
+        GmailOAuth["Google Gmail OAuth 2.0 Relay"]
+        ReportLab["Zero-Network Vector PDF Engine"]
+        AzureLogicApps["Azure Logic App Serverless Timers"]
     end
 
     ClientLayer --> GatewayLayer
     AzureLogicApps -->|X-Cron-Secret HTTP POST| GatewayLayer
-    GatewayLayer --> Intelligence & Scoring Engines
-    GatewayLayer --> Cloud Storage & External Services
+    GatewayLayer --> IntelligenceEngines
+    GatewayLayer --> CloudServices
 ```
 
 ---
