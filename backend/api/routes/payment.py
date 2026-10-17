@@ -78,16 +78,22 @@ async def activate_user_subscription(
         return await user_repo.update(user_id, updates)
 
     # Paid plan: 'pro' or 'premium'
+    user_end_date = user.subscription_end_date
+    if user_end_date and user_end_date.tzinfo is None:
+        user_end_date = user_end_date.replace(tzinfo=timezone.utc)
+
     has_future_expiry = (
         user.subscription_active
-        and user.subscription_end_date
-        and user.subscription_end_date > now
+        and user_end_date
+        and user_end_date > now
     )
 
     if has_future_expiry:
         # Early renewal: preserve remaining days and extend
         start_date = user.subscription_start_date or now
-        end_date = user.subscription_end_date + timedelta(days=days)
+        if start_date and start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        end_date = user_end_date + timedelta(days=days)
     else:
         # Fresh activation or renewal after expiration
         start_date = now

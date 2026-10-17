@@ -194,18 +194,13 @@ def create_application() -> FastAPI:
             content={"detail": str(exc)},
         )
 
-    # CORS & GZip Middlewares
-    cors_kwargs = {
-        "allow_origins": settings.ALLOWED_ORIGINS,
-        "allow_credentials": True,
-        "allow_methods": ["*"],
-        "allow_headers": ["*"],
-        "expose_headers": ["*"],
-    }
-    if settings.CORS_ORIGIN_REGEX:
-        cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
-
-    app.add_middleware(CORSMiddleware, **cors_kwargs)
+    # ── Middlewares Stack ─────────────────────────────────────────────────────
+    # Note on middleware ordering in Starlette/FastAPI:
+    # Middlewares execute in REVERSE order of addition (LIFO).
+    # Adding CORSMiddleware LAST ensures it wraps all inner middlewares,
+    # request lifecycle handlers, and exception handlers — guaranteeing that
+    # all preflight OPTIONS requests, valid requests, and error responses (400, 403, 500)
+    # properly include Access-Control-Allow-Origin headers.
     app.add_middleware(TenantMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=500)
 
@@ -242,6 +237,19 @@ def create_application() -> FastAPI:
             duration_sec=duration,
         )
         return response
+
+    # CORS Middleware (Outermost)
+    cors_kwargs = {
+        "allow_origins": settings.ALLOWED_ORIGINS,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+        "expose_headers": ["*"],
+    }
+    if settings.CORS_ORIGIN_REGEX:
+        cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     # Prometheus Metrics Endpoint
     @app.get("/metrics", include_in_schema=False)

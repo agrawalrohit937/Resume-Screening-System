@@ -4,10 +4,10 @@ Application Configuration — Environment-driven settings via Pydantic v2
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from dotenv import load_dotenv
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE_PATH = Path(__file__).resolve().parent.parent / ".env"
@@ -154,20 +154,54 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
-    # ── URL Normalization ─────────────────────────────────────────────────────
+    # ── URL & Origin Normalization ────────────────────────────────────────────
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def _parse_allowed_origins(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
     @model_validator(mode="after")
     def _finalize_settings(self) -> "Settings":
         if self.FRONTEND_URL:
             self.FRONTEND_URL = self.FRONTEND_URL.strip().rstrip("/")
-        if not self.ALLOWED_ORIGINS:
-            self.ALLOWED_ORIGINS = [
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:3000",
-                "http://localhost:8000",
-            ]
-        if self.FRONTEND_URL and self.FRONTEND_URL not in self.ALLOWED_ORIGINS:
-            self.ALLOWED_ORIGINS.append(self.FRONTEND_URL)
+
+        default_origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "https://careershala.tech",
+            "https://www.careershala.tech",
+        ]
+
+        origins_set = set(self.ALLOWED_ORIGINS or [])
+        origins_set.update(default_origins)
+
+        if self.FRONTEND_URL:
+            origins_set.add(self.FRONTEND_URL)
+            if "://" in self.FRONTEND_URL:
+                scheme, domain = self.FRONTEND_URL.split("://", 1)
+                if domain.startswith("www."):
+                    origins_set.add(f"{scheme}://{domain[4:]}")
+                else:
+                    origins_set.add(f"{scheme}://www.{domain}")
+
+        self.ALLOWED_ORIGINS = sorted(list(origins_set))
+
+        if not self.CORS_ORIGIN_REGEX:
+            self.CORS_ORIGIN_REGEX = r"^https:\/\/(.*\.)?careershala\.tech$|^https:\/\/.*\.vercel\.app$"
+
         return self
 
     # ── Helper Properties ─────────────────────────────────────────────────────
