@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 from typing import Optional, Dict, Any
+from fastapi import HTTPException
 try:
     import razorpay
 except ImportError:

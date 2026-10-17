@@ -138,29 +138,44 @@ export default function Premium() {
   const { user, refreshUser } = useAuth()
   const [processingPlan, setProcessingPlan] = useState(null)
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && window.Razorpay) {
+        return resolve(true)
+      }
+      const scriptId = 'razorpay-checkout-sdk'
+      let script = document.getElementById(scriptId)
+      if (!script) {
+        script = document.createElement('script')
+        script.id = scriptId
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+        script.async = true
+        document.body.appendChild(script)
+      }
+      script.onload = () => resolve(true)
+      script.onerror = () => resolve(false)
+      // Safety timeout after 4 seconds
+      setTimeout(() => resolve(Boolean(window.Razorpay)), 4000)
+    })
+  }
+
   // Dynamically load the external Razorpay Checkout SDK script tag
   useEffect(() => {
-    const scriptId = 'razorpay-checkout-sdk'
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement('script')
-      script.id = scriptId
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-      script.async = true
-      document.body.appendChild(script)
-    }
+    loadRazorpayScript()
   }, [])
 
   const handlePaymentFlow = async (planName) => {
     setProcessingPlan(planName)
     try {
-      // Step 1: Request order instantiation from backend gateway routes
+      // Step 1: Ensure Razorpay SDK script is ready
+      const sdkReady = await loadRazorpayScript()
+      if (!sdkReady || !window.Razorpay) {
+        throw new Error('Payment gateway SDK failed to load. Please verify your internet connection or disable ad-blockers.')
+      }
+
+      // Step 2: Request order instantiation from backend gateway routes
       const checkoutRes = await createCheckout(planName.toLowerCase())
       const orderData = checkoutRes.data
-
-      // Ensure the runtime script has compiled into global context
-      if (!window.Razorpay) {
-        throw new Error('Payment SDK is loading. Please try again in a moment.')
-      }
 
       // Step 2: Configure the native modal checkout options overlay
       const options = {

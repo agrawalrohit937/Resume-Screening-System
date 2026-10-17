@@ -23,7 +23,7 @@ IF NOT EXIST "frontend\.env" (
 
 echo.
 echo [*] Launching Backend (FastAPI on http://127.0.0.1:8000)...
-start "CareerShala Backend API" cmd /k "cd backend && python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000"
+start "CareerShala Backend API" cmd /k "cd backend && (if exist venv\Scripts\activate.bat call venv\Scripts\activate.bat) && python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000"
 
 echo [*] Launching Frontend (Vite on http://localhost:5173)...
 start "CareerShala Frontend" cmd /k "cd frontend && npm run dev"

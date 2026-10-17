@@ -56,8 +56,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never intercept cross-origin requests (e.g. Razorpay checkout, Google OAuth, Cloudinary, Analytics)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Never cache backend API calls or Vite dev internal requests
-  if (url.pathname.startsWith('/api') || url.pathname.includes('/@vite') || url.pathname.includes('/@fs') || url.pathname.includes('/node_modules/')) {
+  if (
+    url.pathname.startsWith('/api') ||
+    url.pathname.includes('/@vite') ||
+    url.pathname.includes('/@fs') ||
+    url.pathname.includes('/node_modules/')
+  ) {
     return;
   }
 
@@ -84,7 +94,14 @@ self.addEventListener('fetch', (event) => {
           if (indexResponse) {
             return indexResponse;
           }
-          return caches.match('/');
+          const rootResponse = await caches.match('/');
+          if (rootResponse) {
+            return rootResponse;
+          }
+          return new Response(
+            '<!DOCTYPE html><html><body><h1>Offline</h1><p>Please check your connection and reload.</p></body></html>',
+            { status: 503, headers: { 'Content-Type': 'text/html' } }
+          );
         })
     );
     return;
@@ -122,8 +139,8 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch((err) => {
-          // Offline fallback for images if desired
           console.debug('[ServiceWorker] Fetch failed for:', request.url, err);
+          return new Response('', { status: 408, statusText: 'Request Timeout' });
         });
     })
   );
