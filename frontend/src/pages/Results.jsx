@@ -364,11 +364,11 @@ export default function Results() {
   const isJdReady = jdText.trim().length >= 50 || !!jdFile
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 pb-20 font-sans text-slate-900 antialiased relative">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-16 sm:pb-20 font-sans text-slate-900 antialiased relative px-3 sm:px-6 lg:px-8">
       <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-gradient-to-b from-[#2E9BDA]/10 to-transparent blur-3xl rounded-full -z-10 pointer-events-none" />
       <div className="absolute -top-32 left-0 w-[500px] h-[500px] bg-gradient-to-br from-indigo-100/10 to-transparent blur-3xl rounded-full -z-10 pointer-events-none" />
 
-      <div className="w-full relative z-10 space-y-6">
+      <div className="w-full relative z-10 space-y-4 sm:space-y-6">
         <AnimatePresence mode="wait">
 
           {/* ── VIEW 1: SCANNER INPUTS ── */}
@@ -380,20 +380,20 @@ export default function Results() {
               exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
             >
               {/* Hero Section */}
-              <div className="text-center max-w-3xl mx-auto mb-12 mt-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold mb-5 shadow-sm">
+              <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 mt-2 sm:mt-4 px-1">
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 text-[11px] sm:text-xs font-bold mb-3 sm:mb-5 shadow-2xs">
                   <Target size={14} className="text-[#2E9BDA]" />
                   Enterprise ATS Readiness Engine
                 </div>
-                <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mb-4">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-2 sm:mb-4 leading-tight">
                   Optimize Your Resume for <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] to-indigo-600">Corporate Screening</span>
                 </h1>
-                <p className="text-slate-500 text-base sm:text-lg font-medium max-w-2xl mx-auto">
+                <p className="text-slate-500 text-xs sm:text-base md:text-lg font-medium max-w-2xl mx-auto leading-relaxed">
                   Evaluate your profile against target roles using semantic AI and strict enterprise boolean filters.
                 </p>
 
                 {/* Quick Presets */}
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <div className="mt-4 sm:mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
                   {PRESET_ROLES.map((role, idx) => {
                     const isSelected = selectedPreset === role.title
                     return (
@@ -402,12 +402,12 @@ export default function Results() {
                         whileTap={{ scale: 0.97 }}
                         key={idx}
                         onClick={() => applyPresetRole(role)}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer shadow-sm ${isSelected
+                        className={`px-3.5 py-1.5 sm:px-5 sm:py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-2xs ${isSelected
                             ? 'bg-slate-900 text-white border-slate-900 shadow-md'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300 hover:shadow-md'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300 hover:shadow-xs'
                           }`}
                       >
-                        <span className="text-base">{role.icon}</span> {role.title}
+                        <span className="text-sm sm:text-base">{role.icon}</span> {role.title}
                       </motion.button>
                     )
                   })}
@@ -415,57 +415,60 @@ export default function Results() {
               </div>
 
               {/* Dual Workstation Cards (Balanced Heights) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch min-h-[480px]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-stretch min-h-0 lg:min-h-[480px]">
 
                 {/* 1. Resume Card */}
-                <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-5 sm:p-7 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-4 sm:p-7 md:p-8 border border-slate-200/80 shadow-lg shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/5 rounded-bl-full -z-10" />
 
-                  <div className="flex items-center gap-3.5 sm:gap-4 mb-6 sm:mb-8">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
-                      <FileText size={20} />
+                  <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8">
+                    <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-2xs text-slate-700 flex items-center justify-center shrink-0">
+                      <FileText size={18} className="sm:w-5 sm:h-5 text-slate-700" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">1. Candidate Resume</h3>
-                      <p className="text-xs sm:text-sm text-slate-500 font-medium">Upload PDF or DOCX (Max 10MB)</p>
+                      <h3 className="text-sm sm:text-lg font-black text-slate-900 tracking-tight">1. Candidate Resume</h3>
+                      <p className="text-[11px] sm:text-sm text-slate-500 font-medium">Upload PDF or DOCX (Max 10MB)</p>
                     </div>
                   </div>
 
                   <div className="flex-1 flex flex-col">
                     {uploadDone ? (
-                      <div className="flex-1 w-full bg-gradient-to-b from-emerald-50/50 to-white border-2 border-emerald-100 border-dashed rounded-xl sm:rounded-[1.5rem] p-6 sm:p-8 flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-sm">
-                          <CheckCircle2 size={36} />
+                      <div className="flex-1 w-full bg-gradient-to-b from-emerald-50/50 to-white border-2 border-emerald-100 border-dashed rounded-xl sm:rounded-[1.5rem] p-4 sm:p-8 flex flex-col items-center justify-center text-center">
+                        <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2.5 sm:mb-4 shadow-2xs">
+                          <CheckCircle2 size={24} className="sm:w-9 sm:h-9" />
                         </div>
-                        <h4 className="text-base sm:text-lg font-bold text-slate-900 truncate w-full max-w-xs">{resumeFile?.name || 'Resume Ready'}</h4>
-                        <p className="text-xs sm:text-sm text-emerald-600 font-bold mt-1">Successfully Parsed & Ready</p>
+                        <h4 className="text-sm sm:text-lg font-bold text-slate-900 truncate w-full max-w-xs">{resumeFile?.name || 'Resume Ready'}</h4>
+                        <p className="text-xs sm:text-sm text-emerald-600 font-bold mt-0.5 sm:mt-1">Successfully Parsed & Ready</p>
                         <button
                           onClick={() => { setUploadDone(false); setResumeFile(null); setResumeId(''); }}
-                          className="mt-5 sm:mt-6 px-5 sm:px-6 py-2 sm:py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer"
+                          className="mt-3.5 sm:mt-6 px-4 py-2 sm:px-6 sm:py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-all cursor-pointer"
                         >
                           Upload Different File
                         </button>
                       </div>
                     ) : (
-                      <div {...getResumeRootProps()} className={`flex-1 w-full border-2 border-dashed rounded-xl sm:rounded-[1.5rem] flex flex-col items-center justify-center p-6 sm:p-8 text-center cursor-pointer transition-all ${resumeDrag ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'}`}>
+                      <div {...getResumeRootProps()} className={`flex-1 w-full border-2 border-dashed rounded-xl sm:rounded-[1.5rem] flex flex-col items-center justify-center p-5 sm:p-8 text-center cursor-pointer transition-all ${resumeDrag ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'}`}>
                         <input {...getResumeInputProps()} />
                         {uploading ? (
                           <div className="w-full max-w-[240px]">
                             <div className="flex items-center justify-center mb-3">
-                              <Loader2 size={22} className="animate-spin text-[#2E9BDA] mr-2.5" />
+                              <Loader2 size={20} className="animate-spin text-[#2E9BDA] mr-2" />
                               <span className="text-xs sm:text-sm font-bold text-slate-700">Uploading Document...</span>
                             </div>
-                            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div className="w-full bg-slate-200 h-1.5 sm:h-2 rounded-full overflow-hidden">
                               <div className="bg-[#2E9BDA] h-full transition-all duration-300" style={{ width: `${uploadProgress || 50}%` }} />
                             </div>
                           </div>
                         ) : (
                           <>
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center mb-3.5 sm:mb-4">
-                              <Upload size={24} className="text-[#2E9BDA]" />
+                            <div className="w-11 h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white shadow-2xs border border-slate-100 flex items-center justify-center mb-2.5 sm:mb-4">
+                              <Upload size={20} className="sm:w-6 sm:h-6 text-[#2E9BDA]" />
                             </div>
-                            <p className="text-sm sm:text-base font-bold text-slate-800">Drag & drop your resume here</p>
-                            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">or click to browse from your computer</p>
+                            <p className="text-xs sm:text-base font-bold text-slate-800">
+                              <span className="sm:hidden">Tap to upload your resume</span>
+                              <span className="hidden sm:inline">Drag & drop your resume here</span>
+                            </p>
+                            <p className="text-[11px] sm:text-sm text-slate-500 font-medium mt-0.5 sm:mt-1">or click to browse from your device</p>
                           </>
                         )}
                       </div>
@@ -474,57 +477,57 @@ export default function Results() {
                 </div>
 
                 {/* 2. Job Description Card */}
-                <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-5 sm:p-7 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] p-4 sm:p-7 md:p-8 border border-slate-200/80 shadow-lg shadow-slate-200/40 flex flex-col h-full relative overflow-hidden group hover:border-slate-300 transition-colors">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-[#2E9BDA]/5 rounded-bl-full -z-10" />
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
-                    <div className="flex items-center gap-3.5 sm:gap-4">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center justify-center shrink-0">
-                        <Layers size={20} />
+                  <div className="flex flex-row items-center justify-between gap-2 sm:gap-3 mb-4 sm:mb-8">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-2xs text-slate-700 flex items-center justify-center shrink-0">
+                        <Layers size={18} className="sm:w-5 sm:h-5 text-slate-700" />
                       </div>
                       <div>
-                        <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">2. Target Role</h3>
-                        <p className="text-xs sm:text-sm text-slate-500 font-medium">Define the JD requirements</p>
+                        <h3 className="text-sm sm:text-lg font-black text-slate-900 tracking-tight">2. Target Role</h3>
+                        <p className="text-[11px] sm:text-sm text-slate-500 font-medium">Define JD requirements</p>
                       </div>
                     </div>
-                    <div className="flex self-start sm:self-auto bg-slate-100/80 p-1 rounded-xl text-xs font-bold border border-slate-200/80">
-                      <button onClick={() => setJdMode('paste')} className={`px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'paste' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Paste Text</button>
-                      <button onClick={() => setJdMode('upload')} className={`px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'upload' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Upload File</button>
+                    <div className="flex bg-slate-100/80 p-0.5 sm:p-1 rounded-xl text-[11px] sm:text-xs font-bold border border-slate-200/80 shrink-0">
+                      <button onClick={() => setJdMode('paste')} className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'paste' ? 'bg-white shadow-2xs text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Paste Text</button>
+                      <button onClick={() => setJdMode('upload')} className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg transition-all cursor-pointer ${jdMode === 'upload' ? 'bg-white shadow-2xs text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Upload File</button>
                     </div>
                   </div>
 
-                  <div className="flex-1 flex flex-col gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex-1 flex flex-col gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                          <Briefcase size={16} className="text-slate-400" />
+                        <div className="absolute inset-y-0 left-3 sm:left-4 flex items-center pointer-events-none">
+                          <Briefcase size={15} className="text-slate-400" />
                         </div>
-                        <input value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Target Role (e.g. Backend Dev)" className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white transition-all shadow-sm" />
+                        <input value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Target Role (e.g. Backend Dev)" className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white transition-all shadow-2xs" />
                       </div>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                          <Code2 size={16} className="text-slate-400" />
+                        <div className="absolute inset-y-0 left-3 sm:left-4 flex items-center pointer-events-none">
+                          <Code2 size={15} className="text-slate-400" />
                         </div>
-                        <input value={requiredSkills} onChange={e => setRequiredSkills(e.target.value)} placeholder="Mandatory Skills (comma-separated)" className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white transition-all shadow-sm" />
+                        <input value={requiredSkills} onChange={e => setRequiredSkills(e.target.value)} placeholder="Mandatory Skills (comma-separated)" className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white transition-all shadow-2xs" />
                       </div>
                     </div>
 
                     {jdMode === 'upload' ? (
-                      <div {...getJDRootProps()} className={`flex-1 w-full border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center p-8 text-center cursor-pointer transition-all ${jdDrag ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' : jdFile ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'}`}>
+                      <div {...getJDRootProps()} className={`flex-1 w-full border-2 border-dashed rounded-xl sm:rounded-[1.5rem] flex flex-col items-center justify-center p-5 sm:p-8 text-center cursor-pointer transition-all ${jdDrag ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' : jdFile ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'}`}>
                         <input {...getJDInputProps()} />
                         {jdFile ? (
                           <div className="flex flex-col items-center">
-                            <CheckCircle2 size={32} className="text-emerald-500 mb-3" />
-                            <p className="text-base font-bold text-emerald-900 truncate max-w-xs">{jdFile.name}</p>
-                            <p className="text-sm text-emerald-600 font-medium mt-1">{(jdFile.size / 1024).toFixed(1)} KB</p>
+                            <CheckCircle2 size={26} className="text-emerald-500 mb-2 sm:mb-3" />
+                            <p className="text-sm sm:text-base font-bold text-emerald-900 truncate max-w-xs">{jdFile.name}</p>
+                            <p className="text-xs sm:text-sm text-emerald-600 font-medium mt-0.5 sm:mt-1">{(jdFile.size / 1024).toFixed(1)} KB</p>
                           </div>
                         ) : (
                           <>
-                            <div className="w-16 h-16 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center mb-4">
-                              <FileText size={28} className="text-slate-400" />
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white shadow-2xs border border-slate-100 flex items-center justify-center mb-2.5 sm:mb-4">
+                              <FileText size={22} className="sm:w-7 sm:h-7 text-slate-400" />
                             </div>
-                            <p className="text-base font-bold text-slate-800">Drop JD file here</p>
-                            <p className="text-sm text-slate-500 font-medium mt-1">PDF, DOCX, or TXT</p>
+                            <p className="text-xs sm:text-base font-bold text-slate-800">Drop JD file here</p>
+                            <p className="text-[11px] sm:text-sm text-slate-500 font-medium mt-0.5 sm:mt-1">PDF, DOCX, or TXT</p>
                           </>
                         )}
                       </div>
@@ -534,10 +537,10 @@ export default function Results() {
                           value={jdText}
                           onChange={e => setJdText(e.target.value)}
                           placeholder="Paste the full job description here..."
-                          className="flex-1 w-full min-h-[160px] p-5 bg-slate-50 border border-slate-200 rounded-[1.5rem] text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white resize-none transition-all shadow-sm"
+                          className="flex-1 w-full min-h-[120px] sm:min-h-[160px] p-3.5 sm:p-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-[1.5rem] text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:bg-white resize-none transition-all shadow-2xs"
                         />
-                        <div className="absolute bottom-4 right-4">
-                          <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm border ${jdText.length >= 50 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}>
+                        <div className="absolute bottom-2.5 right-2.5 sm:bottom-4 sm:right-4">
+                          <span className={`text-[9px] sm:text-[10px] font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg shadow-2xs border ${jdText.length >= 50 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}>
                             {jdText.length >= 50 ? 'Ready to analyze' : 'Min 50 chars'}
                           </span>
                         </div>
@@ -549,21 +552,21 @@ export default function Results() {
               </div>
 
               {/* Master Scan CTA Button */}
-              <div className="flex justify-center mt-10">
+              <div className="flex justify-center mt-5 sm:mt-10">
                 <motion.button
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleAnalyze}
                   disabled={analyzing || !uploadDone || !isJdReady}
-                  className="group w-full max-w-xl py-4 rounded-[1.25rem] font-black text-base text-white bg-gradient-to-r from-[#2E9BDA] via-[#248bc7] to-indigo-600 shadow-xl shadow-[#2E9BDA]/25 flex items-center justify-center gap-3 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-2xl hover:shadow-[#2E9BDA]/40"
+                  className="group w-full max-w-xl py-3.5 sm:py-4 rounded-xl sm:rounded-[1.25rem] font-black text-sm sm:text-base text-white bg-gradient-to-r from-[#2E9BDA] via-[#248bc7] to-indigo-600 shadow-lg shadow-[#2E9BDA]/25 flex items-center justify-center gap-2 sm:gap-3 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:shadow-[#2E9BDA]/35 active:scale-98"
                 >
                   {analyzing ? (
-                    <><Loader2 size={20} className="animate-spin" /> Evaluating Profile...</>
+                    <><Loader2 size={18} className="animate-spin" /> Evaluating Profile...</>
                   ) : (
                     <>
-                      <Zap size={20} className="text-white" />
+                      <Zap size={18} className="text-white" />
                       <span>Run Dual-Engine ATS Analysis</span>
-                      <ArrowRight size={20} className="group-hover:translate-x-1.5 transition-transform" />
+                      <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
                     </>
                   )}
                 </motion.button>

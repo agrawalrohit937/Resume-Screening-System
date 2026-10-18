@@ -1,43 +1,43 @@
-import { useState, useRef, useEffect, memo, lazy, Suspense } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu,
   Search,
   Sparkles,
-  HelpCircle,
   ChevronDown,
-  FileText,
-  Video,
   Zap,
   LayoutDashboard,
   Trophy,
   Settings,
-  Flame,
   Crown,
   User,
   Globe,
   X,
   Briefcase,
-  ArrowLeft
+  ArrowLeft,
+  Target,
+  Compass
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getGamificationProfile } from '../services/interviewApi'
 import AvatarRing from './AvatarRing'
 import NotificationBell from './NotificationBell'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
+import ProfilePlanDropdown from './ProfilePlanDropdown'
 
-const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
-
+// Fast spotlight search routes
 const SEARCH_ROUTES = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, keywords: ['home', 'analytics'] },
-  { name: 'Portfolio Builder & Showcase', path: '/portfolio', icon: Globe, keywords: ['portfolio', 'website', 'developer site', 'showcase', 'projects'] },
-  { name: 'Quick Practice (MCQ)', path: '/interview', icon: Zap, keywords: ['practice', 'mcq', 'quiz', 'quick practice'] },
-  { name: 'Career Quest', path: '/gamification', icon: Trophy, keywords: ['quest', 'rewards', 'badges'] },
-  { name: 'AI Resume Enhancer', path: '/results', icon: Zap, keywords: ['enhance', 'improve'] },
-  { name: 'Billing & Premium', path: '/billing', icon: Crown, keywords: ['billing', 'upgrade', 'pro'] },
-  { name: 'My Profile & Resume', path: '/profile', icon: User, keywords: ['profile', 'resume', 'bio'] },
-  { name: 'Account Settings & Password', path: '/settings', icon: Settings, keywords: ['settings', 'password', 'change password', 'security'] },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, keywords: ['home', 'analytics', 'overview'] },
+  { name: 'Mock Interview (AI MCQ)', path: '/interview', icon: Zap, keywords: ['practice', 'mcq', 'quiz', 'mock interview', 'test'] },
+  { name: 'Live AI Interview', path: '/live-interview', icon: Zap, keywords: ['camera', 'live', 'video', 'speech'] },
+  { name: 'ATS Matcher & Score', path: '/results', icon: Target, keywords: ['enhance', 'improve', 'ats', 'resume score', 'cv'] },
+  { name: 'Job Marketplace', path: '/jobs', icon: Briefcase, keywords: ['jobs', 'apply', 'career', 'internship', 'openings'] },
+  { name: 'Application Tracker', path: '/applications', icon: Compass, keywords: ['applications', 'status', 'interviews', 'applied'] },
+  { name: 'Portfolio Builder', path: '/portfolio-builder', icon: Globe, keywords: ['portfolio', 'website', 'developer site', 'showcase'] },
+  { name: 'Career Quest & Rewards', path: '/gamification', icon: Trophy, keywords: ['quest', 'rewards', 'badges', 'xp', 'streak', 'leaderboard'] },
+  { name: 'Billing & Subscriptions', path: '/billing', icon: Crown, keywords: ['billing', 'upgrade', 'pro', 'credits', 'plans'] },
+  { name: 'My Profile & CV', path: '/profile', icon: User, keywords: ['profile', 'resume', 'bio', 'account'] },
+  { name: 'Account Settings', path: '/settings', icon: Settings, keywords: ['settings', 'password', 'security', 'preferences'] },
 ]
 
 const RECRUITER_SEARCH_ROUTES = [
@@ -54,7 +54,7 @@ function UserAvatar({ user, size = 'sm' }) {
   const [imgError, setImgError] = useState(false)
   const avatarUrl = resolveAvatarUrl(user)
   const initials = getInitials(user?.full_name)
-  const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm'
+  const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-9 h-9 text-sm'
 
   useEffect(() => {
     setImgError(false)
@@ -66,21 +66,20 @@ function UserAvatar({ user, size = 'sm' }) {
         src={avatarUrl}
         alt={user?.full_name || 'avatar'}
         referrerPolicy="no-referrer"
-        className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-sm`}
+        className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-2xs`}
         onError={() => setImgError(true)}
       />
     )
   }
 
   return (
-    <div className={`${sizeClass} rounded-full flex items-center justify-center text-white font-extrabold bg-gradient-to-br from-indigo-500 to-blue-600 border-2 border-white shadow-sm`}>
+    <div className={`${sizeClass} rounded-full flex items-center justify-center text-white font-extrabold bg-gradient-to-br from-indigo-500 to-blue-600 border-2 border-white shadow-2xs`}>
       {initials}
     </div>
   )
 }
 
-// --- Main Navbar Component ---
-const Navbar = memo(function Navbar({ onMenuToggle }) {
+const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -91,46 +90,38 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
-  const [streak, setStreak] = useState(0)
   
   const menuRef = useRef(null)
   const searchContainerRef = useRef(null)
   const searchInputRef = useRef(null)
   const mobileSearchInputRef = useRef(null)
 
-  const userId = user?.id || user?._id || null
-  useEffect(() => {
-    if (!userId) {
-      setStreak(0)
-      return
-    }
-    let isMounted = true
-    getGamificationProfile()
-      .then(res => {
-        if (isMounted && res?.data?.current_streak !== undefined) {
-          setStreak(res.data.current_streak)
-        }
-      })
-      .catch(() => {})
-    return () => { isMounted = false }
-  }, [userId])
-
   const isRecruiter = user?.role === 'recruiter'
   const activeSearchRoutes = isRecruiter ? RECRUITER_SEARCH_ROUTES : SEARCH_ROUTES
 
-  // Dynamically get current page name for the breadcrumb
-  const currentRouteName = (() => {
-    if (location.pathname.startsWith('/support/')) return 'Support Ticket Details'
-    if (location.pathname === '/support') return 'Support Tickets'
-    if (location.pathname.startsWith('/recruiter/jobs/')) return 'Jobs & Applicants Pipeline'
-    if (location.pathname.startsWith('/jobs/')) return 'Marketplace Jobs'
-    const found = activeSearchRoutes.find(r => r.path === location.pathname)
-    if (found) return found.name
-    const prefix = activeSearchRoutes.find(r => r.path !== '/' && location.pathname.startsWith(r.path))
-    if (prefix) return prefix.name
-    return isRecruiter ? 'Recruiting Overview' : 'Dashboard'
+  // Clean route display name
+  const pageTitle = (() => {
+    const p = location.pathname
+    if (p === '/dashboard') return 'Dashboard'
+    if (p === '/interview') return 'Mock Interview'
+    if (p === '/live-interview') return 'Live AI Interview'
+    if (p === '/results') return 'ATS Matcher'
+    if (p === '/jobs') return 'Explore Jobs'
+    if (p === '/applications') return 'My Applications'
+    if (p === '/apply-assistant') return 'AI Apply Assistant'
+    if (p === '/gamification') return 'Rewards & Quests'
+    if (p.startsWith('/portfolio')) return 'Portfolio Generator'
+    if (p === '/billing') return 'Billing & Plans'
+    if (p === '/profile') return 'My Profile'
+    if (p === '/settings') return 'Settings'
+    if (p.startsWith('/support')) return 'Support Desk'
+    if (p.startsWith('/recruiter/jobs')) return 'Jobs Pipeline'
+    if (p === '/recruiter/dashboard') return 'Recruiter Overview'
+    const found = activeSearchRoutes.find(r => r.path === p)
+    return found ? found.name : 'Overview'
   })()
 
+  // Search logic
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([])
@@ -145,7 +136,7 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
       )
       setSearchResults(results)
       setSelectedIndex(results.length > 0 ? 0 : -1)
-    }, 150)
+    }, 120)
     return () => clearTimeout(timer)
   }, [searchQuery, activeSearchRoutes])
 
@@ -217,8 +208,9 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
     setSearchQuery('')
     setSearchResults([])
     setSelectedIndex(-1)
-  }, [location.pathname, location.key, location.search])
+  }, [location.pathname, location.key])
 
+  // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -239,78 +231,78 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
   const openCopilot = () => window.dispatchEvent(new Event('careershala:open-copilot'))
 
   const renderSearchResults = (isMobile = false) => {
-    if (!searchQuery.trim()) return null;
+    if (!searchQuery.trim()) return null
     return (
       <div
         style={
           isMobile
             ? undefined
-            : { width: 'min(560px, calc(100vw - 32px))', minWidth: 'min(460px, calc(100vw - 32px))' }
+            : { width: 'min(440px, calc(100vw - 32px))' }
         }
-        className={`bg-white rounded-2xl shadow-[0_25px_60px_rgba(15,23,42,0.22)] border border-slate-200 overflow-hidden z-50 ${
+        className={`bg-white rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.15)] border border-slate-200 overflow-hidden z-50 ${
           isMobile
             ? 'w-full mt-2 max-h-[60vh] overflow-y-auto'
-            : 'absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2'
+            : 'absolute top-[calc(100%+8px)] left-0'
         }`}
       >
         {searchResults.length > 0 ? (
-          <div className="p-2.5 bg-white">
-            <div className="flex items-center justify-between px-3 pt-2 pb-1.5 bg-white border-b border-slate-100 mb-1">
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 shrink-0">Jump To</p>
-              <span className="text-[10px] font-semibold text-slate-400 shrink-0">↑↓ to navigate • ↵ to select</span>
+          <div className="p-2 bg-white">
+            <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-slate-100 mb-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Quick Navigation</p>
+              <span className="text-[10px] font-semibold text-slate-400">↑↓ to navigate • ↵ to select</span>
             </div>
             {searchResults.map((result, idx) => {
-              const isSelected = selectedIndex === idx;
+              const isSelected = selectedIndex === idx
               return (
                 <button
                   key={result.path + idx}
                   type="button"
                   onClick={() => handleNavigate(result.path)}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-left cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left cursor-pointer ${
                     isSelected 
                       ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-100' 
                       : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors border ${
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
                       isSelected 
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
                         : 'bg-slate-100 text-slate-600 border-slate-200/60'
                     }`}>
-                      <result.icon size={16} strokeWidth={2.5} />
+                      <result.icon size={15} strokeWidth={2.5} />
                     </div>
-                    <span className="text-sm font-bold truncate">
+                    <span className="text-xs sm:text-sm font-bold truncate">
                       {result.name}
                     </span>
                   </div>
-                  <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-md border shrink-0 ${
-                    isSelected ? 'opacity-100 bg-white text-indigo-700 border-indigo-200 shadow-2xs' : 'opacity-0 text-slate-400 border-transparent'
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
+                    isSelected ? 'bg-white text-indigo-700 border-indigo-200' : 'opacity-0'
                   }`}>
-                    Select ↵
+                    Jump ↵
                   </span>
                 </button>
-              );
+              )
             })}
           </div>
         ) : (
-          <div className="p-6 sm:p-8 text-center bg-white">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-slate-100">
-              <Search className="w-5 h-5 text-slate-400" strokeWidth={3} />
-            </div>
-            <p className="text-sm font-extrabold text-slate-900">No results found</p>
-            <p className="text-xs text-slate-500 mt-1">Try searching for "Portfolio", "ATS", or "Interview"</p>
+          <div className="p-6 text-center bg-white">
+            <Search className="w-6 h-6 text-slate-400 mx-auto mb-2" strokeWidth={2.5} />
+            <p className="text-xs font-bold text-slate-800">No matching sections found</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Try searching "Interview", "ATS", or "Jobs"</p>
           </div>
         )}
       </div>
-    );
-  };
+    )
+  }
+
+  const isPremiumUser = user?.plan === 'premium' || user?.subscription_tier === 'premium'
 
   return (
-    <header className="h-[72px] shrink-0 sticky top-0 z-50 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 lg:px-6 shadow-xs relative">
+    <header className="h-[64px] shrink-0 sticky top-0 z-40 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 lg:px-6 shadow-2xs relative">
       
-      {/* Mobile Full Overlay Search Bar */}
+      {/* Mobile Search Overlay */}
       <AnimatePresence>
         {isMobileSearchOpen && (
           <motion.div
@@ -343,9 +335,8 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleInputKeyDown}
-                  placeholder="Search ATS, interviews..."
-                  aria-label="Search mobile"
-                  className="w-full h-10 pl-9 pr-8 rounded-xl bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 outline-none text-xs font-semibold text-slate-900 placeholder-slate-400"
+                  placeholder="Search ATS, Mock Interviews, jobs..."
+                  className="w-full h-10 pl-9 pr-8 rounded-xl bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white outline-none text-xs font-semibold text-slate-900 placeholder-slate-400"
                 />
                 {Boolean(searchQuery) && (
                   <button
@@ -362,9 +353,8 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
               </div>
             </div>
 
-            {/* Mobile Dropdown Positioned Below Header */}
             {Boolean(searchQuery.trim()) && (
-              <div className="absolute top-[72px] left-2 right-2 z-50">
+              <div className="absolute top-[64px] left-2 right-2 z-50">
                 {renderSearchResults(true)}
               </div>
             )}
@@ -372,39 +362,30 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
         )}
       </AnimatePresence>
 
-      {/* 1. Left: Menu Button & Breadcrumb */}
-      <div className="flex items-center shrink-0 gap-2 sm:gap-3">
-        <motion.button 
-          whileHover={{ scale: 1.05, backgroundColor: 'rgb(226 232 240)' }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onMenuToggle} 
+      {/* 1. LEFT: Toggle Button + Clean Page Title */}
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={onMenuToggle}
           aria-label="Toggle navigation menu"
-          className="p-2 sm:p-2.5 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+          className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/70 shadow-2xs transition-all cursor-pointer"
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <Menu size={19} strokeWidth={2.5} />
-        </motion.button>
-        
-        {/* Breadcrumb only on ultra-wide desktop monitors (1536px+) so all laptops get full spacious search */}
-        <div className="hidden 2xl:flex items-center gap-2 text-sm font-bold text-slate-500 select-none">
-          <span className="hover:text-slate-700 transition-colors cursor-pointer" onClick={() => navigate('/')}>Home</span>
-          <span>/</span>
-          {location.pathname.startsWith('/support/') ? (
-            <>
-              <span className="hover:text-slate-700 transition-colors cursor-pointer" onClick={() => navigate('/support')}>Support</span>
-              <span>/</span>
-              <span className="text-slate-800 tracking-tight">Ticket Details</span>
-            </>
-          ) : (
-            <span className="text-slate-800 tracking-tight">{currentRouteName}</span>
-          )}
+          <Menu size={18} strokeWidth={2.2} />
+        </button>
+
+        {/* Clean, lightweight breadcrumb (no heavy boxes) */}
+        <div className="hidden sm:flex items-center gap-2 text-sm select-none">
+          <span className="text-slate-400 font-medium">Workspace</span>
+          <span className="text-slate-300">/</span>
+          <span className="font-extrabold text-slate-900 tracking-tight">{pageTitle}</span>
         </div>
       </div>
 
-      {/* 2. Center: Responsive Search Bar (Takes maximum spacious width on all laptops) */}
-      <div className="hidden sm:flex flex-1 max-w-2xl mx-3 sm:mx-4 lg:mx-8 relative z-50" ref={searchContainerRef}>
+      {/* 2. CENTER: Clean, Balanced Spotlight Search */}
+      <div className="hidden md:flex flex-1 max-w-md mx-6 relative z-30" ref={searchContainerRef}>
         <div className="relative group w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors z-10 pointer-events-none" strokeWidth={2.5} />
-          
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 pointer-events-none transition-colors" strokeWidth={2.5} />
           <input
             ref={searchInputRef}
             type="text"
@@ -412,144 +393,99 @@ const Navbar = memo(function Navbar({ onMenuToggle }) {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Search ATS, Mock Interviews, settings..."
-            aria-label="Search ATS, Mock Interviews, or settings"
-            className="w-full h-10 sm:h-11 pl-10 pr-14 sm:pr-16 rounded-2xl bg-slate-50/80 hover:bg-slate-100/80 focus:bg-white border border-slate-200/90 focus:border-indigo-400 focus:ring-[3px] focus:ring-indigo-500/10 outline-none text-xs sm:text-sm font-semibold text-slate-900 placeholder-slate-400 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] group-focus-within:shadow-[0_8px_30px_rgba(99,102,241,0.08)] truncate"
+            placeholder="Search ATS, Mock Interview, jobs..."
+            aria-label="Quick search"
+            className="w-full h-10 pl-10 pr-12 rounded-xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10 outline-none text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 transition-all shadow-2xs"
           />
-          
           {Boolean(searchQuery) ? (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery('')
                 setSearchResults([])
-                setSelectedIndex(-1)
                 setIsSearchFocused(false)
-                if (searchInputRef.current) {
-                  searchInputRef.current.value = ''
-                  searchInputRef.current.focus()
-                }
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer z-20"
-              aria-label="Clear search query"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
             >
-              <X size={14} strokeWidth={2.5} />
+              <X size={13} strokeWidth={2.5} />
             </button>
           ) : (
-            <div className="hidden md:flex items-center absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-bold text-slate-400 bg-white border border-slate-200 rounded-md shadow-2xs">
-                ⌘K
-              </kbd>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none select-none">
+              <kbd className="px-1.5 py-0.5 text-[10px] font-extrabold text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">⌘K</kbd>
             </div>
           )}
         </div>
-
-        {/* Search Results Dropdown (Spacious & Responsive) */}
         {Boolean(isSearchFocused && searchQuery.trim()) && renderSearchResults(false)}
       </div>
 
-      {/* 3. Right: Actions & Profile */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      {/* 3. RIGHT: Clean, Minimalist Suite (Copilot, Notifications, Profile) */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         
-        {/* Mobile Search Icon Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
+        {/* Mobile Search Trigger Icon */}
+        <button
+          type="button"
           onClick={() => {
             setIsMobileSearchOpen(true)
             setTimeout(() => mobileSearchInputRef.current?.focus(), 50)
           }}
           aria-label="Open search"
-          className="sm:hidden p-2 rounded-2xl bg-white text-slate-600 border border-slate-200 shadow-sm cursor-pointer"
+          className="md:hidden p-2 rounded-xl bg-slate-50 text-slate-600 border border-slate-200 shadow-2xs cursor-pointer"
         >
-          <Search size={18} strokeWidth={2.5} />
-        </motion.button>
+          <Search size={16} strokeWidth={2.5} />
+        </button>
 
-        {/* Gamification Streak Pill (Visible on 2xl only) */}
-        {!isRecruiter && user?.role !== 'admin' && (
-          <div className="hidden 2xl:flex items-center gap-2 px-3 py-2 rounded-2xl bg-white border border-slate-200 shadow-sm cursor-default" title="Current Daily Practice Streak">
-            <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
-              <Flame size={12} strokeWidth={3} />
-            </div>
-            <span className="text-xs font-black text-slate-700">{streak} Day{streak === 1 ? '' : 's'}</span>
-          </div>
-        )}
-
-        {/* AI Copilot */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        {/* AI Copilot Button (Sleek Gradient Pill) */}
+        <button
+          type="button"
           onClick={openCopilot}
           aria-label="Open AI Copilot"
-          className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white border border-indigo-500 shadow-[0_4px_12px_rgba(79,70,229,0.3)] hover:shadow-[0_6px_16px_rgba(79,70,229,0.4)] transition-all cursor-pointer touch-manipulation"
-          title="Open AI Copilot"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer"
+          title="Open AI Career Copilot"
         >
-          <Sparkles size={16} strokeWidth={2.4} className="text-indigo-100 shrink-0 animate-pulse" />
-          <span className="hidden 2xl:inline text-xs font-black uppercase tracking-widest">Copilot</span>
-        </motion.button>
+          <Sparkles size={14} className="text-indigo-200 animate-pulse" />
+          <span className="hidden sm:inline">Copilot</span>
+        </button>
 
         {/* Notifications */}
         <NotificationBell />
 
-        {/* Help (Visible on 2xl screens only) */}
-        <motion.button 
-          whileHover={{ scale: 1.05, backgroundColor: 'white' }}
-          whileTap={{ scale: 0.95 }}
-          aria-label="Help and documentation"
-          className="hidden 2xl:flex p-2.5 rounded-2xl text-slate-600 border border-transparent hover:border-slate-200 hover:shadow-sm transition-all"
-        >
-          <HelpCircle size={20} strokeWidth={2.5} />
-        </motion.button>
+        {/* Subtle Divider */}
+        <div className="w-px h-6 bg-slate-200 hidden sm:block mx-1" />
 
-        <div className="w-px h-7 bg-slate-200/80 hidden sm:block mx-0.5" />
-
-        {/* User Dropdown */}
+        {/* User Profile Chip */}
         <div className="relative" ref={menuRef}>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <button
+            type="button"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="User account menu"
-            className="flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-2 sm:pr-2.5 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+            className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-xl hover:bg-slate-100 border border-transparent hover:border-slate-200/80 transition-all cursor-pointer select-none"
           >
-            <div className="relative">
-              <AvatarRing user={user} ringSize={32} shape="circle">
-                <UserAvatar user={user} size="sm" />
-              </AvatarRing>
-              {(user?.plan === 'premium' || user?.subscription_tier === 'premium') && (
-                <div className="sm:hidden absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
-                  <Crown size={14} className="text-amber-500 fill-amber-400" />
-                </div>
-              )}
-              {(user?.plan === 'pro' || user?.subscription_tier === 'pro') && (
-                <div className="sm:hidden absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
-                  <Crown size={14} className="text-slate-400 fill-slate-300" />
-                </div>
-              )}
+            <AvatarRing user={user} ringSize={32} shape="circle">
+              <UserAvatar user={user} size="sm" />
+            </AvatarRing>
+            
+            <div className="hidden sm:flex flex-col text-left leading-tight">
+              <span className="text-xs font-extrabold text-slate-900 truncate max-w-[100px] flex items-center gap-1">
+                {user?.full_name?.split(' ')[0] || 'User'}
+                {isPremiumUser && <Crown size={11} className="text-amber-500 fill-amber-400 shrink-0" />}
+              </span>
+              <span className="text-[10.5px] font-semibold text-slate-400 truncate max-w-[100px] capitalize">
+                {user?.role === 'recruiter' ? 'Recruiter' : isPremiumUser ? 'Pro Member' : 'Candidate'}
+              </span>
             </div>
-            <span className="hidden 2xl:flex items-center gap-1 text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight max-w-[85px] sm:max-w-[120px] truncate">
-              {user?.full_name?.split(' ')[0] || 'User'}
-              {(user?.plan === 'premium' || user?.subscription_tier === 'premium') && (
-                <Crown size={13} className="text-amber-500 fill-amber-400 drop-shadow-sm ml-0.5 shrink-0" />
-              )}
-              {(user?.plan === 'pro' || user?.subscription_tier === 'pro') && (
-                <Crown size={13} className="text-slate-400 fill-slate-300 drop-shadow-sm ml-0.5 shrink-0" />
-              )}
-            </span>
-            <ChevronDown size={14} strokeWidth={3} className="text-slate-400 hidden 2xl:block ml-0.5 shrink-0" />
-          </motion.button>
 
+            <ChevronDown size={13} className={`text-slate-400 hidden sm:block transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Account Dropdown */}
           {isOpen && (
             <>
-              {/* Backdrop — closes dropdown on outside click */}
               <div
                 className="fixed inset-0 z-40"
                 onClick={() => setIsOpen(false)}
               />
-              {/* Dropdown Card */}
-              <div className="absolute right-0 mt-3 rounded-3xl shadow-[0_10px_40px_rgba(30,58,138,0.12)] border border-slate-200/80 bg-white/95 backdrop-blur-xl overflow-hidden z-50 w-[calc(100vw-24px)] sm:w-[340px] max-w-[340px]">
-                <Suspense fallback={<div className="p-4 text-center text-xs text-slate-500 font-medium">Loading...</div>}>
-                  <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
-                </Suspense>
+              <div className="absolute right-0 mt-2 rounded-2xl shadow-[0_15px_40px_rgba(30,58,138,0.15)] border border-slate-200 bg-white overflow-hidden z-50 w-[calc(100vw-24px)] sm:w-[320px] max-w-[320px] animate-in fade-in zoom-in-95 duration-100">
+                <ProfilePlanDropdown user={user} onClose={() => setIsOpen(false)} />
               </div>
             </>
           )}

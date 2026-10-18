@@ -85,6 +85,19 @@ export default function Dashboard() {
       setGami(g.data || null)
       setResumeCount(r.data?.resumes?.length || 0)
       setScoreTrend(analyticsData?.score_trend || [])
+      
+      try {
+        const sum = analyticsData?.summary || {}
+        const best = sum.best_score ?? 0
+        const normBest = best > 1 ? Math.round(best) : Math.round(best * 100)
+        const totalChecks = sum.total_ats_checks || 0
+        const streakVal = g.data?.current_streak || 0
+        localStorage.setItem('careershala_cached_stats', JSON.stringify({
+          score: totalChecks > 0 ? normBest : 0,
+          streak: streakVal,
+          totalChecks: totalChecks
+        }))
+      } catch {}
     }).finally(() => {
       if (mounted) setLoading(false)
     })
@@ -300,7 +313,7 @@ export default function Dashboard() {
                   {readiness}<span className="text-xl sm:text-3xl text-indigo-600 font-extrabold">%</span>
                 </span>
                 <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-slate-400 mt-1 whitespace-nowrap select-none">
-                  Career Score
+                  Score
                 </span>
               </div>
             </div>

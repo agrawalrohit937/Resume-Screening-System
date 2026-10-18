@@ -60,19 +60,6 @@ Requirements:
 - Strong command of SQL, Python (Pandas/NumPy), Tableau or Power BI.
 - Solid understanding of statistical concepts, KPI tracking, and data modeling.`,
   },
-  {
-    title: 'DevOps & Cloud',
-    icon: '☁️',
-    color: 'from-sky-500/10 to-blue-500/10 border-sky-200 text-sky-700',
-    skills: 'Docker, Kubernetes, AWS, CI/CD, Terraform, Linux, Git, Prometheus',
-    description: `Seeking a DevOps & Cloud Engineer to build and maintain our high-availability cloud infrastructure.
-Responsibilities:
-- Manage multi-region AWS cloud infrastructure using Terraform and Infrastructure as Code.
-- Orchestrate containerized workloads on Kubernetes (EKS) and optimize CI/CD pipelines.
-Requirements:
-- Strong proficiency with Docker, Kubernetes, AWS services, and Linux systems.
-- Experience with GitHub Actions CI/CD pipelines and infrastructure monitoring.`,
-  },
 ]
 
 // ── Text Extraction Helpers ──────────────────────────────────────────────────
