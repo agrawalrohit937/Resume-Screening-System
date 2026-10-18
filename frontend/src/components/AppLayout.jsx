@@ -9,7 +9,7 @@ import RouteErrorBoundary from './RouteErrorBoundary'
 import AvatarRing from './AvatarRing'
 import { resolveAvatarUrl } from '../utils/avatarUtils'
 
-const ProfilePlanDropdown = lazy(() => import('./ProfilePlanDropdown'))
+import ProfilePlanDropdown from './ProfilePlanDropdown'
 import { CopilotProvider } from '../features/copilot'
 const CopilotSurface = lazy(() => import('../features/copilot/CopilotSurface'))
 
@@ -138,12 +138,10 @@ function MobileHeader({ onMenuToggle }) {
             ref={dropdownRef}
             className="fixed top-[64px] right-3 left-3 sm:left-auto sm:w-[340px] max-w-[350px] ml-auto z-[110] shadow-2xl rounded-3xl overflow-hidden"
           >
-            <Suspense fallback={null}>
-              <ProfilePlanDropdown
-                user={user}
-                onClose={() => setIsProfileOpen(false)}
-              />
-            </Suspense>
+            <ProfilePlanDropdown
+              user={user}
+              onClose={() => setIsProfileOpen(false)}
+            />
           </div>
         </div>
       )}

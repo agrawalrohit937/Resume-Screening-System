@@ -112,23 +112,31 @@ async def _check_and_apply_lazy_expiration(user: UserModel, user_repo: UserRepos
     """
     if user.subscription_active and user.subscription_end_date:
         end_date = user.subscription_end_date
-        if end_date.tzinfo is None:
-            end_date = end_date.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        if now > end_date:
-            updates = {
-                "plan": "free",
-                "subscription_active": False,
-                "subscription_status": "expired",
-                "subscription_end_date": None,
-                "plan_updated_at": now,
-            }
-            await user_repo.update(str(user.id), updates)
-            user.plan = "free"
-            user.subscription_active = False
-            user.subscription_status = "expired"
-            user.subscription_end_date = None
-            user.plan_updated_at = now
+        if isinstance(end_date, str):
+            try:
+                end_date = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            except Exception:
+                end_date = None
+        if isinstance(end_date, datetime):
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
+            else:
+                end_date = end_date.astimezone(timezone.utc)
+            now = datetime.now(timezone.utc)
+            if now > end_date:
+                updates = {
+                    "plan": "free",
+                    "subscription_active": False,
+                    "subscription_status": "expired",
+                    "subscription_end_date": None,
+                    "plan_updated_at": now,
+                }
+                await user_repo.update(str(user.id), updates)
+                user.plan = "free"
+                user.subscription_active = False
+                user.subscription_status = "expired"
+                user.subscription_end_date = None
+                user.plan_updated_at = now
     return user
 
 

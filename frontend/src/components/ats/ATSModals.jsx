@@ -31,23 +31,23 @@ export function InvalidDocumentError({ confidence, warnings = [], onReset }) {
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      className="max-w-2xl mx-auto my-8 p-8 sm:p-10 bg-white/95 backdrop-blur-2xl border border-rose-200/90 rounded-3xl shadow-2xl text-center flex flex-col items-center gap-4"
+      className="max-w-2xl mx-auto my-4 sm:my-8 p-5 sm:p-10 bg-white/95 backdrop-blur-2xl border border-rose-200/90 rounded-2xl sm:rounded-3xl shadow-xl text-center flex flex-col items-center gap-3 sm:gap-4 mx-3 sm:mx-auto"
     >
-      <div className="w-20 h-20 rounded-3xl bg-rose-50 border-2 border-rose-200 flex items-center justify-center text-rose-600 shadow-sm animate-pulse">
-        <XCircle size={44} />
+      <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-rose-50 border-2 border-rose-200 flex items-center justify-center text-rose-600 shadow-2xs animate-pulse">
+        <XCircle size={32} className="sm:w-11 sm:h-11" />
       </div>
 
-      <h2 className="text-2xl font-black text-slate-900 font-poppins">
+      <h2 className="text-lg sm:text-2xl font-black text-slate-900 font-poppins">
         Document Not Recognized as a Resume
       </h2>
 
-      <p className="text-slate-600 text-sm max-w-md leading-relaxed font-medium">
+      <p className="text-slate-600 text-xs sm:text-sm max-w-md leading-relaxed font-medium">
         We couldn't detect standard resume sections (Work Experience, Technical Skills, Education). 
         The file may be a scan, certificate, invoice, or formatted with non-standard multi-column tables.
       </p>
 
       {(warnings.length > 0 || typeof confidence === 'number') && (
-        <div className="w-full max-w-md mt-2 p-4 bg-slate-50 border border-rose-100 rounded-2xl text-left text-xs text-slate-700 font-medium">
+        <div className="w-full max-w-md mt-2 p-3 sm:p-4 bg-slate-50 border border-rose-100 rounded-xl sm:rounded-2xl text-left text-xs text-slate-700 font-medium">
           {typeof confidence === 'number' && (
             <p className="font-mono font-bold text-rose-700 mb-1">
               Detection Confidence: {Math.round(confidence * 100)}%
@@ -61,7 +61,7 @@ export function InvalidDocumentError({ confidence, warnings = [], onReset }) {
 
       <button
         onClick={onReset}
-        className="mt-4 px-8 py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-extrabold rounded-2xl transition shadow-lg hover:shadow-xl transform active:scale-98 cursor-pointer"
+        className="mt-2 sm:mt-4 px-6 py-2.5 sm:px-8 sm:py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-extrabold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition shadow-md hover:shadow-lg transform active:scale-98 cursor-pointer"
       >
         Upload Valid ATS Resume
       </button>
@@ -102,19 +102,19 @@ export function ScanningDiagnosticsModal({ jobTitle }) {
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
-        className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl border border-indigo-100/90 overflow-hidden relative"
+        className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl border border-indigo-100/90 overflow-hidden relative"
       >
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
         
         {/* Hologram Cyber Scanner Visualizer */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative w-28 h-32 bg-gradient-to-b from-indigo-50/80 via-blue-50/60 to-purple-50/80 border-2 border-indigo-200/90 rounded-2xl shadow-inner flex flex-col items-center justify-center p-3 overflow-hidden">
-            <FileText size={40} className="text-indigo-600 mb-1 opacity-80" />
+        <div className="flex flex-col items-center mb-4 sm:mb-6">
+          <div className="relative w-22 h-26 sm:w-28 sm:h-32 bg-gradient-to-b from-indigo-50/80 via-blue-50/60 to-purple-50/80 border-2 border-indigo-200/90 rounded-2xl shadow-inner flex flex-col items-center justify-center p-2.5 sm:p-3 overflow-hidden">
+            <FileText size={32} className="sm:w-10 sm:h-10 text-indigo-600 mb-1 opacity-80" />
             
             {/* Animated Laser Scanning Line */}
             <motion.div
-              animate={{ y: [-45, 45, -45] }}
+              animate={{ y: [-38, 38, -38] }}
               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
               className="absolute w-full h-1.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_14px_#06b6d4]"
             />
@@ -127,10 +127,10 @@ export function ScanningDiagnosticsModal({ jobTitle }) {
             />
           </div>
 
-          <h3 className="text-xl font-black text-slate-900 mt-4 font-poppins text-center">
+          <h3 className="text-base sm:text-xl font-black text-slate-900 mt-3 sm:mt-4 font-poppins text-center">
             Evaluating ATS Readiness
           </h3>
-          <p className="text-xs text-indigo-600 font-extrabold tracking-wider uppercase mt-0.5">
+          <p className="text-[11px] sm:text-xs text-indigo-600 font-extrabold tracking-wider uppercase mt-0.5">
             Targeting: {jobTitle || 'Target Requisition'}
           </p>
         </div>
