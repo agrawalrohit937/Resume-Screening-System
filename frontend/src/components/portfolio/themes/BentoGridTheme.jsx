@@ -68,6 +68,7 @@ export default function BentoGridTheme({
   const [typedText, setTypedText] = useState('');
   const [roleIdx, setRoleIdx] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const typingWords = (profile.typing_roles && profile.typing_roles.length > 0)
     ? profile.typing_roles
@@ -216,10 +217,11 @@ export default function BentoGridTheme({
           {/* Avatar Tile */}
           <BentoCard colSpan={1} rowSpan={1} className="p-2 bg-gradient-to-tr from-amber-100 to-orange-50">
             <div className="w-full h-full rounded-[24px] overflow-hidden relative group">
-              {profile.avatar_url ? (
+              {profile.avatar_url && !avatarFailed ? (
                 <img
                   src={profile.avatar_url}
                   alt={profile.full_name}
+                  onError={() => setAvatarFailed(true)}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
               ) : (

@@ -35,6 +35,7 @@ export default function CyberpunkTheme({
   const [isDeleting, setIsDeleting] = useState(false);
   const [glitchActive, setGlitchActive] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const typingWords = (profile.typing_roles && profile.typing_roles.length > 0)
     ? profile.typing_roles
@@ -207,10 +208,11 @@ export default function CyberpunkTheme({
               <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-yellow-400 z-10" />
               <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-yellow-400 z-10" />
 
-              {profile.avatar_url ? (
+              {profile.avatar_url && !avatarFailed ? (
                 <img 
                   src={profile.avatar_url} 
                   alt={profile.full_name} 
+                  onError={() => setAvatarFailed(true)}
                   className="w-full h-full object-cover grayscale contrast-125 hover:grayscale-0 transition-all duration-500"
                 />
               ) : (

@@ -34,6 +34,7 @@ export default function GlassmorphicTheme({
   const [roleIdx, setRoleIdx] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const canvasRef = useRef(null);
 
   const typingWords = (profile.typing_roles && profile.typing_roles.length > 0)
@@ -274,10 +275,11 @@ export default function GlassmorphicTheme({
           <div className="relative group shrink-0">
             <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-60 blur-xl group-hover:opacity-100 transition-opacity duration-700" />
             <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl bg-slate-900/80 backdrop-blur-xl border border-white/20 p-2 shadow-2xl overflow-hidden flex items-center justify-center">
-              {profile.avatar_url ? (
+              {profile.avatar_url && !avatarFailed ? (
                 <img 
                   src={profile.avatar_url} 
                   alt={profile.full_name} 
+                  onError={() => setAvatarFailed(true)}
                   className="w-full h-full object-cover rounded-2xl transform group-hover:scale-105 transition-transform duration-700"
                 />
               ) : (

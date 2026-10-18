@@ -30,6 +30,7 @@ export default function MinimalEleganceTheme({
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('ALL');
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const allProjects = profile.projects || [];
   const projectCategories = ['ALL', ...Array.from(new Set(allProjects.map(p => (p.category || 'PROJECT').toUpperCase()).filter(Boolean)))];
@@ -136,13 +137,18 @@ export default function MinimalEleganceTheme({
             </div>
 
             {/* Avatar Editorial Frame */}
-            {profile.avatar_url && (
+            {profile.avatar_url && !avatarFailed ? (
               <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden border-4 border-white shadow-xl shrink-0 bg-[#e8e6e0]">
                 <img 
                   src={profile.avatar_url} 
                   alt={profile.full_name} 
+                  onError={() => setAvatarFailed(true)}
                   className="w-full h-full object-cover grayscale contrast-110 hover:grayscale-0 transition-all duration-700"
                 />
+              </div>
+            ) : (
+              <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden border-4 border-white shadow-xl shrink-0 bg-[#e8e6e0] flex items-center justify-center text-[#2c2b29] text-5xl font-serif">
+                {(profile.full_name || 'E')[0]}
               </div>
             )}
           </div>
