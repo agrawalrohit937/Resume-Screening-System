@@ -34,7 +34,13 @@ export default function PublicPortfolio() {
   useEffect(() => {
     // Guarantee window scroll is unlocked and starts at top
     window.scrollTo(0, 0);
+    document.documentElement.style.overflow = 'auto';
     document.body.style.overflow = 'auto';
+    const rootEl = document.getElementById('root');
+    if (rootEl) {
+      rootEl.style.overflow = 'visible';
+      rootEl.style.height = 'auto';
+    }
 
     const fetchPortfolio = async () => {
       setLoading(true);
@@ -154,19 +160,31 @@ export default function PublicPortfolio() {
 
   const selectedTheme = profile.theme_id || 'glassmorphic_pro';
 
-  switch (selectedTheme) {
-    case 'cyberpunk_dark':
-      return <CyberpunkTheme {...commonProps} />;
-    case 'minimal_elegance':
-      return <MinimalEleganceTheme {...commonProps} />;
-    case 'neon_developer':
-      return <NeonDeveloperTheme {...commonProps} />;
-    case '3d_interactive':
-      return <ThreeDInteractiveTheme {...commonProps} />;
-    case 'bento_grid_ux':
-      return <BentoGridTheme {...commonProps} />;
-    case 'glassmorphic_pro':
-    default:
-      return <GlassmorphicTheme {...commonProps} />;
-  }
+  const renderTheme = () => {
+    switch (selectedTheme) {
+      case 'cyberpunk_dark':
+        return <CyberpunkTheme {...commonProps} />;
+      case 'minimal_elegance':
+        return <MinimalEleganceTheme {...commonProps} />;
+      case 'neon_developer':
+        return <NeonDeveloperTheme {...commonProps} />;
+      case '3d_interactive':
+        return <ThreeDInteractiveTheme {...commonProps} />;
+      case 'bento_grid_ux':
+        return <BentoGridTheme {...commonProps} />;
+      case 'glassmorphic_pro':
+      default:
+        return <GlassmorphicTheme {...commonProps} />;
+    }
+  };
+
+  return (
+    <div 
+      id="portfolio-scroll-container" 
+      className="w-full h-screen overflow-y-auto overflow-x-hidden relative"
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
+      {renderTheme()}
+    </div>
+  );
 }
