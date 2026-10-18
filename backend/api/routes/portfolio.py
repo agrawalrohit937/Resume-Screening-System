@@ -928,7 +928,7 @@ async def get_public_portfolio(username: str, db: AsyncIOMotorDatabase = Depends
 
 # ─── 6. Analytics Event Tracker ───────────────────────────────────────────────
 @router.post("/analytics/track/{username}/{event_type}", summary="Track page views and clicks")
-@limiter.limit("1/minute")
+@limiter.limit("60/minute")
 async def track_portfolio_event(
     request: Request,
     username: str,

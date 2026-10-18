@@ -34,6 +34,7 @@ export default function ThreeDInteractiveTheme({
   const [roleIdx, setRoleIdx] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('ALL');
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const spaceCanvasRef = useRef(null);
 
   const typingWords = (profile.typing_roles && profile.typing_roles.length > 0)
@@ -265,10 +266,11 @@ export default function ThreeDInteractiveTheme({
             <div className="absolute -inset-4 bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 rounded-full opacity-30 blur-2xl group-hover:opacity-60 transition-opacity" />
             <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-full p-2 bg-gradient-to-tr from-purple-500 to-cyan-400 shadow-2xl overflow-hidden">
               <div className="w-full h-full rounded-full overflow-hidden bg-[#070b14]">
-                {profile.avatar_url ? (
+                {profile.avatar_url && !avatarFailed ? (
                   <img
                     src={profile.avatar_url}
                     alt={profile.full_name}
+                    onError={() => setAvatarFailed(true)}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                   />
                 ) : (

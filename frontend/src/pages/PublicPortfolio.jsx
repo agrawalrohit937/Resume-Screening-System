@@ -32,14 +32,24 @@ export default function PublicPortfolio() {
 
   // Fetch Public Profile Data
   useEffect(() => {
+    // Guarantee window scroll is unlocked and starts at top
+    window.scrollTo(0, 0);
+    document.body.style.overflow = 'auto';
+
     const fetchPortfolio = async () => {
       setLoading(true);
       try {
         const res = await getPublicPortfolio(username);
         const profileData = res?.data || (res?.full_name || res?.username ? res : null);
         if (profileData) {
+          let avatar = profileData.avatar_url;
+          if (avatar && !avatar.startsWith('http://') && !avatar.startsWith('https://') && !avatar.startsWith('data:')) {
+            const apiBase = import.meta.env.VITE_API_URL || '';
+            avatar = `${apiBase.replace(/\/api\/v1\/?$/, '')}/static/${avatar.replace(/^\/+/, '')}`;
+          }
           setProfile({
             ...profileData,
+            avatar_url: avatar,
             skills: cleanSkillsDict(profileData.skills)
           });
           trackPortfolioEvent(username, 'view');
@@ -56,6 +66,10 @@ export default function PublicPortfolio() {
     if (username) {
       fetchPortfolio();
     }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [username]);
 
   // Handle Resume Download
