@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import structlog
 
-from certificates.ftp_storage import FTPCertificateStorage
+from services.cloudinary_service import upload_certificate
 from certificates.id_generator import generate_certificate_id, resolve_grade
 from certificates.qr import build_verification_url, generate_qr_image
 from certificates.registry import get_registry_entry
@@ -108,12 +108,17 @@ class CertificateService:
             logger.error("Certificate PDF rendering failed", error=str(e))
             raise
 
-        filename = f"{cert_id}.pdf"
         try:
-            public_url, _public_id = await FTPCertificateStorage.async_upload(filename, pdf_bytes)
+            public_url, _public_id = await upload_certificate(pdf_bytes, cert_id)
         except Exception as e:
             logger.error("Certificate upload failed", error=str(e))
             raise
+
+        topic_value = (
+            snapshot.get("assessment_slug")
+            or snapshot.get("assessment_name")
+            or "general"
+        ).lower().strip()
 
         record = CertificateRecord(
             id=cert_id,
@@ -126,6 +131,7 @@ class CertificateService:
             issued_at=issued_at,
             revoked_at=None,
             public_url=public_url,
+            topic=topic_value,
         )
         try:
             await record.persist()

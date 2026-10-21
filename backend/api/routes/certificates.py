@@ -52,10 +52,6 @@ class ClaimPayload(BaseModel):
     difficulty: str
 
 
-class ResendLatestPayload(BaseModel):
-    topic: str
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 async def _do_issue(
@@ -85,6 +81,7 @@ async def _do_issue(
     existing_cert = await raw_db.certificates.find_one({
         "user_id": str(current_user.id),
         "$or": [
+            {"topic": final_slug},
             {"snapshot.assessment_slug": final_slug},
             {"snapshot.assessment_name": {"$regex": f"^{re.escape(assessment_name)}$", "$options": "i"}},
             {"snapshot.assessment_slug_display": {"$regex": f"^{re.escape(assessment_name)}$", "$options": "i"}}
@@ -216,6 +213,7 @@ async def check_certificate_status(
     cert = await raw_db.certificates.find_one({
         "user_id": str(current_user.id),
         "$or": [
+            {"topic": slug},
             {"snapshot.assessment_slug": slug},
             {"snapshot.assessment_name": {"$regex": f"^{re.escape(topic)}$", "$options": "i"}},
             {"snapshot.assessment_slug_display": {"$regex": f"^{re.escape(topic)}$", "$options": "i"}}

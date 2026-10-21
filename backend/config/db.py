@@ -145,6 +145,11 @@ async def _ensure_indexes() -> None:
         ])
 
         # ─── certificates ─────────────────────────────────────────────────
+        try:
+            await db.certificates.drop_index("certificate_user_topic_unique")
+        except Exception:
+            pass
+
         await db.certificates.create_indexes([
             IndexModel([("user_id", ASCENDING)], name="cert_user_idx"),
             IndexModel([("status", ASCENDING)], name="cert_status_idx"),
@@ -154,6 +159,7 @@ async def _ensure_indexes() -> None:
                  ("snapshot.assessment_slug", ASCENDING)],
                 name="cert_user_type_slug_idx",
             ),
+            IndexModel([("user_id", ASCENDING), ("topic", ASCENDING)], name="cert_user_topic_idx"),
         ])
 
         # ─── user_profiles & portfolio_analytics ──────────────────────────
