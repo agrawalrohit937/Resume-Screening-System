@@ -13,9 +13,6 @@ renderer.py or service.py changes.
 CERTIFICATE_REGISTRY = {
     "assessment": {
         "template": "default_v1",
-        # Fields the context-builder for this type MUST populate before
-        # the snapshot is frozen. Keeps a silent missing-field bug from
-        # reaching WeasyPrint as a blank space on the PDF.
         "required_snapshot_fields": [
             "assessment_name",
             "assessment_slug",
@@ -26,13 +23,6 @@ CERTIFICATE_REGISTRY = {
         ],
         "certificate_type_label": "CareerShala Assessment",
     },
-    # Example of a second type sharing the SAME template/design.
-    # Uncomment when course completion certs actually launch.
-    # "course": {
-    #     "template": "default_v1",
-    #     "required_snapshot_fields": ["course_name", "completion_date"],
-    #     "certificate_type_label": "CareerShala Course",
-    # },
 }
 
 

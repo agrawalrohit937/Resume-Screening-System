@@ -1,8 +1,11 @@
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict, field, fields
 from datetime import datetime
 from typing import Optional
+import structlog
 
 from config.db import get_database
+
+logger = structlog.get_logger(__name__)
 
 COLLECTION = "certificates"
 SCHEMA_VERSION = 1
@@ -16,17 +19,48 @@ class CertificateRecord:
     user_id: str
     recipient_name: str
     snapshot: dict
-    status: str  # "active" | "revoked"
+    status: str  # "active" | "revoked" | "superseded"
     issued_at: datetime
     revoked_at: Optional[datetime] = None
     public_url: str = ""
+    topic: Optional[str] = None
+    superseded_by: Optional[str] = None
+    superseded_at: Optional[datetime] = None
     schema_version: int = field(default=SCHEMA_VERSION)
 
     async def persist(self) -> None:
         db = get_database()
         doc = asdict(self)
         doc["_id"] = doc.pop("id")
-        await db[COLLECTION].insert_one(doc)
+        if not doc.get("topic"):
+            doc["topic"] = (
+                self.snapshot.get("assessment_slug")
+                or self.snapshot.get("assessment_name")
+                or "general"
+            ).lower().strip()
+
+        try:
+            await db[COLLECTION].insert_one(doc)
+        except Exception as e:
+            err_str = str(e)
+            if "certificate_user_topic_unique" in err_str or ("E11000" in err_str and "topic" in err_str):
+                logger.warning("Detected legacy certificate_user_topic_unique index collision, dropping index and retrying", error=err_str)
+                try:
+                    await db[COLLECTION].drop_index("certificate_user_topic_unique")
+                except Exception as drop_err:
+                    logger.warning("Could not drop legacy certificate_user_topic_unique index", error=str(drop_err))
+                await db[COLLECTION].insert_one(doc)
+            else:
+                raise
+
+    @classmethod
+    def from_mongo(cls, doc: dict) -> "CertificateRecord":
+        d = dict(doc)
+        d["id"] = d.pop("_id", d.get("id"))
+        d.pop("schema_version", None)
+        valid_fields = {f.name for f in fields(cls)}
+        filtered = {k: v for k, v in d.items() if k in valid_fields}
+        return cls(**filtered)
 
     @staticmethod
     async def find_by_id(cert_id: str) -> Optional["CertificateRecord"]:
@@ -34,9 +68,7 @@ class CertificateRecord:
         doc = await db[COLLECTION].find_one({"_id": cert_id})
         if doc is None:
             return None
-        doc["id"] = doc.pop("_id")
-        doc.pop("schema_version", None)
-        return CertificateRecord(**doc)
+        return CertificateRecord.from_mongo(doc)
 
     @staticmethod
     async def find_by_user(user_id: str, page_size: int = 20) -> list["CertificateRecord"]:
@@ -44,13 +76,6 @@ class CertificateRecord:
         cursor = db[COLLECTION].find({"user_id": user_id}).sort("issued_at", -1).limit(page_size)
         results = []
         async for doc in cursor:
-            doc["id"] = doc.pop("_id")
-            doc.pop("schema_version", None)
-            results.append(CertificateRecord(**doc))
+            results.append(CertificateRecord.from_mongo(doc))
         return results
 
-
-# Indexes to create once at startup (call from your app's startup hook):
-#   db.certificates.create_index("user_id")
-#   db.certificates.create_index("status")
-#   db.certificates.create_index([("user_id", 1), ("certificate_type", 1), ("snapshot.assessment_slug", 1)])
