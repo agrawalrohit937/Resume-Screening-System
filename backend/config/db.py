@@ -1,12 +1,18 @@
 """
-Database Configuration — Motor async MongoDB client with index management
+Database Configuration — Native PyMongo Async / Motor async MongoDB client with index management
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from pymongo import ASCENDING, DESCENDING, TEXT, IndexModel
+
+# Native PyMongo Async Driver (PyMongo 4.9+ native asynchronous API)
+from pymongo import AsyncMongoClient, ASCENDING, DESCENDING, TEXT, IndexModel
+from pymongo.asynchronous.database import AsyncDatabase
+
+# Backward-compatible type aliases for legacy code
+AsyncIOMotorClient = AsyncMongoClient
+AsyncIOMotorDatabase = AsyncDatabase
 
 from core.config import settings
 
@@ -20,13 +26,13 @@ except Exception:
 logger = structlog.get_logger(__name__)
 
 # ─── Global State ─────────────────────────────────────────────────────────────
-_client: Optional[AsyncIOMotorClient] = None
-_db: Optional[AsyncIOMotorDatabase] = None
+_client: Optional[AsyncMongoClient] = None
+_db: Optional[AsyncDatabase] = None
 
 
 async def connect_db() -> None:
     global _client, _db
-    _client = AsyncIOMotorClient(
+    _client = AsyncMongoClient(
         settings.MONGO_URI,
         maxPoolSize=settings.MONGO_MAX_CONNECTIONS,
         minPoolSize=settings.MONGO_MIN_CONNECTIONS,
@@ -34,17 +40,21 @@ async def connect_db() -> None:
     )
     _db = _client[settings.MONGO_DB_NAME]
     await _ensure_indexes()
-    logger.info("MongoDB connected", db=settings.MONGO_DB_NAME)
+    logger.info("MongoDB connected", db=settings.MONGO_DB_NAME, driver="pymongo_async")
 
 
 async def disconnect_db() -> None:
-    global _client
+    global _client, _db
     if _client:
-        _client.close()
+        close_op = _client.close()
+        if hasattr(close_op, "__await__"):
+            await close_op
         logger.info("MongoDB disconnected")
+    _client = None
+    _db = None
 
 
-def get_database() -> AsyncIOMotorDatabase:
+def get_database() -> AsyncDatabase:
     if _db is None:
         raise RuntimeError("Database not initialized. Call connect_db() first.")
     return _db

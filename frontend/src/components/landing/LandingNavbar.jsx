@@ -29,7 +29,7 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
         <Link to="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center group-hover:shadow-sm group-hover:scale-105 transition-all duration-300 p-1">
             <img
-              src="/logo.png"
+              src="/logo_t.webp"
               alt="CareerShala Logo"
               width={32}
               height={32}

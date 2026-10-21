@@ -115,6 +115,7 @@ async def test_scim_user_crud_lifecycle():
 @pytest.mark.asyncio
 async def test_eeo_recording_and_aggregate_report():
     mock_db = MagicMock()
+    mock_db.raw_db = mock_db
     mock_db.eeo_responses.insert_one = AsyncMock()
 
     payload = EEOSelfIdentificationPayload(

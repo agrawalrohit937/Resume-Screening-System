@@ -9,9 +9,11 @@ Provides:
 
 from __future__ import annotations
 
+from collections import OrderedDict
 import hashlib
 import json
 import os
+import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
@@ -21,6 +23,7 @@ logger = structlog.get_logger(__name__)
 
 # 30 days TTL in seconds (30 * 24 * 3600)
 DEFAULT_CACHE_TTL_SECONDS = 2592000
+DEFAULT_MAX_MEM_ENTRIES = 2000
 
 
 def compute_embedding_cache_key(text: str, model_version: str) -> str:
@@ -70,9 +73,17 @@ class EmbeddingCacheManager:
     Manages embedding caching across Redis store with zero-RAM pass-through fallback.
     """
 
-    def __init__(self, redis_client: Optional[Any] = None, ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS):
+    def __init__(
+        self,
+        redis_client: Optional[Any] = None,
+        ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
+        max_mem_entries: int = DEFAULT_MAX_MEM_ENTRIES,
+    ):
         self.redis = redis_client
         self.ttl_seconds = ttl_seconds
+        self.max_mem_entries = max_mem_entries
+        self._lock = threading.Lock()
+        self._mem_cache: OrderedDict[str, List[float]] = OrderedDict()
 
     def get_cached_embeddings(
         self,
@@ -110,6 +121,13 @@ class EmbeddingCacheManager:
                 except Exception:
                     pass
 
+            # Fallback to local thread-safe LRU in-memory cache
+            with self._lock:
+                if key in self._mem_cache:
+                    self._mem_cache.move_to_end(key)
+                    cached_map[idx] = self._mem_cache[key]
+                    continue
+
             missing_indices.append(idx)
             missing_texts.append(text)
 
@@ -122,8 +140,18 @@ class EmbeddingCacheManager:
         model_version: str,
     ) -> None:
         """
-        Caches newly computed embeddings into Redis store.
+        Caches newly computed embeddings into Redis store and bounded in-memory cache.
         """
+        # Populate bounded in-memory cache with thread safety and O(1) LRU eviction
+        with self._lock:
+            for text, emb in zip(texts, embeddings):
+                key = compute_embedding_cache_key(text, model_version)
+                if key in self._mem_cache:
+                    self._mem_cache.move_to_end(key)
+                elif len(self._mem_cache) >= self.max_mem_entries:
+                    self._mem_cache.popitem(last=False)
+                self._mem_cache[key] = emb
+
         if self.redis is not None:
             try:
                 pipe = self.redis.pipeline()

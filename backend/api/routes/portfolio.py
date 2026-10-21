@@ -8,7 +8,7 @@ import json
 import re
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, Request, Query, status
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 from pydantic import BaseModel
 import structlog
 from fastapi_cache.decorator import cache
@@ -45,7 +45,7 @@ router = APIRouter(tags=["Portfolio Generator"])
 
 
 # ─── Helper to optionally get current user ID ─────────────────────────────────
-async def get_optional_user(credentials=Depends(security), db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_optional_user(credentials=Depends(security), db: AsyncDatabase = Depends(get_db)):
     if not credentials:
         return None
     try:
@@ -120,7 +120,7 @@ async def parse_resume_for_portfolio(file: UploadFile = File(...)):
 async def upload_portfolio_photo(
     file: UploadFile = File(...),
     user_id: Optional[str] = Depends(get_optional_user),
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncDatabase = Depends(get_db)
 ):
     """
     Accepts multipart image upload, streams bytes directly to Cloudinary,
@@ -262,7 +262,7 @@ async def enhance_portfolio_content(req: EnhanceRequest):
 async def check_slug_availability(
     slug: str = Query(..., description="The slug or username to check"),
     user_id: Optional[str] = Depends(get_optional_user),
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncDatabase = Depends(get_db)
 ):
     clean_slug = slug.strip().lower().replace(" ", "-")
     clean_slug = re.sub(r'[^a-z0-9_-]', '', clean_slug)
@@ -340,7 +340,7 @@ async def check_slug_availability(
 async def save_portfolio(
     profile: PortfolioProfileModel,
     user_id: Optional[str] = Depends(get_optional_user),
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = profile.username.strip().lower()
     clean_username = re.sub(r'[^a-z0-9_-]', '', clean_username)
@@ -448,7 +448,7 @@ async def save_portfolio(
 async def get_my_portfolio(
     sync_from_resume: bool = False,
     user_id: Optional[str] = Depends(get_optional_user),
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncDatabase = Depends(get_db)
 ):
     if not user_id:
         return {"status": "empty", "data": None}
@@ -811,7 +811,7 @@ async def get_my_portfolio(
 
 # ─── 5. Public Portfolio View ─────────────────────────────────────────────────
 @router.get("/public/{username}", summary="Public portfolio viewer data")
-async def get_public_portfolio(username: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_public_portfolio(username: str, db: AsyncDatabase = Depends(get_db)):
     clean_username = username.strip().lower()
     norm_query = re.sub(r'[\s\-_]', '', clean_username)
     
@@ -933,7 +933,7 @@ async def track_portfolio_event(
     request: Request,
     username: str,
     event_type: str,
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
     field_map = {
@@ -957,7 +957,7 @@ async def track_portfolio_event(
 
 
 @router.get("/analytics/{username}", summary="Get portfolio metrics")
-async def get_portfolio_analytics(username: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_portfolio_analytics(username: str, db: AsyncDatabase = Depends(get_db)):
     clean_username = username.strip().lower()
     stats = await db.portfolio_analytics.find_one({"username": clean_username})
     if not stats:
@@ -978,7 +978,7 @@ async def send_contact_message(
     username: str,
     msg: ContactMessageSchema,
     bg_tasks: BackgroundTasks,
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
     profile = await db.user_profiles.find_one({"username": clean_username})

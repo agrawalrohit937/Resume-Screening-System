@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 import structlog
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 from bson import ObjectId
 
 from models.audit_log_model import AuditLogModel
@@ -24,7 +24,7 @@ class AuditLogRepository(BaseRepository):
     Append-only repository for compliance audit logs.
     """
 
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.db = db
         self.collection = db["audit_logs"]
 

@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from bson import ObjectId
 import structlog
-from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.copilot_model import (
     CopilotSessionModel,
@@ -32,7 +32,7 @@ class CopilotRepository(BaseRepository):
     Enforces multi-tenant data isolation and candidate ownership on every query.
     """
 
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.db = db
         self.sessions = db.copilot_sessions
         self.messages = db.copilot_messages

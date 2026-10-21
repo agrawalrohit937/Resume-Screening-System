@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from models.user_model import UserModel
 from api.deps import get_current_user, get_db
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 router = APIRouter()
 
@@ -35,7 +35,7 @@ def _parse_dt(val: Any) -> Optional[datetime]:
 @router.get("/me")
 async def get_my_notifications(
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """Return real user notifications synthesized from certificates, point activities, and streaks,
     filtered by persistent user notification state (cleared_at, dismissed_ids, read_ids)."""
@@ -146,7 +146,7 @@ async def get_my_notifications(
 @router.delete("/clear-all")
 async def clear_all_notifications(
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """Clear all current notifications for the user so they stay cleared even after reload."""
     user_id = str(current_user.id)
@@ -168,7 +168,7 @@ async def clear_all_notifications(
 @router.post("/read-all")
 async def mark_all_notifications_as_read(
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """Mark all current notifications as read."""
     user_id = str(current_user.id)
@@ -190,7 +190,7 @@ async def mark_all_notifications_as_read(
 async def mark_notification_as_read(
     notification_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """Mark a single notification as read."""
     user_id = str(current_user.id)
@@ -210,7 +210,7 @@ async def mark_notification_as_read(
 async def dismiss_notification(
     notification_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncIOMotorDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """Dismiss / delete a single notification."""
     if notification_id == "clear-all":

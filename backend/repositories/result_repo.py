@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import structlog
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.result_model import ATSResultModel, JobDescriptionModel
 
@@ -18,7 +18,7 @@ from repositories.base_repo import BaseRepository
 
 
 class ResultRepository(BaseRepository):
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.results = db.results
         self.job_descriptions = db.job_descriptions
 

@@ -11,7 +11,7 @@ import sys
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 import structlog
 
 from services.copilot.rag.ingestion import ingest_resume_chunks, ingest_job_chunks
@@ -24,7 +24,7 @@ async def backfill_all(tenant_id: str = "default"):
     db_name = os.getenv("DB_NAME", "resume_screening")
 
     print(f"Connecting to MongoDB at {mongo_uri} (db: {db_name})...")
-    client = AsyncIOMotorClient(mongo_uri)
+    client = AsyncMongoClient(mongo_uri)
     db = client[db_name]
 
     print(f"Backfilling resumes for tenant: {tenant_id}...")
@@ -72,7 +72,7 @@ async def backfill_all(tenant_id: str = "default"):
         total_job_chunks += count
 
     print(f"✅ Completed job backfill: {total_jobs} jobs, {total_job_chunks} total chunks.")
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":

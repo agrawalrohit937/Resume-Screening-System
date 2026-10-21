@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.support_ticket_model import SupportTicketModel
 
@@ -18,7 +18,7 @@ from repositories.base_repo import BaseRepository
 
 
 class SupportTicketRepository(BaseRepository):
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.collection = db.support_tickets
 
     def _normalize_value(self, value: Any) -> Any:

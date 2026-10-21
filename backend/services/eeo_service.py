@@ -77,10 +77,13 @@ class EEOService:
         )
 
         if active_db is not None:
-            raw_target = getattr(active_db, "raw_db", active_db)
+            from services.multi_tenancy.tenant_repository import TenantScopedDatabase
+            raw_target = active_db.raw_db if isinstance(active_db, TenantScopedDatabase) else active_db
             doc = record.model_dump(by_alias=True, exclude={"id"})
             doc["_id"] = ObjectId()
-            await raw_target.eeo_responses.insert_one(doc)
+            insert_op = raw_target.eeo_responses.insert_one(doc)
+            if hasattr(insert_op, "__await__"):
+                await insert_op
             record.id = str(doc["_id"])
 
         logger.info(

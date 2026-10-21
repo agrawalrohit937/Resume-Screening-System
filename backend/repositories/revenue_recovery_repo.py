@@ -5,8 +5,8 @@ Repository Layer — Revenue Recovery Cases & Attempts
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import DESCENDING, ASCENDING
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.revenue_recovery_model import (
     RecoveryCaseModel,
@@ -19,7 +19,7 @@ from models.revenue_recovery_model import (
 
 
 class RevenueRecoveryRepository:
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.db = db
         self.collection = db.recovery_cases
 
