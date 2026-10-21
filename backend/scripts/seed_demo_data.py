@@ -28,7 +28,7 @@ if sys.platform == "win32":
 # Add parent directory to sys.path so backend modules can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from core.config import settings
 from core.security import hash_password
 
@@ -208,7 +208,7 @@ DEMO_JOBS = [
 
 async def seed_data(mongo_uri: str, db_name: str) -> None:
     print(f"\n[*] Connecting to MongoDB: {mongo_uri} (Database: {db_name})...")
-    client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=5000)
+    client = AsyncMongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
     db = client[db_name]
 
     # Test connection
@@ -473,7 +473,7 @@ async def seed_data(mongo_uri: str, db_name: str) -> None:
 
     print(f"    [OK] Successfully synchronized {total_apps_seeded} applicants across pipeline.")
 
-    client.close()
+    await client.close()
     print("\n[OK] Demo data seeding complete! Ready for evaluation.")
     print("=" * 60)
     print("DEMO EVALUATION CREDENTIALS:")

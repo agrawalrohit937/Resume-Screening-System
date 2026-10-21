@@ -1,11 +1,11 @@
 import sys
 sys.path.insert(0, '.')
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from core.config import settings
 
 async def cleanup_executive_roles():
-    client = AsyncIOMotorClient(settings.MONGO_URI)
+    client = AsyncMongoClient(settings.MONGO_URI)
     db = client[settings.MONGO_DB_NAME]
     users_coll = db["users"]
 
@@ -26,7 +26,7 @@ async def cleanup_executive_roles():
                 updated_count += 1
 
     print(f"Cleanup complete. Updated {updated_count} executive users.")
-    client.close()
+    await client.close()
 
 if __name__ == "__main__":
     asyncio.run(cleanup_executive_roles())

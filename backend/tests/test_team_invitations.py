@@ -124,7 +124,7 @@ async def test_email_service_send_team_invitation(monkeypatch):
 
     sent_data = {}
 
-    async def mock_send(self, to_email, subject, html_body):
+    async def mock_send(self, to_email, subject, html_body, **kwargs):
         sent_data["to_email"] = to_email
         sent_data["subject"] = subject
         sent_data["html_body"] = html_body

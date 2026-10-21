@@ -47,9 +47,9 @@ async def test_prompt_incorporates_full_jd_and_custom_questions():
         custom_questions=custom_questions,
     )
 
-    assert "OFFICIAL FULL JOB DESCRIPTION (MUST BASE QUESTIONS ON THIS):" in prompt
+    assert ("TARGET JOB DESCRIPTION (JD):" in prompt or "OFFICIAL FULL JOB DESCRIPTION" in prompt)
     assert full_jd in prompt
-    assert "MANDATORY EMPLOYER CUSTOM QUESTIONS:" in prompt
+    assert ("MANDATORY INTERVIEWER CUSTOM QUESTIONS:" in prompt or "MANDATORY EMPLOYER CUSTOM QUESTIONS:" in prompt)
     assert custom_questions[0] in prompt
     assert custom_questions[1] in prompt
 

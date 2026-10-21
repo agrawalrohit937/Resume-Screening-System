@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.otp_model import OTPModel, OTPPurpose
 
@@ -15,7 +15,7 @@ from repositories.base_repo import BaseRepository
 
 
 class OTPRepository(BaseRepository):
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.collection = db.otps
 
     async def create(self, email: str, purpose: OTPPurpose, otp_hash: str,

@@ -6,6 +6,12 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+try:
+    import lightgbm
+    HAS_LIGHTGBM = True
+except ImportError:
+    HAS_LIGHTGBM = False
+
 from train_ltr import (
     extract_ltr_feature_vector,
     train_lambdamart_ranker,
@@ -52,6 +58,7 @@ def test_ltr_feature_extraction():
     assert vec[1] == 90.0
 
 
+@pytest.mark.skipif(not HAS_LIGHTGBM, reason="lightgbm not installed")
 def test_ltr_training_pipeline_and_ndcg():
     res = run_training_pipeline()
     assert res["n_train_samples"] > 0
@@ -59,6 +66,7 @@ def test_ltr_training_pipeline_and_ndcg():
     assert res["validation_ndcg10"] >= 0.80  # High NDCG on training benchmark
 
 
+@pytest.mark.skipif(not HAS_LIGHTGBM, reason="lightgbm not installed")
 def test_ltr_service_prediction():
     # Ensure model is trained
     if ltr_service.booster is None:

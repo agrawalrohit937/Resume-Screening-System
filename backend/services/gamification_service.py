@@ -8,7 +8,7 @@ from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any
 
 import structlog
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 from bson import ObjectId
 
 logger = structlog.get_logger(__name__)
@@ -134,7 +134,7 @@ DAILY_MISSIONS = [
 
 class GamificationService:
 
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.db = db
         self.collection = db.user_gamification
         self.events_col = db.gamification_events

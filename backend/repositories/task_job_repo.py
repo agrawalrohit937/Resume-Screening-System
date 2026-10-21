@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import structlog
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 from bson import ObjectId
 
 from models.task_job_model import TaskJobModel, JobStatus, JobType
@@ -24,7 +24,7 @@ class TaskJobRepository(BaseRepository):
     Repository for managing async background job records in MongoDB.
     """
 
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.db = db
         self.collection = db["task_jobs"]
 

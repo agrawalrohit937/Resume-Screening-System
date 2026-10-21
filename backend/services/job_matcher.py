@@ -26,12 +26,36 @@ from utils.pagination import stream_cursor
 
 logger = structlog.get_logger(__name__)
 
+
 # Stopwords to filter out generic seniority/level modifiers when extracting core role tokens
 ROLE_STOPWORDS = {
     "senior", "sr", "junior", "jr", "mid", "lead", "staff", "principal",
     "intern", "trainee", "associate", "head", "director", "vp", "manager",
     "specialist", "consultant", "analyst", "at", "in", "for", "and", "of", "the",
 }
+
+
+def _calculate_cosine_similarity(vec_a: Any, vec_b: Any) -> float:
+    """Computes cosine similarity between two numeric vectors."""
+    if not vec_a or not vec_b or len(vec_a) != len(vec_b):
+        return 0.0
+    dot = sum(float(a) * float(b) for a, b in zip(vec_a, vec_b))
+    norm_a = (sum(float(a) ** 2 for a in vec_a)) ** 0.5
+    norm_b = (sum(float(b) ** 2 for b in vec_b)) ** 0.5
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return float(dot / (norm_a * norm_b))
+
+
+def _calibrate_match_score(similarity: float) -> float:
+    """Calibrates raw vector cosine similarity to a human-friendly match score (0.0 to 100.0)."""
+    if similarity <= 0.0:
+        return 0.0
+    if similarity >= 0.5:
+        scaled = 50.0 + (similarity * 45.0)
+    else:
+        scaled = similarity * 100.0
+    return float(round(min(98.0, max(0.0, scaled)), 1))
 
 
 def _extract_candidate_role_signals(parsed_dict: Dict[str, Any], raw_text: str = "") -> Dict[str, Any]:

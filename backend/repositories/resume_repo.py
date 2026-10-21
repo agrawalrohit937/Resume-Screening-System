@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import structlog
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.resume_model import ResumeModel, ResumeStatus
 
@@ -18,7 +18,7 @@ from repositories.base_repo import BaseRepository
 
 
 class ResumeRepository(BaseRepository):
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.collection = db.resumes
 
     async def create(self, resume_data: dict) -> ResumeModel:

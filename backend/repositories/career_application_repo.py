@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.career_application_model import (
     CareerApplicationModel,
@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 
 class CareerApplicationRepository(BaseRepository):
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.collection = db[CAREER_APPLICATION_COLLECTION]
 
     async def create(self, data: dict) -> CareerApplicationModel:

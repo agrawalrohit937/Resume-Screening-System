@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.user_model import UserModel, UserRole, UserStatus
 
@@ -18,7 +18,7 @@ from repositories.base_repo import BaseRepository
 
 
 class UserRepository(BaseRepository):
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.collection = db.users
 
     async def create(self, user_data: dict) -> UserModel:

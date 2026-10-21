@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Optional, Any
 
 import structlog
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from models.interview_session_model import (
     InterviewSession, SessionStatus, CheatingEventRecord, QuestionAnswer,
@@ -90,7 +90,7 @@ QUESTION_BANK = {
 
 class LiveInterviewService:
 
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self.db = db
         self.col = db.live_interview_sessions
 

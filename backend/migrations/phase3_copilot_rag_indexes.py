@@ -9,8 +9,7 @@ import sys
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import ASCENDING, DESCENDING, IndexModel
+from pymongo import AsyncMongoClient, ASCENDING, DESCENDING, IndexModel
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -21,7 +20,7 @@ async def run_migration():
     db_name = os.getenv("DB_NAME", "resume_screening")
 
     print(f"Connecting to MongoDB at {mongo_uri} (db: {db_name})...")
-    client = AsyncIOMotorClient(mongo_uri)
+    client = AsyncMongoClient(mongo_uri)
     db = client[db_name]
 
     print("Ensuring indexes on copilot_chunks...")
@@ -38,7 +37,7 @@ async def run_migration():
     ])
 
     print("✅ Phase 3 RAG migration completed successfully.")
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":

@@ -24,8 +24,7 @@ from typing import Any, Dict, Optional
 sys.path.insert(0, ".")
 
 import structlog
-from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import UpdateOne
+from pymongo import AsyncMongoClient, UpdateOne
 
 from core.config import settings
 from core.logging import setup_logging
@@ -113,7 +112,7 @@ async def migrate_all_users(mongo_uri: str, db_name: str, dry_run: bool = True):
         db_name: Database name.
         dry_run: If True, only log what would be changed without writing.
     """
-    client = AsyncIOMotorClient(mongo_uri)
+    client = AsyncMongoClient(mongo_uri)
     db = client[db_name]
     collection = db.users
 
@@ -191,7 +190,7 @@ async def migrate_all_users(mongo_uri: str, db_name: str, dry_run: bool = True):
             message="Run with --apply flag to execute the migration.",
         )
 
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":

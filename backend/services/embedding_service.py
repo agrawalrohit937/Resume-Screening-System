@@ -130,7 +130,12 @@ class EmbeddingModelSingleton:
 
                 # Dynamically set dimensions from loaded model
                 try:
-                    self.dimensions = self.model.get_sentence_embedding_dimension()
+                    if hasattr(self.model, "get_embedding_dimension"):
+                        self.dimensions = self.model.get_embedding_dimension()
+                    elif hasattr(self.model, "get_sentence_embedding_dimension"):
+                        self.dimensions = self.model.get_sentence_embedding_dimension()
+                    else:
+                        self.dimensions = DEFAULT_DIMENSIONS
                 except Exception:
                     self.dimensions = DEFAULT_DIMENSIONS
 
