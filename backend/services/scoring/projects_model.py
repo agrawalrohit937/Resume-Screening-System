@@ -53,7 +53,8 @@ def extract_project_technologies(proj: Dict[str, Any], known_skills: Optional[Se
     text = f"{proj.get('title', '')} {proj.get('description', '')} {hl_str}".lower()
     if known_skills:
         for sk in known_skills:
-            if re.search(r"\b" + re.escape(sk.lower()) + r"\b", text):
+            pattern = rf"(?<![a-zA-Z0-9_]){re.escape(sk.lower())}(?![a-zA-Z0-9_+#])"
+            if re.search(pattern, text):
                 found.add(sk.lower())
 
     return sorted(list(found))

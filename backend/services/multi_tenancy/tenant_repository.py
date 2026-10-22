@@ -282,6 +282,62 @@ class TenantScopedCollection:
         return AsyncCursorProxy(op)
 
 
+    async def distinct(
+        self,
+        key: str,
+        filter_query: Optional[Dict[str, Any]] = None,
+        tenant_override: Optional[str] = None,
+        *args,
+        **kwargs,
+    ) -> Any:
+        """
+        Finds distinct values within the active tenant partition.
+        """
+        scoped = self._scope_query(filter_query or {}, tenant_override)
+        op = self._collection.distinct(key, scoped, *args, **kwargs)
+        if hasattr(op, "__await__"):
+            return await op
+        return op
+
+    async def find_one_and_update(
+        self,
+        filter_query: Dict[str, Any],
+        update_query: Dict[str, Any],
+        tenant_override: Optional[str] = None,
+        *args,
+        **kwargs,
+    ) -> Any:
+        scoped = self._scope_query(filter_query, tenant_override)
+        op = self._collection.find_one_and_update(scoped, update_query, *args, **kwargs)
+        if hasattr(op, "__await__"):
+            return await op
+        return op
+
+    async def find_one_and_delete(
+        self,
+        filter_query: Dict[str, Any],
+        tenant_override: Optional[str] = None,
+        *args,
+        **kwargs,
+    ) -> Any:
+        scoped = self._scope_query(filter_query, tenant_override)
+        op = self._collection.find_one_and_delete(scoped, *args, **kwargs)
+        if hasattr(op, "__await__"):
+            return await op
+        return op
+
+    @property
+    def database(self) -> Any:
+        return getattr(self._collection, "database", None)
+
+    @property
+    def raw_collection(self) -> Any:
+        return self._collection
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._collection, name)
+
+
 class AsyncCursorProxy:
     """
     Unified asynchronous cursor proxy for PyMongo 4.9+ native async driver
@@ -332,53 +388,6 @@ class AsyncCursorProxy:
             return getattr(self._resolved, item)
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
-    async def distinct(
-        self,
-        key: str,
-        filter_query: Optional[Dict[str, Any]] = None,
-        tenant_override: Optional[str] = None,
-        *args,
-        **kwargs,
-    ) -> Any:
-        """
-        Finds distinct values within the active tenant partition.
-        """
-        scoped = self._scope_query(filter_query or {}, tenant_override)
-        op = self._collection.distinct(key, scoped, *args, **kwargs)
-        if hasattr(op, "__await__"):
-            return await op
-        return op
-
-    async def find_one_and_update(
-        self,
-        filter_query: Dict[str, Any],
-        update_query: Dict[str, Any],
-        tenant_override: Optional[str] = None,
-        *args,
-        **kwargs,
-    ) -> Any:
-        scoped = self._scope_query(filter_query, tenant_override)
-        op = self._collection.find_one_and_update(scoped, update_query, *args, **kwargs)
-        if hasattr(op, "__await__"):
-            return await op
-        return op
-
-    async def find_one_and_delete(
-        self,
-        filter_query: Dict[str, Any],
-        tenant_override: Optional[str] = None,
-        *args,
-        **kwargs,
-    ) -> Any:
-        scoped = self._scope_query(filter_query, tenant_override)
-        op = self._collection.find_one_and_delete(scoped, *args, **kwargs)
-        if hasattr(op, "__await__"):
-            return await op
-        return op
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._collection, name)
-
 
 class TenantScopedDatabase:
     """
@@ -393,6 +402,10 @@ class TenantScopedDatabase:
     @property
     def raw_db(self) -> Any:
         return self._raw_db
+
+    @property
+    def client(self) -> Any:
+        return getattr(self._raw_db, "client", None)
 
     def get_collection(self, name: str) -> Any:
         coll = self._raw_db[name]

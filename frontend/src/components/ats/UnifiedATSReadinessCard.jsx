@@ -52,17 +52,42 @@ export default function UnifiedATSReadinessCard({
   }, [matchedSkillsRaw, strictMatchedKeywords])
 
   const unifiedMissing = useMemo(() => {
+    const cleanKey = (str) =>
+      (str || '')
+        .toLowerCase()
+        .replace(/\s*\([^)]*\)/g, '')
+        .replace(/[\s\-_]+/g, ' ')
+        .trim()
+
     const combined = [...missingSkillsRaw, ...strictMissingKeywords]
     const matchedLower = new Set(unifiedMatched.map(s => s.toLowerCase().trim()))
-    return dedupeCaseInsensitive(combined).filter(s => {
+    const matchedClean = new Set(unifiedMatched.map(cleanKey))
+
+    const filtered = dedupeCaseInsensitive(combined).filter(s => {
       const sLower = s.toLowerCase().trim()
-      if (matchedLower.has(sLower)) return false
-      // If a matched skill encompasses this missing sub-skill (e.g. "Data Structures & Algorithms" covers "Algorithms")
+      const sClean = cleanKey(s)
+      if (matchedLower.has(sLower) || matchedClean.has(sClean)) return false
+      
+      // If a matched skill encompasses this missing skill or vice-versa (e.g. "Data Structures & Algorithms" covers "Algorithms", "Object-Oriented Programming" covers "Object-Oriented Programming (OOP)")
       for (const m of matchedLower) {
-        if (m.includes(sLower) && sLower.length >= 4) return false
+        const mClean = cleanKey(m)
+        if (mClean === sClean) return false
+        if ((m.includes(sLower) || sLower.includes(m)) && Math.min(sLower.length, m.length) >= 4) return false
       }
       return true
     })
+
+    // Deduplicate within missing list itself by cleanKey (so "Object-Oriented Programming" and "Object-Oriented Programming (OOP)" don't both show)
+    const seenClean = new Set()
+    const resultList = []
+    for (const item of filtered) {
+      const key = cleanKey(item)
+      if (!seenClean.has(key)) {
+        seenClean.add(key)
+        resultList.push(item)
+      }
+    }
+    return resultList
   }, [missingSkillsRaw, strictMissingKeywords, unifiedMatched])
 
   const totalUnifiedCount = unifiedMatched.length + unifiedMissing.length

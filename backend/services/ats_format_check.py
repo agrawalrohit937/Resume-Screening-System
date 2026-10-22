@@ -21,7 +21,7 @@ logger = structlog.get_logger(__name__)
 
 # Standard Resume Section Headers Expected by ATS
 STANDARD_SECTIONS = {
-    "experience": re.compile(r"\b(?:work\s+experience|professional\s+experience|employment|experience|work\s+history)\b", re.IGNORECASE),
+    "experience": re.compile(r"\b(?:work\s+experience|professional\s+experience|employment|experience|work\s+history|internships?|internship\s+experience)\b", re.IGNORECASE),
     "education": re.compile(r"\b(?:education|academic|academics|qualifications|university|degrees?)\b", re.IGNORECASE),
     "skills": re.compile(r"\b(?:skills|technical\s+skills|core\s+competencies|technologies|expertise|proficiencies)\b", re.IGNORECASE),
     "projects": re.compile(r"\b(?:projects|personal\s+projects|academic\s+projects|portfolio|key\s+projects)\b", re.IGNORECASE),

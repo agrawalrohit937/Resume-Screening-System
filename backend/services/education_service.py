@@ -121,8 +121,19 @@ def is_degree_in_progress(edu: dict, raw_text: str = "", current_year: int = 202
             except (ValueError, TypeError):
                 pass
 
-    if raw_text and ("pursuing" in raw_text.lower() or "2023-2027" in raw_text or "2023 - 2027" in raw_text):
-        return True
+    if raw_text:
+        rt_low = raw_text.lower()
+        if any(w in rt_low for w in ("pursuing", "in progress", "in-progress", "expected graduation", "currently enrolled")):
+            return True
+        future_range = re.search(r"\b20\d{2}\s*[-–to]\s*(20\d{2})\b", raw_text)
+        if future_range:
+            try:
+                if int(future_range.group(1)) >= current_year:
+                    return True
+            except ValueError:
+                pass
+        if re.search(r"\b(202[5-9]|203\d)\b", raw_text):
+            return True
 
     return False
 
