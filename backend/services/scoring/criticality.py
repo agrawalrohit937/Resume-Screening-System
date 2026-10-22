@@ -110,26 +110,19 @@ class JDCriticalityIndex:
         """Finds word-bounded occurrences of skill in JD text."""
         if not skill or not skill.strip():
             return []
+        s = skill.strip().lower()
+        escaped = re.escape(s)
+        left = r"(?<![a-zA-Z0-9_])"
+        right = r"(?![a-zA-Z0-9_+#])" if (s.endswith("+") or s.endswith("#") or len(s) == 1) else r"(?![a-zA-Z0-9_])"
         try:
-            pattern = re.compile(r"\b" + re.escape(skill.strip()) + r"\b", re.IGNORECASE)
+            pattern = re.compile(f"{left}{escaped}{right}", re.IGNORECASE)
             spans = [m.span() for m in pattern.finditer(self.jd_text)]
             if spans:
                 return spans
         except Exception:
             pass
 
-        # Substring fallback for punctuation-heavy skill names (e.g. C++, .NET)
-        skill_lower = skill.strip().lower()
-        jd_lower = self.jd_text.lower()
-        spans = []
-        pos = 0
-        while True:
-            idx = jd_lower.find(skill_lower, pos)
-            if idx == -1:
-                break
-            spans.append((idx, idx + len(skill_lower)))
-            pos = idx + len(skill_lower)
-        return spans
+        return []
 
 
 def infer_criticality(

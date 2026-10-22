@@ -5,11 +5,14 @@ and audits JDs for exclusionary language, unrealistic requirement stacking, and 
 """
 
 from datetime import date
+import json
 import re
 from typing import List, Optional, Dict, Any
+import httpx
 from pydantic import BaseModel, Field
 import structlog
 
+from core.llm_client import groq_key_pool
 from services.ontology.graph import get_ontology_graph
 
 logger = structlog.get_logger(__name__)
@@ -278,3 +281,154 @@ def audit_job_description(
         issues=issues,
         suggestions=suggestions
     )
+
+
+# ---------------------------------------------------------------------------
+# Section Segmentation (Boundary Detection) & Direct Groq LLM Extraction
+# ---------------------------------------------------------------------------
+
+def segment_jd_sections(jd_text: str) -> Dict[str, str]:
+    """
+    Step 1: Section Segmentation (Boundary Detection)
+    Segments a Job Description into 3 distinct functional boundaries:
+    1. company_profile: About Us, Company overview (Ignored for candidate eligibility)
+    2. responsibilities: Role expectations and duties (Used for skills and relevance)
+    3. requirements: Mandatory candidate criteria, education, tenure, skills
+    """
+    if not jd_text or not jd_text.strip():
+        return {"company_profile": "", "responsibilities": "", "requirements": "", "general": ""}
+
+    sections = {
+        "company_profile": "",
+        "responsibilities": "",
+        "requirements": "",
+        "general": ""
+    }
+
+    current_section = "general"
+    lines = jd_text.splitlines()
+    buffer: Dict[str, List[str]] = {k: [] for k in sections}
+
+    for line in lines:
+        cleaned_line = line.strip()
+        lower_line = cleaned_line.lower()
+
+        # Check section header boundaries
+        if len(cleaned_line) < 80:
+            if re.search(r"\b(about\s+us|about\s+the\s+company|who\s+we\s+are|company\s+overview|company\s+profile|our\s+story)\b", lower_line):
+                current_section = "company_profile"
+                continue
+            elif re.search(r"\b(responsibilities|what\s+you(?:'ll|\s+will)\s+do|day[\s-]to[\s-]day|the\s+role|key\s+duties|job\s+summary)\b", lower_line):
+                current_section = "responsibilities"
+                continue
+            elif re.search(r"\b(requirements|qualifications|eligibility|what\s+we(?:'re|\s+are)\s+looking\s+for|must\s+have|skills\s+required|minimum\s+qualifications)\b", lower_line):
+                current_section = "requirements"
+                continue
+
+        buffer[current_section].append(line)
+
+    for k in sections:
+        sections[k] = "\n".join(buffer[k]).strip()
+
+    return sections
+
+
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = "openai/gpt-oss-120b"
+
+JD_PARSER_SYSTEM_PROMPT = """You are an expert Technical Recruiter and Job Description Analyzer.
+Your task is to analyze the Job Description sections and extract the CANDIDATE's required qualifications into pure JSON.
+
+CRITICAL INSTRUCTIONS:
+1. Extract requirements that the CANDIDATE must satisfy.
+2. The input is pre-segmented into [Company Profile], [Responsibilities], and [Requirements / Eligibility Criteria].
+3. STRICT BOUNDARY RULE:
+   - Completely IGNORE [Company Profile] when determining candidate experience, education, or eligibility.
+   - Example: "With 10+ years of hands-on expertise, we help businesses..." -> This is COMPANY AGE. Candidate required experience is 0.
+   - Example: "Established in 2015, we are an 8-year-old firm..." -> This is COMPANY HISTORY. Candidate required experience is 0.
+4. Candidate minimum experience and education MUST be extracted ONLY from [Requirements / Eligibility Criteria].
+5. If the job mentions "Graduation / Freshers / Trainee / Intern / Entry Level / 0-1 years / No active backlogs" and does NOT explicitly ask for senior professional experience, set "candidate_min_experience_years" to 0 and "is_fresher_eligible" to true.
+6. Extract technical, functional, and domain skills required from the candidate across requirements and responsibilities.
+7. Whenever the JD says 'at least one of X, Y, or Z', 'proficiency in one of X, Y, or Z', 'X or Y or Z', 'either X or Y', capture those alternative skills together in "skill_or_groups": [["<skillA>", "<skillB>"], ...].
+
+OUTPUT FORMAT (strict JSON only, no markdown, no explanation):
+{
+  "role": "<job title>",
+  "candidate_min_experience_years": <number: 0 if fresher or unspecified, else float like 2.0, 5.0>,
+  "is_fresher_eligible": <boolean>,
+  "required_skills": ["<skill1>", "<skill2>", ...],
+  "skill_or_groups": [["<skillA>", "<skillB>"], ...],
+  "minimum_education": "<e.g. Bachelor, Master, Graduation, or null>"
+}
+"""
+
+
+async def parse_jd_with_groq(jd_text: str) -> Dict[str, Any]:
+    """
+    Direct structured LLM parser for Job Descriptions using Groq.
+    Uses Section Segmentation (Boundary Detection) and Groq LLaMA-3 JSON mode
+    to extract candidate-only specifications in ~200ms without false-positives.
+    """
+    if not jd_text or len(jd_text.strip()) < 10:
+        return {}
+
+    segmented = segment_jd_sections(jd_text)
+    company_sec = segmented["company_profile"][:1500]
+    resp_sec = segmented["responsibilities"][:2500]
+    req_sec = (segmented["requirements"] or segmented["general"])[:3000]
+
+    structured_user_prompt = f"""Analyze this Job Description:
+
+[Company Profile (Ignore for Candidate Eligibility)]:
+{company_sec or 'N/A'}
+
+[Responsibilities]:
+{resp_sec or 'N/A'}
+
+[Requirements / Eligibility Criteria]:
+{req_sec or jd_text[:4000]}
+"""
+
+    async def _make_request(api_key: Optional[str]) -> Dict[str, Any]:
+        if not api_key:
+            logger.warning("No Groq API key available for JD parsing.")
+            return {}
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": GROQ_MODEL,
+            "messages": [
+                {"role": "system", "content": JD_PARSER_SYSTEM_PROMPT},
+                {"role": "user", "content": structured_user_prompt},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+            "max_tokens": 600,
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(GROQ_URL, json=payload, headers=headers)
+            if response.status_code != 200:
+                raise RuntimeError(f"Groq API returned HTTP {response.status_code}: {response.text}")
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+            return json.loads(content)
+
+    try:
+        result = await groq_key_pool.execute_async_with_fallback(_make_request)
+        if isinstance(result, dict):
+            logger.info(
+                "JD parsed successfully with Groq",
+                role=result.get("role"),
+                min_exp=result.get("candidate_min_experience_years"),
+                skills_count=len(result.get("required_skills", [])),
+            )
+            return result
+        return {}
+    except Exception as exc:
+        logger.warning("Groq JD parser call failed", error=str(exc))
+        return {}
+

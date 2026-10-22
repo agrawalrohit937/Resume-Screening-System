@@ -40,10 +40,13 @@ EVIDENCE_MULTIPLIERS = {
 def make_skill_regex(skill: str) -> re.Pattern:
     """
     Creates a regex pattern that matches the skill name with robust boundary detection,
-    safely handling non-word tokens like C++, C#, .NET.
+    safely handling non-word tokens like C++, C#, .NET while preventing single-letter collisions.
     """
-    escaped = re.escape(skill.strip().lower())
-    return re.compile(rf"(?<![a-zA-Z0-9]){escaped}(?![a-zA-Z0-9])", re.IGNORECASE)
+    s = skill.strip().lower()
+    escaped = re.escape(s)
+    left = r"(?<![a-zA-Z0-9_])"
+    right = r"(?![a-zA-Z0-9_+#])" if (s.endswith("+") or s.endswith("#") or len(s) == 1) else r"(?![a-zA-Z0-9_])"
+    return re.compile(f"{left}{escaped}{right}", re.IGNORECASE)
 
 
 def build_resume_section_index(

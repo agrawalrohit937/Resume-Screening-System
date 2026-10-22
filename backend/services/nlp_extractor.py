@@ -42,11 +42,6 @@ NEGATION_CUES: Set[str] = {
     "avoid", "avoiding", "avoids"
 }
 
-NICE_TO_HAVE_CUES: Set[str] = {
-    "preferred", "plus", "bonus", "desirable", "ideally",
-    "nice to have", "nice-to-have", "good to have", "good-to-have"
-}
-
 # Clause boundary: newline, sentence enders (a '.' only when followed by whitespace/end so that
 # Node.js / .NET / Vue.js are not split), comma, colon, and contrast conjunctions.
 _CLAUSE_SPLIT = re.compile(
@@ -376,12 +371,19 @@ def extract_skills_from_sections(resume_data: Any) -> List[str]:
 
 def extract_education_level(raw_text: str) -> Optional[str]:
     """
-    Extracts candidate's highest degree.
-
-    Ambiguous short forms (MS, BS, BE) are only accepted in unambiguous shapes
-    ("M.S. in ...", "B.E."), so "MS Excel" / "MS Office" and the English word "be"
-    do not produce a degree. Returns None when no degree evidence is found.
+    Extracts candidate's highest degree using standardized education_service equivalence.
+    Ambiguous short forms (MS Excel, etc.) are safely isolated. Returns None when no degree is found.
     """
+    if not raw_text or not raw_text.strip():
+        return None
+    try:
+        from services.education_service import resolve_degree_level
+        rank, isced, label = resolve_degree_level(raw_text)
+        if rank > 0 and label and label != "Unclassified":
+            return label
+    except Exception:
+        pass
+
     text = raw_text.lower()
     degrees = [
         ("Ph.D / Doctorate", [r"\bph\.?d\b", r"\bdoctorate\b", r"\bdoctor of philosophy\b"]),
@@ -407,7 +409,7 @@ def extract_education_level(raw_text: str) -> Optional[str]:
         for pat in patterns:
             if re.search(pat, text):
                 return level_name
-    return None  # No degree evidence: do not grant free Bachelor's credit
+    return None
 
 
 def extract_resume_data_deterministic(raw_text: str) -> Dict[str, Any]:
@@ -431,9 +433,21 @@ def extract_resume_data_deterministic(raw_text: str) -> Dict[str, Any]:
 
     education_entries = []
     if education_level:
+        field_patterns = (
+            (r"\b(computer|cse|software|it)\b", "Computer Science Engineering"),
+            (r"\b(ece|electronics|electrical)\b", "Electronics & Communication"),
+            (r"\b(mechanical|mech)\b", "Mechanical Engineering"),
+            (r"\b(civil)\b", "Civil Engineering"),
+            (r"\b(management|business|commerce|bba|mba|finance|marketing)\b", "Management / Business"),
+            (r"\b(science|mathematics|math|physics|chemistry)\b", "Science / Mathematics"),
+        )
+        field_name = next(
+            (name for pat, name in field_patterns if re.search(pat, raw_text, re.IGNORECASE)),
+            "General",
+        )
         education_entries.append({
             "degree": education_level,
-            "field": "Computer Science Engineering" if re.search(r"\b(computer|cse|software|it)\b", raw_text, re.IGNORECASE) else "Engineering",
+            "field": field_name,
             "is_in_progress": is_in_progress,
         })
 
@@ -454,3 +468,37 @@ def extract_resume_data_deterministic(raw_text: str) -> Dict[str, Any]:
         },
         "raw_text_length": len(raw_text),
     }
+
+
+_DISJUNCTION_CUES = [
+    re.compile(r"\b(?:at least one|one or more|one of|either|any of|any one of)\b", re.IGNORECASE),
+    re.compile(r"\b(?:such as|like|e\.g\.)\b.*?\b(?:or|/)\b", re.IGNORECASE),
+    re.compile(r"\b(?:or|/)\b", re.IGNORECASE),
+]
+
+
+def extract_skill_or_groups(jd_text: str) -> List[Set[str]]:
+    """
+    Detects disjunctive skill requirements ('OR' groups) in job descriptions.
+    Examples:
+      - 'proficiency in at least one programming language such as Java, Python, C++, or JavaScript'
+      - 'experience in either React or Angular or Vue'
+      - 'knowledge of PostgreSQL or MySQL'
+      - 'Python / Go / Java'
+    Returns a list of sets of canonical skill names that form mutually alternative groups.
+    """
+    if not jd_text or not jd_text.strip():
+        return []
+
+    clauses = [c.strip() for c in re.split(r"[\n•\*\;]+|\.\s+", jd_text) if c.strip()]
+    or_groups: List[Set[str]] = []
+
+    for clause in clauses:
+        if any(pat.search(clause) for pat in _DISJUNCTION_CUES):
+            skills = extract_skills_deterministic(clause)
+            if len(skills) >= 2:
+                group_set = set(skills)
+                if not any(group_set.issubset(g) or g.issubset(group_set) for g in or_groups):
+                    or_groups.append(group_set)
+
+    return or_groups

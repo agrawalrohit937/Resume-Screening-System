@@ -27,6 +27,7 @@ from schemas.ats_schema import (
 
 from services.scoring_engine import score_resume
 from services.skill_ontology import canonicalize_skills
+from services.jd_parser_service import parse_jd_with_groq
 from utils.validators import validate_object_id
 import time
 
@@ -112,10 +113,10 @@ async def match_resume(
     if jd_file and hasattr(jd_file, "filename") and jd_file.filename:
         filename = jd_file.filename
         ext = Path(filename).suffix.lower().lstrip(".")
-        if ext not in ("pdf", "docx", "doc", "txt"):
+        if ext not in ("pdf", "docx", "txt"):
             raise HTTPException(
                 status_code=400,
-                detail="Unsupported JD file type. Please upload a PDF, DOCX, or TXT file.",
+                detail="Unsupported JD file type. Please upload a PDF, DOCX, or TXT file (legacy .doc files must be converted to .docx or .pdf).",
             )
 
         contents = await jd_file.read()
@@ -207,6 +208,21 @@ async def match_resume(
 
     t_start = time.perf_counter()
 
+    # Direct Groq JD parser: extracts clean candidate specs (avoids company age confusion)
+    llm_min_years = None
+    llm_min_education = None
+    try:
+        jd_specs = await parse_jd_with_groq(job_description)
+        if jd_specs:
+            if jd_specs.get("candidate_min_experience_years") is not None:
+                llm_min_years = float(jd_specs["candidate_min_experience_years"])
+            if jd_specs.get("minimum_education"):
+                llm_min_education = str(jd_specs["minimum_education"])
+            if not required_skills and jd_specs.get("required_skills"):
+                required_skills = canonicalize_skills(jd_specs["required_skills"])
+    except Exception as parse_err:
+        logger.warning("Groq JD parser skipped", error=str(parse_err))
+
     try:
         resume_payload = resume.parsed_data.model_dump() if hasattr(resume.parsed_data, "model_dump") else (resume.parsed_data or {})
         if "raw_text" not in resume_payload:
@@ -217,6 +233,8 @@ async def match_resume(
             jd=job_description,
             mode="candidate",
             required_skills=required_skills or [],
+            min_years=llm_min_years,
+            min_education=llm_min_education,
         )
     except Exception as e:
         logger.exception("Unified scoring engine execution failed", error=str(e))
@@ -329,6 +347,22 @@ async def bulk_match(
             detail="No parsed resumes found.",
         )
 
+    # Parse JD once with Groq for the entire batch (avoids company tenure confusion)
+    llm_min_years = None
+    llm_min_education = None
+    bulk_required_skills = payload.required_skills or []
+    try:
+        jd_specs = await parse_jd_with_groq(payload.job_description)
+        if jd_specs:
+            if jd_specs.get("candidate_min_experience_years") is not None:
+                llm_min_years = float(jd_specs["candidate_min_experience_years"])
+            if jd_specs.get("minimum_education"):
+                llm_min_education = str(jd_specs["minimum_education"])
+            if not bulk_required_skills and jd_specs.get("required_skills"):
+                bulk_required_skills = canonicalize_skills(jd_specs["required_skills"])
+    except Exception as parse_err:
+        logger.warning("Bulk Groq JD parser skipped", error=str(parse_err))
+
     results = []
 
     for resume in parsed_resumes:
@@ -351,6 +385,9 @@ async def bulk_match(
                 resume=resume_payload,
                 jd=payload.job_description,
                 mode="candidate",
+                required_skills=bulk_required_skills,
+                min_years=llm_min_years,
+                min_education=llm_min_education,
             )
         except Exception:
             logger.exception(

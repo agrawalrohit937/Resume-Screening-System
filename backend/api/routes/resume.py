@@ -147,46 +147,22 @@ async def upload_resume_endpoint(
         "is_primary": True,
     }
 
-    # Perform atomic primary swap using MongoDB session transaction if supported,
-    # with automatic compensating fallback.
-    resume = None
-    client = resume_repo.collection.database.client
-    try:
-        async with await client.start_session() as session:
-            async with session.start_transaction():
-                await resume_repo.collection.update_many(
-                    {"user_id": user_id_str},
-                    {"$set": {"is_primary": False}},
-                    session=session,
-                )
-                res = await resume_repo.collection.insert_one(resume_data, session=session)
-                resume_data["_id"] = str(res.inserted_id)
-                resume = ResumeModel(**resume_data)
+    # Set previous resumes to non-primary and create new resume document
+    await resume_repo.collection.update_many(
+        {"user_id": user_id_str},
+        {"$set": {"is_primary": False}},
+    )
+    resume_data.pop("_id", None)
+    resume = await resume_repo.create(resume_data)
 
-                await user_repo.collection.update_one(
-                    {"_id": ObjectId(user_id_str)},
-                    {"$set": {
-                        "profile_resume_url": file_url,
-                        "profile_resume_name": original_filename,
-                        "updated_at": datetime.now(timezone.utc),
-                    }},
-                    session=session,
-                )
-    except Exception as tx_err:
-        logger.info("Session transaction unavailable or failed, applying compensating fallback", error=str(tx_err))
-        await resume_repo.collection.update_many(
-            {"user_id": user_id_str},
-            {"$set": {"is_primary": False}},
-        )
-        resume = await resume_repo.create(resume_data)
-        await user_repo.collection.update_one(
-            {"_id": ObjectId(user_id_str)},
-            {"$set": {
-                "profile_resume_url": file_url,
-                "profile_resume_name": original_filename,
-                "updated_at": datetime.now(timezone.utc),
-            }},
-        )
+    await user_repo.collection.update_one(
+        {"_id": ObjectId(user_id_str)},
+        {"$set": {
+            "profile_resume_url": file_url,
+            "profile_resume_name": original_filename,
+            "updated_at": datetime.now(timezone.utc),
+        }},
+    )
 
     # Compensating post-check: ensure user has exactly 1 primary resume
     primary_count = await resume_repo.collection.count_documents({"user_id": user_id_str, "is_primary": True})
@@ -210,28 +186,44 @@ async def upload_resume_endpoint(
 
     # Dispatched via TaskManager (Persistent Job Queue with live status tracking)
     tenant_id = getattr(current_user, "tenant_id", None) or "default"
-    job_record = await task_manager.enqueue_job(
-        job_type=JobType.RESUME_PARSE_EMBED,
-        payload={
-            "resume_id": str(resume.id),
-            "file_path": storage_path,
-            "file_type": file_type,
-            "user_id": str(current_user.id),
-            "file_hash": file_hash,
-            "tenant_id": tenant_id,
-        },
-        task_coro_func=execute_resume_upload_pipeline,
-        tenant_id=tenant_id,
-        user_id=str(current_user.id),
-        idempotency_key=idempotency_key,
-    )
+    job_id = None
+    try:
+        job_record = await task_manager.enqueue_job(
+            job_type=JobType.RESUME_PARSE_EMBED,
+            payload={
+                "resume_id": str(resume.id),
+                "file_path": storage_path,
+                "file_type": file_type,
+                "user_id": str(current_user.id),
+                "file_hash": file_hash,
+                "tenant_id": tenant_id,
+            },
+            task_coro_func=execute_resume_upload_pipeline,
+            tenant_id=tenant_id,
+            user_id=str(current_user.id),
+            idempotency_key=idempotency_key,
+        )
+        job_id = job_record.job_id if hasattr(job_record, "job_id") else getattr(job_record, "get", lambda k: None)("job_id")
+    except Exception as q_err:
+        logger.warning("Task manager enqueue failed, falling back to background_tasks", error=str(q_err))
+        job_id = f"bg_{uuid.uuid4().hex[:12]}"
+        background_tasks.add_task(
+            _parse_resume_background,
+            str(resume.id),
+            storage_path,
+            file_type,
+            resume_repo,
+            user_repo,
+            str(current_user.id),
+            parser,
+        )
 
     return ResumeUploadResponse(
         resume_id=str(resume.id),
         filename=filename,
         status=ResumeStatus.PENDING,
         message="Resume uploaded. Parsing and embedding pipeline queued.",
-        job_id=job_record.job_id if hasattr(job_record, "job_id") else getattr(job_record, "get", lambda k: None)("job_id"),
+        job_id=job_id,
     )
 
 

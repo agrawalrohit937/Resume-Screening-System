@@ -129,13 +129,62 @@ SKILL_ALIASES: Dict[str, str] = {
     "cn": "Computer Networks",
     "object oriented programming": "Object-Oriented Programming",
     "object-oriented programming": "Object-Oriented Programming",
+    "object-oriented programming (oop)": "Object-Oriented Programming",
+    "object oriented programming (oop)": "Object-Oriented Programming",
+    "object-oriented programming (oops)": "Object-Oriented Programming",
+    "object oriented programming (oops)": "Object-Oriented Programming",
+    "object-oriented programming concepts": "Object-Oriented Programming",
+    "object oriented programming concepts": "Object-Oriented Programming",
     "oop": "Object-Oriented Programming",
     "oops": "Object-Oriented Programming",
+    "oop concepts": "Object-Oriented Programming",
+    "oops concepts": "Object-Oriented Programming",
+    "object oriented design": "Object-Oriented Programming",
+    "object-oriented design": "Object-Oriented Programming",
+    "ood": "Object-Oriented Programming",
     "system design": "System Design",
     "low level design": "LLD",
     "high level design": "HLD",
     "lld": "LLD",
     "hld": "HLD",
+
+    # Web Services & APIs
+    "rest api": "REST APIs",
+    "rest apis": "REST APIs",
+    "restful api": "REST APIs",
+    "restful apis": "REST APIs",
+    "web services": "Web Services",
+    "web service": "Web Services",
+    "web-services": "Web Services",
+    "restful web services": "Web Services",
+    "rest web services": "Web Services",
+    "apis": "REST APIs",
+    "api integration": "REST APIs",
+
+    # Software Engineering Practices & SDLC
+    "sdlc": "SDLC",
+    "software development life cycle": "SDLC",
+    "software development lifecycle": "SDLC",
+    "database design": "Database Design",
+    "unit testing": "Testing",
+    "integration testing": "Testing",
+    "debugging": "Debugging",
+    "debugging practices": "Debugging",
+    "debugging skills": "Debugging",
+    "debug": "Debugging",
+    "troubleshooting": "Debugging",
+    "software development tools": "Software Development Tools",
+    "development tools": "Software Development Tools",
+
+    # Analytical & Problem Solving
+    "analytical and problem-solving skills": "Analytical Skills",
+    "analytical and problem-solving": "Analytical Skills",
+    "analytical skills": "Analytical Skills",
+    "analytical thinking": "Analytical Skills",
+    "problem-solving skills": "Problem Solving",
+    "problem solving skills": "Problem Solving",
+    "problem-solving": "Problem Solving",
+    "problem solving": "Problem Solving",
     
     # Programming Languages
     "python": "Python",
@@ -187,7 +236,7 @@ SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
     },
     "Backend Development": {
         "parents": ["Web Development", "Software Engineering"],
-        "children": ["FastAPI", "Django", "Flask", "Node.js", "Express", "NestJS", "Spring Boot", "Go", "Java", "Python", "GraphQL"]
+        "children": ["FastAPI", "Django", "Flask", "Node.js", "Express", "NestJS", "Spring Boot", "Go", "Java", "Python", "GraphQL", "REST APIs", "Web Services"]
     },
     "Cloud Platforms": {
         "parents": ["DevOps & Infrastructure"],
@@ -199,11 +248,11 @@ SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
     },
     "DevOps & CI/CD": {
         "parents": ["Software Engineering"],
-        "children": ["CI/CD", "GitHub Actions", "Jenkins", "Terraform", "Ansible", "Docker", "Kubernetes"]
+        "children": ["CI/CD", "GitHub Actions", "Jenkins", "Terraform", "Ansible", "Docker", "Kubernetes", "Git", "SDLC", "Software Development Tools", "Debugging", "Testing"]
     },
     "Relational Databases": {
         "parents": ["Databases"],
-        "children": ["PostgreSQL", "MySQL", "SQL Server", "SQLite", "Oracle", "SQL"]
+        "children": ["PostgreSQL", "MySQL", "SQL Server", "SQLite", "Oracle", "SQL", "DBMS", "Database Design"]
     },
     "NoSQL Databases": {
         "parents": ["Databases"],
@@ -216,6 +265,38 @@ SKILL_TAXONOMY: Dict[str, Dict[str, List[str]]] = {
     "Programming Languages": {
         "parents": ["Software Engineering"],
         "children": ["Python", "JavaScript", "TypeScript", "Go", "Java", "C++", "C#", "Rust", "SQL"]
+    },
+    "Object-Oriented Programming": {
+        "parents": ["Computer Science Fundamentals", "Software Engineering"],
+        "children": ["Python", "Java", "C++", "C#", "TypeScript", "JavaScript", "Go", "Rust", "OOP", "OOPS"]
+    },
+    "Web Services": {
+        "parents": ["Web Development", "Backend Development"],
+        "children": ["REST APIs", "FastAPI", "GraphQL", "Webhooks", "Microservices", "RESTful APIs", "SOAP", "API Integration", "APIs"]
+    },
+    "Database Design": {
+        "parents": ["Databases", "Computer Science Fundamentals"],
+        "children": ["DBMS", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Database Management Systems", "Relational Databases", "NoSQL Databases", "Indexing", "Normalization"]
+    },
+    "Software Development Tools": {
+        "parents": ["Software Engineering", "DevOps & Infrastructure"],
+        "children": ["Git", "Docker", "VS Code", "Postman", "GitHub", "GitLab", "CI/CD", "Jira", "GitHub Actions"]
+    },
+    "SDLC": {
+        "parents": ["Software Engineering"],
+        "children": ["Git", "CI/CD", "GitHub Actions", "Agile", "Scrum", "Testing", "Unit Testing", "Jira", "DevOps"]
+    },
+    "Debugging": {
+        "parents": ["Software Engineering"],
+        "children": ["Testing", "Unit Testing", "PyTest", "Integration Testing", "Troubleshooting", "Logging"]
+    },
+    "System Design": {
+        "parents": ["Computer Science Fundamentals", "Software Engineering"],
+        "children": ["Microservices", "REST APIs", "LLD", "HLD", "Database Design", "Scalability", "High Availability", "Architecture"]
+    },
+    "Analytical Skills": {
+        "parents": ["Computer Science Fundamentals"],
+        "children": ["Data Structures & Algorithms", "Algorithms", "DSA", "Problem Solving", "Analytical Thinking"]
     }
 }
 

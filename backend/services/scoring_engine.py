@@ -18,17 +18,15 @@ Changelog (v2.0.1):
 from __future__ import annotations
 
 import gc
-import json
 import math
 import os
 import re
 import time
-from collections import Counter
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
-import requests
 import structlog
 
 from services.scoring.constants import SkillMatch
@@ -54,6 +52,22 @@ try:
     from services.security.pii_redactor import mask_pii_extended
 except Exception:
     mask_pii_extended = None
+
+try:
+    from core.telemetry import trace_span
+    from core.metrics import record_ats_match_metrics
+    from services.multi_tenancy.tenant_context import get_current_tenant_id
+except Exception:
+    trace_span = None
+    record_ats_match_metrics = None
+    get_current_tenant_id = None
+
+def _record_metrics(start_t: float, status: str) -> None:
+    if record_ats_match_metrics and get_current_tenant_id:
+        try:
+            record_ats_match_metrics(tenant_id=get_current_tenant_id(), duration_sec=time.perf_counter() - start_t, status=status)
+        except Exception:
+            pass
 
 logger = structlog.get_logger(__name__)
 
@@ -148,224 +162,59 @@ _EXPECTED_SECTION_HINTS = [
     r"objective", r"certifi", r"work history", r"employment",
 ]
 
-_SOFT_LANGUAGE = re.compile(
-    r"\b(preferred|nice[\s-]to[\s-]have|plus|bonus|desirable|a\s+plus|ideally|good\s+to\s+have)\b",
-    re.IGNORECASE,
-)
-_HARD_LANGUAGE = re.compile(
-    r"\b(required|must\s+have|minimum|at\s+least|essential|mandatory|must\s+possess|need\s+to\s+have)\b",
-    re.IGNORECASE,
-)
-
-_YEARS_PATTERNS = [
-    re.compile(r"(\d+)\s*\+\s*years?", re.IGNORECASE),
-    re.compile(r"(\d+)\s*(?:to|-|–)\s*\d+\s*years?", re.IGNORECASE),
-    re.compile(r"minimum\s+of\s+(\d+)\s*years?", re.IGNORECASE),
-    re.compile(r"at\s+least\s+(\d+)\s*years?", re.IGNORECASE),
-    re.compile(r"(\d+)\s*years?\s*(?:of\s+)?(?:relevant\s+|professional\s+|work\s+)?experience", re.IGNORECASE),
-]
-
-_ENTRY_LEVEL_PATTERN = re.compile(
-    r"\b(entry[\s-]level|fresher|freshers|junior|intern|internship|trainee|graduate|0\s*[-–to]\s*1\s*years?|0\+?\s*years?|no\s+experience\s+required)\b",
-    re.IGNORECASE,
-)
-
-_DEGREE_RANK = {
-    "high school": 1, "diploma": 1, "iti": 1,
-    "associate": 2,
-    "bachelor": 3, "b.tech": 3, "btech": 3, "b.e.": 3, "be": 3, "b.s.": 3,
-    "bs": 3, "b.a.": 3, "ba": 3, "bca": 3, "bsc": 3, "b.sc": 3,
-    "graduation": 3, "graduate": 3, "undergraduate": 3,
-    "master": 4, "m.tech": 4, "mtech": 4, "m.s.": 4, "ms": 4, "m.a.": 4,
-    "ma": 4, "mba": 4, "mca": 4, "msc": 4, "m.sc": 4, "b.ed": 4, "bed": 4,
-    "post graduation": 4, "postgraduate": 4, "post-graduation": 4, "post-graduate": 4,
-    "phd": 5, "ph.d.": 5, "doctorate": 5,
-}
-
-_DEGREE_WORD_PATTERN = re.compile(
-    r"\b(" + "|".join(re.escape(k) for k in sorted(_DEGREE_RANK, key=len, reverse=True)) + r")\b",
-    re.IGNORECASE,
-)
-
-_PURSUING_PATTERN = re.compile(
-    r"\b(pursuing|expected|anticipated|in\s+progress|currently\s+enrolled|final[\s-]year)\b",
-    re.IGNORECASE,
-)
-
-_ENGLISH_STOPWORDS = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
-    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
-    "can", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from",
-    "further", "had", "has", "have", "having", "he", "her", "here", "hers", "herself", "him", "himself",
-    "his", "how", "i", "if", "in", "into", "is", "it", "its", "itself", "just", "me", "more", "most",
-    "my", "myself", "no", "nor", "not", "now", "of", "off", "on", "once", "only", "or", "other", "our",
-    "ours", "ourselves", "out", "over", "own", "same", "she", "should", "so", "some", "such", "than",
-    "that", "the", "their", "theirs", "them", "themselves", "then", "there", "these", "they", "this",
-    "those", "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what",
-    "when", "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours",
-    "resume", "experience", "education", "skills", "project", "projects", "work", "responsibilities"
-}
-
-_COMPANY_EXP_SNIPPET_PATTERNS = [
-    re.compile(r"\b(?:we|our|us|company|firm|agency|team|builders?|help|helping|transform|founded|established)\b[^\.\n]*?\b\d+[\+\s\-to\d]*\s*years", re.IGNORECASE),
-    re.compile(r"\bwith\s+\d+[\+\s\-to\d]*\s*years[^\.\n]*?\b(?:we|our|help|serve|serving|deliver|delivering|build|builders?)\b", re.IGNORECASE),
-    re.compile(r"\b\d+[\+\s\-to\d]*\s*years(?:\s+of)?\s+(?:hands[\s-]on\s+)?(?:expertise|excellence|innovation|heritage|leadership|presence|service|history|track[\s-]record)", re.IGNORECASE),
-    re.compile(r"\b(?:for\s+over|for\s+more\s+than|over)\s+\d+[\+\s\-to\d]*\s*years\s*,?\s*(?:we|our)\b", re.IGNORECASE),
-    re.compile(r"\b(?:about\s+us|about\s+the\s+company|who\s+we\s+are|company\s+overview)\b", re.IGNORECASE),
-]
-
-
-def _is_company_experience_context(text: str, start: int, end: int) -> bool:
-    window_start = max(0, start - 150)
-    window_end = min(len(text), end + 150)
-    snippet = text[window_start:window_end]
-    for cp in _COMPANY_EXP_SNIPPET_PATTERNS:
-        if cp.search(snippet):
-            return True
-    return False
-
-
-def _context_is_hard_requirement(jd_text: str, match_start: int, match_end: int, window: int = 90) -> bool:
-    lo = max(0, match_start - window)
-    hi = min(len(jd_text), match_end + window)
-    ctx = jd_text[lo:hi]
-    if _SOFT_LANGUAGE.search(ctx):
-        return False
-    if _HARD_LANGUAGE.search(ctx):
-        return True
-    return True
+from services.nlp_extractor import _ZERO_EXP_PATTERN as _ENTRY_LEVEL_PATTERN
 
 
 def _extract_years_requirement(jd_text: str) -> Optional[Tuple[float, bool]]:
+    """Extracts required experience years from JD text using unified NLP extractor."""
     if not jd_text or not jd_text.strip():
         return None
-
-    # 1. Strict Entry-Level / Fresher / 0-1 Years mapping
-    zero_exp_match = bool(re.search(
-        r"\b(fresher|freshers|entry[\s-]level|trainee|intern|internship|graduate|no\s+prior\s+experience|no\s+experience\s+required|no\s+experience\s+needed|zero\s+experience|0\s*(?:[-–]|to)\s*1\s*(?:years?|yrs?)|0\+?\s*(?:years?|yrs?)|0\s*(?:years?|yrs?)\s+experience)\b",
-        jd_text,
-        re.IGNORECASE,
-    ))
-
-    # 2. Check for higher tenure requirements (>= 2 years)
-    senior_patterns = [
-        re.compile(r"([2-9]|\d{2,})\s*\+\s*years?", re.IGNORECASE),
-        re.compile(r"([2-9]|\d{2,})\s*(?:to|-|–)\s*\d+\s*years?", re.IGNORECASE),
-        re.compile(r"minimum\s+(?:of\s+)?([2-9]|\d{2,})\s*years?", re.IGNORECASE),
-        re.compile(r"at\s+least\s+([2-9]|\d{2,})\s*years?", re.IGNORECASE),
-        re.compile(r"([2-9]|\d{2,})\s*years?\s*(?:of\s+)?(?:relevant\s+|professional\s+|work\s+)?experience", re.IGNORECASE),
-    ]
-
-    best: Optional[Tuple[float, bool]] = None
-    for pattern in senior_patterns:
-        for m in pattern.finditer(jd_text):
-            prefix = jd_text[max(0, m.start() - 6):m.start()]
-            if re.search(r"0\s*(?:[-–]|to)\s*$", prefix, re.IGNORECASE):
-                continue
-            if _is_company_experience_context(jd_text, m.start(), m.end()):
-                continue
-            try:
-                years = float(m.group(1))
-            except (ValueError, IndexError):
-                continue
-            is_hard = _context_is_hard_requirement(jd_text, m.start(), m.end())
-            if best is None or years > best[0]:
-                best = (years, is_hard)
-
-    # If Fresher / 0-1 Years / Entry level was detected, prioritize entry-level mapping if no explicit senior requirement
-    if zero_exp_match and (best is None or best[0] <= 1.0):
+    try:
+        from services.nlp_extractor import extract_experience_requirement
+        years = extract_experience_requirement(jd_text)
+        is_hard = years > 0
+        return (years, is_hard)
+    except Exception:
         return (0.0, False)
 
-    # If a senior requirement (>= 2.0 yrs) is found and not in zero-exp context, prioritize it
-    if best is not None and best[0] >= 2.0:
-        return best
 
-    # If Fresher was detected
-    if zero_exp_match:
-        return (0.0, False)
-
-    # Standard 1+ years pattern evaluation
-    for pattern in _YEARS_PATTERNS:
-        for m in pattern.finditer(jd_text):
-            if _is_company_experience_context(jd_text, m.start(), m.end()):
-                continue
-            try:
-                years = float(m.group(1))
-            except (ValueError, IndexError):
-                continue
-            is_hard = _context_is_hard_requirement(jd_text, m.start(), m.end())
-            if best is None or years > best[0]:
-                best = (years, is_hard)
-
-    return best
+def _map_education_level(level_str: Optional[str]) -> Optional[Tuple[int, str]]:
+    """Maps education level string to (rank, label) using education equivalence service."""
+    if not level_str or not str(level_str).strip():
+        return None
+    try:
+        from services.education_service import resolve_degree_level
+        rank, _, label = resolve_degree_level(str(level_str))
+        if rank > 0:
+            return (rank, label)
+    except Exception:
+        pass
+    return None
 
 
 def _extract_degree_requirement(jd_text: str) -> Optional[Tuple[int, str, bool]]:
-    best: Optional[Tuple[int, str, bool]] = None
-    for m in _DEGREE_WORD_PATTERN.finditer(jd_text):
-        label = m.group(1).lower()
-        rank = _DEGREE_RANK.get(label)
-        if rank is None:
-            continue
-
-        if label == "be":
-            prefix = jd_text[max(0, m.start() - 15):m.start()].lower()
-            if re.search(r"\b(must|will|should|to|can|could|shall|may|might|would)\s+$", prefix):
-                continue
-            surrounding = jd_text[max(0, m.start() - 15):min(len(jd_text), m.end() + 15)]
-            if not re.search(r"\b(b\.e\.|b\.tech|degree|engineering)\b", surrounding, re.IGNORECASE):
-                continue
-
-        is_hard = _context_is_hard_requirement(jd_text, m.start(), m.end())
-        if best is None or rank > best[0]:
-            best = (rank, label, is_hard)
-    return best
+    """Extracts degree requirements from JD text using standardized education equivalence service."""
+    if not jd_text or not jd_text.strip():
+        return None
+    try:
+        from services.education_service import resolve_degree_level
+        rank, isced, label = resolve_degree_level(jd_text)
+        if rank > 0 and label and label != "Unclassified":
+            return (rank, label, True)
+    except Exception:
+        pass
+    return None
 
 
 def _candidate_max_degree_rank(extracted_data: dict) -> Tuple[int, bool]:
-    from core.feature_flags import FEATURE_SKILLS_FIRST_EDUCATION
-    if FEATURE_SKILLS_FIRST_EDUCATION:
-        try:
-            from services.education_service import candidate_highest_education
-            max_rank, max_isced, in_progress, best_label, evidence = candidate_highest_education(extracted_data)
-            if max_rank > 0:
-                return max_rank, in_progress
-        except Exception as e:
-            logger.debug("Failed in ISCED education resolution", error=str(e))
-
-    education = extracted_data.get("education", []) or []
-    raw_text = str(extracted_data.get("raw_text") or "")
-    max_rank = 0
-    in_progress = False
-    for edu in education:
-        if hasattr(edu, "model_dump"):
-            edu = edu.model_dump()
-        elif hasattr(edu, "__dict__"):
-            edu = edu.__dict__
-        degree_str = str(edu.get("degree") or "")
-        m = _DEGREE_WORD_PATTERN.search(degree_str)
-        if not m:
-            continue
-        rank = _DEGREE_RANK.get(m.group(1).lower(), 0)
-        try:
-            from services.education_service import is_degree_in_progress
-            is_pursuing = is_degree_in_progress(edu, raw_text=raw_text)
-        except Exception:
-            is_pursuing = bool(_PURSUING_PATTERN.search(degree_str)) or not edu.get("end_year")
-
-        if rank > max_rank:
-            max_rank = rank
-            in_progress = is_pursuing
-        elif rank == max_rank and is_pursuing:
-            in_progress = True
-
-    if max_rank == 0 and extracted_data.get("education_level"):
-        edu_level_str = str(extracted_data.get("education_level") or "")
-        m = _DEGREE_WORD_PATTERN.search(edu_level_str)
-        if m:
-            max_rank = _DEGREE_RANK.get(m.group(1).lower(), 0)
-
-    return max_rank, in_progress
+    """Accurately resolves candidate's highest degree rank and in-progress status via education_service."""
+    try:
+        from services.education_service import candidate_highest_education
+        max_rank, _, in_progress, _, _ = candidate_highest_education(extracted_data)
+        return max_rank, in_progress
+    except Exception as e:
+        logger.debug("Failed in ISCED education resolution", error=str(e))
+        return 0, False
 
 
 def _skills_score(
@@ -375,30 +224,47 @@ def _skills_score(
     explicit_required: Optional[Set[str]] = None,
     extracted_data: Optional[Dict[str, Any]] = None,
     raw_text: str = "",
-) -> Tuple[float, List[str], List[str], List[str], List[Dict[str, Any]]]:
+    or_groups: Optional[List[Set[str]]] = None,
+) -> Tuple[float, List[str], List[str], List[str], List[Dict[str, Any]], Set[str]]:
     """
     Computes criticality-weighted graded skill credit and partitions required skills into:
       - matched_skills (credit >= 0.85)
       - transferable_skills (credit in [0.3, 0.85))
       - missing_skills (credit < 0.3)
 
-    When FEATURE_CONTEXTUAL_SKILLS is True, modulates credit with evidence location,
-    recency decay, duration, and anti-keyword-stuffing verification.
-
-    Weighting:
-      skills_score = Σ(credit_i × weight_i) / Σ(weight_i)
-
-    Complexity:
-      Time: O(N_jd * N_cand + N_jd * L_jd + N_skills * L_resume)
-      Space: O(N_jd + N_cand + L_jd)
+    Supports disjunctive 'OR' skill groups (e.g. 'at least one of Java, Python, C++, or JavaScript').
+    When a candidate satisfies at least one alternative, other unsatisfied alternatives in that group
+    are treated as satisfied options and are not marked as missing or penalized.
     """
     matched, transferable, missing = [], [], []
     skill_evidence: List[Dict[str, Any]] = []
     canonical_jd = canonicalize_skills(jd_skills) if canonicalize_skills else list(dict.fromkeys(jd_skills or []))
     if not canonical_jd:
-        return 1.0, cand_skills, [], [], []
+        return 1.0, cand_skills, [], [], [], set()
 
     canonical_cand = canonicalize_skills(cand_skills) if canonicalize_skills else cand_skills
+
+    # Resolve satisfied disjunctive OR groups
+    satisfied_group_alternatives: Set[str] = set()
+    if or_groups:
+        cand_norm_set = {c.lower() for c in (canonical_cand or [])}
+        for group in or_groups:
+            norm_group = {s for s in group if s}
+            matched_in_group = set()
+            for member in norm_group:
+                is_match = False
+                if evaluate_skill_fulfillment:
+                    res = evaluate_skill_fulfillment(member, canonical_cand)
+                    credit_val = res.credit if isinstance(res, SkillMatch) else (1.0 if res[0] else 0.0)
+                    is_match = (credit_val >= 0.85)
+                else:
+                    is_match = member.lower() in cand_norm_set
+                if is_match:
+                    matched_in_group.add(member)
+
+            if matched_in_group:
+                for alt in (norm_group - matched_in_group):
+                    satisfied_group_alternatives.add(alt.lower())
 
     # Build section index if contextual skill scoring is active
     section_index = None
@@ -446,6 +312,10 @@ def _skills_score(
         credit = match_obj.credit if match_obj is not None else 0.0
         bucket = match_obj.bucket if match_obj is not None else "missing"
 
+        # If unfulfilled alternative in already-satisfied OR group, do not penalize or mark missing
+        if credit < 0.3 and req.lower() in satisfied_group_alternatives:
+            continue
+
         # Contextual modulation if active and skill is fulfilled/transferable
         if section_index is not None and credit > 0.0:
             try:
@@ -476,10 +346,17 @@ def _skills_score(
     matched_set = {m.lower() for m in matched}
     transferable = [t for t in transferable if t.lower() not in matched_set]
     transferable_set = {t.lower() for t in transferable}
-    missing = [s for s in missing if s.lower() not in matched_set and s.lower() not in transferable_set]
+    seen_missing = set()
+    deduped_missing = []
+    for s in missing:
+        s_low = s.lower()
+        if s_low not in matched_set and s_low not in transferable_set and s_low not in seen_missing:
+            seen_missing.add(s_low)
+            deduped_missing.append(s)
+    missing = deduped_missing
 
     score = (total_weighted_credit / total_weights) if total_weights > 0 else 1.0
-    return score, matched, transferable, missing, skill_evidence
+    return score, matched, transferable, missing, skill_evidence, satisfied_group_alternatives
 
 
 def _compute_experience(
@@ -527,19 +404,19 @@ def _compute_experience(
     return baseline_score, None
 
 
-def _experience_score(extracted_data: dict, jd_text: str, min_years: Optional[float] = None) -> float:
-    score, _ = _compute_experience(extracted_data, jd_text, min_years)
-    return score
-
-
-def _education_score(extracted_data: dict, jd_text: str) -> float:
+def _education_score(extracted_data: dict, jd_text: str, min_education: Optional[str] = None) -> float:
     """
     Computes education match score with explicit support and partial credit for in-progress degrees.
     Applies 90% credit for in-progress candidates matching the major/target tier,
     and 85% credit for general in-progress candidates at the required level.
     """
-    degree_req = _extract_degree_requirement(jd_text)
-    required_rank = degree_req[0] if degree_req else 1
+    mapped_edu = _map_education_level(min_education)
+    if mapped_edu is not None:
+        required_rank = mapped_edu[0]
+    else:
+        degree_req = _extract_degree_requirement(jd_text)
+        required_rank = degree_req[0] if degree_req else 1
+
     cand_rank, in_progress = _candidate_max_degree_rank(extracted_data)
 
     if cand_rank >= required_rank:
@@ -560,72 +437,10 @@ def _education_score(extracted_data: dict, jd_text: str) -> float:
         return 0.75 if in_progress else 0.60
 
 
-def _knockout_math(
-    extracted_data: dict,
-    jd_text: str,
-    skill_universe: Optional[List[str]] = None,
-    profile: Optional[WeightProfile] = None,
-) -> Dict[str, Any]:
-    prof = profile or CANDIDATE_PROFILE
-    cand_skills = extracted_data.get("skills", []) or extracted_data.get("technical_skills", []) or []
-
-    # Identify JD skills
-    if skill_universe:
-        jd_skills = canonicalize_skills(skill_universe) if canonicalize_skills else skill_universe
-    elif extract_skills_deterministic:
-        raw_jd_skills = extract_skills_deterministic(jd_text)
-        jd_skills = canonicalize_skills(raw_jd_skills) if canonicalize_skills else raw_jd_skills
-    else:
-        jd_skills = []
-
-    s_score, matched_skills, transferable_skills, missing_skills = _skills_score(cand_skills, jd_skills)
-    exp_score = _experience_score(extracted_data, jd_text)
-    edu_score = _education_score(extracted_data, jd_text)
-
-    # Dynamic Weight Shifting for Entry-Level / 0-Experience (Phase 1.5)
-    cand_exp = float(extracted_data.get("total_experience_years") or 0.0)
-    work_exp = extracted_data.get("work_experience") or extracted_data.get("experience") or []
-    has_zero_exp = (cand_exp <= 0.0) and len(work_exp) == 0
-    is_entry_jd = bool(_ENTRY_LEVEL_PATTERN.search(jd_text or ""))
-    years_req = _extract_years_requirement(jd_text or "")
-    jd_min_years = years_req[0] if years_req else None
-    jd_has_high_min = (jd_min_years is not None and jd_min_years > 1.0)
-    should_redistribute = is_entry_jd or (has_zero_exp and not jd_has_high_min) or (jd_min_years is not None and jd_min_years <= 1.0 and exp_score < 1.0)
-
-    skills_w = prof.skills_weight
-    exp_w = prof.experience_weight
-    edu_w = prof.education_weight
-
-    if should_redistribute and (has_zero_exp or exp_score == 0.0):
-        base_sum = skills_w + edu_w
-        if base_sum > 0:
-            skills_w = skills_w + (exp_w * (skills_w / base_sum))
-            edu_w = edu_w + (exp_w * (edu_w / base_sum))
-            exp_w = 0.0
-
-    math_score = (
-        (s_score * skills_w)
-        + (exp_score * exp_w)
-        + (edu_score * edu_w)
-    )
-
-    return {
-        "skills_score": round(s_score * 100, 1),
-        "experience_score": round(exp_score * 100, 1),
-        "education_score": round(edu_score * 100, 1),
-        "knockout_math_score": round(math_score * 100, 1),
-        "matched_skills": matched_skills,
-        "transferable_skills": transferable_skills,
-        "missing_skills": missing_skills,
-    }
-
-
 def _parsing_health(raw_text: str) -> Dict[str, Any]:
-    warnings: List[str] = []
     text = (raw_text or "").strip()
     words = text.split()
     word_count = len(words)
-
     if word_count == 0:
         return {
             "is_healthy": False,
@@ -634,17 +449,18 @@ def _parsing_health(raw_text: str) -> Dict[str, Any]:
             "metrics": {"word_count": 0},
         }
 
-    too_short = word_count < 100
+    has_tables = bool(re.search(r"(\|[^\n]+\|\n){2,}", text))
     short_tokens = sum(1 for w in words if len(re.sub(r"[^A-Za-z0-9]", "", w)) <= 2)
-    short_token_ratio = short_tokens / word_count
+    short_token_ratio = round(short_tokens / word_count, 3)
+    has_multicol = short_token_ratio > 0.35 and word_count > 100
     alpha_chars = sum(1 for c in text if c.isalpha())
-    alpha_ratio = alpha_chars / max(len(text), 1)
-    clean_lengths = [len(re.sub(r"[^A-Za-z0-9]", "", w)) for w in words]
-    clean_lengths = [l for l in clean_lengths if l > 0]
-    avg_word_len = sum(clean_lengths) / len(clean_lengths) if clean_lengths else 0
+    alpha_ratio = round(alpha_chars / max(len(text), 1), 3)
+    clean_lengths = [len(re.sub(r"[^A-Za-z0-9]", "", w)) for w in words if re.sub(r"[^A-Za-z0-9]", "", w)]
+    avg_word_len = round(sum(clean_lengths) / len(clean_lengths), 2) if clean_lengths else 0.0
     sections_found = sum(1 for pat in _EXPECTED_SECTION_HINTS if re.search(pat, text.lower()))
 
-    if too_short:
+    warnings: List[str] = []
+    if word_count < 100:
         warnings.append(f"Only {word_count} words extracted — unusually brief for a resume.")
     if short_token_ratio > 0.35:
         warnings.append("High ratio of short text fragments (likely multi-column layout issue).")
@@ -654,26 +470,12 @@ def _parsing_health(raw_text: str) -> Dict[str, Any]:
         warnings.append("Extracted words are unusually short on average.")
     if sections_found == 0:
         warnings.append("No standard resume section headers detected.")
-
-    confidence = 1.0
-    if too_short:
-        confidence -= 0.4
-    confidence -= min(short_token_ratio, 0.5)
-    if alpha_ratio < 0.55:
-        confidence -= 0.2
-    # Table / Grid Detection
-    has_tables = bool(re.search(r"(\|[^\n]+\|\n){2,}", text))
     if has_tables:
         warnings.append("Embedded tables detected — may impact line parsing in legacy ATS systems.")
 
-    # Multi-Column detection
-    has_multicol = short_token_ratio > 0.35 and word_count > 100
-    if has_multicol:
-        confidence -= 0.15
+    conf = 1.0 - (0.4 if word_count < 100 else 0.0) - min(short_token_ratio, 0.5) - (0.2 if alpha_ratio < 0.55 else 0.0) - (0.15 if has_multicol else 0.0)
+    confidence = round(max(0.0, min(1.0, conf)), 2)
 
-    confidence = max(0.0, min(1.0, confidence))
-
-    # Run Candidate ATS Format Checker
     format_report = None
     try:
         from services.ats_format_check import check_ats_formatting
@@ -682,14 +484,14 @@ def _parsing_health(raw_text: str) -> Dict[str, Any]:
         format_report = {"is_ats_compliant": confidence >= 0.6, "format_issues": [], "compliance_score": round(confidence * 100, 1)}
 
     return {
-        "is_healthy": confidence >= 0.6 and not too_short,
-        "confidence": round(confidence, 2),
+        "is_healthy": confidence >= 0.6 and word_count >= 100,
+        "confidence": confidence,
         "warnings": warnings,
         "metrics": {
             "word_count": word_count,
-            "short_token_ratio": round(short_token_ratio, 3),
-            "alpha_ratio": round(alpha_ratio, 3),
-            "avg_word_len": round(avg_word_len, 2),
+            "short_token_ratio": short_token_ratio,
+            "alpha_ratio": alpha_ratio,
+            "avg_word_len": avg_word_len,
             "sections_found": sections_found,
             "has_tables": has_tables,
             "has_multi_column": has_multicol,
@@ -699,10 +501,43 @@ def _parsing_health(raw_text: str) -> Dict[str, Any]:
     }
 
 
+def _record_check(
+    checks: List[Dict[str, Any]],
+    reasons: List[str],
+    advisories: List[str],
+    rule_id: str,
+    label: str,
+    passed: Any,
+    severity: str,
+    observed: str,
+    evidence: Optional[List[str]] = None,
+    source: str = "",
+    extra: Optional[Dict[str, Any]] = None,
+) -> None:
+    chk = {
+        "rule_id": rule_id,
+        "label": label,
+        "passed": passed,
+        "severity": severity,
+        "observed": observed,
+        "evidence": evidence or [],
+        "source": source,
+    }
+    if extra:
+        chk.update(extra)
+    checks.append(chk)
+    if passed is False:
+        if severity == "hard":
+            reasons.append(observed)
+        else:
+            advisories.append(observed)
+
+
 def _evaluate_eligibility(
     extracted_data: dict,
     jd_text: str,
     min_years: Optional[float] = None,
+    min_education: Optional[str] = None,
     profile: Optional[WeightProfile] = None,
     parsing_health: Optional[dict] = None,
     job: Optional[Any] = None,
@@ -730,16 +565,13 @@ def _evaluate_eligibility(
     candidate_years = float(extracted_data.get("total_experience_years") or 0)
 
     # Reconcile min_years (structured field) vs regex extraction from JD text
-    regex_years_req = _extract_years_requirement(jd_text)
     if min_years is not None:
         required_years = float(min_years)
-        is_hard = regex_years_req[1] if regex_years_req is not None else False
+        is_hard = (required_years > 0)
         exp_source = "structured_min_years"
-    elif regex_years_req is not None:
-        required_years, is_hard = regex_years_req
-        exp_source = "jd_regex"
     else:
-        required_years, is_hard = None, False
+        regex_years_req = _extract_years_requirement(jd_text)
+        required_years, is_hard = regex_years_req if regex_years_req is not None else (None, False)
         exp_source = "jd_regex"
 
     if required_years is not None and required_years > 0:
@@ -748,30 +580,25 @@ def _evaluate_eligibility(
         exp_evidence = [f"experience[{i}]" for i in range(min(len(exp_list), 3))] or ["total_experience_years"]
 
         years_passed = True
+        obs_text = f"~{candidate_years:.1f} years" if candidate_years > 0 else "none detected"
         if candidate_years <= 0 and required_years > 0:
             years_passed = False
-            msg = f"Requires {required_years:.0f}+ years of professional experience — none detected."
-            if is_hard:
-                reasons.append(msg)
-            else:
-                advisories.append(msg + " (preferred)")
+            obs_text = f"Requires {required_years:.0f}+ years of professional experience — none detected."
         elif candidate_years < required_years:
-            msg = f"Requires {required_years:.0f}+ years of experience; resume shows ~{candidate_years:.1f} year(s)."
+            obs_text = f"Requires {required_years:.0f}+ years of experience; resume shows ~{candidate_years:.1f} year(s)."
             if is_hard and candidate_years < required_years * threshold_ratio:
                 years_passed = False
-                reasons.append(msg)
-            else:
-                advisories.append(msg)
 
-        checks.append({
-            "rule_id": "min_years",
-            "label": f"{required_years:.0f}+ years required",
-            "passed": years_passed,
-            "severity": "hard" if is_hard else "soft",
-            "observed": f"~{candidate_years:.1f} years" if candidate_years > 0 else "none detected",
-            "evidence": exp_evidence,
-            "source": exp_source,
-        })
+        _record_check(
+            checks, reasons, advisories,
+            rule_id="min_years",
+            label=f"{required_years:.0f}+ years required",
+            passed=years_passed,
+            severity="hard" if is_hard else "soft",
+            observed=obs_text,
+            evidence=exp_evidence,
+            source=exp_source,
+        )
 
     edu_mode = "preferred"
     if isinstance(job, dict):
@@ -782,7 +609,16 @@ def _evaluate_eligibility(
 
     # Skills-first mode: when 'ignored', degree requirements produce no eligibility check
     if edu_mode != "ignored":
-        degree_req = _extract_degree_requirement(jd_text)
+        mapped_edu = _map_education_level(min_education)
+        if mapped_edu is not None:
+            required_rank, required_label = mapped_edu
+            is_hard = (edu_mode == "required") or (required_rank > 0 and edu_mode != "preferred")
+            edu_source = "structured_min_education"
+            degree_req = (required_rank, required_label, is_hard) if required_rank > 0 else None
+        else:
+            degree_req = _extract_degree_requirement(jd_text)
+            edu_source = "jd_regex"
+
         if degree_req is not None:
             required_rank, required_label, is_hard = degree_req
             if edu_mode == "required":
@@ -798,34 +634,31 @@ def _evaluate_eligibility(
             if candidate_rank == 0:
                 degree_passed = False
                 msg = f"Requires a {required_label.title()}-level degree — none found on resume."
-                if is_hard:
-                    reasons.append(msg)
-                else:
-                    advisories.append(msg + " (preferred)")
             elif candidate_rank < required_rank:
                 if not in_progress:
                     degree_passed = False
                     msg = f"Requires a {required_label.title()}-level degree; highest education ranks below."
-                    if is_hard:
-                        reasons.append(msg)
-                    else:
-                        advisories.append(msg)
                 else:
-                    advisories.append(f"Meets the {required_label.title()}-level requirement with a degree currently in progress (Degree in Progress).")
+                    msg = f"Meets the {required_label.title()}-level requirement with a degree currently in progress (Degree in Progress)."
             elif in_progress:
-                advisories.append(f"Meets the {required_label.title()}-level requirement with a degree currently in progress (Degree in Progress).")
+                msg = f"Meets the {required_label.title()}-level requirement with a degree currently in progress (Degree in Progress)."
+            else:
+                msg = "Degree Aligned"
 
-            checks.append({
-                "rule_id": "degree_level",
-                "label": f"{required_label.title()}-level degree required",
-                "passed": degree_passed,
-                "severity": "hard" if is_hard else "soft",
-                "observed": "Degree in Progress" if in_progress else str(extracted_data.get("education_level") or ("Degree Aligned" if degree_passed else "none found")),
-                "status_label": "Degree in Progress" if in_progress else ("Degree Aligned" if degree_passed else "Degree Mismatch"),
-                "is_in_progress": in_progress,
-                "evidence": edu_evidence,
-                "source": "jd_regex",
-            })
+            observed_str = "Degree in Progress" if in_progress else str(extracted_data.get("education_level") or (msg if not degree_passed else "Degree Aligned"))
+            status_label = "Degree in Progress" if in_progress else ("Degree Aligned" if degree_passed else "Degree Mismatch")
+
+            _record_check(
+                checks, reasons, advisories,
+                rule_id="degree_level",
+                label=f"{required_label.title()}-level degree required",
+                passed=degree_passed,
+                severity="hard" if is_hard else "soft",
+                observed=observed_str,
+                evidence=edu_evidence,
+                source=edu_source,
+                extra={"status_label": status_label, "is_in_progress": in_progress},
+            )
 
     # Pluggable Credential Verification Layer
     from core.feature_flags import FEATURE_CREDENTIAL_VERIFICATION
@@ -850,144 +683,57 @@ def _evaluate_eligibility(
         except Exception as e:
             logger.debug("Failed evaluating credential eligibility", error=str(e))
 
-    # Phase 5: Structured Optional Recruiter Eligibility Checks (driven by job fields)
+    # Recruiter Eligibility Checks (driven by job fields)
     if job and isinstance(job, dict):
-        # 1. Location & Remote Policy Check (Off by default, configurable per job)
-        # Fairness Note: Location constraints are strictly driven by verified job specifications.
+        # 1. Location & Remote Policy
         req_loc = str(job.get("location") or job.get("required_location") or "").strip()
         remote_pol = str(job.get("remote_policy") or "").strip().lower()
         if req_loc or remote_pol:
             cand_loc = str(extracted_data.get("location") or extracted_data.get("city") or "").strip()
             if remote_pol in ("remote", "work_from_home", "fully_remote"):
-                loc_passed = True
-                loc_obs = f"Remote policy ({remote_pol}) accommodates candidate"
+                loc_passed, loc_obs = True, f"Remote policy ({remote_pol}) accommodates candidate"
             elif not cand_loc:
-                loc_passed = "unverified"
-                loc_obs = "Location not explicitly specified on resume"
+                loc_passed, loc_obs = "unverified", "Location not explicitly specified on resume"
             elif req_loc.lower() in cand_loc.lower() or cand_loc.lower() in req_loc.lower():
-                loc_passed = True
-                loc_obs = cand_loc
+                loc_passed, loc_obs = True, cand_loc
             else:
-                loc_passed = False
-                loc_obs = f"Candidate located in {cand_loc}, role requires {req_loc}"
-
+                loc_passed, loc_obs = False, f"Candidate located in {cand_loc}, role requires {req_loc}"
             is_hard_loc = bool(job.get("hard_location_requirement", False))
-            checks.append({
-                "rule_id": "location_policy",
-                "label": f"Location: {req_loc or remote_pol}",
-                "passed": loc_passed,
-                "severity": "hard" if (is_hard_loc and loc_passed is False) else "soft",
-                "observed": loc_obs,
-                "evidence": ["location"] if cand_loc else [],
-                "source": "job_location_spec",
-            })
-            if loc_passed is False:
-                if is_hard_loc:
-                    reasons.append(loc_obs)
-                else:
-                    advisories.append(loc_obs)
+            _record_check(checks, reasons, advisories, "location_policy", f"Location: {req_loc or remote_pol}", loc_passed, "hard" if (is_hard_loc and loc_passed is False) else "soft", loc_obs, ["location"] if cand_loc else [], "job_location_spec")
 
-        # 2. Notice Period Check
+        # 2. Notice Period & Salary Expectations
         max_notice = job.get("max_notice_days") or job.get("notice_period_days")
         if max_notice is not None:
             max_notice_val = float(max_notice)
             cand_notice = extracted_data.get("notice_period_days") or extracted_data.get("notice_days")
-            if cand_notice is None:
-                n_passed = "unverified"
-                n_obs = "Notice period not stated on resume"
-            else:
-                cand_notice_val = float(cand_notice)
-                n_passed = cand_notice_val <= max_notice_val
-                n_obs = f"{cand_notice_val:.0f} days (max allowed: {max_notice_val:.0f} days)"
-
+            n_passed = "unverified" if cand_notice is None else (float(cand_notice) <= max_notice_val)
+            n_obs = "Notice period not stated on resume" if cand_notice is None else f"{float(cand_notice):.0f} days (max allowed: {max_notice_val:.0f} days)"
             is_hard_notice = bool(job.get("hard_notice_requirement", False))
-            checks.append({
-                "rule_id": "notice_period",
-                "label": f"Notice period <= {max_notice_val:.0f} days",
-                "passed": n_passed,
-                "severity": "hard" if (is_hard_notice and n_passed is False) else "soft",
-                "observed": n_obs,
-                "evidence": ["notice_period_days"] if cand_notice is not None else [],
-                "source": "job_notice_spec",
-            })
-            if n_passed is False:
-                if is_hard_notice:
-                    reasons.append(n_obs)
-                else:
-                    advisories.append(n_obs)
+            _record_check(checks, reasons, advisories, "notice_period", f"Notice period <= {max_notice_val:.0f} days", n_passed, "hard" if (is_hard_notice and n_passed is False) else "soft", n_obs, ["notice_period_days"] if cand_notice is not None else [], "job_notice_spec")
 
-        # 3. Work Authorization Check (Off by default, fairness note documented)
-        if bool(job.get("require_work_auth", False)):
-            req_auth = str(job.get("work_authorization") or "Valid Work Authorization").strip()
-            cand_auth = extracted_data.get("work_authorization") or extracted_data.get("visa_status")
-            if not cand_auth:
-                auth_passed = "unverified"
-                auth_obs = "Work authorization status unverified on resume"
-            else:
-                auth_passed = True
-                auth_obs = str(cand_auth)
-
-            checks.append({
-                "rule_id": "work_authorization",
-                "label": f"Work Authorization: {req_auth}",
-                "passed": auth_passed,
-                "severity": "hard" if auth_passed is False else "soft",
-                "observed": auth_obs,
-                "evidence": ["work_authorization"] if cand_auth else [],
-                "source": "job_auth_spec",
-            })
-
-        # 4. Salary Expectation vs Budget
         max_salary = job.get("max_salary") or job.get("salary_budget_max")
         if max_salary is not None:
             max_sal_val = float(max_salary)
             cand_exp_sal = extracted_data.get("expected_salary") or extracted_data.get("salary_expectation")
-            if cand_exp_sal is None:
-                sal_passed = "unverified"
-                sal_obs = "Salary expectation not stated on resume"
-            else:
-                cand_sal_val = float(cand_exp_sal)
-                sal_passed = cand_sal_val <= max_sal_val
-                sal_obs = f"Expected: {cand_sal_val:,.0f} (Budget: {max_sal_val:,.0f})"
+            sal_passed = "unverified" if cand_exp_sal is None else (float(cand_exp_sal) <= max_sal_val)
+            sal_obs = "Salary expectation not stated on resume" if cand_exp_sal is None else f"Expected: {float(cand_exp_sal):,.0f} (Budget: {max_sal_val:,.0f})"
+            _record_check(checks, reasons, advisories, "salary_expectation", f"Salary Budget <= {max_sal_val:,.0f}", sal_passed, "soft", sal_obs, ["expected_salary"] if cand_exp_sal is not None else [], "job_salary_spec")
 
-            checks.append({
-                "rule_id": "salary_expectation",
-                "label": f"Salary Budget <= {max_sal_val:,.0f}",
-                "passed": sal_passed,
-                "severity": "soft",
-                "observed": sal_obs,
-                "evidence": ["expected_salary"] if cand_exp_sal is not None else [],
-                "source": "job_salary_spec",
-            })
-            if sal_passed is False:
-                advisories.append(sal_obs)
+        # 3. Work Authorization & Languages
+        if bool(job.get("require_work_auth", False)):
+            req_auth = str(job.get("work_authorization") or "Valid Work Authorization").strip()
+            cand_auth = extracted_data.get("work_authorization") or extracted_data.get("visa_status")
+            auth_passed = "unverified" if not cand_auth else True
+            auth_obs = "Work authorization status unverified on resume" if not cand_auth else str(cand_auth)
+            _record_check(checks, reasons, advisories, "work_authorization", f"Work Authorization: {req_auth}", auth_passed, "hard" if auth_passed is False else "soft", auth_obs, ["work_authorization"] if cand_auth else [], "job_auth_spec")
 
-        # 5. Required Languages
         req_langs = job.get("required_languages") or []
         if req_langs and isinstance(req_langs, list):
             cand_langs = [str(l).lower() for l in (extracted_data.get("languages") or [])]
             missing_langs = [l for l in req_langs if str(l).lower() not in cand_langs]
-            if not cand_langs:
-                lang_passed = "unverified"
-                lang_obs = "Languages not listed on resume"
-            elif not missing_langs:
-                lang_passed = True
-                lang_obs = f"Proficient in {', '.join(req_langs)}"
-            else:
-                lang_passed = False
-                lang_obs = f"Missing required language(s): {', '.join(missing_langs)}"
-
-            checks.append({
-                "rule_id": "language_requirements",
-                "label": f"Languages: {', '.join(req_langs)}",
-                "passed": lang_passed,
-                "severity": "soft",
-                "observed": lang_obs,
-                "evidence": ["languages"] if cand_langs else [],
-                "source": "job_language_spec",
-            })
-            if lang_passed is False:
-                advisories.append(lang_obs)
+            lang_passed = "unverified" if not cand_langs else (len(missing_langs) == 0)
+            lang_obs = "Languages not listed on resume" if not cand_langs else (f"Proficient in {', '.join(req_langs)}" if not missing_langs else f"Missing required language(s): {', '.join(missing_langs)}")
+            _record_check(checks, reasons, advisories, "language_requirements", f"Languages: {', '.join(req_langs)}", lang_passed, "soft", lang_obs, ["languages"] if cand_langs else [], "job_language_spec")
 
     # Domain Occupation Adapter Rules (Healthcare, Legal, Trades, etc.)
     from core.feature_flags import FEATURE_OCCUPATION_ADAPTERS
@@ -995,32 +741,12 @@ def _evaluate_eligibility(
         try:
             from services.scoring.adapters.registry import detect_occupation_adapter
             job_obj = job if job is not None else {"title": "", "description": jd_text}
-            title = ""
-            occ_code = None
-            if isinstance(job_obj, dict):
-                title = str(job_obj.get("title") or "")
-                occ_code = job_obj.get("occupation_code")
-            else:
-                title = str(getattr(job_obj, "title", "") or "")
-                occ_code = getattr(job_obj, "occupation_code", None)
-
+            title = str(job_obj.get("title") or "") if isinstance(job_obj, dict) else str(getattr(job_obj, "title", "") or "")
+            occ_code = job_obj.get("occupation_code") if isinstance(job_obj, dict) else getattr(job_obj, "occupation_code", None)
             adapter = detect_occupation_adapter(job_title=title, jd_text=jd_text, occupation_code=occ_code)
             for rule in adapter.eligibility_rules(job_obj):
                 passed, observed, evidence = rule.evaluate(extracted_data, job_obj)
-                checks.append({
-                    "rule_id": rule.rule_id,
-                    "label": rule.label,
-                    "passed": passed,
-                    "severity": rule.severity,
-                    "observed": observed,
-                    "evidence": evidence,
-                    "source": rule.source,
-                })
-                if not passed:
-                    if rule.severity == "hard":
-                        reasons.append(f"{rule.label}: {observed}")
-                    else:
-                        advisories.append(f"{rule.label}: {observed}")
+                _record_check(checks, reasons, advisories, rule.rule_id, rule.label, passed, rule.severity, observed, evidence, rule.source)
         except Exception as e:
             logger.warning("Failed executing occupation adapter eligibility rules", error=str(e))
 
@@ -1053,67 +779,61 @@ def _evaluate_eligibility(
     }
 
 
-def _knockout_check(
-    extracted_data: dict,
-    jd_text: str,
-    min_years: Optional[float] = None,
-    profile: Optional[WeightProfile] = None,
-    parsing_health: Optional[dict] = None,
+
+
+def _exact_keyword_match(
+    raw_text: str,
+    skill_universe: List[str],
+    satisfied_alternatives: Optional[Set[str]] = None,
+    matched_skills: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Compatibility wrapper for legacy callers delegating to _evaluate_eligibility."""
-    return _evaluate_eligibility(
-        extracted_data=extracted_data,
-        jd_text=jd_text,
-        min_years=min_years,
-        profile=profile,
-        parsing_health=parsing_health,
-    )
-
-
-def _exact_keyword_match(raw_text: str, skill_universe: List[str]) -> Dict[str, Any]:
     text = raw_text or ""
     universe = canonicalize_skills(skill_universe) if canonicalize_skills else []
     if not universe:
         seen = set()
-        for s in (skill_universe or []):
-            key = (s or "").strip().lower()
-            if key and key not in seen:
-                seen.add(key)
-                universe.append(s.strip())
+        universe = [
+            s.strip() for s in (skill_universe or [])
+            if s and s.strip() and s.strip().lower() not in seen and not seen.add(s.strip().lower())
+        ]
 
     if not universe:
         return {"strict_ats_score": 0.0, "matched_exact": [], "missing_exact": []}
 
+    known_matched = {m.lower() for m in (matched_skills or [])}
+    sat_alts = {s.lower() for s in (satisfied_alternatives or [])}
     matched, missing = [], []
     for skill in universe:
-        sub_skills = [sub.strip() for sub in skill.split("/") if sub.strip()] if "/" in skill else [skill]
+        if skill.lower() in known_matched:
+            matched.append(skill)
+            continue
+
+        sub_skills = [sub.strip() for sub in skill.split("/") if sub.strip()]
         skill_matched = False
         for sub in sub_skills:
-            cleaned = sub.strip()
-            if not cleaned:
-                continue
-            parts = [p for p in re.split(r'[\s\-\.]+', cleaned) if p]
-            if not parts:
-                continue
-            escaped_parts = [re.escape(part) for part in parts]
-            regex_str = r"[\s\-\.\n\r]+".join(escaped_parts)
-            try:
-                pattern = re.compile(r"(?<![A-Za-z0-9])" + regex_str + r"(?![A-Za-z0-9])", re.IGNORECASE)
-                if pattern.search(text):
-                    skill_matched = True
-                    break
-            except re.error:
-                continue
+            parts = [re.escape(p) for p in re.split(r'[\s\-\.]+', sub) if p]
+            if parts:
+                pat = r"(?<![A-Za-z0-9])" + r"[\s\-\.\n\r]+".join(parts) + r"(?![A-Za-z0-9])"
+                try:
+                    if re.search(pat, text, re.IGNORECASE):
+                        skill_matched = True
+                        break
+                except re.error:
+                    continue
 
         if skill_matched:
             matched.append(skill)
-        else:
+        elif skill.lower() not in sat_alts:
             missing.append(skill)
 
-    # Invariant: Matched cannot be missing
     matched_set = {m.lower() for m in matched}
-    missing = [s for s in missing if s.lower() not in matched_set]
-
+    seen_missing = set()
+    deduped_missing = []
+    for s in missing:
+        s_low = s.lower()
+        if s_low not in matched_set and s_low not in seen_missing:
+            seen_missing.add(s_low)
+            deduped_missing.append(s)
+    missing = deduped_missing
     total = len(matched) + len(missing)
     score = round((len(matched) / total) * 100, 1) if total > 0 else 0.0
     return {
@@ -1184,6 +904,8 @@ class SharedScoringComponents:
     experience_profile: Optional[Any] = None
     attribution_evidence: List[Dict[str, Any]] = field(default_factory=list)
     education_requirement_mode: str = "preferred"
+    min_years: Optional[float] = None
+    min_education: Optional[str] = None
 
     @property
     def knockout_result(self) -> Dict[str, Any]:
@@ -1203,92 +925,51 @@ def build_smart_embedding_text(
     Prioritizes high-signal content in order:
     1. Structured Skills (technical & core)
     2. Structured Education (degrees & domains)
-    3. Structured Work Experience (most recent first; drops least recent if over budget)
+    3. Structured Work Experience (most recent first)
     4. Professional Summary & Projects
-    Falls back to naive text truncation only when structured parsed data is absent.
     """
     if not extracted_data or not isinstance(extracted_data, dict):
         return (raw_text or "")[:max_chars].strip()
 
-    # 1. Collect skills (including multi-section extraction from coursework, projects, experience)
-    direct_skills = list(
-        extracted_data.get("skills")
-        or extracted_data.get("technical_skills")
-        or []
-    )
+    skills_list = list(extracted_data.get("skills") or extracted_data.get("technical_skills") or [])
     if extract_skills_from_sections:
         try:
-            sec_skills = extract_skills_from_sections(extracted_data)
-            skills_list = list(dict.fromkeys(direct_skills + sec_skills))
+            skills_list = list(dict.fromkeys(skills_list + extract_skills_from_sections(extracted_data)))
         except Exception:
-            skills_list = direct_skills
-    else:
-        skills_list = direct_skills
-    skills_part = f"Skills: {', '.join(str(s) for s in skills_list if s)}" if skills_list else ""
+            pass
 
-    # 2. Collect education
-    edu_entries = extracted_data.get("education") or []
     edu_strings = []
-    for edu in edu_entries:
-        if hasattr(edu, "model_dump"):
-            edu = edu.model_dump()
-        elif hasattr(edu, "__dict__"):
-            edu = edu.__dict__
-        if isinstance(edu, dict):
-            parts = [
-                str(edu.get("degree") or "").strip(),
-                str(edu.get("field_of_study") or "").strip(),
-                str(edu.get("institution") or "").strip(),
-            ]
-            clean_parts = [p for p in parts if p]
-            if clean_parts:
-                edu_strings.append(" - ".join(clean_parts))
-    edu_part = f"Education: {'; '.join(edu_strings)}" if edu_strings else ""
+    for edu in (extracted_data.get("education") or []):
+        d = edu.model_dump() if hasattr(edu, "model_dump") else (edu if isinstance(edu, dict) else getattr(edu, "__dict__", {}))
+        clean_parts = [str(d.get(k) or "").strip() for k in ("degree", "field_of_study", "institution") if d.get(k)]
+        if clean_parts:
+            edu_strings.append(" - ".join(clean_parts))
 
-    # 3. Collect work experience (most recent first)
-    exp_entries = list(extracted_data.get("work_experience") or [])
     exp_strings = []
-    for exp in exp_entries:
-        if hasattr(exp, "model_dump"):
-            exp = exp.model_dump()
-        elif hasattr(exp, "__dict__"):
-            exp = exp.__dict__
-        if isinstance(exp, dict):
-            role = str(exp.get("title") or exp.get("role") or "").strip()
-            comp = str(exp.get("company") or "").strip()
-            desc = str(exp.get("description") or "").strip()
-            tech = exp.get("technologies") or []
-            tech_str = f"Tech: {', '.join(tech)}" if tech else ""
-            line = f"{role} at {comp}. {tech_str}. {desc}".strip()
-            if line:
-                exp_strings.append(line)
+    for exp in (extracted_data.get("work_experience") or []):
+        d = exp.model_dump() if hasattr(exp, "model_dump") else (exp if isinstance(exp, dict) else getattr(exp, "__dict__", {}))
+        role = str(d.get("title") or d.get("role") or "").strip()
+        comp = str(d.get("company") or "").strip()
+        desc = str(d.get("description") or "").strip()
+        tech = f"Tech: {', '.join(d.get('technologies') or [])}" if d.get("technologies") else ""
+        header = f"{role} at {comp}" if (role or comp) else ""
+        line = " ".join(p for p in (header, tech, desc) if p)
+        if line:
+            exp_strings.append(line)
 
     summary = str(extracted_data.get("summary") or "").strip()
 
-    base_parts = [p for p in [skills_part, edu_part] if p]
-    base_text = "\n".join(base_parts)
+    sections = []
+    if skills_list:
+        sections.append(f"Skills: {', '.join(str(s) for s in skills_list if s)}")
+    if edu_strings:
+        sections.append(f"Education: {'; '.join(edu_strings)}")
+    if exp_strings:
+        sections.append(f"Experience: {' | '.join(exp_strings)}")
+    if summary:
+        sections.append(f"Summary: {summary}")
 
-    remaining_budget = max_chars - len(base_text) - 10
-
-    packed_exp = []
-    for exp_str in exp_strings:
-        if len(exp_str) + 2 <= remaining_budget:
-            packed_exp.append(exp_str)
-            remaining_budget -= (len(exp_str) + 2)
-        else:
-            if remaining_budget > 60:
-                packed_exp.append(exp_str[:remaining_budget - 3] + "...")
-            break
-
-    exp_part = f"Experience: {' | '.join(packed_exp)}" if packed_exp else ""
-
-    final_sections = [base_text]
-    if exp_part:
-        final_sections.append(exp_part)
-    if summary and remaining_budget > 100:
-        final_sections.append(f"Summary: {summary[:remaining_budget - 15]}")
-
-    result = "\n".join(s for s in final_sections if s).strip()
+    result = "\n".join(sections).strip()
     return result[:max_chars] if result else (raw_text or "")[:max_chars].strip()
 
 
@@ -1297,6 +978,7 @@ def _compute_shared_components(
     jd: Union[Dict[str, Any], str],
     required_skills: Optional[List[str]] = None,
     min_years: Optional[float] = None,
+    min_education: Optional[str] = None,
     profile: Optional[WeightProfile] = None,
 ) -> SharedScoringComponents:
     """Computes all expensive NLP, ontology, extraction, and embedding math ONCE."""
@@ -1320,18 +1002,21 @@ def _compute_shared_components(
 
     jd_text = jd.get("description") or jd.get("text") or str(jd or "") if isinstance(jd, dict) else str(jd or "")
 
-    # Resolve min_years if not explicitly passed
+    # Resolve min_years and min_education if not explicitly passed
     resolved_min_years = min_years
     if resolved_min_years is None and isinstance(jd, dict):
         resolved_min_years = jd.get("min_years")
 
+    resolved_min_education = min_education
+    if resolved_min_education is None and isinstance(jd, dict):
+        resolved_min_education = jd.get("minimum_education") or jd.get("min_education")
+
     # 2. Formulate Skill Universe
-    explicit_reqs = canonicalize_skills(required_skills) if canonicalize_skills else [s.strip() for s in (required_skills or []) if s and s.strip()]
-    jd_skills = canonicalize_skills(extract_skills_deterministic(jd_text)) if (canonicalize_skills and extract_skills_deterministic) else (extract_skills_deterministic(jd_text) if extract_skills_deterministic else [])
-    if canonicalize_skills:
-        skill_universe = canonicalize_skills(explicit_reqs + jd_skills)
-    else:
-        skill_universe = list(dict.fromkeys(explicit_reqs + jd_skills))
+    canon_fn = canonicalize_skills or (lambda seq: list(dict.fromkeys(str(s).strip() for s in seq if s and str(s).strip())))
+    extract_fn = extract_skills_deterministic or (lambda t: [])
+    explicit_reqs = canon_fn(required_skills or [])
+    jd_skills = canon_fn(extract_fn(jd_text))
+    skill_universe = canon_fn(explicit_reqs + jd_skills)
 
     # 3. Execute Modular Shared Components (Embedding & NLP called ONCE)
     parsing_health = _parsing_health(raw_text)
@@ -1339,35 +1024,46 @@ def _compute_shared_components(
         extracted_data,
         jd_text,
         min_years=resolved_min_years,
+        min_education=resolved_min_education,
         profile=profile,
         parsing_health=parsing_health,
         job=jd,
     )
     knockout = eligibility
-    keyword_match = _exact_keyword_match(raw_text, skill_universe)
 
     # Precomputed JD Criticality Index for O(L_jd) weighting
     jd_index = JDCriticalityIndex(jd_text) if (FEATURE_CRITICALITY_WEIGHTING and jd_text) else ""
-    cand_skills_direct = list(extracted_data.get("skills", []) or extracted_data.get("technical_skills", []) or [])
+    cand_skills = list(extracted_data.get("skills", []) or extracted_data.get("technical_skills", []) or [])
     if extract_skills_from_sections:
         try:
-            cand_section_skills = extract_skills_from_sections(extracted_data)
-            cand_skills = list(dict.fromkeys(cand_skills_direct + cand_section_skills))
+            cand_skills = list(dict.fromkeys(cand_skills + extract_skills_from_sections(extracted_data)))
         except Exception:
-            cand_skills = cand_skills_direct
-    else:
-        cand_skills = cand_skills_direct
+            pass
 
-    s_score, matched_skills, transferable_skills, missing_skills, skill_evidence = _skills_score(
+    # Extract OR groups from JD text
+    try:
+        from services.nlp_extractor import extract_skill_or_groups
+        or_groups = extract_skill_or_groups(jd_text)
+    except Exception:
+        or_groups = []
+
+    s_score, matched_skills, transferable_skills, missing_skills, skill_evidence, satisfied_alts = _skills_score(
         cand_skills,
         skill_universe,
         jd_source=jd_index,
         explicit_required=set(explicit_reqs),
         extracted_data=extracted_data,
         raw_text=raw_text,
+        or_groups=or_groups,
+    )
+    keyword_match = _exact_keyword_match(
+        raw_text,
+        skill_universe,
+        satisfied_alternatives=satisfied_alts,
+        matched_skills=matched_skills,
     )
     exp_score, exp_profile = _compute_experience(extracted_data, jd_text, min_years=resolved_min_years)
-    edu_score = _education_score(extracted_data, jd_text)
+    edu_score = _education_score(extracted_data, jd_text, min_education=resolved_min_education)
 
     # Project scoring for entry-level / portfolio evidence (Phase 1.2)
     cand_projects = extracted_data.get("projects") or []
@@ -1463,6 +1159,8 @@ def _compute_shared_components(
         experience_profile=exp_profile,
         attribution_evidence=attribution_evidence,
         education_requirement_mode=edu_mode,
+        min_years=resolved_min_years,
+        min_education=resolved_min_education,
     )
 
 
@@ -1478,9 +1176,12 @@ def _apply_profile(
     cand_exp = float(components.extracted_data.get("total_experience_years") or 0.0)
     work_exp = components.extracted_data.get("work_experience") or components.extracted_data.get("experience") or []
     has_zero_exp = (cand_exp <= 0.0) and len(work_exp) == 0
-    is_entry_jd = bool(_ENTRY_LEVEL_PATTERN.search(components.jd_text or ""))
-    years_req = _extract_years_requirement(components.jd_text or "")
-    jd_min_years = years_req[0] if years_req else None
+    is_entry_jd = bool(_ENTRY_LEVEL_PATTERN.search(components.jd_text or "")) or (components.min_years is not None and components.min_years <= 1.0)
+    if components.min_years is not None:
+        jd_min_years = components.min_years
+    else:
+        years_req = _extract_years_requirement(components.jd_text or "")
+        jd_min_years = years_req[0] if years_req else None
     jd_has_high_min = (jd_min_years is not None and jd_min_years > 1.0)
     should_redistribute = is_entry_jd or (has_zero_exp and not jd_has_high_min) or (jd_min_years is not None and jd_min_years <= 1.0 and components.experience_score < 1.0)
 
@@ -1561,33 +1262,20 @@ def _apply_profile(
     legacy_recruiter_score = final_score
 
     # Recommendation
-    if quality_score >= 80.0:
-        rec_label = "Strong Match" if mode == "candidate" else "strong_match"
-    elif quality_score >= 60.0:
-        rec_label = "Good Match" if mode == "candidate" else "good_match"
-    elif quality_score >= 40.0:
-        rec_label = "Partial Match" if mode == "candidate" else "partial_match"
-    else:
-        rec_label = "Low Match" if mode == "candidate" else "poor_match"
+    rec_tiers = [(80.0, "Strong Match", "strong_match"), (60.0, "Good Match", "good_match"), (40.0, "Partial Match", "partial_match")]
+    rec_label = next((c if mode == "candidate" else r for thresh, c, r in rec_tiers if quality_score >= thresh), "Low Match" if mode == "candidate" else "poor_match")
 
     # Actionable Suggestions
     suggestions: List[str] = []
-    missing = components.missing_skills
-    if missing:
-        suggestions.append(f"Missing mandatory skills for this role: {', '.join(missing[:5])}.")
+    if components.missing_skills:
+        suggestions.append(f"Missing mandatory skills for this role: {', '.join(components.missing_skills[:5])}.")
     if round(components.experience_score * 100, 1) < 70:
-        suggestions.append(
-            "Experience duration is below the target requirement. Add detailed internship highlights or technical project bullets to showcase hands-on exposure."
-        )
+        suggestions.append("Experience duration is below the target requirement. Add detailed internship highlights or technical project bullets to showcase hands-on exposure.")
     cand_rank, in_progress = _candidate_max_degree_rank(components.extracted_data)
     if in_progress:
-        suggestions.append(
-            "Degree in Progress: Highlight anticipated graduation timeline, relevant technical coursework, and capstone projects."
-        )
+        suggestions.append("Degree in Progress: Highlight anticipated graduation timeline, relevant technical coursework, and capstone projects.")
     elif round(components.education_score * 100, 1) < 70:
-        suggestions.append(
-            "Education requirement differs from target degree. Emphasize relevant coursework, certifications, and technical capstone projects."
-        )
+        suggestions.append("Education requirement differs from target degree. Emphasize relevant coursework, certifications, and technical capstone projects.")
     if quality_score >= 80:
         suggestions.append("Strong technical alignment and high skill relevance for this role.")
 
@@ -1655,21 +1343,16 @@ def _apply_profile(
         result_payload["learned_ranker_score"] = None
 
     # Extract stable ScoringFeatures (Phase 1.5)
-    active_flags: List[str] = []
-    if FEATURE_MULTI_VECTOR_EMBEDDING:
-        active_flags.append("FEATURE_MULTI_VECTOR_EMBEDDING")
-    if FEATURE_CROSS_ENCODER_RERANK:
-        active_flags.append("FEATURE_CROSS_ENCODER_RERANK")
-    if FEATURE_REAL_EXPERIENCE_MODEL:
-        active_flags.append("FEATURE_REAL_EXPERIENCE_MODEL")
-    if FEATURE_SPLIT_ELIGIBILITY:
-        active_flags.append("FEATURE_SPLIT_ELIGIBILITY")
-    if FEATURE_CRITICALITY_WEIGHTING:
-        active_flags.append("FEATURE_CRITICALITY_WEIGHTING")
-    if FEATURE_PROJECTS_SCORING:
-        active_flags.append("FEATURE_PROJECTS_SCORING")
-    if FEATURE_CONTEXTUAL_SKILLS:
-        active_flags.append("FEATURE_CONTEXTUAL_SKILLS")
+    flag_pairs = [
+        ("FEATURE_MULTI_VECTOR_EMBEDDING", FEATURE_MULTI_VECTOR_EMBEDDING),
+        ("FEATURE_CROSS_ENCODER_RERANK", FEATURE_CROSS_ENCODER_RERANK),
+        ("FEATURE_REAL_EXPERIENCE_MODEL", FEATURE_REAL_EXPERIENCE_MODEL),
+        ("FEATURE_SPLIT_ELIGIBILITY", FEATURE_SPLIT_ELIGIBILITY),
+        ("FEATURE_CRITICALITY_WEIGHTING", FEATURE_CRITICALITY_WEIGHTING),
+        ("FEATURE_PROJECTS_SCORING", FEATURE_PROJECTS_SCORING),
+        ("FEATURE_CONTEXTUAL_SKILLS", FEATURE_CONTEXTUAL_SKILLS),
+    ]
+    active_flags = [name for name, enabled in flag_pairs if enabled]
 
     features_obj = extract_scoring_features(
         result_payload,
@@ -1732,6 +1415,7 @@ def score_resume(
     required_skills: Optional[List[str]] = None,
     profile: Optional[WeightProfile] = None,
     min_years: Optional[float] = None,
+    min_education: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Unified multi-factor scoring entrypoint for candidate and recruiter modes.
@@ -1744,6 +1428,7 @@ def score_resume(
         required_skills: Optional list of required target skills.
         profile: Optional custom WeightProfile override.
         min_years: Optional authoritative minimum years override.
+        min_education: Optional authoritative minimum education level override.
 
     Returns:
         Unified dictionary with final_score, component scores, knockout status,
@@ -1751,32 +1436,23 @@ def score_resume(
     """
     start_t = time.perf_counter()
     try:
-        from core.telemetry import trace_span
-        from core.metrics import record_ats_match_metrics
-        from services.multi_tenancy.tenant_context import get_current_tenant_id
-
-        with trace_span("scoring_engine.score_resume", attributes={"scoring.mode": mode}):
+        tracer = trace_span("scoring_engine.score_resume", attributes={"scoring.mode": mode}) if trace_span else nullcontext()
+        with tracer:
             active_profile = profile or SCORING_PROFILES.get(mode, CANDIDATE_PROFILE)
             components = _compute_shared_components(
                 resume=resume,
                 jd=jd,
                 required_skills=required_skills,
                 min_years=min_years,
+                min_education=min_education,
                 profile=active_profile,
             )
             result = _apply_profile(components, active_profile, mode=mode)
-            duration = time.perf_counter() - start_t
-            record_ats_match_metrics(tenant_id=get_current_tenant_id(), duration_sec=duration, status="success")
+            _record_metrics(start_t, "success")
             gc.collect()
             return result
     except Exception as exc:
-        duration = time.perf_counter() - start_t
-        try:
-            from core.metrics import record_ats_match_metrics
-            from services.multi_tenancy.tenant_context import get_current_tenant_id
-            record_ats_match_metrics(tenant_id=get_current_tenant_id(), duration_sec=duration, status="failed")
-        except Exception:
-            pass
+        _record_metrics(start_t, "failed")
         raise exc
 
 
@@ -1785,6 +1461,7 @@ def score_resume_dual(
     jd: Union[Dict[str, Any], str],
     required_skills: Optional[List[str]] = None,
     min_years: Optional[float] = None,
+    min_education: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Runs shared extraction/embedding ONCE, returns both scoring perspectives.
@@ -1801,21 +1478,18 @@ def score_resume_dual(
     """
     start_t = time.perf_counter()
     try:
-        from core.telemetry import trace_span
-        from core.metrics import record_ats_match_metrics
-        from services.multi_tenancy.tenant_context import get_current_tenant_id
-
-        with trace_span("scoring_engine.score_resume_dual"):
+        tracer = trace_span("scoring_engine.score_resume_dual") if trace_span else nullcontext()
+        with tracer:
             components = _compute_shared_components(
                 resume=resume,
                 jd=jd,
                 required_skills=required_skills,
                 min_years=min_years,
+                min_education=min_education,
             )
             cand_res = _apply_profile(components, CANDIDATE_PROFILE, mode="candidate")
             rec_res = _apply_profile(components, RECRUITER_PROFILE, mode="recruiter")
-            duration = time.perf_counter() - start_t
-            record_ats_match_metrics(tenant_id=get_current_tenant_id(), duration_sec=duration, status="success")
+            _record_metrics(start_t, "success")
             gc.collect()
             return {
                 "candidate_score": cand_res["final_score"],
@@ -1831,11 +1505,5 @@ def score_resume_dual(
                 "scoring_version": SCORING_ENGINE_VERSION,
             }
     except Exception as exc:
-        duration = time.perf_counter() - start_t
-        try:
-            from core.metrics import record_ats_match_metrics
-            from services.multi_tenancy.tenant_context import get_current_tenant_id
-            record_ats_match_metrics(tenant_id=get_current_tenant_id(), duration_sec=duration, status="failed")
-        except Exception:
-            pass
+        _record_metrics(start_t, "failed")
         raise exc

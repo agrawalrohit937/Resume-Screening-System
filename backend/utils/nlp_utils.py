@@ -92,11 +92,33 @@ def lemmatize_text(text: str) -> str:
     return " ".join(_lemmatizer.lemmatize(t) for t in tokens)
 
 
+def _skill_pattern(s: str) -> str:
+    escaped = re.escape(s)
+    left = r"(?<![a-zA-Z0-9_])"
+    right = r"(?![a-zA-Z0-9_+#])" if (s.endswith("+") or s.endswith("#") or len(s) == 1) else r"(?![a-zA-Z0-9_])"
+    return f"{left}{escaped}{right}"
+
+
+def _get_expanded_tech_skills() -> Set[str]:
+    """Returns base tech skills merged with full ontology knowledge graph."""
+    combined = set(TECH_SKILLS)
+    try:
+        from services.skill_ontology import get_all_known_skills
+        combined.update(get_all_known_skills())
+    except Exception:
+        pass
+    return combined
+
+
 def detect_skills_in_text(text: str) -> Tuple[List[str], List[str]]:
-    """Returns (technical_skills, soft_skills) found in text."""
+    """Returns (technical_skills, soft_skills) found in text using ontology-backed matching."""
+    if not text:
+        return [], []
     lowered = text.lower()
-    tech = sorted([s for s in TECH_SKILLS if re.search(rf"\b{re.escape(s)}\b", lowered)])
-    soft = sorted([s for s in SOFT_SKILLS if re.search(rf"\b{re.escape(s)}\b", lowered)])
+    # Check base skills and dynamically expanded ontology skills
+    all_tech = _get_expanded_tech_skills()
+    tech = sorted([s for s in all_tech if re.search(_skill_pattern(s), lowered)])
+    soft = sorted([s for s in SOFT_SKILLS if re.search(_skill_pattern(s), lowered)])
     return tech, soft
 
 

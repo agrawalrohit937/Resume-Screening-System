@@ -90,30 +90,12 @@
       background-color: #f8fafc;
       color: #0f172a;
     }
-    /* Prevent layout shift during font swap & hero initial load */
-    .hero-title-lcp {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      font-weight: 900;
-      letter-spacing: -0.03em;
-      line-height: 1.12;
-      contain: layout paint;
-    }
   </style>
 
 </head>
 
 <body class="h-full">
-  <div id="root" class="h-full w-full">
-    <!-- Static fallback for search engine crawlers before JS hydration; replaced by React upon mount -->
-    <header style="text-align: center; padding: 48px 16px;">
-      <h1 class="hero-title-lcp" style="font-size: 2.25rem; font-weight: 900; color: #0f172a; margin: 0 auto 16px auto; max-width: 900px; line-height: 1.15;">
-        CareerShala — Turn Your Resume into Job Offers with AI
-      </h1>
-      <p style="font-size: 1.125rem; color: #475569; max-width: 700px; margin: 0 auto; line-height: 1.6;">
-        CareerShala is your AI career co-pilot. Optimize resumes for ATS filters, practice live AI mock interviews, and launch verified developer portfolios.
-      </p>
-    </header>
-  </div>
+  <div id="root" class="h-full w-full"></div>
 
   <script type="module" src="/src/main.jsx"></script>
 </body>
