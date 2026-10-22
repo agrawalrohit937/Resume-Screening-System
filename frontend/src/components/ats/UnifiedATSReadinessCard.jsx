@@ -54,7 +54,15 @@ export default function UnifiedATSReadinessCard({
   const unifiedMissing = useMemo(() => {
     const combined = [...missingSkillsRaw, ...strictMissingKeywords]
     const matchedLower = new Set(unifiedMatched.map(s => s.toLowerCase().trim()))
-    return dedupeCaseInsensitive(combined).filter(s => !matchedLower.has(s.toLowerCase().trim()))
+    return dedupeCaseInsensitive(combined).filter(s => {
+      const sLower = s.toLowerCase().trim()
+      if (matchedLower.has(sLower)) return false
+      // If a matched skill encompasses this missing sub-skill (e.g. "Data Structures & Algorithms" covers "Algorithms")
+      for (const m of matchedLower) {
+        if (m.includes(sLower) && sLower.length >= 4) return false
+      }
+      return true
+    })
   }, [missingSkillsRaw, strictMissingKeywords, unifiedMatched])
 
   const totalUnifiedCount = unifiedMatched.length + unifiedMissing.length

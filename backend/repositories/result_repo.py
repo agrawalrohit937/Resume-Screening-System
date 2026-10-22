@@ -104,21 +104,33 @@ class ResultRepository(BaseRepository):
                 "max_score": {"$max": "$final_score"},
                 "min_score": {"$min": "$final_score"},
                 "strong_matches": {
-                    "$sum": {"$cond": [{"$gte": ["$final_score", 0.8]}, 1, 0]}
+                    "$sum": {"$cond": [
+                        {"$or": [
+                            {"$gte": ["$final_score", 80]},
+                            {"$and": [{"$lte": ["$final_score", 1.0]}, {"$gte": ["$final_score", 0.8]}]}
+                        ]}, 1, 0
+                    ]}
                 },
                 "good_matches": {
                     "$sum": {"$cond": [
-                        {"$and": [
-                            {"$gte": ["$final_score", 0.6]},
-                            {"$lt": ["$final_score", 0.8]}
+                        {"$or": [
+                            {"$and": [{"$gte": ["$final_score", 60]}, {"$lt": ["$final_score", 80]}]},
+                            {"$and": [{"$lte": ["$final_score", 1.0]}, {"$gte": ["$final_score", 0.6]}, {"$lt": ["$final_score", 0.8]}]}
                         ]}, 1, 0
                     ]}
                 },
                 "poor_matches": {
-                    "$sum": {"$cond": [{"$lt": ["$final_score", 0.4]}, 1, 0]}
+                    "$sum": {"$cond": [
+                        {"$or": [
+                            {"$lt": ["$final_score", 40]},
+                            {"$and": [{"$lte": ["$final_score", 1.0]}, {"$lt": ["$final_score", 0.4]}]}
+                        ]}, 1, 0
+                    ]}
                 },
             }},
         ]
         cursor = self.results.aggregate(pipeline)
+        if hasattr(cursor, "__await__") and not hasattr(cursor, "to_list"):
+            cursor = await cursor
         result = await cursor.to_list(length=1)
         return result[0] if result else {}

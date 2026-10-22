@@ -278,7 +278,59 @@ class TenantScopedCollection:
         else:
             tid = tenant_override or self.tenant_id
             scoped_pipeline = [{"$match": {"tenant_id": tid}}] + list(pipeline)
-        return self._collection.aggregate(scoped_pipeline, *args, **kwargs)
+        op = self._collection.aggregate(scoped_pipeline, *args, **kwargs)
+        return AsyncCursorProxy(op)
+
+
+class AsyncCursorProxy:
+    """
+    Unified asynchronous cursor proxy for PyMongo 4.9+ native async driver
+    (where collection.aggregate returns a coroutine) and Motor (where it returns a cursor).
+    Provides seamless support for:
+      - await cursor.to_list(length)
+      - async for item in cursor:
+      - cursor = await collection.aggregate(...)
+      - await collection.aggregate(...).to_list(...)
+    """
+
+    def __init__(self, coro_or_cursor: Any):
+        self._target = coro_or_cursor
+        self._resolved = None
+
+    async def _resolve(self) -> Any:
+        if self._resolved is None:
+            if hasattr(self._target, "__await__"):
+                self._resolved = await self._target
+            else:
+                self._resolved = self._target
+        return self._resolved
+
+    def __await__(self):
+        return self._resolve().__await__()
+
+    async def __aiter__(self):
+        cursor = await self._resolve()
+        async for item in cursor:
+            yield item
+
+    async def to_list(self, length: Optional[int] = None) -> List[Any]:
+        cursor = await self._resolve()
+        op = cursor.to_list(length)
+        if hasattr(op, "__await__"):
+            return await op
+        return op
+
+    async def next(self) -> Any:
+        cursor = await self._resolve()
+        op = cursor.next()
+        if hasattr(op, "__await__"):
+            return await op
+        return op
+
+    def __getattr__(self, item: str) -> Any:
+        if self._resolved is not None:
+            return getattr(self._resolved, item)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
     async def distinct(
         self,
