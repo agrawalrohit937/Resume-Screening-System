@@ -136,15 +136,18 @@ export default function Dashboard() {
   const atsStrength = normalizeScore(s.best_score)
   const atsAverage = normalizeScore(s.average_score)
   const interviewAvg = normalizeScore(gami?.average_score)
-  const interviewBest = normalizeScore(gami?.best_score)
+  const interviewBest = normalizeScore(gami?.best_score ?? gami?.average_score)
   
   const hasCertificate = interviewBest >= 100
-  const readiness = Math.round((atsStrength * 0.4) + (interviewAvg * 0.6)) || (atsStrength > 0 ? atsStrength : 0)
+  const readiness = Math.round((atsStrength * 0.4) + (interviewAvg * 0.6)) || (atsStrength > 0 ? atsStrength : interviewAvg > 0 ? interviewAvg : 0)
 
-  // Profile Completeness
-  const profileCompleteness = analytics?.profile_completeness || { score: 0, percentage: 0, fields: {} }
+  // Profile Completeness with sensible fallback from authenticated user profile
+  const fallbackProfilePct = user ? Math.round(([
+    user.email, user.full_name, user.phone, user.linkedin_url, user.github_username, user.profile_picture, resumeCount > 0, (s.total_ats_checks || 0) > 0
+  ].filter(Boolean).length / 8) * 100) : 0
+  const profileCompleteness = analytics?.profile_completeness || { score: fallbackProfilePct / 100, percentage: fallbackProfilePct, fields: {} }
   const pcFields = profileCompleteness.fields || {}
-  const profilePct = profileCompleteness.percentage || 0
+  const profilePct = profileCompleteness.percentage || fallbackProfilePct
 
   // Gamification Info
   const levelInfo = gami?.level_info || {}

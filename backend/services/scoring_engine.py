@@ -175,8 +175,10 @@ _DEGREE_RANK = {
     "associate": 2,
     "bachelor": 3, "b.tech": 3, "btech": 3, "b.e.": 3, "be": 3, "b.s.": 3,
     "bs": 3, "b.a.": 3, "ba": 3, "bca": 3, "bsc": 3, "b.sc": 3,
+    "graduation": 3, "graduate": 3, "undergraduate": 3,
     "master": 4, "m.tech": 4, "mtech": 4, "m.s.": 4, "ms": 4, "m.a.": 4,
     "ma": 4, "mba": 4, "mca": 4, "msc": 4, "m.sc": 4, "b.ed": 4, "bed": 4,
+    "post graduation": 4, "postgraduate": 4, "post-graduation": 4, "post-graduate": 4,
     "phd": 5, "ph.d.": 5, "doctorate": 5,
 }
 
@@ -203,6 +205,24 @@ _ENGLISH_STOPWORDS = {
     "when", "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours",
     "resume", "experience", "education", "skills", "project", "projects", "work", "responsibilities"
 }
+
+_COMPANY_EXP_SNIPPET_PATTERNS = [
+    re.compile(r"\b(?:we|our|us|company|firm|agency|team|builders?|help|helping|transform|founded|established)\b[^\.\n]*?\b\d+[\+\s\-to\d]*\s*years", re.IGNORECASE),
+    re.compile(r"\bwith\s+\d+[\+\s\-to\d]*\s*years[^\.\n]*?\b(?:we|our|help|serve|serving|deliver|delivering|build|builders?)\b", re.IGNORECASE),
+    re.compile(r"\b\d+[\+\s\-to\d]*\s*years(?:\s+of)?\s+(?:hands[\s-]on\s+)?(?:expertise|excellence|innovation|heritage|leadership|presence|service|history|track[\s-]record)", re.IGNORECASE),
+    re.compile(r"\b(?:for\s+over|for\s+more\s+than|over)\s+\d+[\+\s\-to\d]*\s*years\s*,?\s*(?:we|our)\b", re.IGNORECASE),
+    re.compile(r"\b(?:about\s+us|about\s+the\s+company|who\s+we\s+are|company\s+overview)\b", re.IGNORECASE),
+]
+
+
+def _is_company_experience_context(text: str, start: int, end: int) -> bool:
+    window_start = max(0, start - 150)
+    window_end = min(len(text), end + 150)
+    snippet = text[window_start:window_end]
+    for cp in _COMPANY_EXP_SNIPPET_PATTERNS:
+        if cp.search(snippet):
+            return True
+    return False
 
 
 def _context_is_hard_requirement(jd_text: str, match_start: int, match_end: int, window: int = 90) -> bool:
@@ -242,6 +262,8 @@ def _extract_years_requirement(jd_text: str) -> Optional[Tuple[float, bool]]:
             prefix = jd_text[max(0, m.start() - 6):m.start()]
             if re.search(r"0\s*(?:[-–]|to)\s*$", prefix, re.IGNORECASE):
                 continue
+            if _is_company_experience_context(jd_text, m.start(), m.end()):
+                continue
             try:
                 years = float(m.group(1))
             except (ValueError, IndexError):
@@ -250,17 +272,23 @@ def _extract_years_requirement(jd_text: str) -> Optional[Tuple[float, bool]]:
             if best is None or years > best[0]:
                 best = (years, is_hard)
 
-    # If a senior requirement (>= 2.0 yrs) is found, prioritize it
+    # If Fresher / 0-1 Years / Entry level was detected, prioritize entry-level mapping if no explicit senior requirement
+    if zero_exp_match and (best is None or best[0] <= 1.0):
+        return (0.0, False)
+
+    # If a senior requirement (>= 2.0 yrs) is found and not in zero-exp context, prioritize it
     if best is not None and best[0] >= 2.0:
         return best
 
-    # If Fresher / 0-1 Years / Entry level was detected, explicitly map to 0.0 years
+    # If Fresher was detected
     if zero_exp_match:
         return (0.0, False)
 
     # Standard 1+ years pattern evaluation
     for pattern in _YEARS_PATTERNS:
         for m in pattern.finditer(jd_text):
+            if _is_company_experience_context(jd_text, m.start(), m.end()):
+                continue
             try:
                 years = float(m.group(1))
             except (ValueError, IndexError):

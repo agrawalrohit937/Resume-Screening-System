@@ -306,6 +306,11 @@ export default function Results() {
     setInvalidDocument(false)
     setInvalidDocData(null)
     setShowWizard(false)
+    setSelectedPreset(null)
+    setRequiredSkills('')
+    setJobTitle('')
+    setJdText('')
+    setJdFile(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 

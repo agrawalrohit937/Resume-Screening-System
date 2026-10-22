@@ -50,6 +50,17 @@ def load_curated_tech_overlay() -> Tuple[List[SkillNode], List[SkillEdge]]:
                     )
                 )
 
+        # Specific conceptual subsumptions (e.g. Data Structures & Algorithms covers Algorithms)
+        edges.append(
+            SkillEdge(
+                source="Data Structures & Algorithms",
+                target="Algorithms",
+                relation=TypedRelation.BROADER_THAN.value,
+                weight=1.0,
+                metadata={"source": "curated_tech_overlay"}
+            )
+        )
+
         for canonical in all_canonicals:
             category = None
             for cat, data in SKILL_TAXONOMY.items():

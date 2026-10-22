@@ -72,6 +72,25 @@ _ZERO_EXP_PATTERN = re.compile(
 )
 
 
+_COMPANY_EXP_SNIPPET_PATTERNS = [
+    re.compile(r"\b(?:we|our|us|company|firm|agency|team|builders?|help|helping|transform|founded|established)\b[^\.\n]*?\b\d+[\+\s\-to\d]*\s*years", re.IGNORECASE),
+    re.compile(r"\bwith\s+\d+[\+\s\-to\d]*\s*years[^\.\n]*?\b(?:we|our|help|serve|serving|deliver|delivering|build|builders?)\b", re.IGNORECASE),
+    re.compile(r"\b\d+[\+\s\-to\d]*\s*years(?:\s+of)?\s+(?:hands[\s-]on\s+)?(?:expertise|excellence|innovation|heritage|leadership|presence|service|history|track[\s-]record)", re.IGNORECASE),
+    re.compile(r"\b(?:for\s+over|for\s+more\s+than|over)\s+\d+[\+\s\-to\d]*\s*years\s*,?\s*(?:we|our)\b", re.IGNORECASE),
+    re.compile(r"\b(?:about\s+us|about\s+the\s+company|who\s+we\s+are|company\s+overview)\b", re.IGNORECASE),
+]
+
+
+def _is_company_experience_context(text: str, start: int, end: int) -> bool:
+    window_start = max(0, start - 150)
+    window_end = min(len(text), end + 150)
+    snippet = text[window_start:window_end]
+    for cp in _COMPANY_EXP_SNIPPET_PATTERNS:
+        if cp.search(snippet):
+            return True
+    return False
+
+
 def extract_experience_requirement(text: str) -> float:
     """
     Extracts the required years of experience from job description or role text.
@@ -99,13 +118,15 @@ def extract_experience_requirement(text: str) -> float:
             prefix = text[max(0, m.start() - 6):m.start()]
             if re.search(r"0\s*(?:[-–]|to)\s*$", prefix, re.IGNORECASE):
                 continue
+            if _is_company_experience_context(text, m.start(), m.end()):
+                continue
             try:
                 val = float(m.group(1))
                 max_senior_years = max(max_senior_years, val)
             except (ValueError, IndexError):
                 pass
 
-    if max_senior_years >= 2.0:
+    if max_senior_years >= 2.0 and not has_zero_cue:
         return max_senior_years
 
     if has_zero_cue:
@@ -124,6 +145,8 @@ def extract_experience_requirement(text: str) -> float:
         for m in re.finditer(pat, text, re.IGNORECASE):
             prefix = text[max(0, m.start() - 5):m.start()]
             if re.search(r"0\s*[-–to]\s*$", prefix):
+                continue
+            if _is_company_experience_context(text, m.start(), m.end()):
                 continue
             try:
                 val = float(m.group(1))
@@ -400,6 +423,20 @@ def extract_resume_data_deterministic(raw_text: str) -> Dict[str, Any]:
     phone = extract_phone(raw_text)
     urls = extract_urls(raw_text)
 
+    is_in_progress = bool(re.search(
+        r"\b(pursuing|expected|anticipated|in[\s-]progress|currently[\s-]enrolled|final[\s-]year|202[6-9]|203\d)\b",
+        raw_text,
+        re.IGNORECASE,
+    ))
+
+    education_entries = []
+    if education_level:
+        education_entries.append({
+            "degree": education_level,
+            "field": "Computer Science Engineering" if re.search(r"\b(computer|cse|software|it)\b", raw_text, re.IGNORECASE) else "Engineering",
+            "is_in_progress": is_in_progress,
+        })
+
     # Return structured dict for graph state and downstream ATS services
     return {
         "skills": skills,
@@ -408,6 +445,8 @@ def extract_resume_data_deterministic(raw_text: str) -> Dict[str, Any]:
         "all_expanded_skills": list(expansion["all_expanded_skills"]),
         "total_experience_years": total_exp,
         "education_level": education_level,
+        "education": education_entries,
+        "is_in_progress": is_in_progress,
         "contact_info": {
             "email": email,
             "phone": phone,

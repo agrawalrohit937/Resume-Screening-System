@@ -236,6 +236,14 @@ class GamificationService:
 
         doc["level_info"] = self._compute_level(doc.get("total_points", 0))
 
+        # Ensure best_score is always tracked and synced
+        if doc.get("best_score") is None:
+            doc["best_score"] = round(float(doc.get("average_score", 0.0) or 0.0), 3)
+            await self.collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"best_score": doc["best_score"]}}
+            )
+
         # Calculate exact global leaderboard rank dynamically
         total_pts = doc.get("total_points", 0)
         higher_count = await self.collection.count_documents({"total_points": {"$gt": total_pts}})
@@ -254,6 +262,7 @@ class GamificationService:
             "total_interviews": 0,
             "total_questions_answered": 0,
             "average_score": 0.0,
+            "best_score": 0.0,
             "badges": [],
             "recent_points": [],
             "clean_sessions": 0,
@@ -372,10 +381,12 @@ class GamificationService:
 
         total_points_new = profile.get("total_points", 0) + awarded_points
 
-        # Update running average
+        # Update running average and best score
         old_avg = profile.get("average_score", 0.0)
+        old_best = float(profile.get("best_score") if profile.get("best_score") is not None else old_avg)
         old_count = profile.get("total_interviews", 0)
         new_avg = ((old_avg * old_count) + interview_score) / (old_count + 1)
+        new_best = max(old_best, float(interview_score))
 
         point_events = [
             {"points": e["pts"], "event": e["type"], "ts": now.isoformat()}
@@ -399,6 +410,7 @@ class GamificationService:
         }
         update_set = {
             "average_score": round(new_avg, 3),
+            "best_score": round(new_best, 3),
             "updated_at": now,
             "current_streak": streak_result["new_streak"],
         }
