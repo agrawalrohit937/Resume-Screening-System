@@ -25,7 +25,7 @@ import {
   Code2
 } from 'lucide-react'
 
-import api, { uploadResume, getResumes, getResumeById, matchATS, generatePDF, setPrimaryResume } from '../services/api'
+import api, { uploadResume, getResumes, getResumeById, matchATS, extractJDText, generatePDF, setPrimaryResume } from '../services/api'
 import { PRESET_ROLES, extractJobDescriptionText, formatApiError } from '../components/ats/ATSHelpers'
 import {
   InvalidDocumentError,
@@ -208,11 +208,12 @@ export default function Results() {
       setJdText('')
 
       try {
-        const extracted = await extractJobDescriptionText(file)
+        toast.loading(`Extracting text from ${file.name}...`, { id: 'jd-extract' })
+        const extracted = await extractJobDescriptionText(file, extractJDText)
         setJdText(extracted)
-        toast.success(`Extracted text from ${file.name}`)
+        toast.success(`Extracted clean text from ${file.name}`, { id: 'jd-extract' })
       } catch (err) {
-        toast.error(err.message || 'Could not extract text from the file')
+        toast.error(err.response?.data?.detail || err.message || 'Could not extract text from the file', { id: 'jd-extract' })
       }
     },
     multiple: false,

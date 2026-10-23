@@ -188,12 +188,13 @@ export const deleteResume = (id) => api.delete(`/resume/${id}`)
 
 export const reparseResume = (id) => api.post(`/resume/${id}/reparse`)
 
+export const extractJDText = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/ats/extract-jd', formData)
+}
+
 export const matchATS = (p) => {
-  if (typeof FormData !== 'undefined' && p instanceof FormData) {
-    return api.post('/ats/match', p, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-  }
   return api.post('/ats/match', p)
 }
 

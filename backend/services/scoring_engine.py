@@ -205,6 +205,15 @@ def _extract_degree_requirement(jd_text: str) -> Optional[Tuple[int, str, bool]]
         pass
     return None
 
+# Backward-compatible degree rank mapping for legacy consumers / unit tests
+_DEGREE_RANK: Dict[str, int] = {
+    "iti": 1, "diploma": 1, "high school": 1, "12th": 1,
+    "associate": 2, "polytechnic": 2,
+    "b.sc": 3, "bsc": 3, "bca": 3, "b.tech": 3, "btech": 3, "b.e": 3, "be": 3, "bachelor": 3, "b.com": 3,
+    "b.ed": 4, "bed": 4, "m.sc": 4, "msc": 4, "master": 4, "m.tech": 4, "mtech": 4, "m.e": 4, "mca": 4, "mba": 4,
+    "phd": 5, "doctorate": 5, "post doctorate": 5,
+}
+
 
 def _candidate_max_degree_rank(extracted_data: dict) -> Tuple[int, bool]:
     """Accurately resolves candidate's highest degree rank and in-progress status via education_service."""
