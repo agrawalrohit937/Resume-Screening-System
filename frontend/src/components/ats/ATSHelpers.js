@@ -63,18 +63,17 @@ Requirements:
 ]
 
 // ── Text Extraction Helpers ──────────────────────────────────────────────────
-export async function extractJobDescriptionText(file) {
+export async function extractJobDescriptionText(file, apiExtractFn) {
   if (!file) return ''
   if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt') || file.name.toLowerCase().endsWith('.md')) {
     return file.text()
   }
-  // For PDF / DOCX, parse using standard browser text extraction or prompt user
-  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ||
-    file.name.toLowerCase().endsWith('.docx') ||
-    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    return file.text().catch(() => '')
+  // For PDF / DOCX, use the backend DocumentParserService (never read binary PDF as UTF-8 in browser)
+  if (apiExtractFn && typeof apiExtractFn === 'function') {
+    const res = await apiExtractFn(file)
+    return res?.data?.text || res?.text || ''
   }
-  return file.text ? file.text() : ''
+  return ''
 }
 
 export function dedupeCaseInsensitive(items) {

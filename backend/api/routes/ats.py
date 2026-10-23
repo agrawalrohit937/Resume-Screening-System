@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from typing import Optional
 from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
@@ -57,6 +57,57 @@ def _extract_contact_snapshot(extracted_data: dict) -> dict:
         "linkedin": raw.get("linkedin") or None,
         "github": raw.get("github") or None,
         "portfolio": raw.get("portfolio") or None,
+    }
+
+
+@router.post("/extract-jd")
+async def extract_jd_text(
+    file: UploadFile = File(...),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Extract clean plain text from an uploaded JD file (PDF, DOCX, TXT) using DocumentParserService."""
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    ext = Path(file.filename).suffix.lower().lstrip(".")
+    if ext not in ("pdf", "docx", "txt"):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported JD file type. Please upload a PDF, DOCX, or TXT file.",
+        )
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded JD file is empty.")
+
+    if ext == "txt":
+        text = contents.decode("utf-8", errors="ignore").strip()
+    else:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
+            tmp.write(contents)
+            tmp_path = tmp.name
+        try:
+            parser = ParserService()
+            text = await parser._extract_raw_text(tmp_path, ext)
+        except Exception as e:
+            logger.error("Failed to parse JD file", error=str(e), filename=file.filename)
+            raise HTTPException(
+                status_code=422,
+                detail=f"Failed to extract text from JD file '{file.filename}': {str(e)}",
+            )
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    if not text or len(text.strip()) < 10:
+        raise HTTPException(
+            status_code=422,
+            detail="Could not extract sufficient text from the uploaded document. Please check the file content.",
+        )
+
+    return {
+        "text": text.strip(),
+        "filename": file.filename,
+        "length": len(text.strip()),
     }
 
 
