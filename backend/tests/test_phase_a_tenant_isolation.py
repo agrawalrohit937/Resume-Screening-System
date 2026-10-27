@@ -11,8 +11,6 @@ from fastapi.responses import JSONResponse
 from services.multi_tenancy.tenant_context import (
     tenant_context,
     platform_admin_context,
-    get_current_tenant_id,
-    is_platform_admin,
     TenantAccessDeniedError,
 )
 from services.multi_tenancy.tenant_repository import (

@@ -106,7 +106,6 @@ def set_trusted_device_cookie(response: JSONResponse, device_id_plain: str) -> N
 import asyncio
 import uuid
 from services.token_service import TokenService
-from core.security import decode_token
 
 async def build_and_persist_tokens(
     user: UserModel,

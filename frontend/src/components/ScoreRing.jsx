@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
  * @param {number} score - Value between 0 and 100 (e.g., 82 for 82%).
  *                         Matches the 0-100 scale emitted by the backend ATS engine.
  */
-export default function ScoreRing({ score = 0, size = 140, strokeWidth = 10, label = 'ATS Match Score', animated = true }) {
+export default function ScoreRing({ score = 0, size = 140, strokeWidth = 10, label = 'ATS Match Score', animated = true, className = '' }) {
   const [displayScore, setDisplayScore] = useState(0)
 
   // Calculate precise SVG properties
@@ -85,7 +85,7 @@ export default function ScoreRing({ score = 0, size = 140, strokeWidth = 10, lab
   const gradId = `ringGradient-${pct}`
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 bg-white rounded-3xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] w-fit mx-auto select-none">
+    <div className={className || "flex flex-col items-center justify-center p-4 bg-white rounded-3xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] w-fit mx-auto select-none"}>
       
       {/* Outer Visual Container */}
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>

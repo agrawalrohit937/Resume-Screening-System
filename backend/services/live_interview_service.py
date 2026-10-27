@@ -5,14 +5,13 @@ import uuid
 import re
 import secrets
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional
 
 import structlog
 from pymongo.asynchronous.database import AsyncDatabase
 
 from models.interview_session_model import (
-    InterviewSession, SessionStatus, CheatingEventRecord, QuestionAnswer,
-    DifficultyLevel, CheatingEventType,
+    SessionStatus, CheatingEventType,
 )
 from services.ai_interview_service import AIInterviewService
 from utils.json_utils import parse_llm_json

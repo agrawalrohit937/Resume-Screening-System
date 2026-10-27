@@ -2,11 +2,9 @@
 Unit tests for Unified Scoring Engine (Phase 1 & Phase 5).
 """
 
-import pytest
 from services.scoring_engine import (
     score_resume,
     score_resume_dual,
-    WeightProfile,
     CANDIDATE_PROFILE,
     RECRUITER_PROFILE,
 )
@@ -64,18 +62,18 @@ def test_unified_scoring_engine_recruiter_mode():
 
 
 def test_candidate_profile_fresher_weights():
-    assert CANDIDATE_PROFILE.strict_weight == 0.80
-    assert CANDIDATE_PROFILE.semantic_weight == 0.20
-    assert CANDIDATE_PROFILE.skills_weight == 0.70
-    assert CANDIDATE_PROFILE.experience_weight == 0.15
+    assert CANDIDATE_PROFILE.strict_weight == 1.00
+    assert CANDIDATE_PROFILE.semantic_weight == 0.00
+    assert CANDIDATE_PROFILE.skills_weight == 0.65
+    assert CANDIDATE_PROFILE.experience_weight == 0.20
     assert CANDIDATE_PROFILE.education_weight == 0.15
     assert CANDIDATE_PROFILE.enforce_hard_knockout is False
 
-    assert RECRUITER_PROFILE.strict_weight == 0.60
-    assert RECRUITER_PROFILE.semantic_weight == 0.40
-    assert RECRUITER_PROFILE.skills_weight == 0.50
-    assert RECRUITER_PROFILE.experience_weight == 0.30
-    assert RECRUITER_PROFILE.education_weight == 0.20
+    assert RECRUITER_PROFILE.strict_weight == 1.00
+    assert RECRUITER_PROFILE.semantic_weight == 0.00
+    assert RECRUITER_PROFILE.skills_weight == 0.60
+    assert RECRUITER_PROFILE.experience_weight == 0.25
+    assert RECRUITER_PROFILE.education_weight == 0.15
     assert RECRUITER_PROFILE.enforce_hard_knockout is True
 
     # Fresher with 100% skill match, 0 professional years, ongoing degree

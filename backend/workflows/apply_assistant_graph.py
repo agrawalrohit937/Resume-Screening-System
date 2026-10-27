@@ -1,29 +1,17 @@
-"""
-LangGraph wiring for the AI Apply Assistant.
-
-Consolidated Version: Contains the State definition, all Nodes 
-(JDAnalyzer, EmailGenerator, CoverLetterGenerator, QualityValidator), 
-and the Graph wiring in a single file.
-
-- Uses Groq for structured data extraction and validation.
-- Uses Gemini 1.5 Pro for writing high-quality emails and cover letters.
-"""
+"""LangGraph workflow for generating and validating an application draft."""
 
 import asyncio
-import json
 import re
 from pathlib import Path
 from typing import TypedDict, List
 from langgraph.graph import StateGraph, END
 
-# LLM Imports
-from langchain_core.prompts import ChatPromptTemplate
 try:
     from google import genai
 except Exception:
     genai = None
 
-import os
+from core.llm_client import gemini_key_pool, get_groq_client
 from utils.json_utils import parse_llm_json
 # ─── STATE DEFINITION ────────────────────────────────────────────────────────
 
@@ -57,26 +45,22 @@ def _load_prompt(filename: str) -> str:
     return prompt_path.read_text(encoding="utf-8")
 
 
-# ─── NODE 1: JD ANALYZER (GROQ) ──────────────────────────────────────────────
+# ─── NODE 1: JD ANALYZER ─────────────────────────────────────────────────────
 
 _DEFAULT_ANALYSIS = {"required_skills": [], "seniority": "unspecified", "tone": "formal"}
 
 async def jd_analyzer_node(state: ApplyAssistantState) -> dict:
     """Parses raw job description text into structured requirements."""
-    try:
-        llm = get_groq_client()
-        prompt = _load_prompt("jd_analysis.txt").format(job_description=state.get("job_description", ""))
-        response = await llm.ainvoke(prompt)
-        jd_analysis = parse_llm_json(response.content, default=_DEFAULT_ANALYSIS)
-        if not isinstance(jd_analysis, dict):
-            jd_analysis = _DEFAULT_ANALYSIS
-    except Exception:
-        jd_analysis = _DEFAULT_ANALYSIS
-
+    llm = get_groq_client()
+    prompt = _load_prompt("jd_analysis.txt").format(job_description=state.get("job_description", ""))
+    response = await llm.ainvoke(prompt)
+    jd_analysis = parse_llm_json(response.content, default=None)
+    if not isinstance(jd_analysis, dict):
+        raise ValueError("JD analysis returned invalid JSON")
     return {"jd_analysis": jd_analysis}
 
 
-# ─── NODE 2: EMAIL GENERATOR (DIRECT GEMINI CLIENT WITH KEY POOL FALLBACK) ───
+# ─── NODE 2: EMAIL GENERATOR ────────────────────────────────────────────────
 async def email_generator_node(state: ApplyAssistantState) -> dict:
     """Drafts the application email subject + body using Gemini Direct SDK with automatic key pool rotation."""
     job_title = state.get("job_title", "Position")
@@ -119,26 +103,11 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
         clean_body = re.sub(r"<br\s*/?>", "\n", body, flags=re.IGNORECASE).strip()
         return {"email_subject": subject, "email_body": clean_body}
 
-    try:
-        return await gemini_key_pool.execute_async_with_fallback(_generate)
-    except Exception:
-        pass
-
-    # Fallback professional email template
-    subject = f"Application for {job_title} at {company_name}"
-    body = (
-        f"Dear Hiring Manager at {company_name},\n\n"
-        f"I am writing to express my strong interest in the {job_title} position. "
-        f"With a solid foundation in software engineering, technical innovation, and collaborative problem solving, "
-        f"I am eager to contribute effectively to your team's ongoing success.\n\n"
-        f"Please find my resume attached for your review. I look forward to discussing how my experience aligns with your requirements.\n\n"
-        f"Sincerely,\nCandidate"
-    )
-    return {"email_subject": subject, "email_body": body}
+    return await gemini_key_pool.execute_async_with_fallback(_generate)
 
 
 
-# ─── NODE 3: COVER LETTER GENERATOR (DIRECT GEMINI CLIENT WITH KEY POOL FALLBACK) ────
+# ─── NODE 3: COVER LETTER GENERATOR ─────────────────────────────────────────
 async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
     """Drafts the cover letter BODY TEXT using Gemini Direct SDK with automatic key pool rotation."""
     job_title = state.get("job_title", "Position")
@@ -170,23 +139,7 @@ async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
             return {"cover_letter_text": response.text.strip()}
         raise ValueError("Empty response from Gemini")
 
-    try:
-        return await gemini_key_pool.execute_async_with_fallback(_generate)
-    except Exception:
-        pass
-
-    # Fallback professional cover letter template
-    cover_letter_text = (
-        f"Dear Hiring Manager,\n\n"
-        f"I am writing to express my enthusiastic interest in the {job_title} position at {company_name}. "
-        f"Having thoroughly reviewed the job description, I am confident that my technical background, problem-solving mindset, "
-        f"and passion for building impactful software make me a strong fit for your organization.\n\n"
-        f"Throughout my professional journey, I have consistently delivered high-performance solutions and collaborated with cross-functional teams "
-        f"to build robust applications. My experience closely matches the key qualifications sought for this position.\n\n"
-        f"Thank you for reviewing my application. I welcome the opportunity to discuss my qualifications further in an interview.\n\n"
-        f"Sincerely,\nCandidate"
-    )
-    return {"cover_letter_text": cover_letter_text}
+    return await gemini_key_pool.execute_async_with_fallback(_generate)
 
 
 # ─── NODE 4: QUALITY VALIDATOR (GROQ) ────────────────────────────────────────
@@ -234,8 +187,8 @@ async def _llm_tone_check(state: ApplyAssistantState) -> list:
         response = await llm.ainvoke(prompt)
         issues = parse_llm_json(response.content, default=[])
         return issues if isinstance(issues, list) else []
-    except Exception:
-        return []
+    except Exception as exc:
+        return [f"Quality validation unavailable: {exc}"]
 
 async def quality_validator_node(state: ApplyAssistantState) -> dict:
     """Validates the generated draft before it reaches the user."""
@@ -267,13 +220,10 @@ async def concurrent_drafting_node(state: ApplyAssistantState) -> dict:
     email_res, cl_res = await asyncio.gather(
         email_generator_node(state),
         cover_letter_generator_node(state),
-        return_exceptions=True
     )
     result = {}
-    if isinstance(email_res, dict):
-        result.update(email_res)
-    if isinstance(cl_res, dict):
-        result.update(cl_res)
+    result.update(email_res)
+    result.update(cl_res)
     return result
 
 

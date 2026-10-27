@@ -11,14 +11,11 @@ Provides asynchronous background pipelines for:
 from __future__ import annotations
 
 import os
-import time
 from typing import Any, Dict, List, Optional
 import structlog
 from bson import ObjectId
 
 from models.resume_model import ResumeStatus
-from services.tasks.celery_app import celery_app
-from services.tasks.task_manager import task_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -99,30 +96,33 @@ async def execute_resume_upload_pipeline(
     p_service = ParserService()
 
     try:
-        # Step 1: Parse Document
+        # Step 1: Parse Document (Fast Path - makes resume immediately usable for ATS matching)
         if repo and job_id:
-            await repo.update_progress(job_id, progress=25, stage_message="Extracting document text and metadata", tenant_id=tenant_id)
+            await repo.update_progress(job_id, progress=50, stage_message="Extracting document text and metadata", tenant_id=tenant_id)
         await r_repo.update_status(resume_id, ResumeStatus.PROCESSING)
         parsed = await p_service.parse_resume(file_path, file_type)
         parsed_dict = parsed.model_dump()
 
-        # Step 2: Section Chunker
+        # Immediate persist -> resume status becomes 'parsed' immediately!
+        await r_repo.update_parsed_data(resume_id, parsed_dict)
+        await u_repo.increment_counter(user_id, "total_resumes")
+
+        # Step 2: Section Chunker & BGE-M3 Vector Embeddings (Async Enrichment)
         if repo and job_id:
-            await repo.update_progress(job_id, progress=50, stage_message="Chunking resume into semantic sections", tenant_id=tenant_id)
+            await repo.update_progress(job_id, progress=75, stage_message="Generating semantic vectors (BGE-M3)", tenant_id=tenant_id)
         chunks = chunk_resume(parsed_dict, raw_text=parsed.raw_text)
 
-        # Step 3: Vector Embeddings (BGE-M3)
-        if repo and job_id:
-            await repo.update_progress(job_id, progress=75, stage_message="Generating dense vector embeddings (BGE-M3)", tenant_id=tenant_id)
         if chunks:
             chunk_texts = [c["text"] for c in chunks]
             vectors = embedding_model.encode(chunk_texts)
             for idx, c in enumerate(chunks):
                 c["embedding"] = vectors[idx] if idx < len(vectors) else None
 
-        parsed_dict["chunks"] = chunks
-        await r_repo.update_parsed_data(resume_id, parsed_dict)
-        await u_repo.increment_counter(user_id, "total_resumes")
+            from bson import ObjectId
+            await r_repo.collection.update_one(
+                {"_id": ObjectId(resume_id)},
+                {"$set": {"parsed_data.chunks": chunks}}
+            )
 
         if repo and job_id:
             await repo.update_progress(job_id, progress=100, stage_message="Resume pipeline completed", tenant_id=tenant_id)
@@ -320,42 +320,4 @@ async def execute_bulk_rescore(
         "job_id": job_id,
         "rescored_count": rescored_count,
     }
-
-
-# Optional Celery task registrations
-if celery_app is not None:
-    import asyncio
-
-    @celery_app.task(name="careershala.parse_resume", bind=True, max_retries=3)
-    def parse_resume_celery(self, payload: Dict[str, Any], idempotency_key: str):
-        loop = asyncio.get_event_loop()
-        try:
-            return loop.run_until_complete(
-                execute_resume_upload_pipeline(**payload)
-            )
-        except Exception as exc:
-            countdown = 2 ** self.request.retries
-            raise self.retry(exc=exc, countdown=countdown)
-
-    @celery_app.task(name="careershala.batch_scoring", bind=True, max_retries=3)
-    def batch_scoring_celery(self, payload: Dict[str, Any], idempotency_key: str):
-        loop = asyncio.get_event_loop()
-        try:
-            return loop.run_until_complete(
-                execute_batch_ats_scoring(**payload)
-            )
-        except Exception as exc:
-            countdown = 2 ** self.request.retries
-            raise self.retry(exc=exc, countdown=countdown)
-
-    @celery_app.task(name="careershala.bulk_rescore", bind=True, max_retries=3)
-    def bulk_rescore_celery(self, payload: Dict[str, Any], idempotency_key: str):
-        loop = asyncio.get_event_loop()
-        try:
-            return loop.run_until_complete(
-                execute_bulk_rescore(**payload)
-            )
-        except Exception as exc:
-            countdown = 2 ** self.request.retries
-            raise self.retry(exc=exc, countdown=countdown)
 

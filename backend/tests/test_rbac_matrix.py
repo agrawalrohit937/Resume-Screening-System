@@ -9,7 +9,6 @@ from core.rbac import (
     Permission,
     check_rbac_access,
     has_permission,
-    ROLE_PERMISSIONS_MAP,
 )
 from models.user_model import UserRole
 

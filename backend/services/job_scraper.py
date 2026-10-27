@@ -195,16 +195,8 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
 
                 jd_text = external_job.get("job_description") or ""
 
-                # Compute dense vector embedding for instant ATS matching
+                # Note: External jobs use fast skill/role matching; dense embeddings are computed on-demand if deep-scanned
                 jd_embedding_vec = []
-                try:
-                    from services.embedding_service import embedding_model, EMBEDDING_DIMENSIONS
-                    text_for_emb = f"{external_job.get('job_title') or 'Software Engineer'}. Skills: {', '.join(skills_list)}. {jd_text[:1000]}"
-                    vecs = embedding_model.encode([text_for_emb])
-                    if vecs and len(vecs[0]) == EMBEDDING_DIMENSIONS:
-                        jd_embedding_vec = vecs[0]
-                except Exception as emb_exc:
-                    logger.warning("Failed to generate embedding during job scrape", error=str(emb_exc))
 
                 job_doc = {
                     "company_name": external_job.get("employer_name") or "Leading Tech Employer",
@@ -261,7 +253,6 @@ if __name__ == "__main__":
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from core.config import settings
     from config.db import connect_db, disconnect_db, get_database
 
     async def _run_manual_scrape() -> None:

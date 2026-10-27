@@ -9,23 +9,20 @@ import re
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
 
 from typing import Any
 from api.deps import get_user_repo, get_otp_service, get_otp_repo, get_database
 from core.config import settings
 from core.security import (
     decode_token,
-    verify_password,
     verify_password_async,
-    hash_password,
     hash_password_async,
     generate_device_id,
     hash_device_id,
     verify_device_id,
     generate_challenge_token,
 )
-from models.user_model import UserModel, UserRole, UserStatus, AuthProvider, TrustedDevice
+from models.user_model import UserRole, UserStatus, AuthProvider, TrustedDevice
 from models.otp_model import OTPPurpose
 from repositories.user_repo import UserRepository
 from repositories.otp_repo import OTPRepository

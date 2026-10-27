@@ -4,7 +4,6 @@ Tests dynamic expiry evaluation, jurisdiction validation, and mandatory knockout
 """
 
 from datetime import date, timedelta
-import pytest
 
 from models.credential_model import Credential
 from services.credential_service import (
@@ -13,7 +12,6 @@ from services.credential_service import (
     set_credential_verifier,
     NoOpCredentialVerifier,
 )
-from services.scoring_engine import _evaluate_eligibility
 
 
 def test_credential_model_and_expiry_at_scoring_time():

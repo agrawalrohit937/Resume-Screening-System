@@ -8,7 +8,6 @@ import pytest
 
 from services.ats_format_check import check_ats_formatting
 from services.scoring_engine import score_resume
-import services.embedding_service as emb_svc
 
 
 @pytest.fixture(autouse=True)

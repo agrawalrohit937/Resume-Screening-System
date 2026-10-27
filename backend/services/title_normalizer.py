@@ -7,7 +7,7 @@ Computes seniority delta and soft title matching scores for ATS evaluation.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 import structlog
 
 logger = structlog.get_logger(__name__)

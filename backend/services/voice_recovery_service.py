@@ -2,7 +2,6 @@
 Voice Recovery Service — Conversational Hinglish AI agent for phone/voice recovery interactions.
 """
 
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import structlog
 from core.llm_client import get_groq_client

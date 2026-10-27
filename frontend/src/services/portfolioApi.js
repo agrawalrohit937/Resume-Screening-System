@@ -54,6 +54,11 @@ export async function savePortfolio(profileData) {
   return response.data;
 }
 
+export async function unpublishPortfolio() {
+  const response = await api.post('/portfolio/unpublish');
+  return response.data;
+}
+
 /**
  * Fetch current authenticated user's portfolio
  * @param {boolean} syncFromResume
@@ -79,7 +84,8 @@ export async function getPublicPortfolio(username) {
  */
 export async function trackPortfolioEvent(username, eventType) {
   try {
-    const response = await api.post(`/portfolio/analytics/track/${username}/${eventType}`);
+    const normalizedEvent = eventType === 'contact' ? 'contact_click' : eventType;
+    const response = await api.post(`/portfolio/analytics/track/${username}/${normalizedEvent}`);
     return response.data;
   } catch (e) {
     // Silent fail for analytics
@@ -105,4 +111,3 @@ export async function checkSlugAvailability(slug) {
   const response = await api.get(`/portfolio/check-slug?slug=${encodeURIComponent(slug)}`);
   return response.data;
 }
-

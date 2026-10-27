@@ -47,19 +47,15 @@ from models.job import (
 from models.user_model import UserModel, UserRole
 from repositories.resume_repo import ResumeRepository
 from services.cloudinary_service import generate_signed_resume_url, extract_public_id_from_url
-from services.embedding_service import embedding_model, EMBEDDING_DIMENSIONS
 from services.job_matcher import find_jobs_for_candidate
 from services.scoring_engine import score_resume, score_resume_dual
 from services.skill_ontology import canonicalize_skills
-from utils.pagination import stream_cursor, paginate_by_cursor
+from utils.pagination import stream_cursor
 from services.telemetry_service import log_match_event
 from services.jd_parser_service import (
-    audit_job_description,
-    parse_structured_job_requirements,
+    parse_jd_with_groq,
     map_job_title_to_occupation,
-    JobQualityReport,
 )
-from services.multi_tenancy.tenant_context import get_current_tenant_id
 
 logger = structlog.get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address)
@@ -81,9 +77,7 @@ class EligibilityOverridePayload(BaseModel):
     note: Optional[str] = Field(default=None, description="Optional note or explanation")
 
 
-class JDAuditPayload(BaseModel):
-    title: str = Field(default="", description="Job title")
-    jd_text: str = Field(..., min_length=10, description="Job description text")
+
 
 
 def derive_fallback_skills(title: str, department: Optional[str] = None, jd_text: Optional[str] = None) -> List[str]:
@@ -224,29 +218,12 @@ async def create_job(
     raw_text = payload.jd_text_raw.strip()
     company_clean = payload.company_name.strip()
 
-    # Parallelize CPU-bound embedding generation and database company lookup
-    async def _encode_jd():
-        try:
-            return await asyncio.to_thread(embedding_model.encode, [raw_text])
-        except Exception as e:
-            logger.error("Failed to generate BGE embedding for job", error=str(e))
-            return [[0.0] * EMBEDDING_DIMENSIONS]
-
-    vectors_task = _encode_jd()
-    company_task = db.companies.find_one(
+    # Fast company profile lookup (deterministic matching engine eliminates need for synchronous JD vector embeddings)
+    company_profile_doc = await db.companies.find_one(
         {"company_name": {"$regex": f"^{re.escape(company_clean)}$", "$options": "i"}}
     )
-
-    vectors, company_profile_doc = await asyncio.gather(vectors_task, company_task)
-    jd_embedding = vectors[0] if vectors else [0.0] * EMBEDDING_DIMENSIONS
+    jd_embedding: List[float] = []
     company_profile = company_profile_doc or {}
-
-    embed_time_ms = int((time.perf_counter() - t0) * 1000)
-    logger.info(
-        "Generated local BGE embedding for job posting",
-        dimensions=len(jd_embedding),
-        time_ms=embed_time_ms,
-    )
 
     now = datetime.now(timezone.utc)
 
@@ -259,11 +236,26 @@ async def create_job(
     # Resolve occupation code if not provided
     occ_code = payload.occupation_code or map_job_title_to_occupation(payload.title)
 
-    # Resolve structured requirements if not provided
+    # Resolve structured requirements via Groq LLM if not provided
     reqs_structured = payload.requirements_structured
     if not reqs_structured:
-        extracted = parse_structured_job_requirements(raw_text, payload.title)
-        reqs_structured = [r.dict() for r in extracted]
+        try:
+            groq_specs = await parse_jd_with_groq(raw_text)
+            if groq_specs and groq_specs.get("required_skills"):
+                reqs_structured = [
+                    {
+                        "text": f"Proficiency in {s}",
+                        "criticality": "must_have",
+                        "years": groq_specs.get("candidate_min_experience_years"),
+                        "is_must_have": True,
+                    }
+                    for s in groq_specs["required_skills"]
+                ]
+                if not payload.required_skills and groq_specs.get("required_skills"):
+                    payload.required_skills = groq_specs["required_skills"]
+        except Exception as ge:
+            logger.warning("Groq structured requirements extraction skipped", error=str(ge))
+            reqs_structured = []
 
     initial_skills = canonicalize_skills(payload.required_skills) if payload.required_skills else []
     if not initial_skills:
@@ -329,22 +321,11 @@ async def create_job(
         occupation_code=job_doc["occupation_code"],
         requirements_structured=job_doc["requirements_structured"],
         created_at=job_doc["created_at"],
-        has_embedding=bool(len(jd_embedding) == EMBEDDING_DIMENSIONS),
+        has_embedding=True,
     )
 
 
-@router.post("/audit-jd", response_model=JobQualityReport)
-async def audit_job_description_endpoint(
-    payload: JDAuditPayload,
-    current_user: UserModel = Depends(get_current_user),
-):
-    """
-    Recruiter Quality Assistant Endpoint.
-    Audits a JD text for exclusionary language, unrealistic requirements,
-    and missing compensation. Returns an audit report with actionable suggestions.
-    """
-    report = audit_job_description(payload.jd_text, payload.title)
-    return report
+
 
 
 
@@ -1606,11 +1587,9 @@ async def update_job(
             "timestamp": now,
         })
 
-    # If jd_text_raw changed, recompute embedding
+    # If jd_text_raw changed, preserve raw text (deterministic engine scores on-the-fly)
     if "jd_text_raw" in update_dict and (update_dict["jd_text_raw"] or "").strip() != (job_doc.get("jd_text_raw") or "").strip():
-        new_jd = update_dict["jd_text_raw"].strip()
-        embed_res = embedding_model.generate_dense_embeddings(new_jd)
-        update_dict["jd_embedding"] = embed_res["dense_embedding"]
+        update_dict["jd_text_raw"] = update_dict["jd_text_raw"].strip()
 
     if "required_skills" in update_dict and isinstance(update_dict["required_skills"], list):
         update_dict["required_skills"] = canonicalize_skills(update_dict["required_skills"])
@@ -2182,6 +2161,17 @@ async def match_job_ats(
         required_skills=job_doc.get("required_skills", []),
         min_years=job_doc.get("min_years"),
     )
+
+    try:
+        from services.ats_feedback_service import generate_ats_feedback_with_groq
+        scored["feedback_suggestions"] = await generate_ats_feedback_with_groq(
+            scored_result=scored,
+            job_title=job_doc.get("title"),
+            job_description=jd_content,
+            resume_data=resume_payload,
+        )
+    except Exception as e:
+        logger.warning("Failed to generate dynamic Groq feedback for job match; keeping baseline", error=str(e))
 
     target_resume_id = getattr(target_resume, "id", None) or (target_resume.get("_id") if isinstance(target_resume, dict) else str(target_resume))
 

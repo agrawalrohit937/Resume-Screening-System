@@ -2,8 +2,8 @@
 Predictive Risk Scoring Service — Deterministic, explainable subscription churn & payment failure risk scoring.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 import structlog
 
 from models.revenue_recovery_model import RiskLevel

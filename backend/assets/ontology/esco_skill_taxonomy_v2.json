@@ -66,8 +66,15 @@
       "id": "skill:tech:react",
       "canonical": "React",
       "category": "Web & Frontend Frameworks",
-      "aliases": ["react.js", "reactjs", "react 18", "react native"],
+      "aliases": ["react.js", "reactjs", "react 18"],
       "labels": {"en": "React"}
+    },
+    {
+      "id": "skill:tech:react_native",
+      "canonical": "React Native",
+      "category": "Mobile Development",
+      "aliases": ["react-native", "reactnative"],
+      "labels": {"en": "React Native"}
     },
     {
       "id": "skill:tech:node",

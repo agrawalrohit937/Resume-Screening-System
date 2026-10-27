@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
-from bson import ObjectId
 
 
 class UserRole(str, Enum):

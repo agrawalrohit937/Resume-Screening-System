@@ -2,7 +2,7 @@
 Database Configuration — Native PyMongo Async / Motor async MongoDB client with index management
 """
 
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 
@@ -36,7 +36,10 @@ async def connect_db() -> None:
         settings.MONGO_URI,
         maxPoolSize=settings.MONGO_MAX_CONNECTIONS,
         minPoolSize=settings.MONGO_MIN_CONNECTIONS,
-        serverSelectionTimeoutMS=5000,
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=15000,
+        socketTimeoutMS=45000,
+        retryWrites=True,
     )
     _db = _client[settings.MONGO_DB_NAME]
     await _ensure_indexes()

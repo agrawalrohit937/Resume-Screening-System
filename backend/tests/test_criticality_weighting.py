@@ -8,8 +8,6 @@ Tests:
 4. Fallback behavior when FEATURE_CRITICALITY_WEIGHTING is disabled.
 """
 
-import pytest
-from core.feature_flags import FEATURE_CRITICALITY_WEIGHTING
 from services.scoring.criticality import JDCriticalityIndex, infer_criticality
 from services.scoring_engine import score_resume
 

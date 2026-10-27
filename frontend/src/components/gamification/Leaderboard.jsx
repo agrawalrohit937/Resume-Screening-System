@@ -77,10 +77,10 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
 
   // Only display candidates on the leaderboard (exclude admin & recruiter)
   const candidateLeaderboard = leaderboard.filter(
-    (e) => !e.role || e.role.toLowerCase() === 'candidate'
+    (e) => !e.role || String(e.role).toLowerCase() === 'candidate'
   )
 
-  const myIndex = candidateLeaderboard.findIndex((e) => e.user_id === currentUserId)
+  const myIndex = candidateLeaderboard.findIndex((e) => String(e.user_id) === String(currentUserId))
   const myRank = myIndex !== -1 ? myIndex + 1 : null
   const myEntry = myIndex !== -1 ? candidateLeaderboard[myIndex] : null
 
@@ -159,7 +159,7 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
               const rank = i + 1
               const isTop3 = rank <= 3
               const rankStyle = TOP_RANKS[rank]
-              const isMe = entry.user_id === currentUserId
+              const isMe = String(entry.user_id) === String(currentUserId)
               
               // Icon to display for rank
               const RankIcon = isTop3 ? rankStyle.icon : undefined

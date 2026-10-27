@@ -9,13 +9,11 @@ Guarantees:
 
 from __future__ import annotations
 
-import asyncio
 import inspect
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Optional
 import structlog
 
 logger = structlog.get_logger(__name__)

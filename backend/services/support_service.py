@@ -3,13 +3,12 @@ Support Ticket Service — Business logic for ticket creation, replies, and prem
 """
 
 import random
-import string
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import structlog
 
-from models.support_ticket_model import SupportTicketModel, TicketAttachment, TicketMessage
+from models.support_ticket_model import SupportTicketModel, TicketMessage
 from models.user_model import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
@@ -122,6 +121,16 @@ class SupportService:
         self.user_repo = user_repo
         self.email_service = email_service
 
+    @staticmethod
+    def _is_admin(user: UserModel) -> bool:
+        roles = getattr(user, "roles", None) or [getattr(user, "role", None)]
+        return any(
+            (role.value if hasattr(role, "value") else str(role)).lower()
+            in ("admin", "platform_admin")
+            for role in roles
+            if role
+        )
+
     def _get_response_time(self, plan: str) -> str:
         return RESPONSE_TIMES.get(plan.lower(), RESPONSE_TIMES["free"])
 
@@ -181,6 +190,13 @@ class SupportService:
             "description": description,
             "priority": priority,
             "status": "open",
+            "status_history": [{
+                "status": "open",
+                "changed_by": user.id,
+                "changed_by_role": user.role,
+                "changed_by_name": user.full_name,
+                "created_at": datetime.now(timezone.utc),
+            }],
             "attachments": attachments or [],
             "messages": [],
             "browser": metadata.get("browser") if metadata else None,
@@ -283,7 +299,7 @@ class SupportService:
         if not ticket:
             return None
         # Ensure user can only view their own tickets (or admin)
-        if ticket.user_id != user.id and user.role != "admin":
+        if ticket.user_id != user.id and not self._is_admin(user):
             return None
         return ticket.model_dump()
 
@@ -314,7 +330,7 @@ class SupportService:
         ticket = await self._resolve_ticket_id(ticket_id)
         if not ticket:
             return None
-        if ticket.user_id != user.id and user.role != "admin":
+        if ticket.user_id != user.id and not self._is_admin(user):
             return None
 
         message = TicketMessage(
@@ -330,9 +346,15 @@ class SupportService:
 
         # If ticket was waiting_for_customer, set back to in_progress
         if ticket.status == "waiting_for_customer":
-            await self.ticket_repo.update_status(ticket.id, "in_progress")
+            updated = await self.ticket_repo.update_status(
+                ticket.id,
+                "in_progress",
+                changed_by=user.id,
+                changed_by_role=user.role,
+                changed_by_name=user.full_name,
+            )
 
-        return updated.model_dump()
+        return updated.model_dump() if updated else None
 
     async def add_support_reply(
         self,
@@ -358,9 +380,15 @@ class SupportService:
 
         # Set status to waiting_for_customer when support replies
         if ticket.status not in ("resolved", "closed"):
-            await self.ticket_repo.update_status(ticket.id, "waiting_for_customer")
+            updated = await self.ticket_repo.update_status(
+                ticket.id,
+                "waiting_for_customer",
+                changed_by="support",
+                changed_by_role="support",
+                changed_by_name=author_name,
+            )
 
-        return updated.model_dump()
+        return updated.model_dump() if updated else None
 
     async def update_ticket_status(
         self, ticket_id: str, user: UserModel, status: str
@@ -368,19 +396,31 @@ class SupportService:
         ticket = await self._resolve_ticket_id(ticket_id)
         if not ticket:
             return None
-        if ticket.user_id != user.id and user.role != "admin":
+        if ticket.user_id != user.id and not self._is_admin(user):
             return None
 
         valid_statuses = {"open", "in_progress", "waiting_for_customer", "resolved", "closed"}
         if status not in valid_statuses:
             raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
 
-        # Users can only resolve/close their own tickets
-        if user.role != "admin" and status not in ("resolved", "closed"):
-            if ticket.status not in ("open", "in_progress", "waiting_for_customer"):
-                raise ValueError("Cannot change status from resolved/closed without admin")
+        is_admin = self._is_admin(user)
+        if not is_admin:
+            if status == "resolved":
+                if ticket.status in ("resolved", "closed"):
+                    raise ValueError("Ticket is already resolved or closed")
+            elif status == "open":
+                if ticket.status not in ("resolved", "closed"):
+                    raise ValueError("Only resolved or closed tickets can be reopened")
+            else:
+                raise ValueError("Candidates can only resolve or reopen their own tickets")
 
-        updated = await self.ticket_repo.update_status(ticket.id, status)
+        updated = await self.ticket_repo.update_status(
+            ticket.id,
+            status,
+            changed_by=user.id,
+            changed_by_role=user.role,
+            changed_by_name=user.full_name,
+        )
         if not updated:
             return None
         return updated.model_dump()
@@ -430,4 +470,3 @@ class SupportService:
             "content_type": content_type,
             "size_bytes": len(file_bytes),
         }
-

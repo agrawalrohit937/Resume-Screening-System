@@ -134,10 +134,17 @@ export default function ApplyAssistant() {
           }
         }
       } else {
-        // Standard page load or refresh: start clean on Job Details form
-        sessionStorage.removeItem('pending_application_draft');
-        sessionStorage.removeItem('pending_application_id');
-        reset();
+        // The backend is the source of truth after refresh; restore an unfinished draft when available.
+        try {
+          const active = await applyAssistantApi.getActiveDraft();
+          if (active && ['draft', 'ready_for_review', 'sending'].includes(active.status)) {
+            restoreDraft(active);
+          } else {
+            reset();
+          }
+        } catch {
+          reset();
+        }
       }
 
       // 2. Check Gmail connection status
@@ -197,7 +204,7 @@ export default function ApplyAssistant() {
         return;
       }
       setJobDetailsState(jobDetails);
-      generateDraft(targetResumeId, jobDetails);
+      await generateDraft(targetResumeId, jobDetails);
     },
     [resumeId, fetchPrimaryResume, generateDraft],
   );
@@ -214,14 +221,14 @@ export default function ApplyAssistant() {
         return;
       }
       setJobDetailsState(jobDetails);
-      checkATSScore(targetResumeId, jobDetails);
+      await checkATSScore(targetResumeId, jobDetails);
     },
     [resumeId, fetchPrimaryResume, checkATSScore],
   );
 
-  const handleProceedToDraft = useCallback(() => {
+  const handleProceedToDraft = useCallback(async () => {
     if (resumeId && jobDetailsState) {
-      generateDraft(resumeId, jobDetailsState);
+      await generateDraft(resumeId, jobDetailsState);
     }
   }, [resumeId, jobDetailsState, generateDraft]);
 

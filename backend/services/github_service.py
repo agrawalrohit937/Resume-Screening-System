@@ -2,7 +2,7 @@
 GitHub Analyzer Service — Fetch repos, analyze tech stack, contribution metrics
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import httpx
 import structlog

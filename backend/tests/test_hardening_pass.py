@@ -3,13 +3,11 @@ Regression test suite for CareerShala Production Hardening & Correctness Pass.
 Covers P0, P1, and P2 hardening items.
 """
 
-import pytest
 from services.scoring_engine import (
     score_resume,
     score_resume_dual,
     build_smart_embedding_text,
     SCORING_ENGINE_VERSION,
-    WeightProfile,
 )
 from workflows.enhancer_graph import mask_pii, unmask_pii
 

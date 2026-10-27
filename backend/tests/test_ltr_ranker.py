@@ -9,7 +9,6 @@ import numpy as np
 
 from ml.train_ranker import (
     LTR_FEATURE_NAMES,
-    PROTECTED_ATTRIBUTE_DENYLIST,
     validate_feature_set_cleanliness,
     compute_inverse_propensity_weight,
     prepare_ranking_dataset,

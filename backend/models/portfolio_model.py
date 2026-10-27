@@ -77,6 +77,7 @@ class PortfolioProfileModel(BaseModel):
     location: Optional[str] = None
     avatar_url: Optional[str] = None
     resume_file_url: Optional[str] = None
+    show_resume_publicly: bool = False
     
     # New fields for Premium Hero Section
     hero_badge: Optional[str] = Field("Open to Opportunities", description="Top badge text, e.g., 'Open to Internships'")
@@ -117,5 +118,6 @@ class PortfolioAnalyticsModel(BaseModel):
 class ContactMessageSchema(BaseModel):
     sender_name: str = Field(..., min_length=2, max_length=100)
     sender_email: EmailStr
+    company: Optional[str] = Field(default=None, max_length=150)
     subject: str = Field(..., min_length=2, max_length=150)
     message: str = Field(..., min_length=5, max_length=2000)

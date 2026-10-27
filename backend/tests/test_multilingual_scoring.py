@@ -8,12 +8,9 @@ from services.embedding_service import (
     embedding_model,
     assert_vector_compatibility,
     EMBEDDING_MODEL_VERSION,
-    EMBEDDING_DIMENSIONS,
 )
 from services.scoring_engine import (
     _candidate_max_degree_rank,
-    _extract_degree_requirement,
-    score_resume,
     _DEGREE_RANK,
 )
 

@@ -11,7 +11,7 @@ Copilot Action Tools (With side_effect=True)
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 import structlog
 
@@ -120,11 +120,11 @@ class EnhanceBulletsTool(BaseTool):
             role_hint = f" for {args.target_role}" if args.target_role else ""
             cleaned = original.strip().rstrip(".")
             if not cleaned.lower().startswith(("managed", "worked", "helped", "developed", "built", "created")):
-                enhanced = f"{verb} {cleaned}{role_hint}, increasing throughput by 35% and reducing processing latency."
+                enhanced = f"{verb} {cleaned}{role_hint}, improving [measurable outcome] through [specific action]."
             else:
                 words = cleaned.split(" ", 1)
                 remainder = words[1] if len(words) > 1 else cleaned
-                enhanced = f"{verb} {remainder}{role_hint}, achieving 99.9% reliability and cutting cloud costs by 22%."
+                enhanced = f"{verb} {remainder}{role_hint}, delivering [measurable outcome] by [specific method]."
 
             rewritten.append({"original": original, "enhanced": enhanced})
 

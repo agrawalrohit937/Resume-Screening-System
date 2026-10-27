@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from pymongo.asynchronous.database import AsyncDatabase
-from bson import ObjectId
 
 from models.audit_log_model import AuditLogModel
 from repositories.base_repo import BaseRepository

@@ -27,6 +27,14 @@ class TicketMessage(BaseModel):
     author_name: Optional[str] = None
 
 
+class TicketStatusChange(BaseModel):
+    status: str
+    changed_by: Optional[str] = None
+    changed_by_role: Optional[str] = None
+    changed_by_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class SupportTicketModel(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
 
@@ -42,6 +50,7 @@ class SupportTicketModel(BaseModel):
 
     # Status
     status: str = "open"  # "open" | "in_progress" | "waiting_for_customer" | "resolved" | "closed"
+    status_history: List[TicketStatusChange] = Field(default_factory=list)
 
     # Attachments
     attachments: List[TicketAttachment] = Field(default_factory=list)
@@ -79,4 +88,3 @@ class SupportTicketModel(BaseModel):
     class Config:
         populate_by_name = True
         arbitrary_types_allowed = True
-

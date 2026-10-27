@@ -34,7 +34,7 @@ export default function EmployerAssessmentComplete({ sessionData = {} }) {
         </motion.div>
 
         {/* Heading */}
-        <h1 className="text-2xl font-black text-slate-900 font-poppins tracking-tight">
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
           Assessment Submitted!
         </h1>
         <p className="text-sm font-semibold text-emerald-700 bg-emerald-50/80 border border-emerald-200/60 rounded-full px-3.5 py-1 inline-flex items-center gap-1.5 mt-2">

@@ -222,7 +222,7 @@ function CompactCandidateCard({
             </CandidateHoverCard>
 
             {/* ATS Score Pill */}
-            <div className={`px-1.5 py-0.5 rounded-md border text-[11px] font-black font-mono shadow-2xs shrink-0 ${scoreTheme.bg}`}>
+            <div className={`px-1.5 py-0.5 rounded-md border text-[11px] font-black shadow-2xs shrink-0 ${scoreTheme.bg}`}>
               {scoreTheme.text}
             </div>
           </div>
@@ -343,6 +343,8 @@ export default function JobApplicants() {
   const { jobId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const cacheKey = `careershala_recruiter_applicants:${user?.id || user?._id || user?.email || 'anonymous'}:${jobId || 'unknown'}`
+  const hasCachedData = useRef(false)
 
   const userRoles = useMemo(() => {
     if (!user) return []
@@ -418,11 +420,19 @@ export default function JobApplicants() {
   // Fetch job applications
   const fetchApplications = async () => {
     if (!jobId) return
-    setLoading(true)
+    setLoading(!hasCachedData.current && applications.length === 0)
     try {
       const res = await getJobApplications(jobId)
       setJob(res.data?.job || null)
       setApplications(res.data?.applications || [])
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          job: res.data?.job || null,
+          applications: res.data?.applications || [],
+        }))
+      } catch {
+        // Session storage is an optional performance cache.
+      }
     } catch (err) {
       console.error('Failed to load applications:', err)
       const msg = err.response?.data?.detail || 'Failed to load applicant pipeline.'
@@ -433,8 +443,20 @@ export default function JobApplicants() {
   }
 
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        const data = JSON.parse(cached)
+        setJob(data.job || null)
+        setApplications(data.applications || [])
+        hasCachedData.current = true
+        setLoading(false)
+      }
+    } catch {
+      sessionStorage.removeItem(cacheKey)
+    }
     fetchApplications()
-  }, [jobId])
+  }, [jobId, cacheKey])
 
   // Move candidate to a stage (API call with optimistic UI update)
   const handleStageChange = async (appId, newStage) => {
@@ -663,7 +685,7 @@ export default function JobApplicants() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 font-poppins tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                 {job?.title || 'Job Applicants Pipeline'}
               </h1>
               {job?.department && (
@@ -700,12 +722,12 @@ export default function JobApplicants() {
             <div className="flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200/80">
               <div className="text-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Applicants</span>
-                <span className="text-lg font-black text-indigo-700 font-poppins">{applications.length}</span>
+                <span className="text-lg font-black text-indigo-700">{applications.length}</span>
               </div>
               <div className="w-[1px] h-6 bg-slate-200" />
               <div className="text-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Avg Match</span>
-                <span className="text-lg font-black text-emerald-700 font-poppins">{avgMatch}%</span>
+                <span className="text-lg font-black text-emerald-700">{avgMatch}%</span>
               </div>
             </div>
 
@@ -892,7 +914,7 @@ export default function JobApplicants() {
                   <div className={`p-3.5 rounded-t-2xl border-b border-slate-100/80 flex items-center justify-between ${stage.headerBg}`}>
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${stage.dotColor}`} />
-                      <h3 className="text-xs font-bold uppercase tracking-wider font-poppins text-slate-700">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                         {stage.title}
                       </h3>
                     </div>
@@ -965,7 +987,7 @@ export default function JobApplicants() {
                   <div className={`p-3.5 rounded-t-2xl border-b border-slate-100/80 flex items-center justify-between ${stage.headerBg}`}>
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${stage.dotColor}`} />
-                      <h3 className="text-xs font-bold uppercase tracking-wider font-poppins text-slate-700">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                         {stage.id === 'Hired' ? '🎉 ' : ''}{stage.title}
                       </h3>
                     </div>
@@ -1254,7 +1276,7 @@ export default function JobApplicants() {
                         </div>
 
                         <div className="text-right">
-                          <span className="text-[28px] font-black text-emerald-400 font-poppins leading-none">
+                          <span className="text-[28px] font-black text-emerald-400 leading-none">
                             {Math.round(selectedApplicant.live_interview_scorecard.overall_score || selectedApplicant.live_interview_score || 0)}%
                           </span>
                           <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
@@ -1332,13 +1354,13 @@ export default function JobApplicants() {
                               <div key={idx} className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5 text-xs">
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="font-bold text-indigo-300">Q{idx + 1}: {ans.question_text}</span>
-                                  <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                                  <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
                                     (ans.ai_score || 0) >= 70 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-300'
                                   }`}>
                                     {Math.round(ans.ai_score || 0)}%
                                   </span>
                                 </div>
-                                <div className="p-2 rounded-xl bg-black/20 border border-white/5 text-[11px] text-slate-300 leading-relaxed font-mono">
+                                <div className="p-2 rounded-xl bg-black/20 border border-white/5 text-[11px] text-slate-300 leading-relaxed">
                                   "{ans.user_answer || 'No response'}"
                                 </div>
                                 {ans.ai_feedback && (
@@ -1407,7 +1429,7 @@ export default function JobApplicants() {
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                         RECRUITER ATS MATCH
                       </span>
-                      <span className={`text-3xl font-black font-poppins ${
+                      <span className={`text-3xl font-black ${
                         Math.round(selectedApplicant.recruiter_score != null ? selectedApplicant.recruiter_score : (selectedApplicant.match_score || 0)) >= 80 
                           ? 'text-emerald-600' 
                           : Math.round(selectedApplicant.recruiter_score != null ? selectedApplicant.recruiter_score : (selectedApplicant.match_score || 0)) >= 60 
@@ -1510,7 +1532,7 @@ export default function JobApplicants() {
                               <span className="text-slate-500 text-[11px]">{edu.institution}</span>
                             </div>
                             {edu.end_year && (
-                              <span className="text-slate-400 font-mono text-[11px]">{edu.end_year}</span>
+                              <span className="text-slate-400 font-medium text-[11px]">{edu.end_year}</span>
                             )}
                           </div>
                         ))}

@@ -21,7 +21,6 @@ from langgraph.graph import StateGraph, END
 
 from models.revenue_recovery_model import (
     RecoveryStatus,
-    RiskLevel,
     RecoveryStrategy,
     RecoveryChannel,
     ActorType,

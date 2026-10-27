@@ -144,7 +144,7 @@ export default function LandingWorkflowSection({ activeStep, setActiveStep }) {
               <div className="relative z-10">
                 {/* Top Row: Number Badge + Consistent Squircle Icon */}
                 <div className="flex items-center justify-between mb-5">
-                  <span className={`font-mono text-xs font-black px-3 py-1.5 rounded-xl border shadow-2xs ${st.badgeClass}`}>
+                  <span className={`text-xs font-black px-3 py-1.5 rounded-xl border shadow-2xs ${st.badgeClass}`}>
                     STEP {st.num}
                   </span>
                   <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-2xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300 flex items-center justify-center">
@@ -152,7 +152,7 @@ export default function LandingWorkflowSection({ activeStep, setActiveStep }) {
                   </div>
                 </div>
 
-                <span className="text-[10.5px] font-black tracking-widest uppercase text-slate-400 font-mono block mb-1">
+                <span className="text-[10.5px] font-black tracking-widest uppercase text-slate-400 block mb-1">
                   PHASE {idx + 1}: {st.stage}
                 </span>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 mb-2 leading-snug group-hover:text-[#2E9BDA] transition-colors">{st.title}</h3>
@@ -160,7 +160,7 @@ export default function LandingWorkflowSection({ activeStep, setActiveStep }) {
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500 relative z-10">
-                <span className="text-[11px] font-mono">Stage {idx + 1} of 6</span>
+                <span className="text-[11px] font-semibold">Stage {idx + 1} of 6</span>
                 {activeStep === idx ? (
                   <span className="flex items-center gap-1 text-[#2E9BDA] font-extrabold text-[11px]">
                     <Check size={14} /> Selected Phase

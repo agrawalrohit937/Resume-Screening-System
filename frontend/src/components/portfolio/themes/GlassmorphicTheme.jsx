@@ -149,7 +149,7 @@ export default function GlassmorphicTheme({
 
       {/* ── FROSTED GLASS TOP NAV ── */}
       <header className="sticky top-0 left-0 w-full z-50 bg-slate-900/60 backdrop-blur-2xl border-b border-white/10 shadow-2xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 p-[1px] flex items-center justify-center shadow-lg shadow-indigo-500/30">
               <div className="w-full h-full bg-slate-900 rounded-[15px] flex items-center justify-center text-cyan-300 font-black text-sm">
@@ -205,10 +205,10 @@ export default function GlassmorphicTheme({
       </header>
 
       {/* ── MAIN CONTENT LAYER ── */}
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-28 space-y-32">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-16 pb-36 space-y-40">
         
         {/* ── HERO BANNER ── */}
-        <section id="home" className="pt-8 sm:pt-14 pb-8 flex flex-col-reverse lg:flex-row items-center justify-between gap-12 border-b border-white/10 pb-16">
+        <section id="home" className="min-h-[78vh] pt-12 sm:pt-20 pb-12 flex flex-col-reverse lg:flex-row items-center justify-between gap-16 border-b border-white/10 pb-20">
           <div className="space-y-6 max-w-2xl text-center lg:text-left">
             {profile.hero_badge && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 text-xs font-bold tracking-widest uppercase shadow-lg shadow-indigo-500/10">
@@ -218,7 +218,7 @@ export default function GlassmorphicTheme({
             )}
 
             <div className="space-y-2">
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.08]">
+              <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black text-white tracking-[-0.05em] leading-[0.98]">
                 {profile.full_name}
               </h1>
               <div className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-cyan-400 flex items-center justify-center lg:justify-start gap-2">
@@ -274,7 +274,7 @@ export default function GlassmorphicTheme({
           {/* Hero Avatar Card */}
           <div className="relative group shrink-0">
             <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-60 blur-xl group-hover:opacity-100 transition-opacity duration-700" />
-            <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl bg-slate-900/80 backdrop-blur-xl border border-white/20 p-2 shadow-2xl overflow-hidden flex items-center justify-center">
+            <div className="relative w-72 h-72 sm:w-[26rem] sm:h-[26rem] rounded-[2rem] bg-slate-900/80 backdrop-blur-xl border border-white/20 p-2 shadow-2xl overflow-hidden flex items-center justify-center">
               {profile.avatar_url && !avatarFailed ? (
                 <img 
                   src={profile.avatar_url} 

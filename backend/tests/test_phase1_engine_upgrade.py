@@ -5,14 +5,8 @@ Phase 1 Verification Tests:
 1.3 Vector score calibration script smoke test and Max-Sim bounds.
 """
 
-import pytest
 from services.scoring.experience_model import compute_experience_saturation, calculate_effective_experience
-from services.scoring.projects_model import (
-    extract_project_technologies,
-    compute_single_project_score,
-    compute_projects_score,
-)
-from services.scoring_engine import score_resume, CANDIDATE_PROFILE, RECRUITER_PROFILE
+from services.scoring_engine import score_resume
 
 
 def test_experience_saturation_properties():

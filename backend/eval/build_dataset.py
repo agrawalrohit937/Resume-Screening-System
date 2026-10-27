@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 import structlog
 
 from eval.dataset_schema import EvaluationDataset, LabeledPair, RecruiterLabel

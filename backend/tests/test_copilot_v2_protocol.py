@@ -13,12 +13,10 @@ Tests:
 9. Backward compatibility for legacy POST /api/v1/copilot/chat endpoint.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-import json
+from typing import Any, Dict, List
 import pytest
 from bson import ObjectId
-from pymongo import ASCENDING, DESCENDING
+from pymongo import DESCENDING
 
 from main import app
 from api.deps import get_copilot_repo

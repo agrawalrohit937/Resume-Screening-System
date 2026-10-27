@@ -11,13 +11,13 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
-from api.deps import get_current_user, get_resume_repo, get_database
+from api.deps import get_current_user, get_resume_repo
 from config.db import get_database
 from models.resume_model import ResumeStatus
 from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
 from services.ai_interview_service import AIInterviewService
-from services.cheating_service import CheatingDetectionService, CheatingEvent
+from services.cheating_service import CheatingDetectionService
 from services.gamification_service import GamificationService
 
 logger = structlog.get_logger(__name__)

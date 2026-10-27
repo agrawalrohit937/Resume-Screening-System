@@ -9,13 +9,12 @@ systems (Okta, Azure AD, OneLogin, PingFederate).
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from bson import ObjectId
 import structlog
 
 from models.enterprise_auth import SCIMEmail, SCIMName, SCIMUserPayload, SCIMUserResponse
 from models.user_model import UserRole, UserStatus
-from services.multi_tenancy import tenant_context
 
 logger = structlog.get_logger(__name__)
 

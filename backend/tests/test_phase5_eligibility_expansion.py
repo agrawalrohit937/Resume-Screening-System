@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from services.scoring_engine import score_resume
-import services.embedding_service as emb_svc
 
 
 @pytest.fixture(autouse=True)

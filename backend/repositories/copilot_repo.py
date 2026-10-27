@@ -33,6 +33,7 @@ class CopilotRepository(BaseRepository):
     """
 
     def __init__(self, db: AsyncDatabase):
+        self._db = db
         self.db = db
         self.sessions = db.copilot_sessions
         self.messages = db.copilot_messages

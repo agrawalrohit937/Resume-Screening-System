@@ -2,9 +2,7 @@
 -Tests for Fresher / 0-1 Years Experience Mapping and Saturating S_exp Calculation.
 -"""
 
-import pytest
 from services.nlp_extractor import extract_experience_requirement
-from utils.nlp_utils import extract_years_of_experience
 from services.scoring_engine import score_resume, _extract_years_requirement
 from services.scoring.experience_model import compute_experience_saturation, calculate_effective_experience
 

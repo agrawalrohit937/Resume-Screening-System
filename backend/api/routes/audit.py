@@ -8,10 +8,10 @@ tenant executives, and platform administrators.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from api.deps import get_database, get_current_user, PaginationParams
 from core.rbac import Permission, check_rbac_access

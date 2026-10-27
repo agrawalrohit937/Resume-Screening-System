@@ -1,4 +1,3 @@
-import pytest
 from services.nlp_extractor import extract_skill_or_groups
 from services.scoring_engine import score_resume
 

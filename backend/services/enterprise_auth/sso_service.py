@@ -11,7 +11,7 @@ from __future__ import annotations
 import base64
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
 import structlog
@@ -19,7 +19,7 @@ from bson import ObjectId
 
 from core.security import create_access_token
 from models.enterprise_auth import OIDCConfiguration, SAMLConfiguration
-from models.user_model import UserModel, UserRole, UserStatus
+from models.user_model import UserRole, UserStatus
 from services.multi_tenancy import tenant_context
 
 logger = structlog.get_logger(__name__)

@@ -10,18 +10,14 @@ Verifies:
 """
 
 import pytest
-from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 from core.security import (
     create_invite_token,
     decode_token,
     verify_token_type,
-    create_access_token,
 )
 from models.user_model import UserModel, UserRole, UserStatus
-from schemas.team_schema import TeamInviteRequest, AcceptInviteRequest
+from schemas.team_schema import AcceptInviteRequest
 
 
 def test_create_and_decode_invite_token():
@@ -163,7 +159,6 @@ async def test_existing_candidate_accept_invite_preserves_password_and_merges_ro
     """
     from unittest.mock import AsyncMock, MagicMock
     from api.routes.team import accept_team_invite
-    from schemas.team_schema import AcceptInviteRequest
 
     # Setup mock user who is already a candidate with a password
     ORIGINAL_HASH = "$2b$12$existing_secure_password_hash"
@@ -253,7 +248,6 @@ async def test_candidate_accepts_interviewer_invite_appends_role_and_preserves_c
     """
     from unittest.mock import AsyncMock, MagicMock
     from api.routes.team import accept_team_invite
-    from schemas.team_schema import AcceptInviteRequest
 
     interviewer_user = UserModel(
         id="user_cand_888",

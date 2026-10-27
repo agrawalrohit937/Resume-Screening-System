@@ -6,10 +6,8 @@ import os
 import uuid
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
 
 from api.deps import get_current_user, get_resume_repo, get_pdf_service
-from core.config import settings
 from models.resume_model import ResumeStatus
 from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository

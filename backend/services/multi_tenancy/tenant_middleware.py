@@ -18,8 +18,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from core.security import decode_token, verify_token_type
 from services.multi_tenancy.tenant_context import (
     clear_tenant_id,
-    get_current_tenant_id,
-    is_platform_admin,
     set_current_tenant_id,
     set_platform_admin,
 )

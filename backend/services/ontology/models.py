@@ -2,7 +2,7 @@
 Data models for the Multi-Domain Occupation and Skill Graph.
 """
 
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 from enum import Enum
 

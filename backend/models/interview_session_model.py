@@ -2,10 +2,9 @@
 Interview Session Model — MongoDB schema for full live interview sessions
 """
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from enum import Enum
 from pydantic import BaseModel, Field
-from bson import ObjectId
 
 
 class SessionStatus(str, Enum):

@@ -2,7 +2,6 @@
 Unit tests for Deterministic NLP Extractor Module.
 """
 
-import pytest
 from services.nlp_extractor import (
     extract_skills_deterministic,
     extract_education_level,

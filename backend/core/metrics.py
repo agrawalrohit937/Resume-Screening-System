@@ -10,8 +10,7 @@ Defines standard collectors and helpers for:
 
 from __future__ import annotations
 
-import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 try:
     import prometheus_client

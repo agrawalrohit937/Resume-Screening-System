@@ -22,6 +22,7 @@ function openCopilot() {
 
 export default function CareerQuest() {
   const { user } = useAuth()
+  const cacheKey = `careershala_gamification_cache:${user?.id || user?._id || user?.email || 'anonymous'}`
   const [activeTab, setActiveTab] = useState(0) // 0 Path · 1 Achievements · 2 Leaderboard
 
   const [profile, setProfile] = useState(null)
@@ -31,6 +32,20 @@ export default function CareerQuest() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        const data = JSON.parse(cached)
+        setProfile(data.profile || null)
+        setLeaderboard(data.leaderboard || [])
+        if (data.catalog?.length) setCatalog(data.catalog)
+        if (data.levels?.length) setLevels(data.levels)
+        setLoading(false)
+      }
+    } catch {
+      sessionStorage.removeItem(cacheKey)
+    }
+
     // Mark daily activity (awards +25 XP if first visit today)
     markDailyActivity().catch(() => {})
 
@@ -49,9 +64,20 @@ export default function CareerQuest() {
 
         const remoteLevels = lv.data?.levels || []
         if (remoteLevels.length && remoteLevels.every((x) => x.name && typeof x.threshold === 'number')) setLevels(remoteLevels)
+
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            profile: p.data || null,
+            leaderboard: l.data?.leaderboard || [],
+            catalog: remoteBadges.length ? remoteBadges : BADGE_CATALOG_FALLBACK,
+            levels: remoteLevels.length ? remoteLevels : FALLBACK_LEVEL_THRESHOLDS,
+          }))
+        } catch {
+          // Session storage is an optional performance cache.
+        }
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [cacheKey])
 
   const earnedBadges = profile?.badges || []
   const currentUserId = user?.id || user?._id

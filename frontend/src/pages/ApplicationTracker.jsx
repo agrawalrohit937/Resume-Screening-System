@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getMyApplications } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 import CompanyLogo from '../components/common/CompanyLogo'
 import EEOSurveyModal from '../components/common/EEOSurveyModal'
 
@@ -69,18 +70,27 @@ const STAGE_CONFIG = {
 }
 
 export default function ApplicationTracker() {
+  const { user } = useAuth()
+  const cacheKey = `careershala_applications_cache:${user?.id || user?._id || user?.email || 'anonymous'}`
+  const hasCachedApplications = useRef(false)
   const [applications, setApplications] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [selectedApp, setSelectedApp] = useState(null)
   const [selectedEeoApp, setSelectedEeoApp] = useState(null)
 
   const fetchApplications = async () => {
-    setLoading(true)
+    setLoading(!hasCachedApplications.current && applications.length === 0)
     try {
       const res = await getMyApplications()
-      setApplications(res.data?.applications || [])
+      const nextApplications = res.data?.applications || []
+      setApplications(nextApplications)
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(nextApplications))
+      } catch {
+        // Session storage is an optional performance cache.
+      }
     } catch (err) {
       console.error('Failed to load candidate applications:', err)
       toast.error('Unable to fetch your application history.')
@@ -90,8 +100,17 @@ export default function ApplicationTracker() {
   }
 
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        hasCachedApplications.current = true
+        setApplications(JSON.parse(cached))
+      }
+    } catch {
+      sessionStorage.removeItem(cacheKey)
+    }
     fetchApplications()
-  }, [])
+  }, [cacheKey])
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -137,7 +156,7 @@ export default function ApplicationTracker() {
                 Real-Time Pipeline
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-poppins tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Application Tracker
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -172,7 +191,7 @@ export default function ApplicationTracker() {
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
               Total Applied
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900 font-poppins mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
               {stats.total}
             </p>
           </div>
@@ -181,7 +200,7 @@ export default function ApplicationTracker() {
             <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
               Under Review
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-amber-700 font-poppins mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-amber-700 mt-1">
               {stats.underReview}
             </p>
           </div>
@@ -190,7 +209,7 @@ export default function ApplicationTracker() {
             <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
               Shortlisted
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-700 font-poppins mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-emerald-700 mt-1">
               {stats.shortlisted}
             </p>
           </div>
@@ -199,7 +218,7 @@ export default function ApplicationTracker() {
             <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider block">
               Interviews
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-purple-700 font-poppins mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-purple-700 mt-1">
               {stats.interview}
             </p>
           </div>
@@ -291,7 +310,7 @@ export default function ApplicationTracker() {
 
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-base font-extrabold text-slate-900 font-poppins">
+                            <h3 className="text-base font-extrabold text-slate-900">
                               {app.job?.title || 'Applied Position'}
                             </h3>
                           </div>
@@ -320,7 +339,7 @@ export default function ApplicationTracker() {
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                               ATS Match
                             </span>
-                            <span className={`text-sm font-black font-poppins ${
+                            <span className={`text-sm font-black ${
                               app.match_score >= 75
                                 ? 'text-emerald-600'
                                 : app.match_score >= 50
@@ -369,7 +388,7 @@ export default function ApplicationTracker() {
               <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4">
                 <Briefcase size={28} />
               </div>
-              <h3 className="text-lg font-extrabold text-slate-900 font-poppins mb-1">
+              <h3 className="text-lg font-extrabold text-slate-900 mb-1">
                 No applications yet
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 mb-6 leading-relaxed">

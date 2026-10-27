@@ -8,10 +8,9 @@ MongoDB storage. Strictly isolates internal employer listings from deletion.
 
 from __future__ import annotations
 
-import os
 import sys
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import structlog
 
@@ -102,7 +101,6 @@ if __name__ == "__main__":
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from core.config import settings
     from config.db import connect_db, disconnect_db, get_database
 
     async def _run_manual_cleanup() -> None:

@@ -4,7 +4,6 @@ Tests SHAP top-5 positive/negative feature breakdown, cited evidence spans,
 counterfactual prioritization, and anti-hallucination validation.
 """
 
-import pytest
 
 from services.explainability_service import (
     compute_shap_contributions,

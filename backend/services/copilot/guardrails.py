@@ -9,7 +9,6 @@ Implements Phase 5 Safety & Observability controls:
 """
 
 import re
-from typing import List, Tuple, Set
 
 # Regex patterns for Prompt Injection and Jailbreak attempts
 INJECTION_PATTERNS = [

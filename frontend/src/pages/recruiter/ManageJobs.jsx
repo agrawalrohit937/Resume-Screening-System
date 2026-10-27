@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -38,6 +38,8 @@ import ScheduleLiveInterviewModal from '../../components/recruiter/ScheduleLiveI
 export default function ManageJobs() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const cacheKey = `careershala_recruiter_jobs:${user?.id || user?._id || user?.email || 'anonymous'}`
+  const hasCachedJobs = useRef(false)
 
   // State
   const [jobs, setJobs] = useState([])
@@ -145,7 +147,7 @@ Requirements & Qualifications:
 
   // Fetch recruiter's jobs
   const fetchJobs = async () => {
-    setLoading(true)
+    setLoading(!hasCachedJobs.current && jobs.length === 0)
     try {
       const response = await getMyPostedJobs()
       console.log("Fetched jobs state:", response)
@@ -162,6 +164,11 @@ Requirements & Qualifications:
         ? payload.data
         : []
       setJobs(rawList)
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(rawList))
+      } catch {
+        // Session storage is an optional performance cache.
+      }
     } catch (err) {
       console.error('Failed to load recruiter jobs:', err)
       const msg = err.response?.data?.detail || 'Failed to fetch job postings.'
@@ -173,8 +180,18 @@ Requirements & Qualifications:
   }
 
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        setJobs(JSON.parse(cached))
+        hasCachedJobs.current = true
+        setLoading(false)
+      }
+    } catch {
+      sessionStorage.removeItem(cacheKey)
+    }
     fetchJobs()
-  }, [])
+  }, [cacheKey])
 
   // Toggle Job Status (Open <-> Closed)
   const handleToggleStatus = async (job) => {
@@ -399,7 +416,7 @@ Requirements & Qualifications:
                   {user?.full_name || 'Recruiter'}
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-poppins tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                 Manage Job Postings
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xl">
@@ -427,7 +444,7 @@ Requirements & Qualifications:
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Postings</span>
                 <Layers size={16} className="text-slate-400" />
               </div>
-              <p className="text-2xl font-black text-slate-900 font-poppins mt-2">
+              <p className="text-2xl font-black text-slate-900 mt-2">
                 {metrics.total}
               </p>
             </div>
@@ -437,7 +454,7 @@ Requirements & Qualifications:
                 <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Active Roles</span>
                 <CheckCircle2 size={16} className="text-emerald-600" />
               </div>
-              <p className="text-2xl font-black text-emerald-900 font-poppins mt-2">
+              <p className="text-2xl font-black text-emerald-900 mt-2">
                 {metrics.openCount}
               </p>
             </div>
@@ -447,7 +464,7 @@ Requirements & Qualifications:
                 <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Total Applicants</span>
                 <Users size={16} className="text-indigo-600" />
               </div>
-              <p className="text-2xl font-black text-indigo-900 font-poppins mt-2">
+              <p className="text-2xl font-black text-indigo-900 mt-2">
                 {metrics.totalApplicants}
               </p>
             </div>
@@ -457,7 +474,7 @@ Requirements & Qualifications:
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Closed Roles</span>
                 <XCircle size={16} className="text-slate-400" />
               </div>
-              <p className="text-2xl font-black text-slate-900 font-poppins mt-2">
+              <p className="text-2xl font-black text-slate-900 mt-2">
                 {metrics.closedCount}
               </p>
             </div>
@@ -745,7 +762,7 @@ Requirements & Qualifications:
               <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4">
                 <Briefcase size={28} />
               </div>
-              <h3 className="text-lg font-extrabold text-slate-900 font-poppins mb-1">
+              <h3 className="text-lg font-extrabold text-slate-900 mb-1">
                 {searchQuery || statusFilter !== 'all' ? 'No matching postings found' : 'No job postings yet'}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 mb-6 leading-relaxed">
@@ -788,7 +805,7 @@ Requirements & Qualifications:
                         {selectedJob.min_years === 0 ? 'Fresher Friendly' : `${selectedJob.min_years}+ Years Exp`}
                       </span>
                     </div>
-                    <h3 className="text-xl font-extrabold text-slate-900 font-poppins">
+                    <h3 className="text-xl font-extrabold text-slate-900">
                       {selectedJob.title}
                     </h3>
                     <p className="text-xs font-semibold text-slate-500 mt-0.5">
@@ -898,7 +915,7 @@ Requirements & Qualifications:
                   {/* Header (Fixed at top of modal) */}
                   <div className="p-5 border-b border-slate-100 shrink-0 flex justify-between items-center">
                     <div>
-                      <h3 className="text-xl font-bold text-slate-900 font-poppins">
+                      <h3 className="text-xl font-bold text-slate-900">
                         Post a New Job
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
@@ -1117,7 +1134,7 @@ Requirements & Qualifications:
                   <div className="p-5 border-b border-slate-100 shrink-0 flex justify-between items-center">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-bold text-slate-900 font-poppins">
+                        <h3 className="text-xl font-bold text-slate-900">
                           Edit Job Posting
                         </h3>
                         {(editingJob.applicant_count || 0) > 0 && (

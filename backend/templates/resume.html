@@ -407,6 +407,7 @@
             </div>
         </div>
         {% if edu.score %}<div class="edu-score">{{ edu.score }}</div>{% endif %}
+        {% if edu.coursework %}<div class="edu-score"><strong>Relevant Coursework:</strong> {{ edu.coursework }}</div>{% endif %}
     </div>
     {% endfor %}
 </div>

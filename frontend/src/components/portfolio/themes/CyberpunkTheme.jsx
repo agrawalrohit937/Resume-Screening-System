@@ -89,7 +89,7 @@ export default function CyberpunkTheme({
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(3,6,12,0.85)_100%)] z-1" />
 
       <header className="sticky top-0 left-0 w-full z-40 bg-[#03060c]/90 backdrop-blur-xl border-b border-cyan-500/40 shadow-[0_0_20px_rgba(0,240,255,0.15)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 bg-cyan-400 animate-ping rounded-full inline-block" />
             <span className="text-white font-black tracking-widest text-sm uppercase flex items-center gap-1.5">
@@ -141,9 +141,9 @@ export default function CyberpunkTheme({
         )}
       </header>
 
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-24 space-y-28">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-16 pb-32 space-y-36">
         
-        <section className="pt-6 sm:pt-12 pb-8 flex flex-col-reverse lg:flex-row items-center justify-between gap-12 border-b border-cyan-500/20 pb-16">
+        <section className="min-h-[78vh] pt-10 sm:pt-20 pb-10 flex flex-col-reverse lg:flex-row items-center justify-between gap-16 border-b border-cyan-500/20 pb-20">
           <div className="space-y-6 max-w-2xl text-center lg:text-left">
             
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-500/50 text-[11px] text-cyan-300 font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(0,240,255,0.2)]">
@@ -152,7 +152,7 @@ export default function CyberpunkTheme({
             </div>
 
             <div className="space-y-2">
-              <h1 className={`text-4xl sm:text-6xl font-black tracking-tight text-white uppercase ${glitchActive ? 'translate-x-1 text-yellow-400' : ''} transition-all`}>
+              <h1 className={`text-5xl sm:text-7xl lg:text-8xl font-black tracking-[-0.06em] leading-none text-white uppercase ${glitchActive ? 'translate-x-1 text-yellow-400' : ''} transition-all`}>
                 {profile.full_name}
               </h1>
               <div className="text-lg sm:text-xl font-bold text-yellow-400 flex items-center justify-center lg:justify-start gap-2">

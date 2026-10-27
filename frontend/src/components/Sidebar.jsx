@@ -550,7 +550,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       animate={mobile ? { x: 0, opacity: 1 } : { width: collapsed ? 72 : 264 }}
       exit={mobile ? { x: -24, opacity: 0 } : undefined}
       transition={mobile ? { type: 'tween', duration: 0.22, ease: [0.16, 1, 0.3, 1] } : { type: 'spring', stiffness: 350, damping: 32 }}
-      className={`h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none shrink-0 ${mobile ? 'relative z-50 w-[250px] max-w-[65vw] sm:max-w-[250px] shadow-2xl rounded-r-3xl' : 'relative z-40 shadow-sm'}`}
+      className={`h-full bg-white border-r border-slate-100 flex flex-col overflow-hidden select-none shrink-0 ${mobile ? 'relative z-50 w-[295px] max-w-[85vw] sm:max-w-[310px] shadow-2xl rounded-r-3xl' : 'relative z-40 shadow-sm'}`}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile ? 'true' : undefined}
     >
@@ -1090,14 +1090,6 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
           {!isCompact && <span>Logout</span>}
         </button>
       </div>
-      {!mobile && (
-        <button onClick={onToggle}
-          title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          className="absolute -right-3 top-[18px] w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-[#2E9BDA] hover:border-blue-200 transition-all z-10 cursor-pointer">
-          <ChevronLeft className={`w-3.5 h-3.5 transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-180'}`} strokeWidth={2.5} />
-        </button>
-      )}
     </motion.aside>
   )
 })

@@ -4,8 +4,8 @@ Defines domain-specific feature weights, eligibility knockouts, and evidence att
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Dict, List, Set, Tuple, Optional, Any, Callable
+from dataclasses import dataclass
+from typing import Dict, List, Set, Tuple, Any
 
 
 @dataclass

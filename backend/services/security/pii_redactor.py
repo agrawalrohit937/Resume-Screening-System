@@ -7,7 +7,7 @@ Implements blind scoring mode (FEATURE_BLIND_SCORING) by masking:
 """
 
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Tuple
 import structlog
 
 logger = structlog.get_logger(__name__)

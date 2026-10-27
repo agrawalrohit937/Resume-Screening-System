@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
+import re
 from bson import ObjectId
 from pymongo.asynchronous.database import AsyncDatabase
 
@@ -83,6 +84,7 @@ class SupportTicketRepository(BaseRepository):
         status: Optional[str] = None,
         priority: Optional[str] = None,
         category: Optional[str] = None,
+        search: Optional[str] = None,
         skip: int = 0,
         limit: int = 20,
     ) -> Tuple[List[SupportTicketModel], int]:
@@ -93,6 +95,14 @@ class SupportTicketRepository(BaseRepository):
             query["priority"] = priority
         if category:
             query["category"] = category
+        if search and search.strip():
+            pattern = re.escape(search.strip())
+            query["$or"] = [
+                {"subject": {"$regex": pattern, "$options": "i"}},
+                {"email": {"$regex": pattern, "$options": "i"}},
+                {"ticket_id": {"$regex": pattern, "$options": "i"}},
+                {"description": {"$regex": pattern, "$options": "i"}},
+            ]
 
         total = await self.collection.count_documents(query)
         cursor = (
@@ -150,20 +160,39 @@ class SupportTicketRepository(BaseRepository):
         return SupportTicketModel(**self._serialize(result))
 
     async def update_status(
-        self, ticket_id: str, status: str
+        self,
+        ticket_id: str,
+        status: str,
+        changed_by: Optional[str] = None,
+        changed_by_role: Optional[str] = None,
+        changed_by_name: Optional[str] = None,
     ) -> Optional[SupportTicketModel]:
+        now = datetime.now(timezone.utc)
         update: Dict[str, Any] = {
             "status": status,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": now,
+            "$push": {
+                "status_history": {
+                    "status": status,
+                    "changed_by": changed_by,
+                    "changed_by_role": changed_by_role,
+                    "changed_by_name": changed_by_name,
+                    "created_at": now,
+                }
+            },
         }
         if status == "resolved":
-            update["resolved_at"] = datetime.now(timezone.utc)
+            update["resolved_at"] = now
+            update["closed_at"] = None
         elif status == "closed":
-            update["closed_at"] = datetime.now(timezone.utc)
+            update["closed_at"] = now
+        elif status == "open":
+            update["resolved_at"] = None
+            update["closed_at"] = None
 
         result = await self.collection.find_one_and_update(
             {"_id": ObjectId(ticket_id)},
-            {"$set": update},
+            {"$set": {k: v for k, v in update.items() if k != "$push"}, "$push": update["$push"]},
             return_document=True,
         )
         if not result:
@@ -191,4 +220,3 @@ class SupportTicketRepository(BaseRepository):
             stats[doc["_id"]] = doc["count"]
         total = await self.collection.count_documents({})
         return {"by_status": stats, "total": total}
-

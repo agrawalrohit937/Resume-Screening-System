@@ -6,7 +6,7 @@ Computes ranking, classification, and calibration metrics with bootstrap 95% con
 from __future__ import annotations
 
 import math
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 import numpy as np
 from scipy.stats import kendalltau, spearmanr
 

@@ -15,7 +15,6 @@ import asyncio
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List
 
 # Ensure utf-8 encoding on Windows consoles
 if sys.platform == "win32":

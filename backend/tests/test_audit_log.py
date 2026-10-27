@@ -12,7 +12,7 @@ Tests:
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 from models.audit_log_model import AuditLogModel, AuditAction, AuditResourceType
 from repositories.audit_log_repo import AuditLogRepository

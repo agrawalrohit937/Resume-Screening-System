@@ -8,10 +8,9 @@ and progress reporting.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import structlog
 from pymongo.asynchronous.database import AsyncDatabase
-from bson import ObjectId
 
 from models.task_job_model import TaskJobModel, JobStatus, JobType
 from repositories.base_repo import BaseRepository

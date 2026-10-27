@@ -9,9 +9,7 @@ import pytest
 from services.nlp_extractor import extract_skills_deterministic
 from services.title_normalizer import normalize_title, calculate_title_match
 from services.ontology.graph import get_ontology_graph
-from services.ontology.loaders import load_taxonomy_csvs
 import core.feature_flags as ff
-import services.embedding_service as emb_svc
 
 
 @pytest.fixture(autouse=True)

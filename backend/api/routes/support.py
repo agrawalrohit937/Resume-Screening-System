@@ -2,22 +2,20 @@
 Support Ticket API Routes — Create, list, reply, and manage support tickets
 """
 
-from typing import Annotated, List, Optional
+from typing import List, Optional
 import structlog
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from api.deps import (
+    get_admin_user,
     get_current_user,
-    get_current_active_user,
-    get_db,
     get_email_service,
     get_user_repo,
-    PaginationParams,
 )
 from config.db import get_database
 from core.config import settings
-from models.user_model import UserModel, UserRole
+from models.user_model import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
 from services.support_service import SupportService
@@ -85,7 +83,8 @@ async def create_ticket(
                     )
                     attachment_list.append(attachment)
                 except Exception as e:
-                    logger.error("Failed to upload attachment", filename=file.filename, error=str(e))
+                    logger.exception("Failed to upload attachment", filename=file.filename)
+                    raise HTTPException(status_code=502, detail=f"Attachment upload failed: {file.filename}") from e
 
     # Parse console errors from JSON string
     parsed_console_errors = []
@@ -177,7 +176,8 @@ async def reply_to_ticket(
                     )
                     attachment_list.append(attachment)
                 except Exception as e:
-                    logger.error("Failed to upload attachment", filename=file.filename, error=str(e))
+                    logger.exception("Failed to upload attachment", filename=file.filename)
+                    raise HTTPException(status_code=502, detail=f"Attachment upload failed: {file.filename}") from e
 
     result = await service.add_reply(ticket_id, user, body, attachment_list)
     if not result:
@@ -211,7 +211,7 @@ async def update_ticket_status(
         )
 
 
-@router.get("/stats", dependencies=[Depends(get_current_user)])
+@router.get("/stats", dependencies=[Depends(get_admin_user)])
 async def get_ticket_stats(
     service: SupportService = Depends(get_support_service),
 ):
@@ -224,4 +224,3 @@ async def get_support_categories():
     """Get all support categories and their subcategories."""
     from services.support_service import SUPPORT_CATEGORIES
     return SUPPORT_CATEGORIES
-

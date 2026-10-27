@@ -10,19 +10,18 @@ Verifies:
 6. Fail-Fast on Permanent Auth Errors (HTTP 401).
 """
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from bson import ObjectId
 
-from models.cron_run_model import CronRunStatus, DeliveryStatus
+from models.cron_run_model import DeliveryStatus
 from scheduler.job_alerts import (
     calculate_slot_id,
     run_nightly_job_alerts,
     sweep_stuck_pending_resumes,
 )
-from services.email_service import EmailService, send_job_alert_email
+from services.email_service import EmailService
 
 
 def test_slot_id_calculation():

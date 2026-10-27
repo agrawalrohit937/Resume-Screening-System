@@ -14,7 +14,6 @@ Serverless Webhook Execution Architecture:
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -181,16 +180,11 @@ async def run_nightly_job_alerts(
     except Exception as exc:
         logger.warning("Pre-digest stale job cleanup encountered an issue", error=str(exc))
 
-    # 3. Ensure active jobs exist (auto-scrape fresh jobs if jobs are zero)
+    # 3. Scheduled fresh external job ingestion (Upserts new Indian tech/fresher jobs, refreshes existing ones)
     try:
+        logger.info("Running scheduled external job scrape during alert retention cycle")
+        await run_external_job_scrape()
         open_jobs_count = await db.jobs.count_documents({"status": {"$in": ["open", "published"]}})
-        if open_jobs_count == 0:
-            logger.info("No active open jobs in database, attempting external job scrape")
-            try:
-                await run_external_job_scrape()
-                open_jobs_count = await db.jobs.count_documents({"status": {"$in": ["open", "published"]}})
-            except Exception as s_err:
-                logger.warning("Scrape during alert cycle failed", error=str(s_err))
 
         if open_jobs_count == 0:
             logger.info("No active open jobs in database; skipping job alerts retention loop.")
@@ -230,7 +224,7 @@ async def run_nightly_job_alerts(
                 "reason": "no_open_jobs",
             }
     except Exception as exc:
-        logger.warning("Could not count open jobs, proceeding with caution", error=str(exc))
+        logger.warning("Issue during scheduled job scrape or open jobs count", error=str(exc))
 
     # 4. Distributed Lock Mutex for this specific scheduled slot (TTL: 30 minutes)
     lock_key = f"cron:job_alerts:{effective_slot_id}:{target_email}" if target_email else f"cron:job_alerts:{effective_slot_id}"

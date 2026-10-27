@@ -2,9 +2,8 @@
 Unit tests for Real Occupation and Skill Graph (ESCO / O*NET / NCO-2015).
 """
 
-import pytest
 from services.ontology.graph import get_ontology_graph, ONTOLOGY_VERSION
-from services.ontology.models import TypedRelation, compute_edge_credit
+from services.ontology.models import compute_edge_credit
 
 
 def test_ontology_initialization():

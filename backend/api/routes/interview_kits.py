@@ -3,7 +3,7 @@ CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 
 from bson import ObjectId

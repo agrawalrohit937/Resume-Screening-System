@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 import structlog
 from bson import ObjectId
@@ -161,8 +161,6 @@ async def _stage_1_prefilter_jobs(
         "min_years": 1,
         "jd_text_raw": 1,
         "department": 1,
-        "jd_embedding": 1,
-        "jd_embedding_bge": 1,
         "created_at": 1,
         "is_external": 1,
         "external_apply_url": 1,

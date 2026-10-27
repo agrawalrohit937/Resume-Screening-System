@@ -107,7 +107,7 @@ export default function BentoGridTheme({
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="max-w-5xl mx-auto h-16 bg-white/70 backdrop-blur-xl border border-white/50 shadow-lg shadow-slate-200/50 rounded-full flex items-center justify-between px-6 pointer-events-auto"
+          className="max-w-7xl mx-auto h-16 bg-white/70 backdrop-blur-xl border border-white/50 shadow-lg shadow-slate-200/50 rounded-full flex items-center justify-between px-6 lg:px-8 pointer-events-auto"
         >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white font-black shadow-inner">
@@ -167,7 +167,7 @@ export default function BentoGridTheme({
         </AnimatePresence>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-32 pb-24 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-36 pb-32 space-y-8">
         
         {/* ── BENTO HERO GRID ── */}
         <motion.section 
@@ -175,7 +175,7 @@ export default function BentoGridTheme({
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 md:grid-cols-4 md:auto-rows-[220px] gap-6"
+          className="min-h-[78vh] grid grid-cols-1 md:grid-cols-4 md:auto-rows-[250px] gap-7"
         >
           {/* Main Identity (Spans 2 cols, 2 rows) */}
           <BentoCard colSpan={2} rowSpan={2} className="p-8 sm:p-12 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50/50">
@@ -188,7 +188,7 @@ export default function BentoGridTheme({
                   </span>
                 </motion.div>
               )}
-              <h1 className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tighter leading-[1.1]">
+              <h1 className="text-6xl sm:text-7xl lg:text-8xl font-black text-slate-900 tracking-[-0.07em] leading-[0.95]">
                 {profile.full_name}
               </h1>
               <div className="h-8">

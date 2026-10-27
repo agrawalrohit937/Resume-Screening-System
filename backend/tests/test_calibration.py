@@ -5,7 +5,6 @@ and candidate fit indicator floor invariants.
 """
 
 from pathlib import Path
-import pytest
 import numpy as np
 
 from ml.calibration import ScoreCalibrator, compute_ece

@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Menu,
   Search,
   Sparkles,
   ChevronDown,
@@ -17,13 +16,15 @@ import {
   Briefcase,
   ArrowLeft,
   Target,
-  Compass
+  Compass,
+  Flame
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
 import NotificationBell from './NotificationBell'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 import ProfilePlanDropdown from './ProfilePlanDropdown'
+import { getGamificationProfile } from '../services/interviewApi'
 
 // Fast spotlight search routes
 const SEARCH_ROUTES = [
@@ -98,6 +99,47 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
 
   const isRecruiter = user?.role === 'recruiter'
   const activeSearchRoutes = isRecruiter ? RECRUITER_SEARCH_ROUTES : SEARCH_ROUTES
+
+  // Live Streak Count
+  const [streakCount, setStreakCount] = useState(() => {
+    try {
+      const cached = localStorage.getItem('careershala_cached_stats')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (typeof parsed?.streak === 'number') return parsed.streak
+      }
+    } catch {}
+    return user?.current_streak ?? 0
+  })
+
+  useEffect(() => {
+    if (!user || isRecruiter) return
+    let isMounted = true
+
+    const syncStreak = () => {
+      getGamificationProfile()
+        .then(res => {
+          if (!isMounted) return
+          const s = res?.data?.current_streak ?? user?.current_streak ?? 0
+          setStreakCount(s)
+          try {
+            const cached = JSON.parse(localStorage.getItem('careershala_cached_stats') || '{}')
+            localStorage.setItem('careershala_cached_stats', JSON.stringify({ ...cached, streak: s }))
+          } catch {}
+        })
+        .catch(() => {})
+    }
+
+    syncStreak()
+
+    window.addEventListener('careershala:gamification-updated', syncStreak)
+    window.addEventListener('careershala:streak-updated', syncStreak)
+    return () => {
+      isMounted = false
+      window.removeEventListener('careershala:gamification-updated', syncStreak)
+      window.removeEventListener('careershala:streak-updated', syncStreak)
+    }
+  }, [user?.id, user?._id, isRecruiter])
 
   // Clean route display name
   const pageTitle = (() => {
@@ -362,24 +404,11 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
         )}
       </AnimatePresence>
 
-      {/* 1. LEFT: Toggle Button + Clean Page Title */}
+      {/* 1. LEFT: Clean Modern Page Title (Stripe / Linear / Vercel pattern) */}
       <div className="flex items-center gap-3 shrink-0">
-        <button
-          type="button"
-          onClick={onMenuToggle}
-          aria-label="Toggle navigation menu"
-          className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/70 shadow-2xs transition-all cursor-pointer"
-          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <Menu size={18} strokeWidth={2.2} />
-        </button>
-
-        {/* Clean, lightweight breadcrumb (no heavy boxes) */}
-        <div className="hidden sm:flex items-center gap-2 text-sm select-none">
-          <span className="text-slate-400 font-medium">Workspace</span>
-          <span className="text-slate-300">/</span>
-          <span className="font-extrabold text-slate-900 tracking-tight">{pageTitle}</span>
-        </div>
+        <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight select-none">
+          {pageTitle}
+        </h1>
       </div>
 
       {/* 2. CENTER: Clean, Balanced Spotlight Search */}
@@ -434,17 +463,35 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
           <Search size={16} strokeWidth={2.5} />
         </button>
 
-        {/* AI Copilot Button (Sleek Gradient Pill) */}
+        {/* AI Copilot Button (Sleek Brand Blue Gradient Pill) */}
         <button
           type="button"
           onClick={openCopilot}
           aria-label="Open AI Copilot"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-xs hover:shadow transition-all cursor-pointer"
+          className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] hover:from-[#2587bf] hover:to-[#1e74a8] text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-sky-500/20 active:scale-98 transition-all cursor-pointer"
           title="Open AI Career Copilot"
         >
-          <Sparkles size={14} className="text-indigo-200 animate-pulse" />
+          <Sparkles size={14} className="text-sky-100 animate-pulse" />
           <span className="hidden sm:inline">Copilot</span>
         </button>
+
+        {/* Daily Streak Flame Pill (Candidate Gamification) */}
+        {!isRecruiter && (
+          <button
+            type="button"
+            onClick={() => navigate('/gamification')}
+            title={`Daily Practice Streak: ${streakCount} Day${streakCount === 1 ? '' : 's'} • Click to view Rewards`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border border-amber-200/90 text-amber-800 transition-all cursor-pointer shadow-2xs group"
+          >
+            <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+              <Flame size={13} className="text-amber-500 fill-amber-500 group-hover:scale-115 transition-transform" />
+            </div>
+            <span className="text-xs font-black text-amber-900 leading-none">{streakCount}</span>
+            <span className="hidden sm:inline text-[11px] font-bold text-amber-700/90 leading-none">
+              {streakCount === 1 ? 'day' : 'days'}
+            </span>
+          </button>
+        )}
 
         {/* Notifications */}
         <NotificationBell />

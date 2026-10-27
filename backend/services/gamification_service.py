@@ -3,13 +3,11 @@ Gamification Service — Points, badges, streaks, leaderboard, daily rewards, mi
 """
 
 import time
-import calendar
 from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any
 
 import structlog
 from pymongo.asynchronous.database import AsyncDatabase
-from bson import ObjectId
 
 logger = structlog.get_logger(__name__)
 
@@ -578,9 +576,7 @@ class GamificationService:
             {"$limit": limit},
         ]
 
-        docs = []
-        async for doc in self.collection.aggregate(pipeline):
-            docs.append(doc)
+        docs = await self.collection.aggregate(pipeline).to_list(length=limit)
 
         result = []
         rank = 1
@@ -1115,4 +1111,3 @@ def invalidate_leaderboard_cache():
     going through award_points() (e.g. test scripts, migrations)."""
     global _leaderboard_cache
     _leaderboard_cache["data"] = None
-

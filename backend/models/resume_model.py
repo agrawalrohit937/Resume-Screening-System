@@ -70,6 +70,7 @@ class ParsedResumeData(BaseModel):
     raw_text: str = ""
     contact_info: ContactInfo = Field(default_factory=ContactInfo)
     full_name: Optional[str] = None
+    location: Optional[str] = None
     summary: Optional[str] = None
     skills: List[str] = []
     technical_skills: List[str] = []
@@ -84,6 +85,7 @@ class ParsedResumeData(BaseModel):
     sections_detected: List[str] = []
     page_count: Optional[int] = 1
     parsing_source: Optional[str] = "pdfplumber"
+    auto_fill_failed: bool = False
 
 
 class ResumeModel(BaseModel):

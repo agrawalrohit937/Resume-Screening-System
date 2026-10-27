@@ -3,14 +3,10 @@ Regression test suite for ATS scoring consistency, skill normalization,
 mutual exclusion invariant, and resume snapshot safety (Phase 10).
 """
 
-import pytest
-from services.skill_ontology import normalize_skill, canonicalize_skills, evaluate_skill_fulfillment
+from services.skill_ontology import canonicalize_skills
 from services.scoring_engine import (
     score_resume,
     score_resume_dual,
-    _compute_shared_components,
-    CANDIDATE_PROFILE,
-    RECRUITER_PROFILE,
 )
 
 

@@ -4,8 +4,7 @@ Verifies that skills listed in 'Relevant Coursework', 'Projects', 'Work Experien
 and 'Education' sections are properly parsed and credited even if missing from explicit 'skills'.
 """
 
-import pytest
-from services.nlp_extractor import extract_skills_from_sections, extract_skills_deterministic
+from services.nlp_extractor import extract_skills_from_sections
 from services.scoring_engine import score_resume
 
 

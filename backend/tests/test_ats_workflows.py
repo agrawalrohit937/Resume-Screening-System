@@ -3,7 +3,6 @@ CareerShala ATS v2.0.0.
 """
 
 import pytest
-from datetime import datetime
 
 from models.requisition import RequisitionStatus, ApprovalDecision, ApprovalStep
 from services.requisition_service import RequisitionService

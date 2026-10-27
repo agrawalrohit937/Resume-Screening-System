@@ -3,7 +3,6 @@ Loaders for ESCO, O*NET, NCO-2015, and High-Priority Curated Tech Taxonomy.
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import structlog
@@ -25,7 +24,7 @@ def load_curated_tech_overlay() -> Tuple[List[SkillNode], List[SkillEdge]]:
     edges: List[SkillEdge] = []
 
     try:
-        from services.ontology.tech_overlay import SKILL_ALIASES, SKILL_TAXONOMY, CHILD_TO_PARENTS
+        from services.ontology.tech_overlay import SKILL_ALIASES, SKILL_TAXONOMY
 
         # Invert aliases to build canonical nodes with aliases
         canonical_to_aliases: Dict[str, List[str]] = {}

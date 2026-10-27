@@ -9,7 +9,6 @@ Verifies:
 
 import time
 import numpy as np
-import pytest
 
 from services.embedding_cache import (
     EmbeddingCacheManager,

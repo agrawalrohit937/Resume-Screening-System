@@ -3,7 +3,6 @@ Unit tests for Chunking & Max-Sim Late Interaction (Phase 1.2).
 """
 
 import numpy as np
-import pytest
 
 from services.chunking_service import chunk_resume, chunk_jd, compute_max_sim_vector_score
 

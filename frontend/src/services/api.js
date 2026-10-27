@@ -203,6 +203,7 @@ export const getATSHistory = (p, config) => api.get('/ats/history', { params: p,
 export const getATSResult = (id) => api.get(`/ats/result/${id}`)
 
 export const enhanceResume = (p) => api.post('enhance/enhance-and-download', p)
+export const recompileResumePdf = (p) => api.post('/enhance/recompile-pdf', p)
 
 export const generateQuickPractice = (p) => api.post('/interview/quick-practice', p)
 
@@ -274,12 +275,12 @@ export const chatCopilotStream = async (message, history = [], quickAction = nul
 
   if (!response.ok) {
     const errText = await response.text();
-    let friendlyMessage = 'Failed to connect to AI Copilot.';
+    let friendlyMessage = 'Failed to connect to CareerMitra.';
     try {
       const errJson = JSON.parse(errText);
       if (errJson.detail) {
         if (response.status === 401 || String(errJson.detail).toLowerCase().includes('authenticated') || String(errJson.detail).toLowerCase().includes('credential')) {
-          friendlyMessage = 'Please sign in to chat with AI Copilot.';
+          friendlyMessage = 'Please sign in to chat with CareerMitra.';
         } else {
           friendlyMessage = errJson.detail;
         }
@@ -354,6 +355,5 @@ export const exportEmployerEvaluationsExcel = (jobId) =>
 
 // EEO Demographic Self-ID & Analytics API
 export const submitEEOSelfId = (payload) => api.post('/eeo/self-id', payload)
-export const seedDemoEEOData = () => api.post('/analytics/seed-eeo-demo')
 
 export default api

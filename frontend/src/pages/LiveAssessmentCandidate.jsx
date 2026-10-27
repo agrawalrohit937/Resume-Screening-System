@@ -432,7 +432,7 @@ export default function LiveAssessmentCandidate() {
         <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-200 flex items-center justify-center text-indigo-600 mb-4 animate-pulse">
           <Sparkles className="h-6 w-6" />
         </div>
-        <h2 className="text-base font-extrabold text-slate-900 font-poppins">
+        <h2 className="text-base font-extrabold text-slate-900">
           Loading AI Assessment Environment...
         </h2>
         <p className="text-xs text-slate-500 mt-1">Verifying secure token & company parameters</p>
@@ -452,7 +452,7 @@ export default function LiveAssessmentCandidate() {
           <div className="h-14 w-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100">
             <AlertTriangle className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-extrabold text-slate-900 font-poppins">
+          <h2 className="text-xl font-extrabold text-slate-900">
             Assessment Link Unavailable
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
@@ -484,7 +484,7 @@ export default function LiveAssessmentCandidate() {
           <div className="h-14 w-14 mx-auto rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-100">
             <XCircle className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-extrabold text-slate-900 font-poppins">
+          <h2 className="text-xl font-extrabold text-slate-900">
             Assessment Terminated
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
@@ -526,7 +526,7 @@ export default function LiveAssessmentCandidate() {
             </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-poppins tracking-tight leading-snug">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug">
             You have been invited by <span className="text-indigo-600">{company}</span> for the{' '}
             <span className="text-slate-900">{role}</span> interview.
           </h1>
@@ -539,7 +539,7 @@ export default function LiveAssessmentCandidate() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-6">
             <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Questions</span>
-              <span className="text-lg font-black text-slate-900 font-poppins mt-0.5 block">{count} Questions</span>
+              <span className="text-lg font-black text-slate-900 mt-0.5 block">{count} Questions</span>
             </div>
 
             <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
@@ -549,7 +549,7 @@ export default function LiveAssessmentCandidate() {
 
             <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-center col-span-2 sm:col-span-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Est. Duration</span>
-              <span className="text-lg font-black text-emerald-700 font-poppins mt-0.5 block">~15–20 min</span>
+              <span className="text-lg font-black text-emerald-700 mt-0.5 block">~15–20 min</span>
             </div>
           </div>
 

@@ -92,7 +92,7 @@ export default function RecommendedJobs() {
                 <span className="text-xs text-slate-400 font-bold">•</span>
                 <span className="text-xs text-slate-500 font-medium">BGE-768 Vector Engine</span>
               </div>
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 font-poppins">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
                 Find Jobs Matched to Your Profile
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 max-w-xl leading-relaxed">
@@ -131,7 +131,7 @@ export default function RecommendedJobs() {
                 <span className="text-xs text-slate-400 font-bold">•</span>
                 <span className="text-xs text-slate-500 font-medium">Resume Required</span>
               </div>
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 font-poppins">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
                 Unlock "Jobs For You" AI Recommendations
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 max-w-xl leading-relaxed">
@@ -173,7 +173,7 @@ export default function RecommendedJobs() {
               768-dim Vector Evaluated
             </span>
           </div>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 font-poppins">
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
             Jobs For You
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -257,7 +257,7 @@ export default function RecommendedJobs() {
                   {/* Title & Company */}
                   <h3 
                     onClick={() => navigate('/jobs')}
-                    className="text-sm font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer font-poppins line-clamp-1"
+                    className="text-sm font-extrabold text-slate-900 group-hover:text-indigo-600 transition cursor-pointer line-clamp-1"
                     title={job.title}
                   >
                     {job.title}

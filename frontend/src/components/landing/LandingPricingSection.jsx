@@ -171,7 +171,7 @@ export default function LandingPricingSection() {
               <div>
                 {/* Header Row */}
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-black text-slate-800 tracking-wider uppercase font-mono">
+                  <span className="text-xs font-black text-slate-800 tracking-wider uppercase">
                     {plan.name}
                   </span>
                   {!plan.isPopular && (

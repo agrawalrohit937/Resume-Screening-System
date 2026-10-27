@@ -3,8 +3,7 @@ Tests for Cultural Name Handling and Identity Normalization.
 Ensures mononyms, patronymics, particles, and non-Latin scripts are correctly handled.
 """
 
-import pytest
-from services.identity_service import parse_cultural_name, detect_script_type
+from services.identity_service import parse_cultural_name
 
 
 def test_mononym_handling():

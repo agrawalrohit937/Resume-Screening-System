@@ -14,7 +14,7 @@ Identifies formatting barriers such as:
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 import structlog
 
 logger = structlog.get_logger(__name__)

@@ -6,8 +6,6 @@ Trains per-occupation-family ranking models on persisted ScoringFeatures with:
 - 5,000 labeled applications minimum sample gate
 """
 
-import os
-import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np

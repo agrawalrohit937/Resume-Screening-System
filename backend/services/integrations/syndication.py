@@ -3,9 +3,7 @@ CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 from datetime import datetime, timezone
-import html
-import json
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from xml.etree import ElementTree as ET
 
 from models.job import JobModel, WorkMode

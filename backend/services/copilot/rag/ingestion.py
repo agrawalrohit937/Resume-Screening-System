@@ -10,7 +10,7 @@ Processes resumes, jobs, transcripts, and help docs:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import structlog
 
 from services.copilot.rag.chunker import DocumentChunker

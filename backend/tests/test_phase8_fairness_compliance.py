@@ -12,7 +12,6 @@ from eval.fairness import (
     run_counterfactual_fairness_test,
 )
 from services.scoring_engine import score_resume
-import services.embedding_service as emb_svc
 
 
 @pytest.fixture(autouse=True)

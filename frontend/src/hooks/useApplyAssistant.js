@@ -47,7 +47,7 @@ export function useApplyAssistant() {
       return result;
     } catch (err) {
       setError(formatErrorMessage(err, 'Failed to check ATS score. Please try again.'));
-      throw err;
+      return null;
     } finally {
       setIsSubmitting(false);
     }
@@ -65,7 +65,7 @@ export function useApplyAssistant() {
     } catch (err) {
       setError(formatErrorMessage(err, 'Failed to generate draft. Please try again.'));
       setStep(STEPS.JOB_DETAILS);
-      throw err;
+      return null;
     } finally {
       setIsSubmitting(false);
     }
@@ -80,7 +80,7 @@ export function useApplyAssistant() {
         return result;
       } catch (err) {
         setError(formatErrorMessage(err, 'Failed to update draft.'));
-        throw err;
+        return null;
       }
     },
     [draft],
@@ -108,7 +108,7 @@ export function useApplyAssistant() {
       return result;
     } catch (err) {
       setError(formatErrorMessage(err, 'Failed to send application.'));
-      throw err;
+      return null;
     } finally {
       setIsSubmitting(false);
     }
@@ -125,4 +125,3 @@ export function useApplyAssistant() {
 
   return { step, setStep, draft, atsResult, error, isSubmitting, checkATSScore, generateDraft, updateDraft, restoreDraft, sendApplication, reset };
 }
-

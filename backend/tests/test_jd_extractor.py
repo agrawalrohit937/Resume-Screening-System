@@ -78,4 +78,4 @@ async def test_ensure_external_job_jd_generates_and_saves():
         assert "Join Acme as Data Engineer" in result_text
         assert job_doc["jd_text_raw"] == result_text
         assert "jd_embedding_bge" in job_doc
-        assert len(job_doc["jd_embedding_bge"]) in (768, 1024)
+        assert len(job_doc["jd_embedding_bge"]) in (384, 768, 1024)

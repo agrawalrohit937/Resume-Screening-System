@@ -31,6 +31,7 @@ ONTOLOGY_VERSION: str = "2.0.0"
 
 _GRAPH_SINGLETON: Optional["OccupationSkillGraph"] = None
 _GRAPH_LOCK = threading.Lock()
+_SKILL_EMB_CACHE: Dict[str, Any] = {}
 
 
 def _clean_term(term: str) -> str:
@@ -40,8 +41,15 @@ def _clean_term(term: str) -> str:
 
 
 def _strip_version(text: str) -> str:
-    """Removes trailing version digits (e.g. 'React 18' -> 'React', 'Python 3.10' -> 'Python')."""
-    return re.sub(r"[\s\-_]*v?\d+(\.\d+)*\b", "", text, flags=re.IGNORECASE).strip()
+    """Removes trailing version digits safely (e.g. 'React 18' -> 'React', 'Python 3.10' -> 'Python') without corrupting S3, EC2, iOS, C#."""
+    if not text or not isinstance(text, str):
+        return ""
+    # Explicit protective check for identifiers with digits or special characters
+    if re.match(r"^(s3|ec2|ios|l1|l2|c#|c\+\+)$", text.strip(), re.IGNORECASE):
+        return text.strip()
+    # Strip explicit trailing version numbers preceded by space, dash, or 'v'
+    cleaned = re.sub(r"(?:[\s\-_]+v?|\b[vV])\d+(?:\.\d+)*$", "", text.strip()).strip()
+    return cleaned or text.strip()
 
 
 class OccupationSkillGraph:
@@ -208,12 +216,12 @@ class OccupationSkillGraph:
         if clean in self.multilingual_labels:
             return self.multilingual_labels[clean]
 
-        # 6. Unknown: Title-case and record for human review gate
-        title_cased = raw_skill.strip().title()
+        # 5. Unknown: Preserve original trimmed string without unsafe title-casing
+        raw_trimmed = raw_skill.strip()
         if record_pending and len(clean) > 2:
-            self._queue_pending_review(raw_skill, title_cased)
+            self._queue_pending_review(raw_skill, raw_trimmed)
 
-        return title_cased
+        return raw_trimmed
 
     def _queue_pending_review(self, raw: str, suggested: str):
         """Queues an unknown skill string for human review gate without modifying active graph."""
@@ -324,14 +332,16 @@ class OccupationSkillGraph:
                 if not best_edge_match or credit > best_edge_match[0]:
                     best_edge_match = (credit, m_type, original_text, bucket)
 
-            # Check required -> candidate edge (e.g. required is substitutable_for candidate)
+            # Check required -> candidate edge only for explicitly substitutable or prerequisite relationships.
+            # A broad parent category must NOT automatically satisfy a specific required child skill.
             if (req_clean, c_norm_clean) in self.edges:
                 edge = self.edges[(req_clean, c_norm_clean)]
-                credit = compute_edge_credit(edge.relation, edge.weight)
-                m_type = edge.relation.upper()
-                bucket = "matched" if credit >= 0.85 else "transferable"
-                if not best_edge_match or credit > best_edge_match[0]:
-                    best_edge_match = (credit, m_type, original_text, bucket)
+                if edge.relation in (TypedRelation.SUBSTITUTABLE_FOR.value, TypedRelation.SAME_AS.value):
+                    credit = compute_edge_credit(edge.relation, edge.weight)
+                    m_type = edge.relation.upper()
+                    bucket = "matched" if credit >= 0.85 else "transferable"
+                    if not best_edge_match or credit > best_edge_match[0]:
+                        best_edge_match = (credit, m_type, original_text, bucket)
 
         if best_edge_match and best_edge_match[0] > 0.0:
             return SkillMatch(
@@ -394,30 +404,49 @@ class OccupationSkillGraph:
             except Exception as e:
                 logger.debug("Fuzzy skill matching failed", error=str(e))
 
-        # 7. Embedding-Based Skill Linking for Unseen Skills (Credit: 0.60, match_type="EMBEDDING")
+        # 7. Embedding-Based Skill Linking for Unseen Skills (Cached single-batch execution)
         try:
             from services.embedding_service import embedding_model
+            import numpy as np
             if candidate_skills:
-                req_emb = embedding_model.encode([req_canonical])
-                cand_embs = embedding_model.encode(candidate_skills)
-                if len(req_emb) == 1 and len(cand_embs) > 0:
-                    import numpy as np
-                    r_vec = np.asarray(req_emb[0], dtype=np.float32)
-                    r_norm = float(np.linalg.norm(r_vec)) or 1.0
-                    c_vecs = np.asarray(cand_embs, dtype=np.float32)
-                    c_norms = np.linalg.norm(c_vecs, axis=1, keepdims=True)
-                    c_norms[c_norms == 0] = 1.0
-                    sims = (c_vecs @ r_vec) / (c_norms.flatten() * r_norm)
+                # 1. Fetch or encode required skill vector
+                req_norm_key = req_canonical.strip().lower()
+                r_vec = _SKILL_EMB_CACHE.get(req_norm_key)
+                if r_vec is None:
+                    enc_req = embedding_model.encode([req_canonical])
+                    v = np.asarray(enc_req[0], dtype=np.float32)
+                    norm = float(np.linalg.norm(v)) or 1.0
+                    r_vec = v / norm
+                    if len(_SKILL_EMB_CACHE) < 5000:
+                        _SKILL_EMB_CACHE[req_norm_key] = r_vec
+
+                # 2. Batch encode any candidate skills not yet in cache (run ONCE for the whole resume!)
+                uncached_cands = [c for c in candidate_skills if c.strip().lower() not in _SKILL_EMB_CACHE]
+                if uncached_cands:
+                    enc_cands = embedding_model.encode(uncached_cands)
+                    for c_text, c_v in zip(uncached_cands, enc_cands):
+                        v = np.asarray(c_v, dtype=np.float32)
+                        norm = float(np.linalg.norm(v)) or 1.0
+                        if len(_SKILL_EMB_CACHE) < 5000:
+                            _SKILL_EMB_CACHE[c_text.strip().lower()] = v / norm
+
+                # 3. Retrieve normalized vectors for all candidate skills
+                c_vecs_list = [_SKILL_EMB_CACHE[c.strip().lower()] for c in candidate_skills if c.strip().lower() in _SKILL_EMB_CACHE]
+                if c_vecs_list and r_vec is not None:
+                    c_matrix = np.vstack(c_vecs_list)
+                    sims = c_matrix @ r_vec
                     best_idx = int(np.argmax(sims))
                     best_sim = float(sims[best_idx])
                     if best_sim >= 0.72:
-                        info = credit_table.get("EMBEDDING", {"credit": 0.60, "bucket": "transferable"})
+                        raw_credit = credit_table.get("EMBEDDING", {}).get("credit", 0.50)
+                        # Cap credit at max 0.50 so embedding fallback cannot act as fully matched
+                        capped_credit = min(0.50, float(raw_credit))
                         return SkillMatch(
                             required=req_canonical,
-                            credit=info["credit"],
+                            credit=capped_credit,
                             match_type="EMBEDDING",
                             evidence=[candidate_skills[best_idx]],
-                            bucket=info["bucket"],
+                            bucket="unverified",
                         )
         except Exception as e:
             logger.debug("Embedding skill linking failed", error=str(e))
@@ -431,6 +460,16 @@ class OccupationSkillGraph:
             evidence=[],
             bucket=none_info["bucket"],
         )
+
+
+    def get_all_known_skills(self) -> Set[str]:
+        """Returns all known canonical skills and alias strings across curated and ESCO taxonomies."""
+        known: Set[str] = set()
+        known.update(self.canonical_nodes.keys())
+        known.update(self.exact_canonicals.keys())
+        known.update(self.curated_aliases.keys())
+        known.update(self.esco_aliases.keys())
+        return known
 
 
     def find_occupation(

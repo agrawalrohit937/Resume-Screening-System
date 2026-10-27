@@ -1,5 +1,3 @@
-import asyncio
-import base64
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 import structlog

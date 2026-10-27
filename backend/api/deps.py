@@ -19,7 +19,6 @@ from repositories.result_repo import ResultRepository
 from repositories.otp_repo import OTPRepository
 from repositories.copilot_repo import CopilotRepository
 from services.parser_service import ParserService
-from services.skill_service import SkillService
 from services.ai_interview_service import AIInterviewService
 from services.github_service import GitHubService
 from services.pdf_generator_service import PDFGeneratorService
@@ -30,7 +29,6 @@ from services.multi_tenancy.tenant_context import (
     get_current_tenant_id,
     set_current_tenant_id,
     set_platform_admin,
-    is_platform_admin,
 )
 from services.multi_tenancy.tenant_repository import TenantScopedDatabase
 
@@ -76,10 +74,6 @@ def get_copilot_repo(db=Depends(get_db)) -> CopilotRepository:
 # ─── Services ─────────────────────────────────────────────────────────────────
 def get_parser_service() -> ParserService:
     return ParserService()
-
-
-def get_skill_service() -> SkillService:
-    return SkillService()
 
 
 def get_interview_service() -> AIInterviewService:

@@ -111,24 +111,7 @@ export default function PortfolioPaywallModal({
         return;
       }
 
-      // Step 3: Robust Instant Activation & Fallback Gateway Simulation
-      // Allows seamless development and instant unlocking
-      await new Promise((r) => setTimeout(r, 1200));
-
-      try {
-        await verifyPayment({
-          plan: planName.toLowerCase(),
-          razorpay_order_id: `order_sim_${Date.now()}`,
-          razorpay_payment_id: `pay_sim_${Date.now()}`,
-          razorpay_signature: 'simulated_signature'
-        });
-      } catch (e) {
-        // Continue if verification endpoint is in test mode
-      }
-
-      toast.success(`🎉 Subscription Activated! ${planName.toUpperCase()} Plan is now Live!`, { id: toastId });
-      if (refreshUser) await refreshUser();
-      onPaymentSuccess();
+      throw new Error('Secure checkout is unavailable. Please try again later.');
 
     } catch (err) {
       console.error('Payment Gateway Error:', err);

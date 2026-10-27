@@ -13,13 +13,11 @@ from workflows.apply_assistant_graph import apply_assistant_graph
 from services.scoring_engine import score_resume
 from repositories.resume_repo import ResumeRepository
 from services.pdf_generator_service import render_html_to_pdf
-from services.email_service import send_with_attachments, send_application_via_gmail_api
+from services.email_service import send_application_via_gmail_api
 from repositories.user_repo import UserRepository
 
 
 import base64
-import json
-import re
 try:
     from google import genai
     from google.genai import types
@@ -107,7 +105,10 @@ class ApplyAssistantService:
                 )
 
         if not raw_response:
-            return {"company_name": "", "job_title": "", "hr_email": "", "job_description": ""}
+            raise HTTPException(
+                status_code=http_status.HTTP_502_BAD_GATEWAY,
+                detail="AI Vision returned an empty response. Please retry with a clearer screenshot.",
+            )
 
         data = parse_llm_json(raw_response, default={})
         if not isinstance(data, dict):
@@ -135,8 +136,6 @@ class ApplyAssistantService:
 
     async def _get_resume(self, resume_id: str, user_id: str) -> dict:
         resume = await self.resume_repo.get_by_id_and_user(resume_id, user_id)
-        if not resume:
-            resume = await self.resume_repo.get_by_id(resume_id)
         if not resume:
             raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Resume not found")
 
@@ -182,6 +181,17 @@ class ApplyAssistantService:
             jd=job_description,
             mode="candidate",
         )
+        try:
+            from services.ats_feedback_service import generate_ats_feedback_with_groq
+            scored["feedback_suggestions"] = await generate_ats_feedback_with_groq(
+                scored_result=scored,
+                job_description=job_description,
+                resume_data={"raw_text": resume_text},
+            )
+        except Exception as exc:
+            logger.warning("ATS feedback generation failed", error=str(exc))
+            scored["feedback_unavailable"] = True
+
         return {
             "result_id": "unified_scoring_engine",
             "score": int(scored.get("final_score", 0)),
@@ -246,13 +256,20 @@ class ApplyAssistantService:
             "missing_keywords": ats_result.get("missing_keywords", []),
         }
 
-        return await self.repo.save_generated_draft(
+        saved = await self.repo.save_generated_draft(
             str(application["_id"]),
+            user_id=user_id,
             jd_analysis=final_state.get("jd_analysis", {}),
             ats_result_ref=ats_result_ref,
             generated_draft=generated_draft,
             needs_manual_review=final_state.get("needs_manual_review", False),
         )
+        if not saved:
+            raise HTTPException(
+                http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "The generated draft could not be saved. Please retry.",
+            )
+        return saved
 
     async def update_draft(self, *, application_id: str, user_id: str, edits: dict) -> dict:
         application = await self.repo.get_by_id(application_id, user_id)
@@ -289,6 +306,17 @@ class ApplyAssistantService:
         locked = await self.repo.update_status(application_id, current_status, ApplicationStatus.SENDING.value)
         if not locked:
             raise HTTPException(http_status.HTTP_409_CONFLICT, "Application status changed - please refresh and try again")
+        if not application.get("hr_email"):
+            await self.repo.update_status(
+                application_id,
+                ApplicationStatus.SENDING.value,
+                ApplicationStatus.FAILED.value,
+                send_metadata={"last_error": "Recruiter or HR email address is required"},
+            )
+            raise HTTPException(
+                http_status.HTTP_400_BAD_REQUEST,
+                "A recruiter or HR email address is required before sending.",
+            )
 
         try:
             resume_doc = await self._get_resume(str(application["resume_id"]), user_id)

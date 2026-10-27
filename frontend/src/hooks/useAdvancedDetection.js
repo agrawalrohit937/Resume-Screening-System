@@ -87,6 +87,7 @@ export function useAdvancedDetection({
   const objTimerRef         = useRef(null)
   const isProcessingRef     = useRef(false)
   const isRunningObjRef     = useRef(false)
+  const missedFramesRef     = useRef(0)
 
   // ── 1. Fast Dynamic Script Loader ──────────────────────────────────────────
   const loadScript = useCallback((src, id) => new Promise((resolve, reject) => {
@@ -166,12 +167,18 @@ export function useAdvancedDetection({
     const count = faces.length
 
     if (count === 0) {
-      setStatus(s => ({ ...s, faceCount: 0, gazeDir: 'unknown', confidence: 0 }))
-      emitEvent('face_missing', 'medium', 'No face detected in camera frame')
-      trackLookAway(true)
-      trackLookingDown(false)
+      missedFramesRef.current++
+      // Only switch to No face after 3 consecutive missed frames (~750ms) to prevent false flickers
+      if (missedFramesRef.current >= 3) {
+        setStatus(s => ({ ...s, faceCount: 0, gazeDir: 'unknown', confidence: 0 }))
+        emitEvent('face_missing', 'medium', 'No face detected in camera frame')
+        trackLookAway(true)
+        trackLookingDown(false)
+      }
       return
     }
+
+    missedFramesRef.current = 0
 
     if (count > 1) {
       emitEvent('multiple_faces', 'high', `${count} faces detected — potential unauthorized assistance`)
@@ -240,12 +247,17 @@ export function useAdvancedDetection({
 
     const initEngine = async () => {
       try {
-        // Step 1: Initialize FaceMesh instantly (<800ms)
-        await loadScript(`https://unpkg.com/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js`, 'mp-camera')
-        await loadScript(`https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/face_mesh.js`, 'mp-facemesh')
+        // Step 1: Initialize FaceMesh instantly using fast reliable jsdelivr CDN with unpkg fallback
+        try {
+          await loadScript(`https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js`, 'mp-camera')
+          await loadScript(`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/face_mesh.js`, 'mp-facemesh')
+        } catch (_) {
+          await loadScript(`https://unpkg.com/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js`, 'mp-camera')
+          await loadScript(`https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/face_mesh.js`, 'mp-facemesh')
+        }
 
         let retries = 0
-        while (!window.FaceMesh && retries < 25) {
+        while (!window.FaceMesh && retries < 50) {
           if (isCancelled) return
           await new Promise(r => setTimeout(r, 100))
           retries++
@@ -254,14 +266,14 @@ export function useAdvancedDetection({
         if (!window.FaceMesh) throw new Error('FaceMesh library unavailable')
 
         const fm = new window.FaceMesh({
-          locateFile: (file) => `https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/${file.replace(/^\//, '')}`,
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/${file.replace(/^\//, '')}`,
         })
 
         fm.setOptions({
           maxNumFaces: 2,
           refineLandmarks: true, // enables iris landmarks 468-477
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          minDetectionConfidence: 0.30, // Optimized for room lighting, backlight & glasses
+          minTrackingConfidence: 0.30,  // Stable continuous tracking
         })
 
         fm.onResults(handleFaceMeshResults)
@@ -281,18 +293,18 @@ export function useAdvancedDetection({
         try {
           await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js', 'tfjs-cdn')
           let tfRetry = 0
-          while (!window.tf && tfRetry < 15) {
+          while (!window.tf && tfRetry < 20) {
             if (isCancelled) return
-            await new Promise(r => setTimeout(r, 200))
+            await new Promise(r => setTimeout(r, 150))
             tfRetry++
           }
 
           if (window.tf) {
             await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js', 'coco-ssd-cdn')
             let cocoRetry = 0
-            while (!window.cocoSsd && cocoRetry < 15) {
+            while (!window.cocoSsd && cocoRetry < 20) {
               if (isCancelled) return
-              await new Promise(r => setTimeout(r, 200))
+              await new Promise(r => setTimeout(r, 150))
               cocoRetry++
             }
 
@@ -305,16 +317,17 @@ export function useAdvancedDetection({
             }
           }
         } catch (e) {
-          // background model notice
+          console.warn('[useAdvancedDetection] COCO background model notice:', e)
         }
 
       } catch (err) {
+        console.error('[useAdvancedDetection] initEngine error:', err)
         if (!isCancelled && mountedRef.current) {
           setStatus(s => ({
             ...s,
-            isWorkerReady: true,
+            isWorkerReady: false,
             isWorkerLoading: false,
-            workerStatus: 'ready',
+            workerStatus: 'error',
           }))
         }
       }
@@ -338,12 +351,14 @@ export function useAdvancedDetection({
     faceTimerRef.current = setInterval(async () => {
       if (isProcessingRef.current || !faceMeshRef.current || !videoRef?.current) return
       const vid = videoRef.current
-      if (vid.readyState < 2 || vid.paused || vid.ended) return
+      if (vid.readyState < 2 || vid.paused || vid.ended || !vid.videoWidth || !vid.videoHeight) return
 
       try {
         isProcessingRef.current = true
         await faceMeshRef.current.send({ image: vid })
       } catch (err) {
+        console.warn('[useAdvancedDetection] FaceMesh frame send error:', err)
+      } finally {
         isProcessingRef.current = false
       }
     }, faceInterval)

@@ -5,7 +5,7 @@ graph ontology lookup, and JD semantic patterns.
 """
 
 import re
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 import structlog
 
 from services.scoring.adapters.base import OccupationAdapter

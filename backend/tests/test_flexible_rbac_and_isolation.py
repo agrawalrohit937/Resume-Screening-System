@@ -9,13 +9,11 @@ Verifies Phase 5 B2B Multi-Tenancy invariants:
 """
 
 import pytest
-from fastapi import HTTPException
 from models.user_model import UserModel, UserRole
 from core.rbac import (
     Permission,
     get_user_combined_permissions,
     has_any_permission,
-    check_rbac_access,
 )
 from services.multi_tenancy.tenant_context import (
     TenantAccessDeniedError,
@@ -27,7 +25,6 @@ from services.multi_tenancy.tenant_context import (
 )
 from services.multi_tenancy.tenant_repository import (
     TenantScopedCollection,
-    TenantScopedDatabase,
 )
 
 

@@ -7,7 +7,7 @@ and supports Skills-First mode (required | preferred | ignored).
 import csv
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple, Any
 import structlog
 
 logger = structlog.get_logger(__name__)

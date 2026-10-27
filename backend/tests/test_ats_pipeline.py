@@ -3,8 +3,6 @@ End-to-End Pipeline Unit Tests for the Enterprise ATS Evaluation Engine.
 Tests all phases: Skill Ontology, NLP Extractor, and Unified Scoring Engine.
 """
 
-import pytest
-from services.skill_ontology import expand_skills, normalize_skill, evaluate_skill_fulfillment
 from services.nlp_extractor import extract_resume_data_deterministic
 from services.scoring_engine import score_resume
 

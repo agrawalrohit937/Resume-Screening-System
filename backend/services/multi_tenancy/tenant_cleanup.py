@@ -8,9 +8,7 @@ and prevents reviving orphaned tenant profiles upon onboarding.
 from __future__ import annotations
 
 import os
-import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import structlog
 from bson import ObjectId
 

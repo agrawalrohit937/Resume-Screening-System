@@ -2,13 +2,12 @@
 CareerShala ATS v2.0.0 - Enterprise Authentication.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 from pydantic import BaseModel
 
 from api.deps import get_database
 from models.enterprise_auth import (
-    SAMLConfiguration,
     SCIMUserPayload,
     SCIMUserResponse,
 )

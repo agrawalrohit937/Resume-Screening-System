@@ -2,8 +2,6 @@
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
-from datetime import datetime
-import math
 from typing import List, Optional, Dict
 import structlog
 

@@ -1,14 +1,4 @@
-"""
-Repository for the AI Apply Assistant module.
-
-Mirrors resume_repo.py's method naming and shape 1:1 (create, get_by_id,
-list_by_user, update, delete) so this doesn't introduce a second data-access
-convention into the codebase.
-
-ASSUMPTION FLAG: the import below assumes a shared get_database() in
-backend/config/db.py, per the README. If your actual helper has a
-different name/path, this is the one line to fix.
-"""
+"""MongoDB persistence for AI Apply Assistant applications."""
 
 from datetime import datetime, timezone
 from typing import Optional, Tuple, List
@@ -60,6 +50,8 @@ class ApplicationRepository:
         return doc
 
     async def get_by_id(self, application_id: str, user_id: str) -> Optional[dict]:
+        if not ObjectId.is_valid(application_id):
+            return None
         return await self.collection.find_one({
             "_id": ObjectId(application_id),
             "user_id": ObjectId(user_id),
@@ -81,6 +73,7 @@ class ApplicationRepository:
         self,
         application_id: str,
         *,
+        user_id: str,
         jd_analysis: dict,
         ats_result_ref: dict,
         generated_draft: dict,
@@ -95,10 +88,22 @@ class ApplicationRepository:
             "status": ApplicationStatus.READY_FOR_REVIEW.value,
             "updated_at": datetime.now(timezone.utc),
         }
-        await self.collection.update_one({"_id": ObjectId(application_id)}, {"$set": update})
-        return await self.collection.find_one({"_id": ObjectId(application_id)})
+        if not ObjectId.is_valid(application_id):
+            return None
+        result = await self.collection.update_one(
+            {"_id": ObjectId(application_id), "user_id": ObjectId(user_id)},
+            {"$set": update},
+        )
+        matched_count = getattr(result, "matched_count", None)
+        if isinstance(matched_count, int) and matched_count != 1:
+            return None
+        return await self.collection.find_one(
+            {"_id": ObjectId(application_id), "user_id": ObjectId(user_id)}
+        )
 
     async def save_edited_draft(self, application_id: str, user_id: str, edits: dict) -> Optional[dict]:
+        if not ObjectId.is_valid(application_id):
+            return None
         edits = {k: v for k, v in edits.items() if v is not None}
         if not edits:
             return await self.get_by_id(application_id, user_id)
@@ -125,7 +130,7 @@ class ApplicationRepository:
         Returns False (writes nothing) if the transition is invalid - the
         service layer should turn that into a 409, never proceed anyway.
         """
-        if not is_valid_transition(current_status, target_status):
+        if not ObjectId.is_valid(application_id) or not is_valid_transition(current_status, target_status):
             return False
 
         update = {"status": target_status, "updated_at": datetime.now(timezone.utc), **extra_fields}

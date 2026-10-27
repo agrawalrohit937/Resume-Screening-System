@@ -6,7 +6,7 @@ cursor pagination across large collections.
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 from bson import ObjectId
 import structlog
 

@@ -256,6 +256,7 @@ export default function TicketDetail() {
   const messages = ticket.messages || []
   const attachments = ticket.attachments || []
   const canResolve = ticket.status !== 'resolved' && ticket.status !== 'closed'
+  const canReopen = ticket.status === 'resolved' || ticket.status === 'closed'
   const slaResponseTime = isEnterprise ? '< 30 Minutes' : (RESPONSE_TIMES[ticket.plan] || '24-48 Hours')
 
   // Creator details
@@ -305,55 +306,57 @@ export default function TicketDetail() {
             </button>
           )}
 
-          {/* Status Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setStatusMenuOpen(!statusMenuOpen)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all shadow-sm"
-            >
-              <span className={`w-2 h-2 rounded-full ${statusConf.dot}`} />
-              <span>{statusConf.label}</span>
-              <ChevronDown size={14} className={`transition-transform ${statusMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
+          {/* Internal workflow status controls are only for support administrators. */}
+          {isAdmin && (
+            <div className="relative">
+              <button
+                onClick={() => setStatusMenuOpen(!statusMenuOpen)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all shadow-sm"
+              >
+                <span className={`w-2 h-2 rounded-full ${statusConf.dot}`} />
+                <span>{statusConf.label}</span>
+                <ChevronDown size={14} className={`transition-transform ${statusMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {statusMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setStatusMenuOpen(false)}
-                />
-                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden z-40 p-1.5 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Change Status
+              {statusMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setStatusMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden z-40 p-1.5 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Change Status
+                    </div>
+                    {Object.entries(STATUS_CONFIG).map(([key, conf]) => {
+                      const isCurrent = key === ticket.status
+                      const isDisabled = !isAdmin && (ticket.status === 'resolved' || ticket.status === 'closed') && (key === 'open' || key === 'in_progress')
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => !isDisabled && handleStatusChange(key)}
+                          disabled={isCurrent || isDisabled}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition-colors ${
+                            isCurrent
+                              ? 'bg-slate-50 text-slate-400 cursor-default'
+                              : isDisabled
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${conf.dot}`} />
+                            <span>{conf.label}</span>
+                          </div>
+                          {isCurrent && <Check size={14} className="text-slate-400" />}
+                        </button>
+                      )
+                    })}
                   </div>
-                  {Object.entries(STATUS_CONFIG).map(([key, conf]) => {
-                    const isCurrent = key === ticket.status
-                    const isDisabled = !isAdmin && (ticket.status === 'resolved' || ticket.status === 'closed') && (key === 'open' || key === 'in_progress')
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => !isDisabled && handleStatusChange(key)}
-                        disabled={isCurrent || isDisabled}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition-colors ${
-                          isCurrent
-                            ? 'bg-slate-50 text-slate-400 cursor-default'
-                            : isDisabled
-                              ? 'text-slate-300 cursor-not-allowed'
-                              : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${conf.dot}`} />
-                          <span>{conf.label}</span>
-                        </div>
-                        {isCurrent && <Check size={14} className="text-slate-400" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -792,7 +795,7 @@ export default function TicketDetail() {
               {/* If user needs more help, allow sending a follow up or reopening */}
               <div className="pt-2">
                 <button
-                  onClick={() => handleStatusChange('open')}
+                  onClick={() => canReopen && handleStatusChange('open')}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs"
                 >
                   <RefreshCw size={14} />
@@ -824,12 +827,14 @@ export default function TicketDetail() {
                     <span className={`w-1.5 h-1.5 rounded-full ${statusConf.dot}`} />
                     {statusConf.label}
                   </span>
-                  <button
-                    onClick={() => setStatusMenuOpen(true)}
-                    className="text-[11px] font-bold text-indigo-600 hover:underline"
-                  >
-                    Edit
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setStatusMenuOpen(true)}
+                      className="text-[11px] font-bold text-indigo-600 hover:underline"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </div>
               </div>
 

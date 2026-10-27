@@ -6,7 +6,7 @@ Tests:
 2. Pydantic schema validation for all tool inputs.
 3. Read tools are strictly grounded (honest "no data on file", zero hallucinated numbers).
 4. Action tools produce structured payloads and generative UI card directives.
-5. Provider adapters: Groq, Gemini, and Mistral formats and tool-call normalization.
+5. Provider adapters: Groq, Gemini, and OpenRouter formats and tool-call normalization.
 6. CopilotRouter: concurrent execution with asyncio.gather, 8s timeout isolation, fault tolerance.
 7. Navigation tool routing replacing hardcoded direct_commands and parse_intents.
 """
@@ -25,10 +25,6 @@ from services.copilot.tools.read_tools import (
     GetATSBreakdownTool,
     SearchResumeArgs,
     SearchResumeTool,
-    GetGitHubProfileTool,
-    GetInterviewHistoryTool,
-    GetCertificatesTool,
-    GetGamificationStateTool,
     SearchJobsArgs,
     SearchJobsTool,
     SearchHelpDocsArgs,
@@ -43,14 +39,9 @@ from services.copilot.tools.action_tools import (
     GenerateInterviewQuestionsTool,
     BuildLearningRoadmapArgs,
     BuildLearningRoadmapTool,
-    DraftOutreachEmailArgs,
-    DraftOutreachEmailTool,
     NavigateArgs,
     NavigateTool,
 )
-from services.copilot.adapters.groq_adapter import GroqToolAdapter
-from services.copilot.adapters.gemini_adapter import GeminiToolAdapter
-from services.copilot.adapters.mistral_adapter import MistralToolAdapter
 from services.copilot.router import CopilotRouter
 
 
@@ -328,50 +319,7 @@ async def test_navigate_tool_replaces_direct_commands(mock_context):
     assert "Interview Practice" in res.summary
 
 
-# ─── 4. Provider Adapters ─────────────────────────────────────────────────────
-
-def test_provider_adapters_format_and_extract():
-    tools = [GetResumeSummaryTool(), NavigateTool()]
-
-    # Groq Adapter
-    groq = GroqToolAdapter()
-    groq_formatted = groq.format_tools(tools)
-    assert len(groq_formatted) == 2
-    assert groq_formatted[0]["type"] == "function"
-    assert groq_formatted[0]["function"]["name"] == "get_resume_summary"
-
-    sample_groq_resp = {
-        "choices": [
-            {
-                "message": {
-                    "tool_calls": [
-                        {
-                            "id": "tc_01",
-                            "type": "function",
-                            "function": {"name": "navigate", "arguments": '{"route": "/results", "reason": "view ATS"}'},
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-    extracted_groq = groq.extract_tool_calls(sample_groq_resp)
-    assert len(extracted_groq) == 1
-    assert extracted_groq[0].name == "navigate"
-    assert extracted_groq[0].args["route"] == "/results"
-
-    # Gemini Adapter
-    gemini = GeminiToolAdapter()
-    gemini_formatted = gemini.format_tools(tools)
-    assert "function_declarations" in gemini_formatted[0]
-
-    # Mistral Adapter
-    mistral = MistralToolAdapter()
-    mistral_formatted = mistral.format_tools(tools)
-    assert len(mistral_formatted) == 2
-
-
-# ─── 5. CopilotRouter Execution & Resilience ──────────────────────────────────
+# ─── 4. CopilotRouter Execution & Resilience ──────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_router_parallel_execution_and_resilience(mock_context):

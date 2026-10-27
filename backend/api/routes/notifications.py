@@ -2,7 +2,7 @@
 Notifications API Route — Dynamic real notification feed for users with MongoDB persistence.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from models.user_model import UserModel

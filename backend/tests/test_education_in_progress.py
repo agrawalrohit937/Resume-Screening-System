@@ -2,17 +2,13 @@
 Unit Tests for In-Progress / Pursuing Degree Classification and Partial Credit Education Scoring.
 """
 
-import pytest
 from services.education_service import (
-    resolve_degree_level,
     candidate_highest_education,
     is_degree_in_progress,
     get_education_classification,
 )
 from services.scoring_engine import (
-    _candidate_max_degree_rank,
     _education_score,
-    _evaluate_eligibility,
     score_resume,
 )
 

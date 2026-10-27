@@ -142,7 +142,7 @@ export default function ThreeDInteractiveTheme({
 
       {/* ── CELESTIAL TOP NAV BAR ── */}
       <header className="sticky top-0 left-0 w-full z-40 bg-[#05070e]/80 backdrop-blur-xl border-b border-purple-900/30 shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-400 p-[1px] flex items-center justify-center shadow-lg shadow-purple-500/20">
               <div className="w-full h-full bg-[#05070e] rounded-full flex items-center justify-center text-purple-300">
@@ -199,10 +199,10 @@ export default function ThreeDInteractiveTheme({
       </header>
 
       {/* ── MAIN CONTENT LAYER ── */}
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-24 space-y-28">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-16 pb-32 space-y-36">
         
         {/* ── HERO ORBIT SPHERE ── */}
-        <section className="pt-8 sm:pt-14 pb-12 flex flex-col-reverse lg:flex-row items-center justify-between gap-12 border-b border-purple-900/20 pb-16">
+        <section className="min-h-[78vh] pt-12 sm:pt-20 pb-12 flex flex-col-reverse lg:flex-row items-center justify-between gap-16 border-b border-purple-900/20 pb-20">
           <div className="space-y-6 max-w-2xl text-center lg:text-left">
             {profile.hero_badge && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/60 border border-purple-500/40 text-purple-300 text-xs font-bold tracking-widest uppercase shadow-lg shadow-purple-500/10">
@@ -212,7 +212,7 @@ export default function ThreeDInteractiveTheme({
             )}
 
             <div className="space-y-2">
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight">
+              <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black text-white tracking-[-0.05em] leading-[0.98]">
                 {profile.full_name}
               </h1>
               <div className="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 flex items-center justify-center lg:justify-start gap-2">
@@ -264,7 +264,7 @@ export default function ThreeDInteractiveTheme({
           {/* 3D Planetary Avatar Ring */}
           <div className="relative group shrink-0">
             <div className="absolute -inset-4 bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 rounded-full opacity-30 blur-2xl group-hover:opacity-60 transition-opacity" />
-            <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-full p-2 bg-gradient-to-tr from-purple-500 to-cyan-400 shadow-2xl overflow-hidden">
+            <div className="relative w-72 h-72 sm:w-[26rem] sm:h-[26rem] rounded-full p-2 bg-gradient-to-tr from-purple-500 to-cyan-400 shadow-2xl overflow-hidden">
               <div className="w-full h-full rounded-full overflow-hidden bg-[#070b14]">
                 {profile.avatar_url && !avatarFailed ? (
                   <img

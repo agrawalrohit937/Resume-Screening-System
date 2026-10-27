@@ -258,6 +258,7 @@ export default function App() {
                 <Route path="profile" element={<Profile />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="portfolio-builder" element={<PortfolioBuilder />} />
+                <Route path="portfolio" element={<Navigate to="/portfolio-builder" replace />} />
 
                 <Route path="results" element={<Results />} />
                 <Route path="billing" element={<Billing />} />

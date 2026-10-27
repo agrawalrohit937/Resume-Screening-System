@@ -5,7 +5,7 @@ import { Send, Square, FileSearch, Mic, Award, Briefcase } from 'lucide-react';
 const SLASH_COMMANDS = [
   { cmd: '/ats', label: 'ATS Scan', desc: 'Match resume against job description', icon: FileSearch },
   { cmd: '/interview', label: 'Mock Interview', desc: 'Practice AI voice questions', icon: Mic },
-  { cmd: '/enhance', label: 'Enhance Bullets', desc: 'Rewrite resume with STAR metrics', icon: Award },
+  { cmd: '/enhance', label: 'Enhance Bullets', desc: 'Rewrite resume with measurable impact', icon: Award },
   { cmd: '/jobs', label: 'Find Jobs', desc: 'Discover matched career roles', icon: Briefcase },
 ];
 
@@ -89,7 +89,7 @@ export default function CopilotInput() {
           value={text}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
-          placeholder="Ask a question or type /..."
+          placeholder="Ask CareerMitra or type /..."
           className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none"
         />
 

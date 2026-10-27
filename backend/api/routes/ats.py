@@ -2,7 +2,6 @@
 # ATS Routes — Single match, bulk match, history
 # """
 
-import json
 import tempfile
 from pathlib import Path
 import structlog
@@ -10,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFi
 from typing import Optional
 from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
-    get_user_repo, PaginationParams, get_database, get_db
+    get_user_repo, PaginationParams, get_database
 )
 from models.result_model import ATSResultModel
 from models.resume_model import ResumeStatus
@@ -232,18 +231,49 @@ async def match_resume(
             detail=f"Resume parsing failed: {resume.parse_error or 'Unknown parsing error'}",
         )
 
-    if resume.status != ResumeStatus.PARSED:
+    valid_parsed_statuses = (ResumeStatus.PARSED, "ready", "parsed")
+    if resume.status not in valid_parsed_statuses and not resume.parsed_data:
         raise HTTPException(
             status_code=404,
             detail="Parsed resume not found.",
         )
 
-    raw_text = (resume.parsed_data.raw_text or "").strip() if resume.parsed_data else ""
+    raw_text = ""
+    if resume.parsed_data:
+        raw_text = (getattr(resume.parsed_data, "raw_text", None) or "").strip()
+        if not raw_text and isinstance(resume.parsed_data, dict):
+            raw_text = (resume.parsed_data.get("raw_text") or "").strip()
+
+    # Synthesize raw_text from structured parsed_data if raw_text is missing (e.g. demo/seeded resumes)
+    if not raw_text and resume.parsed_data:
+        pd = resume.parsed_data if isinstance(resume.parsed_data, dict) else (resume.parsed_data.model_dump() if hasattr(resume.parsed_data, "model_dump") else {})
+        name = pd.get("name") or pd.get("full_name") or "Candidate"
+        summary = pd.get("summary") or ""
+        skills_list = pd.get("skills") or pd.get("technical_skills") or []
+        exp_list = pd.get("work_experience") or pd.get("experience") or []
+        edu_list = pd.get("education") or []
+        
+        lines = [name]
+        if summary:
+            lines.append(summary)
+        if skills_list:
+            lines.append("Skills: " + ", ".join(str(s) for s in skills_list))
+        for exp in exp_list:
+            if isinstance(exp, dict):
+                lines.append(f"{exp.get('title', '')} at {exp.get('company', '')} - {exp.get('description', '')}")
+        for ed in edu_list:
+            if isinstance(ed, dict):
+                lines.append(f"{ed.get('degree', '')} from {ed.get('institution', '')}")
+        raw_text = "\n".join(lines).strip()
+        if hasattr(resume.parsed_data, "raw_text"):
+            resume.parsed_data.raw_text = raw_text
+        elif isinstance(resume.parsed_data, dict):
+            resume.parsed_data["raw_text"] = raw_text
 
     if not raw_text:
         raise HTTPException(
             status_code=422,
-            detail="Resume contains no parsed text.",
+            detail="Resume contains no parsed text. Please re-upload your resume.",
         )
 
     # Save Job Description (Fail-safe)
@@ -260,19 +290,19 @@ async def match_resume(
     t_start = time.perf_counter()
 
     # Direct Groq JD parser: extracts clean candidate specs (avoids company age confusion)
-    llm_min_years = None
-    llm_min_education = None
-    try:
-        jd_specs = await parse_jd_with_groq(job_description)
-        if jd_specs:
-            if jd_specs.get("candidate_min_experience_years") is not None:
-                llm_min_years = float(jd_specs["candidate_min_experience_years"])
-            if jd_specs.get("minimum_education"):
-                llm_min_education = str(jd_specs["minimum_education"])
-            if not required_skills and jd_specs.get("required_skills"):
-                required_skills = canonicalize_skills(jd_specs["required_skills"])
-    except Exception as parse_err:
-        logger.warning("Groq JD parser skipped", error=str(parse_err))
+    db_conn = getattr(result_repo, "db", None) or getattr(resume_repo, "collection", {}).database
+    jd_specs = await parse_jd_with_groq(job_description, db=db_conn)
+    if not jd_specs:
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to parse Job Description with Groq LLM. Please verify your Groq connection and try again.",
+        )
+    llm_min_years = float(jd_specs.get("candidate_min_experience_years") or 0.0)
+    llm_min_education = jd_specs.get("minimum_education")
+    if not required_skills and jd_specs.get("required_skills"):
+        required_skills = canonicalize_skills(jd_specs["required_skills"])
+    if (not job_title or job_title == "Target Role") and jd_specs.get("job_title"):
+        job_title = str(jd_specs["job_title"]).strip()
 
     try:
         resume_payload = resume.parsed_data.model_dump() if hasattr(resume.parsed_data, "model_dump") else (resume.parsed_data or {})
@@ -286,6 +316,14 @@ async def match_resume(
             required_skills=required_skills or [],
             min_years=llm_min_years,
             min_education=llm_min_education,
+            must_have_skills=jd_specs.get("must_have_skills"),
+            nice_to_have_skills=jd_specs.get("nice_to_have_skills"),
+            or_groups=jd_specs.get("or_groups"),
+            years_is_required=jd_specs.get("years_is_required"),
+            education_is_required=jd_specs.get("education_is_required"),
+            job_location=jd_specs.get("location"),
+            remote_policy=jd_specs.get("remote_policy"),
+            jd_confidence=jd_specs.get("jd_confidence", "high"),
         )
     except Exception as e:
         logger.exception("Unified scoring engine execution failed", error=str(e))
@@ -294,6 +332,18 @@ async def match_resume(
             status_code=500,
             detail=f"Failed to analyze resume: {err_detail}",
         )
+
+    # Generate dynamic, personalized suggestions via Groq LLM
+    try:
+        from services.ats_feedback_service import generate_ats_feedback_with_groq
+        scored["feedback_suggestions"] = await generate_ats_feedback_with_groq(
+            scored_result=scored,
+            job_title=job_title,
+            job_description=job_description,
+            resume_data=resume_payload,
+        )
+    except Exception as e:
+        logger.warning("Failed to generate dynamic Groq feedback; keeping baseline", error=str(e))
 
     processing_time_ms = int((time.perf_counter() - t_start) * 1000)
 
@@ -305,6 +355,7 @@ async def match_resume(
         "recommendation": scored["recommendation"],
         "matched_skills": scored["matched_skills"],
         "missing_skills": scored["missing_skills"],
+        "soft_skills": jd_specs.get("soft_skills") or jd_specs.get("soft_competencies") or [],
         "experience_score": scored["experience_score"] / 100.0,
         "education_score": scored["education_score"] / 100.0,
         "feedback_suggestions": scored["feedback_suggestions"],
@@ -324,8 +375,17 @@ async def match_resume(
         # ── HITL wizard support ──
         "contact_snapshot": contact_snapshot,
 
+        # ── v2.3 Engine Fields ──
+        "match_band": scored.get("match_band"),
+        "confidence": scored.get("confidence"),
+        "needs_input": scored.get("needs_input", []),
+        "dropped_components": scored.get("dropped_components", []),
+        "skills_score": scored.get("skills_score"),
+        "projects_score": scored.get("projects_score"),
+        "active_weights": scored.get("active_weights") or {},
+
         # ── Scoring Engine Version ──
-        "scoring_version": scored.get("scoring_version", "1.0.0"),
+        "scoring_version": scored.get("scoring_version", "2.3.0"),
     }
 
     result = None
@@ -399,20 +459,18 @@ async def bulk_match(
         )
 
     # Parse JD once with Groq for the entire batch (avoids company tenure confusion)
-    llm_min_years = None
-    llm_min_education = None
     bulk_required_skills = payload.required_skills or []
-    try:
-        jd_specs = await parse_jd_with_groq(payload.job_description)
-        if jd_specs:
-            if jd_specs.get("candidate_min_experience_years") is not None:
-                llm_min_years = float(jd_specs["candidate_min_experience_years"])
-            if jd_specs.get("minimum_education"):
-                llm_min_education = str(jd_specs["minimum_education"])
-            if not bulk_required_skills and jd_specs.get("required_skills"):
-                bulk_required_skills = canonicalize_skills(jd_specs["required_skills"])
-    except Exception as parse_err:
-        logger.warning("Bulk Groq JD parser skipped", error=str(parse_err))
+    db_conn = getattr(resume_repo, "collection", {}).database
+    jd_specs = await parse_jd_with_groq(payload.job_description, db=db_conn)
+    if not jd_specs:
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to parse Job Description with Groq LLM. Please verify your Groq connection and try again.",
+        )
+    llm_min_years = float(jd_specs.get("candidate_min_experience_years") or 0.0)
+    llm_min_education = jd_specs.get("minimum_education")
+    if not bulk_required_skills and jd_specs.get("required_skills"):
+        bulk_required_skills = canonicalize_skills(jd_specs["required_skills"])
 
     results = []
 
@@ -439,6 +497,14 @@ async def bulk_match(
                 required_skills=bulk_required_skills,
                 min_years=llm_min_years,
                 min_education=llm_min_education,
+                must_have_skills=jd_specs.get("must_have_skills"),
+                nice_to_have_skills=jd_specs.get("nice_to_have_skills"),
+                or_groups=jd_specs.get("or_groups"),
+                years_is_required=jd_specs.get("years_is_required"),
+                education_is_required=jd_specs.get("education_is_required"),
+                job_location=jd_specs.get("location"),
+                remote_policy=jd_specs.get("remote_policy"),
+                jd_confidence=jd_specs.get("jd_confidence", "high"),
             )
         except Exception:
             logger.exception(
@@ -515,7 +581,7 @@ async def get_ats_history(
 # ─── POST /match/batch & POST /batch (Async Background Job) ──────────────────
 from pydantic import BaseModel, Field
 from typing import List
-from models.task_job_model import JobType, TaskJobModel
+from models.task_job_model import JobType
 from repositories.task_job_repo import TaskJobRepository
 from services.tasks import task_manager
 from services.tasks.workers import execute_batch_ats_scoring
@@ -600,6 +666,7 @@ def _build_ats_response(result_id: str, resume_id: str, job_title: str, data: di
         recommendation=str(data.get("recommendation") or "Low Match"),
         matched_skills=data.get("matched_skills") or [],
         missing_skills=data.get("missing_skills") or [],
+        soft_skills=data.get("soft_skills") or [],
         experience_score=float(data.get("experience_score") or 0.0),
         education_score=float(data.get("education_score") or 0.0),
         feedback_suggestions=data.get("feedback_suggestions") or [],
@@ -618,6 +685,15 @@ def _build_ats_response(result_id: str, resume_id: str, job_title: str, data: di
 
         # HITL wizard support
         contact_snapshot=data.get("contact_snapshot"),
+
+        # ATS Scoring Engine v2.3 Fields
+        match_band=data.get("match_band"),
+        confidence=data.get("confidence"),
+        needs_input=data.get("needs_input") or [],
+        dropped_components=data.get("dropped_components") or [],
+        skills_score=float(data.get("skills_score")) if data.get("skills_score") is not None else None,
+        projects_score=float(data.get("projects_score")) if data.get("projects_score") is not None else None,
+        active_weights=data.get("active_weights") or {},
     )
 
 

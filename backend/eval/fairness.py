@@ -8,7 +8,7 @@ Audit attributes are computed on audit records ONLY and never used as scoring fe
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import numpy as np
 import structlog
 
