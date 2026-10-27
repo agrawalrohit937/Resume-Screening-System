@@ -728,7 +728,12 @@ async def get_my_posted_jobs(
                 {"$match": {"job_id": {"$in": job_ids}}},
                 {"$group": {"_id": "$job_id", "count": {"$sum": 1}}},
             ]
-            agg_res = await db.applications.aggregate(pipeline).to_list(len(job_ids))
+            cursor_or_coro = db.applications.aggregate(pipeline)
+            if hasattr(cursor_or_coro, "__await__"):
+                cursor = await cursor_or_coro
+            else:
+                cursor = cursor_or_coro
+            agg_res = await cursor.to_list(len(job_ids))
             for item in agg_res:
                 app_counts[str(item["_id"])] = int(item.get("count", 0))
         except Exception:

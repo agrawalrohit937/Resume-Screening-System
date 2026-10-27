@@ -41,51 +41,42 @@ export default function ProfileHero({ profile, name, badgeCount, leaderboard = [
   const userRank = profile?.rank || myEntry?.rank || (totalPoints > 0 ? 1 : '-')
 
   return (
-    <Card className="p-0 overflow-hidden relative border border-slate-200/80 shadow-sm rounded-3xl bg-white">
+    <Card className="p-0 overflow-hidden relative border border-slate-200/80 shadow-sm rounded-2xl sm:rounded-3xl bg-white">
       {/* Subtle Ambient Background Accent */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-slate-50/80 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 p-4 sm:p-7 flex flex-col md:flex-row md:items-center gap-5 sm:gap-8">
-        
-        {/* User Badge & Profile Overview */}
-        <div className="flex items-center gap-4 sm:gap-5 shrink-0 min-w-0">
-          <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0">
-            <div className="w-full h-full rounded-2xl bg-[#0f172a] text-white flex items-center justify-center shadow-md border border-slate-700">
-              <span className={`font-black ${String(userRank).length > 2 ? 'text-lg sm:text-xl' : 'text-xl sm:text-3xl'} text-white`}>
-                #{userRank}
-              </span>
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center shadow-sm">
-              <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
-            </div>
-          </div>
-          
+      {/* ─── Mobile View (< sm): Ultra-compact & clean ─── */}
+      <div className="sm:hidden p-3.5 space-y-2.5 relative z-10">
+        {/* Row 1: Name, Level Pill & Rank Badge */}
+        <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider mb-1 border border-slate-200 max-w-full truncate">
-              <Sparkles className="w-3 h-3 text-[#2E9BDA] shrink-0" />
-              Level {level} • {league}
-            </div>
-            <h1 className="font-extrabold text-xl sm:text-3xl text-slate-900 leading-tight truncate tracking-tight">
+            <h1 className="font-extrabold text-[15px] text-slate-900 leading-tight truncate">
               {name ? name : levelName}
             </h1>
-            <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11.5px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 sm:px-2.5 rounded-lg border border-amber-200/70">
-                Rank #{userRank}
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-200">
+                <Sparkles className="w-2.5 h-2.5 text-[#2E9BDA]" />
+                Lvl {level} • {league}
               </span>
-              <span className="text-[11px] sm:text-[12.5px] font-medium text-slate-500">• {levelName} Tier</span>
+              <span className="text-[10px] text-slate-400 font-medium truncate">• {levelName}</span>
             </div>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-1 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg shadow-2xs">
+            <Trophy className="w-3 h-3 text-amber-500" />
+            <span className="text-[11px] font-black text-amber-800">#{userRank}</span>
           </div>
         </div>
 
-        {/* Progress Bar Container */}
-        <div className="flex-1 min-w-0 bg-slate-50/80 p-3.5 sm:p-5 rounded-2xl border border-slate-200/60">
-          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-            <span className="text-xs sm:text-[13.5px] font-extrabold text-slate-900">{totalPoints.toLocaleString()} XP</span>
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#1d6fa5] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wide truncate max-w-full">
-              {pointsToNext > 0 ? `${pointsToNext.toLocaleString()} XP to next level` : 'MAX LEVEL'}
+        {/* Row 2: Compact XP Progress */}
+        <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-200/60">
+          <div className="flex items-center justify-between gap-2 mb-1 text-[10.5px]">
+            <span className="font-extrabold text-slate-900">{totalPoints.toLocaleString()} XP</span>
+            <span className="text-[9px] font-bold text-[#1d6fa5] uppercase tracking-wide">
+              {pointsToNext > 0 ? `${pointsToNext.toLocaleString()} XP to next` : 'MAX LEVEL'}
             </span>
           </div>
-          <div className="h-2 sm:h-2.5 rounded-full bg-slate-200/70 overflow-hidden relative">
+          <div className="h-1.5 rounded-full bg-slate-200/80 overflow-hidden relative">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(100, progressPct)}%` }}
@@ -94,15 +85,95 @@ export default function ProfileHero({ profile, name, badgeCount, leaderboard = [
             />
           </div>
         </div>
+
+        {/* Row 3: 4-Item Single Row Stat Strip */}
+        <div className="grid grid-cols-4 divide-x divide-slate-200/60 bg-slate-50/70 rounded-xl border border-slate-200/60 py-1.5 text-center">
+          <div className="px-1">
+            <p className="text-[11px] font-black text-amber-800">#{userRank}</p>
+            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Rank</p>
+          </div>
+          <div className="px-1">
+            <p className="text-[11px] font-black text-amber-600 flex items-center justify-center gap-0.5">
+              <Flame className="w-2.5 h-2.5 text-amber-500" /> {streak}d
+            </p>
+            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Streak</p>
+          </div>
+          <div className="px-1">
+            <p className="text-[11px] font-black text-[#1d6fa5] flex items-center justify-center gap-0.5">
+              <TrendingUp className="w-2.5 h-2.5 text-[#2E9BDA]" /> {avgPct}%
+            </p>
+            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Avg</p>
+          </div>
+          <div className="px-1">
+            <p className="text-[11px] font-black text-slate-700 flex items-center justify-center gap-0.5">
+              <Medal className="w-2.5 h-2.5 text-slate-400" /> {badgeCount}
+            </p>
+            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Badges</p>
+          </div>
+        </div>
       </div>
 
-      {/* Stat Chips Overview */}
-      <div className="relative z-10 px-4 sm:px-7 pb-4 sm:pb-7">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <StatChip icon={Trophy} value={`#${userRank}`} label="Global Rank" color="amber" />
-          <StatChip icon={Flame} value={streak} label="Day Streak" color="amber" />
-          <StatChip icon={TrendingUp} value={`${avgPct}%`} label="Avg Score" color="blue" />
-          <StatChip icon={Medal} value={badgeCount} label="Badges Won" color="slate" />
+      {/* ─── Desktop View (>= sm): Full rich layout ─── */}
+      <div className="hidden sm:block">
+        <div className="relative z-10 p-4 sm:p-7 flex flex-col md:flex-row md:items-center gap-5 sm:gap-8">
+          
+          {/* User Badge & Profile Overview */}
+          <div className="flex items-center gap-4 sm:gap-5 shrink-0 min-w-0">
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0">
+              <div className="w-full h-full rounded-2xl bg-[#0f172a] text-white flex items-center justify-center shadow-md border border-slate-700">
+                <span className={`font-black ${String(userRank).length > 2 ? 'text-lg sm:text-xl' : 'text-xl sm:text-3xl'} text-white`}>
+                  #{userRank}
+                </span>
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center shadow-sm">
+                <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+              </div>
+            </div>
+            
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider mb-1 border border-slate-200 max-w-full truncate">
+                <Sparkles className="w-3 h-3 text-[#2E9BDA] shrink-0" />
+                Level {level} • {league}
+              </div>
+              <h1 className="font-extrabold text-xl sm:text-3xl text-slate-900 leading-tight truncate tracking-tight">
+                {name ? name : levelName}
+              </h1>
+              <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11.5px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 sm:px-2.5 rounded-lg border border-amber-200/70">
+                  Rank #{userRank}
+                </span>
+                <span className="text-[11px] sm:text-[12.5px] font-medium text-slate-500">• {levelName} Tier</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Bar Container */}
+          <div className="flex-1 min-w-0 bg-slate-50/80 p-3.5 sm:p-5 rounded-2xl border border-slate-200/60">
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <span className="text-xs sm:text-[13.5px] font-extrabold text-slate-900">{totalPoints.toLocaleString()} XP</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-[#1d6fa5] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-wide truncate max-w-full">
+                {pointsToNext > 0 ? `${pointsToNext.toLocaleString()} XP to next level` : 'MAX LEVEL'}
+              </span>
+            </div>
+            <div className="h-2 sm:h-2.5 rounded-full bg-slate-200/70 overflow-hidden relative">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, progressPct)}%` }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="h-full rounded-full bg-[#2E9BDA]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Stat Chips Overview */}
+        <div className="relative z-10 px-4 sm:px-7 pb-4 sm:pb-7">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <StatChip icon={Trophy} value={`#${userRank}`} label="Global Rank" color="amber" />
+            <StatChip icon={Flame} value={streak} label="Day Streak" color="amber" />
+            <StatChip icon={TrendingUp} value={`${avgPct}%`} label="Avg Score" color="blue" />
+            <StatChip icon={Medal} value={badgeCount} label="Badges Won" color="slate" />
+          </div>
         </div>
       </div>
     </Card>

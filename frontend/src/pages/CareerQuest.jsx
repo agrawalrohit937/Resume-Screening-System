@@ -101,7 +101,7 @@ export default function CareerQuest() {
   }
 
   return (
-    <div className="w-full space-y-6 pb-16">
+    <div className="w-full space-y-3.5 sm:space-y-6 pb-20 sm:pb-16">
       <ProfileHero
         profile={profile}
         name={user?.full_name || user?.name || user?.username}
@@ -110,8 +110,9 @@ export default function CareerQuest() {
         currentUserId={currentUserId}
       />
 
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 items-stretch sm:items-center">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-5 items-stretch sm:items-center">
+        {/* On mobile, AI insight is hidden to give maximum space to tabs and active content */}
+        <div className="hidden sm:block flex-1 min-w-0">
           <CopilotInsight profile={profile} catalog={catalog} onOpenCopilot={openCopilot} />
         </div>
         <div className="w-full sm:w-auto shrink-0">
