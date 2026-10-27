@@ -1,11 +1,4 @@
-"""
-Pydantic request/response schemas for the AI Apply Assistant API.
-
-ASSUMPTION FLAG: mirrors the conventions described for ats_schema.py /
-resume_schema.py as best I can infer - diff against your real schema
-files and adjust base-model config if yours differs (e.g. if you use
-a shared BaseSchema with populate_by_name / alias_generator already).
-"""
+"""Pydantic request and response schemas for the AI Apply Assistant API."""
 
 from datetime import datetime
 from typing import Optional, List
@@ -27,7 +20,7 @@ class ApplyDraftRequest(BaseModel):
     resume_id: str = Field(..., description="ID of an already-parsed resume owned by the current user")
     company_name: str = Field(..., min_length=1, max_length=200)
     job_title: str = Field(..., min_length=1, max_length=200)
-    hr_email: EmailStr
+    hr_email: Optional[EmailStr] = None
     job_description: str = Field(..., min_length=20, description="Raw JD text")
 
     _validate_resume_id = field_validator("resume_id")(_validate_object_id)
@@ -92,7 +85,6 @@ class ApplicationHistoryResponse(BaseModel):
 
 class ATSScoreRequest(BaseModel):
     resume_id: str = Field(..., description="ID of an already-parsed resume owned by the current user")
-    job_title: str = Field(..., min_length=1, max_length=200)
     job_description: str = Field(..., min_length=20, description="Raw JD text")
 
     _validate_resume_id = field_validator("resume_id")(_validate_object_id)

@@ -1,0 +1,1136 @@
+{
+  "version": "1.0.0",
+  "source": "curated_tech_overlay",
+  "aliases": {
+    "react.js": "React",
+    "reactjs": "React",
+    "vue.js": "Vue",
+    "vuejs": "Vue",
+    "angular.js": "Angular",
+    "angularjs": "Angular",
+    "next.js": "Next.js",
+    "nextjs": "Next.js",
+    "nuxt.js": "Nuxt.js",
+    "nuxtjs": "Nuxt.js",
+    "node.js": "Node.js",
+    "nodejs": "Node.js",
+    "express.js": "Express",
+    "expressjs": "Express",
+    "nest.js": "NestJS",
+    "nestjs": "NestJS",
+    "js": "JavaScript",
+    "ts": "TypeScript",
+    "html5": "HTML",
+    "css3": "CSS",
+    "tailwind css": "Tailwind",
+    "tailwindcss": "Tailwind",
+    "fast api": "FastAPI",
+    "spring boot": "Spring Boot",
+    "django framework": "Django",
+    "flask framework": "Flask",
+    "asp.net": ".NET",
+    "dotnet": ".NET",
+    ".net": ".NET",
+    "pinecone db": "Pinecone",
+    "chromadb": "ChromaDB",
+    "chroma": "ChromaDB",
+    "faiss": "FAISS",
+    "qdrant": "Qdrant",
+    "milvus": "Milvus",
+    "weaviate": "Weaviate",
+    "langchain": "LangChain",
+    "llamaindex": "LlamaIndex",
+    "llama-index": "LlamaIndex",
+    "scikit learn": "Scikit-Learn",
+    "sklearn": "Scikit-Learn",
+    "tf": "TensorFlow",
+    "tensorflow": "TensorFlow",
+    "pytorch": "PyTorch",
+    "huggingface": "Hugging Face",
+    "hugging face": "Hugging Face",
+    "openai api": "OpenAI",
+    "chatgpt": "OpenAI",
+    "llm": "Large Language Models",
+    "llms": "Large Language Models",
+    "large language model": "Large Language Models",
+    "rag": "Retrieval-Augmented Generation",
+    "retrieval augmented generation": "Retrieval-Augmented Generation",
+    "amazon web services": "AWS",
+    "aws cloud": "AWS",
+    "google cloud": "GCP",
+    "google cloud platform": "GCP",
+    "microsoft azure": "Azure",
+    "k8s": "Kubernetes",
+    "docker containers": "Docker",
+    "github action": "GitHub Actions",
+    "ci / cd": "CI/CD",
+    "cicd": "CI/CD",
+    "postgres": "PostgreSQL",
+    "postgresql": "PostgreSQL",
+    "postgressql": "PostgreSQL",
+    "postgre sql": "PostgreSQL",
+    "postgres sql": "PostgreSQL",
+    "postgre": "PostgreSQL",
+    "postgre-sql": "PostgreSQL",
+    "postgres-sql": "PostgreSQL",
+    "psql": "PostgreSQL",
+    "pgsql": "PostgreSQL",
+    "pg": "PostgreSQL",
+    "mongo": "MongoDB",
+    "mongodb": "MongoDB",
+    "elastic search": "Elasticsearch",
+    "es": "Elasticsearch",
+    "ms sql": "SQL Server",
+    "mssql": "SQL Server",
+    "dsa": "Data Structures & Algorithms",
+    "data structures": "Data Structures & Algorithms",
+    "data structures and algorithms": "Data Structures & Algorithms",
+    "data structures & algorithms": "Data Structures & Algorithms",
+    "data structure": "Data Structures & Algorithms",
+    "algorithms": "Algorithms",
+    "algo": "Algorithms",
+    "dbms": "DBMS",
+    "database management system": "DBMS",
+    "database management systems": "DBMS",
+    "operating systems": "Operating Systems",
+    "operating system": "Operating Systems",
+    "os": "Operating Systems",
+    "computer networks": "Computer Networks",
+    "computer networking": "Computer Networks",
+    "networking": "Computer Networks",
+    "cn": "Computer Networks",
+    "object oriented programming": "Object-Oriented Programming",
+    "object-oriented programming": "Object-Oriented Programming",
+    "object-oriented programming (oop)": "Object-Oriented Programming",
+    "object oriented programming (oop)": "Object-Oriented Programming",
+    "object-oriented programming (oops)": "Object-Oriented Programming",
+    "object oriented programming (oops)": "Object-Oriented Programming",
+    "object-oriented programming concepts": "Object-Oriented Programming",
+    "object oriented programming concepts": "Object-Oriented Programming",
+    "oop": "Object-Oriented Programming",
+    "oops": "Object-Oriented Programming",
+    "oop concepts": "Object-Oriented Programming",
+    "oops concepts": "Object-Oriented Programming",
+    "object oriented design": "Object-Oriented Programming",
+    "object-oriented design": "Object-Oriented Programming",
+    "ood": "Object-Oriented Programming",
+    "system design": "System Design",
+    "low level design": "LLD",
+    "high level design": "HLD",
+    "lld": "LLD",
+    "hld": "HLD",
+    "web services": "Web Services",
+    "web service": "Web Services",
+    "web-services": "Web Services",
+    "rest apis": "REST APIs",
+    "rest api": "REST APIs",
+    "restful apis": "REST APIs",
+    "restful api": "REST APIs",
+    "restful web services": "Web Services",
+    "rest web services": "Web Services",
+    "apis": "REST APIs",
+    "api integration": "REST APIs",
+    "database design": "Database Design",
+    "database management": "DBMS",
+    "relational database": "Relational Databases",
+    "relational databases": "Relational Databases",
+    "sdlc": "SDLC",
+    "software development life cycle": "SDLC",
+    "software development lifecycle": "SDLC",
+    "software development tools": "Software Development Tools",
+    "development tools": "Software Development Tools",
+    "debugging practices": "Debugging",
+    "debugging skills": "Debugging",
+    "debug": "Debugging",
+    "debugging": "Debugging",
+    "troubleshooting": "Debugging",
+    "unit testing": "Unit Testing",
+    "testing": "Testing",
+    "analytical and problem-solving skills": "Analytical Skills",
+    "analytical and problem-solving": "Analytical Skills",
+    "analytical skills": "Analytical Skills",
+    "analytical thinking": "Analytical Skills",
+    "problem-solving skills": "Problem Solving",
+    "problem solving skills": "Problem Solving",
+    "problem-solving": "Problem Solving",
+    "problem solving": "Problem Solving",
+    "python": "Python",
+    "py": "Python",
+    "python3": "Python",
+    "python 3": "Python",
+    "python-3": "Python",
+    "golang": "Go",
+    "cpp": "C++",
+    "c sharp": "C#",
+    "c#": "C#",
+    "rust": "Rust",
+    "graphql": "GraphQL",
+    "kafka": "Apache Kafka"
+  },
+  "taxonomy": {
+    "Computer Science Fundamentals": {
+      "parents": [
+        "Software Engineering"
+      ],
+      "children": [
+        "Data Structures & Algorithms",
+        "Algorithms",
+        "DBMS",
+        "Operating Systems",
+        "Computer Networks",
+        "Object-Oriented Programming",
+        "System Design",
+        "LLD",
+        "HLD"
+      ]
+    },
+    "Vector Databases": {
+      "parents": [
+        "AI & Machine Learning",
+        "Databases"
+      ],
+      "children": [
+        "Pinecone",
+        "ChromaDB",
+        "FAISS",
+        "Qdrant",
+        "Milvus",
+        "Weaviate"
+      ]
+    },
+    "Generative AI & LLMs": {
+      "parents": [
+        "AI & Machine Learning"
+      ],
+      "children": [
+        "LangChain",
+        "LlamaIndex",
+        "Large Language Models",
+        "OpenAI",
+        "Hugging Face",
+        "Retrieval-Augmented Generation"
+      ]
+    },
+    "Machine Learning": {
+      "parents": [
+        "AI & Machine Learning",
+        "Data Science"
+      ],
+      "children": [
+        "PyTorch",
+        "TensorFlow",
+        "Scikit-Learn",
+        "Keras",
+        "XGBoost",
+        "Deep Learning",
+        "NLP"
+      ]
+    },
+    "Frontend Development": {
+      "parents": [
+        "Web Development",
+        "Software Engineering"
+      ],
+      "children": [
+        "React",
+        "Vue",
+        "Angular",
+        "Next.js",
+        "Nuxt.js",
+        "Svelte",
+        "HTML",
+        "CSS",
+        "Tailwind",
+        "TypeScript",
+        "JavaScript"
+      ]
+    },
+    "Backend Development": {
+      "parents": [
+        "Web Development",
+        "Software Engineering"
+      ],
+      "children": [
+        "FastAPI",
+        "Django",
+        "Flask",
+        "Node.js",
+        "Express",
+        "NestJS",
+        "Spring Boot",
+        "Go",
+        "Java",
+        "Python"
+      ]
+    },
+    "Cloud Platforms": {
+      "parents": [
+        "DevOps & Infrastructure"
+      ],
+      "children": [
+        "AWS",
+        "Azure",
+        "GCP",
+        "DigitalOcean",
+        "Heroku"
+      ]
+    },
+    "Containerization & Orchestration": {
+      "parents": [
+        "DevOps & Infrastructure"
+      ],
+      "children": [
+        "Docker",
+        "Kubernetes"
+      ]
+    },
+    "DevOps & CI/CD": {
+      "parents": [
+        "Software Engineering"
+      ],
+      "children": [
+        "CI/CD",
+        "GitHub Actions",
+        "Jenkins",
+        "Terraform",
+        "Ansible",
+        "Docker",
+        "Kubernetes"
+      ]
+    },
+    "Relational Databases": {
+      "parents": [
+        "Databases"
+      ],
+      "children": [
+        "PostgreSQL",
+        "MySQL",
+        "SQL Server",
+        "SQLite",
+        "Oracle",
+        "SQL"
+      ]
+    },
+    "NoSQL Databases": {
+      "parents": [
+        "Databases"
+      ],
+      "children": [
+        "MongoDB",
+        "Redis",
+        "Elasticsearch",
+        "Cassandra",
+        "DynamoDB"
+      ]
+    },
+    "Data Engineering": {
+      "parents": [
+        "Software Engineering",
+        "Data Science"
+      ],
+      "children": [
+        "Apache Spark",
+        "Apache Kafka",
+        "Airflow",
+        "Snowflake",
+        "Databricks",
+        "ETL"
+      ]
+    },
+    "Programming Languages": {
+      "parents": [
+        "Software Engineering"
+      ],
+      "children": [
+        "Python",
+        "JavaScript",
+        "TypeScript",
+        "Go",
+        "Java",
+        "C++",
+        "C#",
+        "SQL"
+      ]
+    },
+    "Object-Oriented Programming": {
+      "parents": [
+        "Computer Science Fundamentals",
+        "Software Engineering"
+      ],
+      "children": [
+        "Python",
+        "Java",
+        "C++",
+        "C#",
+        "TypeScript",
+        "JavaScript",
+        "Go",
+        "Rust",
+        "OOP",
+        "OOPS"
+      ]
+    },
+    "Web Services": {
+      "parents": [
+        "Web Development",
+        "Backend Development"
+      ],
+      "children": [
+        "REST APIs",
+        "FastAPI",
+        "GraphQL",
+        "Webhooks",
+        "Microservices",
+        "RESTful APIs",
+        "SOAP",
+        "API Integration",
+        "APIs"
+      ]
+    },
+    "Database Design": {
+      "parents": [
+        "Databases",
+        "Computer Science Fundamentals"
+      ],
+      "children": [
+        "DBMS",
+        "SQL",
+        "PostgreSQL",
+        "MySQL",
+        "MongoDB",
+        "Database Management Systems",
+        "Relational Databases",
+        "NoSQL Databases",
+        "Indexing",
+        "Normalization"
+      ]
+    },
+    "Software Development Tools": {
+      "parents": [
+        "Software Engineering",
+        "DevOps & Infrastructure"
+      ],
+      "children": [
+        "Git",
+        "Docker",
+        "VS Code",
+        "Postman",
+        "GitHub",
+        "GitLab",
+        "CI/CD",
+        "Jira",
+        "GitHub Actions"
+      ]
+    },
+    "SDLC": {
+      "parents": [
+        "Software Engineering"
+      ],
+      "children": [
+        "Git",
+        "CI/CD",
+        "GitHub Actions",
+        "Agile",
+        "Scrum",
+        "Testing",
+        "Unit Testing",
+        "Jira",
+        "DevOps"
+      ]
+    },
+    "Debugging": {
+      "parents": [
+        "Software Engineering"
+      ],
+      "children": [
+        "Testing",
+        "Unit Testing",
+        "PyTest",
+        "Integration Testing",
+        "Troubleshooting",
+        "Logging"
+      ]
+    },
+    "System Design": {
+      "parents": [
+        "Computer Science Fundamentals",
+        "Software Engineering"
+      ],
+      "children": [
+        "Microservices",
+        "REST APIs",
+        "LLD",
+        "HLD",
+        "Database Design",
+        "Scalability",
+        "High Availability",
+        "Architecture"
+      ]
+    },
+    "Analytical Skills": {
+      "parents": [
+        "Computer Science Fundamentals"
+      ],
+      "children": [
+        "Data Structures & Algorithms",
+        "Algorithms",
+        "DSA",
+        "Problem Solving",
+        "Analytical Thinking"
+      ]
+    }
+  },
+  "child_to_parents": {
+    "Computer Science Fundamentals": [
+      "Software Engineering"
+    ],
+    "Data Structures & Algorithms": [
+      "Software Engineering",
+      "Analytical Skills",
+      "Computer Science Fundamentals"
+    ],
+    "Algorithms": [
+      "Software Engineering",
+      "Analytical Skills",
+      "Computer Science Fundamentals"
+    ],
+    "DBMS": [
+      "Software Engineering",
+      "Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "Operating Systems": [
+      "Software Engineering",
+      "Computer Science Fundamentals"
+    ],
+    "Computer Networks": [
+      "Software Engineering",
+      "Computer Science Fundamentals"
+    ],
+    "Object-Oriented Programming": [
+      "Software Engineering",
+      "Computer Science Fundamentals"
+    ],
+    "System Design": [
+      "Software Engineering",
+      "Computer Science Fundamentals"
+    ],
+    "LLD": [
+      "Software Engineering",
+      "System Design",
+      "Computer Science Fundamentals"
+    ],
+    "HLD": [
+      "Software Engineering",
+      "System Design",
+      "Computer Science Fundamentals"
+    ],
+    "Vector Databases": [
+      "Databases",
+      "AI & Machine Learning"
+    ],
+    "Pinecone": [
+      "Databases",
+      "Vector Databases",
+      "AI & Machine Learning"
+    ],
+    "ChromaDB": [
+      "Databases",
+      "Vector Databases",
+      "AI & Machine Learning"
+    ],
+    "FAISS": [
+      "Databases",
+      "Vector Databases",
+      "AI & Machine Learning"
+    ],
+    "Qdrant": [
+      "Databases",
+      "Vector Databases",
+      "AI & Machine Learning"
+    ],
+    "Milvus": [
+      "Databases",
+      "Vector Databases",
+      "AI & Machine Learning"
+    ],
+    "Weaviate": [
+      "Databases",
+      "Vector Databases",
+      "AI & Machine Learning"
+    ],
+    "Generative AI & LLMs": [
+      "AI & Machine Learning"
+    ],
+    "LangChain": [
+      "Generative AI & LLMs",
+      "AI & Machine Learning"
+    ],
+    "LlamaIndex": [
+      "Generative AI & LLMs",
+      "AI & Machine Learning"
+    ],
+    "Large Language Models": [
+      "Generative AI & LLMs",
+      "AI & Machine Learning"
+    ],
+    "OpenAI": [
+      "Generative AI & LLMs",
+      "AI & Machine Learning"
+    ],
+    "Hugging Face": [
+      "Generative AI & LLMs",
+      "AI & Machine Learning"
+    ],
+    "Retrieval-Augmented Generation": [
+      "Generative AI & LLMs",
+      "AI & Machine Learning"
+    ],
+    "Machine Learning": [
+      "AI & Machine Learning",
+      "Data Science"
+    ],
+    "PyTorch": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "TensorFlow": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "Scikit-Learn": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "Keras": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "XGBoost": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "Deep Learning": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "NLP": [
+      "Data Science",
+      "AI & Machine Learning",
+      "Machine Learning"
+    ],
+    "Frontend Development": [
+      "Web Development",
+      "Software Engineering"
+    ],
+    "React": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "Vue": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "Angular": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "Next.js": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "Nuxt.js": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "Svelte": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "HTML": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "CSS": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "Tailwind": [
+      "Web Development",
+      "Frontend Development",
+      "Software Engineering"
+    ],
+    "TypeScript": [
+      "Programming Languages",
+      "Frontend Development",
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "JavaScript": [
+      "Programming Languages",
+      "Frontend Development",
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Backend Development": [
+      "Web Development",
+      "Software Engineering"
+    ],
+    "FastAPI": [
+      "Backend Development",
+      "Web Services",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Django": [
+      "Backend Development",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Flask": [
+      "Backend Development",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Node.js": [
+      "Backend Development",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Express": [
+      "Backend Development",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "NestJS": [
+      "Backend Development",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Spring Boot": [
+      "Backend Development",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Go": [
+      "Backend Development",
+      "Programming Languages",
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Java": [
+      "Backend Development",
+      "Programming Languages",
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Python": [
+      "Backend Development",
+      "Programming Languages",
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "Cloud Platforms": [
+      "DevOps & Infrastructure"
+    ],
+    "AWS": [
+      "Cloud Platforms",
+      "DevOps & Infrastructure"
+    ],
+    "Azure": [
+      "Cloud Platforms",
+      "DevOps & Infrastructure"
+    ],
+    "GCP": [
+      "Cloud Platforms",
+      "DevOps & Infrastructure"
+    ],
+    "DigitalOcean": [
+      "Cloud Platforms",
+      "DevOps & Infrastructure"
+    ],
+    "Heroku": [
+      "Cloud Platforms",
+      "DevOps & Infrastructure"
+    ],
+    "Containerization & Orchestration": [
+      "DevOps & Infrastructure"
+    ],
+    "Docker": [
+      "DevOps & Infrastructure",
+      "DevOps & CI/CD",
+      "Software Development Tools",
+      "Containerization & Orchestration",
+      "Software Engineering"
+    ],
+    "Kubernetes": [
+      "Software Engineering",
+      "Containerization & Orchestration",
+      "DevOps & CI/CD",
+      "DevOps & Infrastructure"
+    ],
+    "DevOps & CI/CD": [
+      "Software Engineering"
+    ],
+    "CI/CD": [
+      "SDLC",
+      "Software Engineering",
+      "DevOps & CI/CD",
+      "Software Development Tools",
+      "DevOps & Infrastructure"
+    ],
+    "GitHub Actions": [
+      "SDLC",
+      "Software Engineering",
+      "DevOps & CI/CD",
+      "Software Development Tools",
+      "DevOps & Infrastructure"
+    ],
+    "Jenkins": [
+      "DevOps & CI/CD",
+      "Software Engineering"
+    ],
+    "Terraform": [
+      "DevOps & CI/CD",
+      "Software Engineering"
+    ],
+    "Ansible": [
+      "DevOps & CI/CD",
+      "Software Engineering"
+    ],
+    "Relational Databases": [
+      "Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "PostgreSQL": [
+      "Databases",
+      "Relational Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "MySQL": [
+      "Databases",
+      "Relational Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "SQL Server": [
+      "Databases",
+      "Relational Databases"
+    ],
+    "SQLite": [
+      "Databases",
+      "Relational Databases"
+    ],
+    "Oracle": [
+      "Databases",
+      "Relational Databases"
+    ],
+    "SQL": [
+      "Relational Databases",
+      "Database Design",
+      "Programming Languages",
+      "Databases",
+      "Computer Science Fundamentals",
+      "Software Engineering"
+    ],
+    "NoSQL Databases": [
+      "Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "MongoDB": [
+      "Computer Science Fundamentals",
+      "Databases",
+      "Database Design",
+      "NoSQL Databases"
+    ],
+    "Redis": [
+      "Databases",
+      "NoSQL Databases"
+    ],
+    "Elasticsearch": [
+      "Databases",
+      "NoSQL Databases"
+    ],
+    "Cassandra": [
+      "Databases",
+      "NoSQL Databases"
+    ],
+    "DynamoDB": [
+      "Databases",
+      "NoSQL Databases"
+    ],
+    "Data Engineering": [
+      "Software Engineering",
+      "Data Science"
+    ],
+    "Apache Spark": [
+      "Data Engineering",
+      "Software Engineering",
+      "Data Science"
+    ],
+    "Apache Kafka": [
+      "Data Engineering",
+      "Software Engineering",
+      "Data Science"
+    ],
+    "Airflow": [
+      "Data Engineering",
+      "Software Engineering",
+      "Data Science"
+    ],
+    "Snowflake": [
+      "Data Engineering",
+      "Software Engineering",
+      "Data Science"
+    ],
+    "Databricks": [
+      "Data Engineering",
+      "Software Engineering",
+      "Data Science"
+    ],
+    "ETL": [
+      "Data Engineering",
+      "Software Engineering",
+      "Data Science"
+    ],
+    "Programming Languages": [
+      "Software Engineering"
+    ],
+    "C++": [
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Software Engineering",
+      "Programming Languages"
+    ],
+    "C#": [
+      "Computer Science Fundamentals",
+      "Object-Oriented Programming",
+      "Software Engineering",
+      "Programming Languages"
+    ],
+    "Rust": [
+      "Software Engineering",
+      "Object-Oriented Programming",
+      "Computer Science Fundamentals"
+    ],
+    "OOP": [
+      "Software Engineering",
+      "Object-Oriented Programming",
+      "Computer Science Fundamentals"
+    ],
+    "OOPS": [
+      "Software Engineering",
+      "Object-Oriented Programming",
+      "Computer Science Fundamentals"
+    ],
+    "Web Services": [
+      "Backend Development",
+      "Web Development"
+    ],
+    "REST APIs": [
+      "Backend Development",
+      "Web Services",
+      "System Design",
+      "Computer Science Fundamentals",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "GraphQL": [
+      "Backend Development",
+      "Web Services",
+      "Web Development"
+    ],
+    "Webhooks": [
+      "Backend Development",
+      "Web Services",
+      "Web Development"
+    ],
+    "Microservices": [
+      "Backend Development",
+      "Web Services",
+      "System Design",
+      "Computer Science Fundamentals",
+      "Web Development",
+      "Software Engineering"
+    ],
+    "RESTful APIs": [
+      "Backend Development",
+      "Web Services",
+      "Web Development"
+    ],
+    "SOAP": [
+      "Backend Development",
+      "Web Services",
+      "Web Development"
+    ],
+    "API Integration": [
+      "Backend Development",
+      "Web Services",
+      "Web Development"
+    ],
+    "APIs": [
+      "Backend Development",
+      "Web Services",
+      "Web Development"
+    ],
+    "Database Design": [
+      "System Design",
+      "Software Engineering",
+      "Databases",
+      "Computer Science Fundamentals"
+    ],
+    "Database Management Systems": [
+      "Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "Indexing": [
+      "Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "Normalization": [
+      "Databases",
+      "Database Design",
+      "Computer Science Fundamentals"
+    ],
+    "Software Development Tools": [
+      "DevOps & Infrastructure",
+      "Software Engineering"
+    ],
+    "Git": [
+      "Software Development Tools",
+      "DevOps & Infrastructure",
+      "Software Engineering",
+      "SDLC"
+    ],
+    "VS Code": [
+      "Software Development Tools",
+      "DevOps & Infrastructure",
+      "Software Engineering"
+    ],
+    "Postman": [
+      "Software Development Tools",
+      "DevOps & Infrastructure",
+      "Software Engineering"
+    ],
+    "GitHub": [
+      "Software Development Tools",
+      "DevOps & Infrastructure",
+      "Software Engineering"
+    ],
+    "GitLab": [
+      "Software Development Tools",
+      "DevOps & Infrastructure",
+      "Software Engineering"
+    ],
+    "Jira": [
+      "Software Development Tools",
+      "DevOps & Infrastructure",
+      "Software Engineering",
+      "SDLC"
+    ],
+    "SDLC": [
+      "Software Engineering"
+    ],
+    "Agile": [
+      "Software Engineering",
+      "SDLC"
+    ],
+    "Scrum": [
+      "Software Engineering",
+      "SDLC"
+    ],
+    "Testing": [
+      "Debugging",
+      "Software Engineering",
+      "SDLC"
+    ],
+    "Unit Testing": [
+      "Debugging",
+      "Software Engineering",
+      "SDLC"
+    ],
+    "DevOps": [
+      "Software Engineering",
+      "SDLC"
+    ],
+    "Debugging": [
+      "Software Engineering"
+    ],
+    "PyTest": [
+      "Debugging",
+      "Software Engineering"
+    ],
+    "Integration Testing": [
+      "Debugging",
+      "Software Engineering"
+    ],
+    "Troubleshooting": [
+      "Debugging",
+      "Software Engineering"
+    ],
+    "Logging": [
+      "Debugging",
+      "Software Engineering"
+    ],
+    "Scalability": [
+      "Software Engineering",
+      "System Design",
+      "Computer Science Fundamentals"
+    ],
+    "High Availability": [
+      "Software Engineering",
+      "System Design",
+      "Computer Science Fundamentals"
+    ],
+    "Architecture": [
+      "Software Engineering",
+      "System Design",
+      "Computer Science Fundamentals"
+    ],
+    "Analytical Skills": [
+      "Computer Science Fundamentals"
+    ],
+    "DSA": [
+      "Analytical Skills",
+      "Computer Science Fundamentals"
+    ],
+    "Problem Solving": [
+      "Analytical Skills",
+      "Computer Science Fundamentals"
+    ],
+    "Analytical Thinking": [
+      "Analytical Skills",
+      "Computer Science Fundamentals"
+    ]
+  }
+}

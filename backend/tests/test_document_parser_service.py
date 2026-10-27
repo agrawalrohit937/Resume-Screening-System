@@ -15,7 +15,6 @@ Tests:
 """
 
 import io
-import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from reportlab.pdfgen import canvas

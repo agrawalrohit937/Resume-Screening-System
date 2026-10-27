@@ -3,7 +3,7 @@ CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import uuid
 from datetime import datetime
 import structlog

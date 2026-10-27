@@ -13,9 +13,9 @@ Provides endpoints for conversational assistance:
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.deps import (
@@ -27,9 +27,6 @@ from api.deps import (
 )
 from models.user_model import UserModel
 from models.copilot_model import (
-    CopilotSessionModel,
-    CopilotMessageModel,
-    CopilotMemoryModel,
     CreateSessionPayload,
     UpdateSessionPayload,
     MessageFeedbackPayload,

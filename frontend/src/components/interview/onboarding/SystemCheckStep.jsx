@@ -150,16 +150,16 @@ export default function SystemCheckStep({
     setEnteringFs(true)
     try {
       await fsGate?.enterImmersive?.()
-    } catch (_) {}
+    } catch (_) { }
     setEnteringFs(false)
     onComplete?.()
   }, [fsGate, onComplete])
 
   return (
-    <div className="min-h-screen w-full bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased">
+    <div className="w-full relative overflow-hidden text-slate-900 antialiased flex flex-col py-2">
       <div className="pointer-events-none absolute -bottom-40 -right-20 h-[420px] w-[420px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
 
-      <div className="relative mx-auto max-w-6xl py-8 sm:py-10 px-4 sm:px-6 lg:px-8">
+      <div className="relative w-full h-full flex flex-col flex-1">
 
         {/* ⚠️ Mobile warning — shown first, before any other content */}
         {isMobile && (
@@ -263,13 +263,12 @@ export default function SystemCheckStep({
                           setStep(item.key)
                         }
                       }}
-                      className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        isCurrent
+                      className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${isCurrent
                           ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/90'
                           : isDone
-                          ? 'text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/60 border border-emerald-100'
-                          : 'text-slate-400 hover:text-slate-600'
-                      }`}
+                            ? 'text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/60 border border-emerald-100'
+                            : 'text-slate-400 hover:text-slate-600'
+                        }`}
                     >
                       {isDone ? (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -283,169 +282,168 @@ export default function SystemCheckStep({
               </div>
 
               <div className="flex-1 flex flex-col justify-center">
-              <AnimatePresence mode="wait">
-                {/* ── Camera ── */}
-                {step === 'camera' && (
-                  <motion.div key="camera" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
-                    <StepHeader icon={Camera} title="Camera Check" desc="We use your webcam to confirm you're present throughout the session." />
-                    <StatusRow label="Camera stream" ok={cameraReady && !cameraError} pending={!cameraReady && !cameraError} errorText={cameraError} />
-                    <StatusRow label="Face framing" ok={faceOk} pending={cameraReady && !faceOk} note={!faceOk && cameraReady ? 'Center your face in the frame with good lighting.' : ''} />
-                    <StepActions
-                      onBack={onBack}
-                      backLabel="← Back to guidelines"
-                      primaryLabel="Continue to microphone"
-                      primaryDisabled={!cameraReady || !!cameraError}
-                      onPrimary={() => setStep('microphone')}
-                      retry={cameraError ? { label: 'Retry camera', onClick: startCamera } : null}
-                    />
-                  </motion.div>
-                )}
+                <AnimatePresence mode="wait">
+                  {/* ── Camera ── */}
+                  {step === 'camera' && (
+                    <motion.div key="camera" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
+                      <StepHeader icon={Camera} title="Camera Check" desc="We use your webcam to confirm you're present throughout the session." />
+                      <StatusRow label="Camera stream" ok={cameraReady && !cameraError} pending={!cameraReady && !cameraError} errorText={cameraError} />
+                      <StatusRow label="Face framing" ok={faceOk} pending={cameraReady && !faceOk} note={!faceOk && cameraReady ? 'Center your face in the frame with good lighting.' : ''} />
+                      <StepActions
+                        onBack={onBack}
+                        backLabel="← Back to guidelines"
+                        primaryLabel="Continue to microphone"
+                        primaryDisabled={!cameraReady || !!cameraError}
+                        onPrimary={() => setStep('microphone')}
+                        retry={cameraError ? { label: 'Retry camera', onClick: startCamera } : null}
+                      />
+                    </motion.div>
+                  )}
 
-                {/* ── Microphone ── */}
-                {step === 'microphone' && (
-                  <motion.div key="mic" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
-                    <StepHeader icon={Mic} title="Microphone Check" desc="Say a few words out loud — we'll measure your input level in real time." />
+                  {/* ── Microphone ── */}
+                  {step === 'microphone' && (
+                    <motion.div key="mic" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
+                      <StepHeader icon={Mic} title="Microphone Check" desc="Say a few words out loud — we'll measure your input level in real time." />
 
-                    <div className="rounded-2xl border border-blue-200 bg-slate-50/60 p-5 space-y-4">
-                      <div className="flex items-end justify-center gap-1.5 h-16">
-                        {Array.from({ length: 14 }).map((_, i) => {
-                          const threshold = (i + 1) * (100 / 14)
-                          const active = mic.state === 'testing' && mic.level >= threshold
-                          return (
-                            <motion.span
-                              key={i}
-                              animate={{ height: active ? `${20 + i * 2.5}%` : '10%', opacity: active ? 1 : 0.25 }}
-                              transition={{ duration: 0.12 }}
-                              className="w-2 rounded-full bg-gradient-to-t from-[#2E9BDA] to-[#5FC3F0]"
-                              style={{ height: '10%' }}
-                            />
-                          )
-                        })}
+                      <div className="rounded-2xl border border-blue-200 bg-slate-50/60 p-5 space-y-4">
+                        <div className="flex items-end justify-center gap-1.5 h-16">
+                          {Array.from({ length: 14 }).map((_, i) => {
+                            const threshold = (i + 1) * (100 / 14)
+                            const active = mic.state === 'testing' && mic.level >= threshold
+                            return (
+                              <motion.span
+                                key={i}
+                                animate={{ height: active ? `${20 + i * 2.5}%` : '10%', opacity: active ? 1 : 0.25 }}
+                                transition={{ duration: 0.12 }}
+                                className="w-2 rounded-full bg-gradient-to-t from-[#2E9BDA] to-[#5FC3F0]"
+                                style={{ height: '10%' }}
+                              />
+                            )
+                          })}
+                        </div>
+                        <p className="text-center text-[12.5px] font-semibold text-blue-900/60">
+                          {mic.state === 'idle' && 'Click below, then speak normally for a few seconds.'}
+                          {mic.state === 'requesting' && 'Requesting microphone access…'}
+                          {mic.state === 'testing' && 'Listening — say something like "testing, one two three"…'}
+                          {mic.state === 'ok' && 'Great — we picked up your voice clearly.'}
+                          {mic.state === 'silent' && "We didn't detect any sound. Check your mic isn't muted."}
+                          {mic.state === 'error' && mic.errorMsg}
+                        </p>
+                        {(mic.state === 'idle' || mic.state === 'silent' || mic.state === 'error') && (
+                          <div className="flex justify-center">
+                            <button type="button" onClick={mic.start} className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-blue-950 text-white text-[13px] font-bold hover:bg-blue-900 transition-all">
+                              {mic.state === 'idle' ? 'Start microphone test' : <><RefreshCw className="h-3.5 w-3.5" /> Try again</>}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-center text-[12.5px] font-semibold text-blue-900/60">
-                        {mic.state === 'idle' && 'Click below, then speak normally for a few seconds.'}
-                        {mic.state === 'requesting' && 'Requesting microphone access…'}
-                        {mic.state === 'testing' && 'Listening — say something like "testing, one two three"…'}
-                        {mic.state === 'ok' && 'Great — we picked up your voice clearly.'}
-                        {mic.state === 'silent' && "We didn't detect any sound. Check your mic isn't muted."}
-                        {mic.state === 'error' && mic.errorMsg}
-                      </p>
-                      {(mic.state === 'idle' || mic.state === 'silent' || mic.state === 'error') && (
-                        <div className="flex justify-center">
-                          <button type="button" onClick={mic.start} className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-blue-950 text-white text-[13px] font-bold hover:bg-blue-900 transition-all">
-                            {mic.state === 'idle' ? 'Start microphone test' : <><RefreshCw className="h-3.5 w-3.5" /> Try again</>}
-                          </button>
-                        </div>
-                      )}
-                    </div>
 
-                    <StepActions
-                      onBack={() => setStep('camera')}
-                      backLabel="← Back"
-                      primaryLabel="Continue to speaker check"
-                      primaryDisabled={mic.state !== 'ok'}
-                      onPrimary={() => setStep('speaker')}
-                      skip={mic.state !== 'ok' ? { label: "Having trouble? Skip this check", onClick: () => setStep('speaker') } : null}
-                    />
-                  </motion.div>
-                )}
+                      <StepActions
+                        onBack={() => setStep('camera')}
+                        backLabel="← Back"
+                        primaryLabel="Continue to speaker check"
+                        primaryDisabled={mic.state !== 'ok'}
+                        onPrimary={() => setStep('speaker')}
+                        skip={mic.state !== 'ok' ? { label: "Having trouble? Skip this check", onClick: () => setStep('speaker') } : null}
+                      />
+                    </motion.div>
+                  )}
 
-                {/* ── Speaker ── */}
-                {step === 'speaker' && (
-                  <motion.div key="speaker" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
-                    <StepHeader icon={Volume2} title="Speaker Check" desc="Play a short test clip to confirm you can hear the AI interviewer." />
+                  {/* ── Speaker ── */}
+                  {step === 'speaker' && (
+                    <motion.div key="speaker" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
+                      <StepHeader icon={Volume2} title="Speaker Check" desc="Play a short test clip to confirm you can hear the AI interviewer." />
 
-                    <div className="rounded-2xl border border-blue-200 bg-slate-50/60 p-6 flex flex-col items-center gap-4 text-center">
-                      <motion.div
-                        animate={tts.speaking ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-                        transition={{ duration: 0.9, repeat: tts.speaking ? Infinity : 0 }}
-                        className={`h-14 w-14 rounded-2xl flex items-center justify-center ${tts.speaking ? 'bg-[#2E9BDA] text-white shadow-lg shadow-[#2E9BDA]/30' : 'bg-[#2E9BDA]/10 text-[#1d6fa5]'}`}
+                      <div className="rounded-2xl border border-blue-200 bg-slate-50/60 p-6 flex flex-col items-center gap-4 text-center">
+                        <motion.div
+                          animate={tts.speaking ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+                          transition={{ duration: 0.9, repeat: tts.speaking ? Infinity : 0 }}
+                          className={`h-14 w-14 rounded-2xl flex items-center justify-center ${tts.speaking ? 'bg-[#2E9BDA] text-white shadow-lg shadow-[#2E9BDA]/30' : 'bg-[#2E9BDA]/10 text-[#1d6fa5]'}`}
+                        >
+                          <Volume2 className="h-6 w-6" />
+                        </motion.div>
+                        <p className="text-[13px] font-semibold text-blue-900/60 max-w-sm">
+                          {tts.speaking ? 'Playing test audio…' : 'Click play, then confirm whether you heard it.'}
+                        </p>
+                        <button type="button" onClick={playSpeakerTest} disabled={tts.speaking} className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-blue-950 text-white text-[13px] font-bold hover:bg-blue-900 disabled:opacity-40 transition-all">
+                          {tts.speaking ? 'Playing…' : 'Play test sound'}
+                        </button>
+
+                        {!tts.speaking && (
+                          <div className="flex items-center gap-3 pt-1">
+                            <button type="button" onClick={() => setSpeakerConfirmed(true)} className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-[12.5px] font-bold border transition-all ${speakerConfirmed === true ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}>
+                              <CheckCircle2 className="h-4 w-4" /> I heard it
+                            </button>
+                            <button type="button" onClick={() => setSpeakerConfirmed(false)} className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-[12.5px] font-bold border transition-all ${speakerConfirmed === false ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-300 text-rose-700 hover:bg-rose-50'}`}>
+                              I didn't hear anything
+                            </button>
+                          </div>
+                        )}
+                        {speakerConfirmed === false && (
+                          <p className="text-[11.5px] text-rose-600 font-medium max-w-sm">
+                            Check your system volume and output device, then play the test sound again.
+                          </p>
+                        )}
+                      </div>
+
+                      <StepActions
+                        onBack={() => setStep('microphone')}
+                        backLabel="← Back"
+                        primaryLabel="Continue"
+                        primaryDisabled={speakerConfirmed !== true}
+                        onPrimary={() => setStep('ready')}
+                        skip={speakerConfirmed !== true ? { label: 'Skip this check', onClick: () => setStep('ready') } : null}
+                      />
+                    </motion.div>
+                  )}
+
+                  {/* ── Ready ── */}
+                  {step === 'ready' && (
+                    <motion.div key="ready" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="space-y-6 text-center">
+                      <div className="h-14 w-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                        <CheckCircle2 className="h-7 w-7" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-[20px] font-extrabold text-blue-950">You're all set</h3>
+                        <p className="text-[13.5px] text-blue-900/55 font-medium max-w-md mx-auto leading-relaxed">
+                          Camera, microphone, and speakers are verified. The interview runs in full-screen — clicking below will switch you into the interview room and start monitoring.
+                        </p>
+                      </div>
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleEnterAndStart}
+                        disabled={enteringFs || isMobile}
+                        title={isMobile ? 'Switch to a desktop or laptop to start the interview' : undefined}
+                        className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg disabled:opacity-60 transition-all ${isMobile
+                            ? 'bg-amber-200 text-amber-800 border-2 border-amber-300 cursor-not-allowed shadow-none'
+                            : 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white shadow-[#2E9BDA]/25'
+                          }`}
                       >
-                        <Volume2 className="h-6 w-6" />
-                      </motion.div>
-                      <p className="text-[13px] font-semibold text-blue-900/60 max-w-sm">
-                        {tts.speaking ? 'Playing test audio…' : 'Click play, then confirm whether you heard it.'}
-                      </p>
-                      <button type="button" onClick={playSpeakerTest} disabled={tts.speaking} className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-blue-950 text-white text-[13px] font-bold hover:bg-blue-900 disabled:opacity-40 transition-all">
-                        {tts.speaking ? 'Playing…' : 'Play test sound'}
-                      </button>
-
-                      {!tts.speaking && (
-                        <div className="flex items-center gap-3 pt-1">
-                          <button type="button" onClick={() => setSpeakerConfirmed(true)} className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-[12.5px] font-bold border transition-all ${speakerConfirmed === true ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}>
-                            <CheckCircle2 className="h-4 w-4" /> I heard it
-                          </button>
-                          <button type="button" onClick={() => setSpeakerConfirmed(false)} className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-[12.5px] font-bold border transition-all ${speakerConfirmed === false ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-300 text-rose-700 hover:bg-rose-50'}`}>
-                            I didn't hear anything
-                          </button>
-                        </div>
-                      )}
-                      {speakerConfirmed === false && (
-                        <p className="text-[11.5px] text-rose-600 font-medium max-w-sm">
-                          Check your system volume and output device, then play the test sound again.
+                        {isMobile
+                          ? <><Smartphone className="h-4 w-4" /> Not available on mobile</>
+                          : enteringFs
+                            ? <><Loader2 className="h-4 w-4 animate-spin" /> Entering full-screen…</>
+                            : <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start</>
+                        }
+                      </motion.button>
+                      {isMobile && (
+                        <p className="text-[11.5px] text-amber-700 font-semibold">
+                          Please open this page on a laptop or desktop to start the interview.
                         </p>
                       )}
-                    </div>
-
-                    <StepActions
-                      onBack={() => setStep('microphone')}
-                      backLabel="← Back"
-                      primaryLabel="Continue"
-                      primaryDisabled={speakerConfirmed !== true}
-                      onPrimary={() => setStep('ready')}
-                      skip={speakerConfirmed !== true ? { label: 'Skip this check', onClick: () => setStep('ready') } : null}
-                    />
-                  </motion.div>
-                )}
-
-                {/* ── Ready ── */}
-                {step === 'ready' && (
-                  <motion.div key="ready" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="space-y-6 text-center">
-                    <div className="h-14 w-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                      <CheckCircle2 className="h-7 w-7" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-[20px] font-extrabold text-blue-950">You're all set</h3>
-                      <p className="text-[13.5px] text-blue-900/55 font-medium max-w-md mx-auto leading-relaxed">
-                        Camera, microphone, and speakers are verified. The interview runs in full-screen — clicking below will switch you into the interview room and start monitoring.
-                      </p>
-                    </div>
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleEnterAndStart}
-                      disabled={enteringFs || isMobile}
-                      title={isMobile ? 'Switch to a desktop or laptop to start the interview' : undefined}
-                      className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg disabled:opacity-60 transition-all ${
-                        isMobile
-                          ? 'bg-amber-200 text-amber-800 border-2 border-amber-300 cursor-not-allowed shadow-none'
-                          : 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white shadow-[#2E9BDA]/25'
-                      }`}
-                    >
-                      {isMobile
-                        ? <><Smartphone className="h-4 w-4" /> Not available on mobile</>
-                        : enteringFs
-                          ? <><Loader2 className="h-4 w-4 animate-spin" /> Entering full-screen…</>
-                          : <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start</>
-                      }
-                    </motion.button>
-                    {isMobile && (
-                      <p className="text-[11.5px] text-amber-700 font-semibold">
-                        Please open this page on a laptop or desktop to start the interview.
-                      </p>
-                    )}
-                    <button type="button" onClick={() => setStep('speaker')} className="block mx-auto text-[12px] font-bold text-blue-400 hover:text-[#1d6fa5] transition-colors">
-                      ← Re-check speaker
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      <button type="button" onClick={() => setStep('speaker')} className="block mx-auto text-[12px] font-bold text-blue-400 hover:text-[#1d6fa5] transition-colors">
+                        ← Re-check speaker
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
       {/* ── Waiting for AI Models Loading Modal ── */}
       <AnimatePresence>

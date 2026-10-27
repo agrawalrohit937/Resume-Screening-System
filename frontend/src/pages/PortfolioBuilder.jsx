@@ -94,7 +94,10 @@ export default function PortfolioBuilder() {
   const [syncingProfile, setSyncingProfile] = useState(false);
   const [profileSynced, setProfileSynced] = useState(false);
 
-  const isPremium = user?.plan === 'premium' || user?.isPremium || user?.subscription_tier === 'premium';
+  const isPremium =
+    user?.isPremium ||
+    (['pro', 'premium'].includes(user?.plan) && user?.subscription_active === true) ||
+    (['pro', 'premium'].includes(user?.subscription_tier) && user?.subscription_active !== false);
 
   // View mode: 'overview' (Screen 0) or 'step' (Cards 1 to 7)
   const [viewMode, setViewMode] = useState('overview');
@@ -125,6 +128,7 @@ export default function PortfolioBuilder() {
     location: '',
     avatar_url: user?.profile_picture || user?.avatar_url || user?.display_picture || '',
     resume_file_url: '',
+    show_resume_publicly: false,
     hero_badge: '✨ Open to Opportunities',
     typing_roles: [],
     hero_metrics: [],
@@ -158,20 +162,10 @@ export default function PortfolioBuilder() {
       if (res.status === 'success' && res.data) {
         const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p, i) => {
           const rawHighlights = (p.highlights || []).map((h) => {
-            if (typeof h === 'string') return { value: '92%', label: 'Metric' };
+            if (typeof h === 'string') return null;
             const v = (h.value || '').trim();
-            // If value is a long sentence (legacy bug), sanitize into crisp metric
-            if (v.length > 15) {
-              const lower = (p.title || '').toLowerCase();
-              if (lower.includes('agent') || lower.includes('ai') || lower.includes('mind')) {
-                return { value: '92.4%', label: 'Accuracy' };
-              } else if (lower.includes('platform') || lower.includes('system') || lower.includes('careershaala')) {
-                return { value: '99.9%', label: 'Uptime' };
-              }
-              return { value: '91.5%', label: 'Efficiency' };
-            }
-            return h;
-          });
+            return v.length <= 15 && h.label?.trim() ? h : null;
+          }).filter(Boolean);
           return { 
             ...p, 
             id: p.id || p._id || `proj_loaded_${i}_${(p.title || 'case').replace(/\s+/g, '_').toLowerCase()}`,
@@ -363,7 +357,7 @@ export default function PortfolioBuilder() {
     const updatedProjects = [...formData.projects];
     const targetProj = updatedProjects[projIdx];
     if (!targetProj.highlights) targetProj.highlights = [];
-    targetProj.highlights.push({ value: '90%+', label: 'Performance' });
+    targetProj.highlights.push({ value: '', label: '' });
     setFormData({ ...formData, projects: updatedProjects });
   };
 
@@ -402,7 +396,7 @@ export default function PortfolioBuilder() {
         ...cleanData,
         username: cleanUsername,
         theme_id: formData.theme_id || 'glassmorphic_pro',
-        user_id: user?.id || user?._id || formData.user_id || 'guest_user'
+        user_id: user?.id || user?._id || formData.user_id
       };
 
       const res = await savePortfolio(payload);

@@ -20,7 +20,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from typing import Any, Dict
@@ -41,7 +40,7 @@ VECTOR_INDEX_SPEC: Dict[str, Any] = {
         {
             "type": "vector",
             "path": "jd_embedding_bge",
-            "numDimensions": 1024,
+            "numDimensions": 384,
             "similarity": "cosine",
         },
         {

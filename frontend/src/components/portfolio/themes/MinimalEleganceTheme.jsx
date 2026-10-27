@@ -44,7 +44,7 @@ export default function MinimalEleganceTheme({
       
       {/* ── TOP EDITORIAL MASTHEAD ── */}
       <header className="sticky top-0 left-0 w-full z-40 bg-[#faf9f6]/90 backdrop-blur-md border-b border-[#e5e4e0]">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
           <a href="#home" className="text-xl font-black tracking-tighter text-[#121316]">
             {profile.full_name}<span className="text-amber-600">.</span>
           </a>
@@ -90,10 +90,10 @@ export default function MinimalEleganceTheme({
       </header>
 
       {/* ── MAIN CONTENT CONTAINER ── */}
-      <main className="max-w-6xl mx-auto px-6 pt-16 pb-28 space-y-32">
+      <main className="max-w-7xl mx-auto px-6 lg:px-12 pt-20 pb-36 space-y-40">
         
         {/* ── HERO EDITORIAL SPREAD ── */}
-        <section id="home" className="pt-8 sm:pt-16 pb-12 border-b border-[#e5e4e0]">
+        <section id="home" className="min-h-[78vh] pt-12 sm:pt-20 pb-16 border-b border-[#e5e4e0] flex items-center">
           <div className="flex flex-col-reverse lg:flex-row items-start justify-between gap-12">
             <div className="space-y-8 max-w-3xl">
               {profile.hero_badge && (
@@ -102,7 +102,7 @@ export default function MinimalEleganceTheme({
                 </span>
               )}
 
-              <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight text-[#121316] leading-[1.02]">
+              <h1 className="text-6xl sm:text-8xl lg:text-[8.5rem] font-black tracking-[-0.07em] text-[#121316] leading-[0.9]">
                 {profile.full_name}
               </h1>
 
@@ -138,7 +138,7 @@ export default function MinimalEleganceTheme({
 
             {/* Avatar Editorial Frame */}
             {profile.avatar_url && !avatarFailed ? (
-              <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden border-4 border-white shadow-xl shrink-0 bg-[#e8e6e0]">
+              <div className="w-56 h-56 sm:w-80 sm:h-80 rounded-full overflow-hidden border-4 border-white shadow-xl shrink-0 bg-[#e8e6e0]">
                 <img 
                   src={profile.avatar_url} 
                   alt={profile.full_name} 

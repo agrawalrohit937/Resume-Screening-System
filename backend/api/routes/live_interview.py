@@ -8,7 +8,7 @@ POST /live-interview/sessions/{id}/complete — finalize + generate report
 GET  /live-interview/sessions/{id}         — fetch session
 GET  /live-interview/history               — user history
 """
-from typing import List, Optional, Dict
+from typing import List, Optional
 from datetime import datetime, timezone
 
 import structlog
@@ -21,9 +21,6 @@ from services.live_interview_service import LiveInterviewService
 from services.evaluation_service import EvaluationService
 from services.gamification_service import GamificationService
 from repositories.resume_repo import ResumeRepository
-
-from config.db import get_database
-from fastapi import Depends
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()

@@ -170,7 +170,7 @@ export default function RecruiterSettings() {
           <Settings size={13} className="text-indigo-600" />
           Account & Preferences
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-poppins tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
           Recruiter Settings
         </h1>
         <p className="text-sm text-slate-500 mt-1 max-w-2xl">

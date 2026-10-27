@@ -19,13 +19,29 @@ import RecommendedJobs from '../components/RecommendedJobs'
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
+  const dashboardCacheKey = `careershala_dashboard_cache:${user?.id || user?.email || 'anonymous'}`
+  const [loading, setLoading] = useState(false)
   
   const [analytics, setAnalytics] = useState(null)
   const [history, setHistory] = useState([])
   const [gami, setGami] = useState(null)
   const [resumeCount, setResumeCount] = useState(0)
   const [scoreTrend, setScoreTrend] = useState([])
+
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(dashboardCacheKey)
+      if (!cached) return
+      const data = JSON.parse(cached)
+      setAnalytics(data.analytics || null)
+      setHistory(data.history || [])
+      setGami(data.gami || null)
+      setResumeCount(data.resumeCount || 0)
+      setScoreTrend(data.scoreTrend || [])
+    } catch {
+      sessionStorage.removeItem(dashboardCacheKey)
+    }
+  }, [dashboardCacheKey])
 
   // ── Enterprise Role Redirection ──────────────────────────────────────────────
   // If an employer (recruiter, interviewer, hiring manager, admin) lands on /dashboard,
@@ -71,7 +87,6 @@ export default function Dashboard() {
       return () => { mounted = false }
     }
 
-    setLoading(true)
     Promise.all([
       getMyAnalytics(undefined, { signal: controller.signal }).catch(() => ({ data: null })),
       getATSHistory({ page_size: 5 }, { signal: controller.signal }).catch(() => ({ data: { items: [] } })),
@@ -85,6 +100,18 @@ export default function Dashboard() {
       setGami(g.data || null)
       setResumeCount(r.data?.resumes?.length || 0)
       setScoreTrend(analyticsData?.score_trend || [])
+
+      try {
+        sessionStorage.setItem(dashboardCacheKey, JSON.stringify({
+          analytics: analyticsData,
+          history: h.data?.items || [],
+          gami: g.data || null,
+          resumeCount: r.data?.resumes?.length || 0,
+          scoreTrend: analyticsData?.score_trend || [],
+        }))
+      } catch {
+        // Session storage is an optional performance cache.
+      }
       
       try {
         const sum = analyticsData?.summary || {}
@@ -106,9 +133,9 @@ export default function Dashboard() {
       mounted = false
       controller.abort()
     }
-  }, [user])
+  }, [user, dashboardCacheKey])
 
-  if (loading) {
+  if (loading && !analytics && !gami) {
     return (
       <div className="w-full space-y-6">
         <div className="h-64 bg-slate-50 rounded-3xl border border-slate-100 animate-pulse" />
@@ -231,7 +258,7 @@ export default function Dashboard() {
           <div className="relative z-10 text-center lg:text-left flex-1 space-y-3 sm:space-y-4">
             <div className="inline-flex items-center gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] sm:text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-              CareerShala Copilot Active
+              CareerMitra Active
             </div>
 
             <div className="space-y-1 sm:space-y-1.5">
@@ -254,7 +281,7 @@ export default function Dashboard() {
                 onClick={openCopilot} 
                 className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
               >
-                <Sparkles size={15} /> Ask AI Copilot
+                <Sparkles size={15} /> Ask CareerMitra
               </button>
               <button 
                 onClick={() => navigate('/results')} 
@@ -535,7 +562,7 @@ export default function Dashboard() {
             </div>
 
             <button
-              onClick={() => navigate('/portfolio')}
+              onClick={() => navigate('/portfolio-builder')}
               className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               Build Live Portfolio <ArrowRight size={14} />

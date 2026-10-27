@@ -1,56 +1,33 @@
-"""
-Agentic Copilot Tool Router
-===========================
-Executes agentic tool-calling loop:
-- Enforces 25s turn budget and 8s per-tool timeout
-- Max 4 tool calls per turn across max 2 sequential rounds
-- Runs independent tools concurrently with asyncio.gather
-- Emits live SSE events: tool_call, tool_result, ui_card, citation, navigate
-- Resilient: tool failures return {ok: False, reason: ...} and never crash the stream
-"""
+"""Deterministic local tool selection and safe tool execution for CareerMitra."""
 
 import asyncio
-import json
-import time
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple
-import httpx
+from typing import Any, Callable, Dict, List, Optional, Tuple
 import structlog
 
-from core.config import settings
-from core.llm_client import groq_key_pool, GeminiKeyPool
+from dataclasses import dataclass
 from services.copilot.context import ToolExecutionContext
 from services.copilot.registry import BaseTool, ToolResult, tool_registry
-from services.copilot.adapters.base import NormalizedToolCall
-from services.copilot.adapters.groq_adapter import GroqToolAdapter
-from services.copilot.adapters.gemini_adapter import GeminiToolAdapter
-from services.copilot.adapters.mistral_adapter import MistralToolAdapter
-import services.copilot.tools  # Ensure all tools are registered
+import services.copilot.tools  # Ensure all read and action tools are registered
 
 logger = structlog.get_logger(__name__)
 
-TURN_BUDGET_SECONDS = 25.0
+
+@dataclass
+class NormalizedToolCall:
+    """Standardized tool call extracted from any LLM provider."""
+    id: str
+    name: str
+    args: Dict[str, Any]
+
+
 PER_TOOL_TIMEOUT_SECONDS = 8.0
-MAX_TOOL_ROUNDS = 2
 MAX_TOTAL_TOOL_CALLS = 4
 
-GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "groq/compound-mini"]
-MISTRAL_BASE = "https://api.mistral.ai/v1/chat/completions"
-MISTRAL_MODELS = ["open-mistral-7b", "ministral-8b-latest"]
-GEMINI_MODEL = "gemini-2.5-flash"
-
-
 class CopilotRouter:
-    """
-    Agentic router coordinating LLM tool-calling, parallel execution, and token streaming.
-    """
+    """Selects and executes grounded tools without an extra provider call."""
 
     def __init__(self):
         self.registry = tool_registry
-        self.groq_adapter = GroqToolAdapter()
-        self.gemini_adapter = GeminiToolAdapter()
-        self.mistral_adapter = MistralToolAdapter()
-        self.gemini_pool = GeminiKeyPool()
 
     async def execute_tool_safe(
         self,
@@ -191,14 +168,7 @@ class CopilotRouter:
                     args={"route": route, "reason": reason},
                 )]
 
-        # 1. Try Groq function calling (if not already planned by slash command)
-        if not tools_to_run and settings.groq_api_keys:
-            try:
-                tools_to_run = await self._call_groq_for_tools(message)
-            except Exception as e:
-                logger.debug("Groq tool call extraction bypassed, using heuristic planner", error=str(e))
-
-        # 2. Fallback to resilient heuristic tool planner if LLM returned 0 tools
+        # Use the local planner so tool selection does not require another provider call.
         if not tools_to_run:
             heuristic_plans = self.select_tools_heuristically(message, quick_action)
             for idx, (t_name, t_args) in enumerate(heuristic_plans):
@@ -288,41 +258,3 @@ class CopilotRouter:
             })
 
         return tool_outputs
-
-    async def _call_groq_for_tools(self, message: str) -> List[NormalizedToolCall]:
-        """Queries Groq with tool definitions to obtain tool calling plan."""
-        tools = self.registry.list_tools()
-        formatted_tools = self.groq_adapter.format_tools(tools)
-
-        for attempt in range(min(2, len(settings.groq_api_keys))):
-            key = groq_key_pool.get_next_key()
-            if not key:
-                break
-            for model in GROQ_MODELS[:2]:
-                try:
-                    async with httpx.AsyncClient(timeout=3.5) as client:
-                        resp = await client.post(
-                            GROQ_BASE,
-                            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                            json={
-                                "model": model,
-                                "messages": [
-                                    {
-                                        "role": "system",
-                                        "content": "You are the tool-calling router for CareerShala Copilot. Decide if any tools should be called to answer the user query. If no tools are needed, do not call any tools.",
-                                    },
-                                    {"role": "user", "content": message},
-                                ],
-                                "tools": formatted_tools,
-                                "tool_choice": "auto",
-                                "temperature": 0.1,
-                            },
-                        )
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            return self.groq_adapter.extract_tool_calls(data)
-                except Exception as e:
-                    logger.debug("Groq tool call attempt failed", model=model, error=str(e))
-                    continue
-
-        return []

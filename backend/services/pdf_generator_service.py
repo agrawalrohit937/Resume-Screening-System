@@ -15,6 +15,7 @@ import gc
 import asyncio
 import os
 import re
+from typing import Any, Dict, List, Optional, Union
 
 import structlog
 from jinja2 import Environment, FileSystemLoader
@@ -23,7 +24,6 @@ try:
 except ImportError:
     sync_playwright = None
 
-from core.config import settings
 from services.cloudinary_service import upload_ats_resume
 
 logger = structlog.get_logger(__name__)
@@ -131,7 +131,7 @@ class PDFGeneratorService:
         return result
 
     def _normalize_resume_context(self, resume_data: dict) -> dict:
-        contact = resume_data.get("contact") or {}
+        contact = resume_data.get("contact") or resume_data.get("contact_info") or {}
         if hasattr(contact, "model_dump"):
             contact = contact.model_dump()
         elif hasattr(contact, "__dict__"):
@@ -146,6 +146,35 @@ class PDFGeneratorService:
                     item = item.__dict__
                 if item:
                     item_copy = dict(item)
+                    # Education normalization
+                    if "institution" in item_copy or "degree" in item_copy or "school" in item_copy:
+                        inst = (item_copy.get("institution") or item_copy.get("school") or item_copy.get("college") or "").strip()
+                        deg = (item_copy.get("degree") or "").strip()
+                        field = (item_copy.get("field_of_study") or item_copy.get("major") or "").strip()
+                        if field and field.lower() not in deg.lower():
+                            deg = f"{deg} — {field}".strip(" —")
+                        item_copy["institution"] = inst
+                        item_copy["degree"] = deg
+
+                        start_y = item_copy.get("start_year")
+                        end_y = item_copy.get("end_year")
+                        edu_year = item_copy.get("year") or item_copy.get("dates") or item_copy.get("duration") or ""
+                        if not edu_year and (start_y or end_y):
+                            edu_year = f"{start_y} - {end_y}" if start_y and end_y else str(end_y or start_y)
+                        item_copy["year"] = str(edu_year).strip()
+
+                        gpa = item_copy.get("gpa") or item_copy.get("cgpa") or item_copy.get("score")
+                        if gpa and str(gpa).strip().lower() != "none":
+                            s_gpa = str(gpa).strip()
+                            item_copy["score"] = s_gpa if ("cgpa" in s_gpa.lower() or "gpa" in s_gpa.lower()) else f"CGPA: {s_gpa}"
+
+                        cw = item_copy.get("coursework") or item_copy.get("courses") or item_copy.get("relevant_coursework")
+                        if cw:
+                            if isinstance(cw, list):
+                                item_copy["coursework"] = ", ".join(str(x).strip() for x in cw if x and str(x).strip())
+                            else:
+                                item_copy["coursework"] = str(cw).strip()
+
                     # Clean company string if location is duplicated at end
                     company = (item_copy.get("company") or "").strip()
                     loc = (item_copy.get("location") or "").strip()
@@ -153,12 +182,22 @@ class PDFGeneratorService:
                         item_copy["company"] = company[:-len(f", {loc}")].strip()
 
                     # Clean bullet highlights (strip leading •, -, ▸, *, ›)
-                    if "highlights" in item_copy and isinstance(item_copy["highlights"], list):
+                    hl = item_copy.get("highlights")
+                    if isinstance(hl, list) and hl:
                         item_copy["highlights"] = [
                             re.sub(r"^[\s\u2022\u25b8\u25b6\u2013\u2014\-\*\>\›\.]+", "", str(h)).strip()
-                            for h in item_copy["highlights"]
+                            for h in hl
                             if h and str(h).strip()
                         ]
+                    else:
+                        # Fallback to description if highlights is empty
+                        desc = (item_copy.get("description") or "").strip()
+                        if desc:
+                            sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', desc) if len(s.strip()) > 15]
+                            item_copy["highlights"] = sentences[:3] if sentences else [desc]
+                        else:
+                            item_copy["highlights"] = []
+
                     # Normalize technologies list so Jinja2 never text-shreds a string
                     techs = item_copy.get("technologies") or item_copy.get("tech_stack") or item_copy.get("stack")
                     if isinstance(techs, str):
@@ -182,21 +221,61 @@ class PDFGeneratorService:
                     normalized.append(item_copy)
             return normalized
 
+        def _format_cert_item(c: Any) -> str:
+            if not c:
+                return ""
+            if isinstance(c, dict):
+                name = (c.get("name") or c.get("title") or c.get("certificate") or c.get("award") or "").strip()
+                issuer = (c.get("issuer") or c.get("organization") or c.get("authority") or c.get("event") or "").strip()
+                desc = (c.get("description") or c.get("details") or "").strip()
+                year = (c.get("issue_date") or c.get("year") or c.get("date") or "").strip()
+                if year.lower() == "none":
+                    year = ""
+                res = name
+                if issuer and issuer.lower() != "none" and issuer.lower() not in res.lower():
+                    res += f" — {issuer}" if res else issuer
+                if desc and desc.lower() != "none" and desc.lower() not in res.lower():
+                    res += f": {desc}" if res else desc
+                if year:
+                    res += f" ({year})"
+                return re.sub(r"^[\s\u2022\u25b8\u2013\u2014\-\*\>]+", "", res).strip()
+            return re.sub(r"^[\s\u2022\u25b8\u2013\u2014\-\*\>]+", "", str(c)).strip()
+
+        # Filter out education items that may have leaked into projects, and promote them to education if missing
+        raw_projects = as_dict_list(resume_data.get("projects", []))
+        raw_education = as_dict_list(resume_data.get("education", []))
+        edu_leak_keywords = ("university", "college", "institute of", "school of", "b.tech", "m.tech", "bachelor")
+        clean_projects = []
+        for p in raw_projects:
+            pname = (p.get("name") or "").lower()
+            if any(k in pname for k in edu_leak_keywords) and not p.get("technologies") and not p.get("highlights"):
+                # Misclassified education entry — promote to education if not already present
+                if not any(pname in (e.get("institution") or "").lower() for e in raw_education):
+                    raw_education.append({
+                        "institution": p.get("name") or "",
+                        "degree": p.get("role") or p.get("title") or "Bachelor of Technology",
+                        "year": p.get("duration") or p.get("dates") or p.get("year") or "",
+                        "score": p.get("score") or "",
+                        "coursework": p.get("coursework") or "",
+                    })
+                continue
+            clean_projects.append(p)
+
         return {
             "full_name": (resume_data.get("full_name") or contact.get("full_name") or "").strip(),
             "role_title": (resume_data.get("target_role") or resume_data.get("role_title") or "").strip(),
-            "email": (contact.get("email") or "").strip(),
-            "phone": (contact.get("phone") or "").strip(),
+            "email": (contact.get("email") or resume_data.get("email") or "").strip(),
+            "phone": (contact.get("phone") or resume_data.get("phone") or "").strip(),
             "location": (contact.get("location") or resume_data.get("location") or "").strip(),
-            "linkedin": (contact.get("linkedin") or "").strip(),
-            "github": (contact.get("github") or "").strip(),
-            "portfolio": (contact.get("portfolio") or "").strip(),
+            "linkedin": (contact.get("linkedin") or resume_data.get("linkedin") or "").strip(),
+            "github": (contact.get("github") or resume_data.get("github") or "").strip(),
+            "portfolio": (contact.get("portfolio") or resume_data.get("portfolio") or "").strip(),
 
             "summary": (resume_data.get("summary") or "").strip(),
 
             "experience": as_dict_list(resume_data.get("experience", [])),
-            "projects": as_dict_list(resume_data.get("projects", [])),
-            "education": as_dict_list(resume_data.get("education", [])),
+            "projects": clean_projects,
+            "education": raw_education,
 
             "skills": (
                 resume_data.get("skills") or {}
@@ -205,14 +284,14 @@ class PDFGeneratorService:
             ),
 
             "certifications": [
-                re.sub(r"^[\s\u2022\u25b8\u2013\u2014\-\*\>]+", "", str(c)).strip()
+                _format_cert_item(c)
                 for c in (resume_data.get("certifications", []) or [])
-                if c and str(c).strip()
+                if _format_cert_item(c) and not _format_cert_item(c).startswith("{'")
             ],
             "achievements": [
-                re.sub(r"^[\s\u2022\u25b8\u2013\u2014\-\*\>]+", "", str(a)).strip()
+                _format_cert_item(a)
                 for a in (resume_data.get("achievements", []) or [])
-                if a and str(a).strip()
+                if _format_cert_item(a) and not _format_cert_item(a).startswith("{'")
             ],
 
             # Growth checklist only
@@ -235,6 +314,14 @@ class PDFGeneratorService:
 
         return resolved_template
 
+    def render_html(self, resume_data: dict, template: str = "resume.html") -> str:
+        context = self._normalize_resume_context(resume_data)
+        template_dir = self._template_dir()
+        env = Environment(loader=FileSystemLoader(template_dir), autoescape=True)
+        template_obj = env.get_template(self._resolve_template_name(template))
+        render_context = {k: v for k, v in context.items() if k != "recommended_skills"}
+        return template_obj.render(**render_context)
+
     async def generate_resume_pdf(
         self,
         resume_data: dict,
@@ -248,12 +335,7 @@ class PDFGeneratorService:
         4. Return the Cloudinary secure_url
         """
         context = self._normalize_resume_context(resume_data)
-
-        template_dir = self._template_dir()
-        env = Environment(loader=FileSystemLoader(template_dir), autoescape=True)
-        template_obj = env.get_template(self._resolve_template_name(template))
-        render_context = {k: v for k, v in context.items() if k != "recommended_skills"}
-        html_content = template_obj.render(**render_context)
+        html_content = self.render_html(resume_data, template)
 
         output_path = os.path.abspath(output_path)
 

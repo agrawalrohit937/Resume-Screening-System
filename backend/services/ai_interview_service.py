@@ -1,12 +1,8 @@
 """
-AI Interview Service — LLM-powered question generation via Groq / Mistral / Anthropic
+AI Interview Service — LLM-powered question generation via Groq / OpenRouter / Anthropic
 Extends existing interview_service.py with real AI capabilities
 """
 
-import json
-import re
-import uuid
-from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 import httpx
@@ -21,16 +17,16 @@ logger = structlog.get_logger(__name__)
 
 # ─── Provider Config ──────────────────────────────────────────────────────────
 GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions"
-MISTRAL_BASE = "https://api.mistral.ai/v1/chat/completions"
+OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_MODEL = "openai/gpt-oss-120b"
-MISTRAL_MODEL = "open-mistral-7b"
+OPENROUTER_MODEL = "openai/gpt-4o-mini"
 
 
 
 class AIInterviewService:
     """
     LLM-powered interview question generation.
-    Falls back through: Groq → Mistral → Anthropic → local templates
+    Falls back through: Groq → OpenRouter → Anthropic → local templates
     """
 
 
@@ -343,11 +339,12 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
                 self._last_model_used = f"groq/{GROQ_MODEL}"
                 return result
 
-        # Try Mistral
-        if hasattr(settings, 'MISTRAL_API_KEY') and settings.MISTRAL_API_KEY:
-            result = await self._call_mistral(prompt, max_tokens)
+        # Try OpenRouter
+        if getattr(settings, 'OPENROUTER_API_KEY', None):
+            result = await self._call_openrouter(prompt, max_tokens)
             if result:
-                self._last_model_used = f"mistral/{MISTRAL_MODEL}"
+                active_model = getattr(settings, 'OPENROUTER_MODEL', OPENROUTER_MODEL)
+                self._last_model_used = f"openrouter/{active_model}"
                 return result
 
         # Try Anthropic (existing setting)
@@ -400,17 +397,34 @@ Evaluate this answer and return ONLY valid JSON (no markdown):
             logger.warning("Groq call failed", error=str(e))
             return None
 
-    async def _call_mistral(self, prompt: str, max_tokens: int) -> Optional[str]:
+    async def _call_openrouter(self, prompt: str, max_tokens: int) -> Optional[str]:
+        api_key = getattr(settings, "OPENROUTER_API_KEY", None)
+        if not api_key:
+            return None
+        active_model = getattr(settings, "OPENROUTER_MODEL", OPENROUTER_MODEL)
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 r = await client.post(
-                    MISTRAL_BASE,
-                    headers={"Authorization": f"Bearer {settings.MISTRAL_API_KEY}", "Content-Type": "application/json"},
-                    json={"model": MISTRAL_MODEL, "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens},
+                    OPENROUTER_BASE,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://careershala.tech",
+                        "X-Title": "CareerShala AI Interview",
+                    },
+                    json={
+                        "model": active_model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": max_tokens,
+                    },
                 )
-                return r.json()["choices"][0]["message"]["content"].strip()
+                if r.status_code == 200:
+                    data = r.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                logger.warning("OpenRouter interview call failed", status=r.status_code, text=r.text)
+                return None
         except Exception as e:
-            logger.warning("Mistral failed", error=str(e))
+            logger.warning("OpenRouter failed", error=str(e))
             return None
 
     async def _call_anthropic(self, prompt: str, max_tokens: int) -> Optional[str]:

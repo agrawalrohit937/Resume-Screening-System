@@ -10,9 +10,7 @@ Evaluates evidence-aware skill fulfillment based on:
 
 from __future__ import annotations
 
-from datetime import date, datetime
-import math
-import os
+from datetime import date
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 import structlog
@@ -30,10 +28,10 @@ _METRIC_RE = re.compile(
 EVIDENCE_MULTIPLIERS = {
     "work_experience_metric": 1.00,
     "work_experience": 1.00,
-    "project": 0.85,
-    "certification": 0.80,
-    "skills_list": 0.60,
-    "unknown": 0.50,
+    "project": 0.95,
+    "certification": 0.90,
+    "skills_list": 0.85,
+    "unknown": 0.70,
 }
 
 
@@ -193,6 +191,11 @@ def evaluate_skill_context(
     in_skills_list = any(sk_low == s or sk_pattern.search(s) for s in section_index["skills_list"])
 
     # Resolve location and base multiplier
+    exp_list = section_index.get("experiences", [])
+    total_duration = sum(float(e.get("duration_years", 0.0) or 0.0) for e in exp_list)
+    # Entry-level / student / fresher condition: no exp or <= 1.0 year of tenure
+    is_entry = not exp_list or total_duration <= 1.0
+
     if in_work_metric:
         where = "work_experience_metric"
         base_mult = 1.00
@@ -203,20 +206,20 @@ def evaluate_skill_context(
         recency_years = min_exp_years_ago if min_exp_years_ago < 90 else 0.0
     elif in_project:
         where = "project"
-        base_mult = 0.85
+        base_mult = 0.95
         recency_years = min_proj_years_ago if min_proj_years_ago < 90 else 0.0
     elif in_cert:
         where = "certification"
-        base_mult = 0.80
+        base_mult = 0.90
         recency_years = 0.0
     elif in_skills_list:
         where = "skills_list"
-        base_mult = 0.60
+        base_mult = 1.00 if is_entry else 0.85
         recency_years = 0.0
     else:
         # Appears in raw text only
         where = "skills_list"
-        base_mult = 0.60
+        base_mult = 1.00 if is_entry else 0.85
         recency_years = 0.0
 
     # 5. Recency Decay (exponential half-life)

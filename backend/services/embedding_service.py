@@ -11,22 +11,20 @@ Provides thread-safe Singleton local embedding model: `BAAI/bge-m3` (or configur
 from __future__ import annotations
 
 import os
-import re
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional
 
 import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Configurable embedding parameters (Phase 1.1)
-EMBEDDING_MODEL_NAME = os.getenv("LOCAL_EMBEDDING_MODEL", "BAAI/bge-m3")
-FALLBACK_MODEL_NAME = "BAAI/bge-base-en-v1.5"
+# Configurable embedding parameters: Fast, lightweight BGE-Small (384-dim, ~130MB)
+EMBEDDING_MODEL_NAME = os.getenv("LOCAL_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
+FALLBACK_MODEL_NAME = "BAAI/bge-small-en-v1.5"
 DEFAULT_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")
-DEFAULT_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1024" if "bge-m3" in EMBEDDING_MODEL_NAME else "768"))
-EMBEDDING_MODEL_VERSION = os.getenv("EMBEDDING_MODEL_VERSION", "bge-m3-v1.0" if "bge-m3" in EMBEDDING_MODEL_NAME else "bge-base-en-v1.5")
+DEFAULT_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "384" if ("small" in EMBEDDING_MODEL_NAME or "MiniLM" in EMBEDDING_MODEL_NAME) else ("1024" if "bge-m3" in EMBEDDING_MODEL_NAME else "768")))
+EMBEDDING_MODEL_VERSION = os.getenv("EMBEDDING_MODEL_VERSION", "bge-small-en-v1.5")
 EMBEDDING_DIMENSIONS = DEFAULT_DIMENSIONS
 
 

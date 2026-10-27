@@ -4,26 +4,23 @@ Portfolio API Routes — Resume auto-parsing, AI enhancer, portfolio CRUD, analy
 
 from datetime import datetime
 from typing import Optional
-import json
+import html
 import re
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, Request, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, Request, Query, status
 from pymongo.asynchronous.database import AsyncDatabase
 from pydantic import BaseModel
 import structlog
-from fastapi_cache.decorator import cache
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from api.deps import get_db, security
+from api.deps import get_db, security, get_current_user, require_plan
 from core.config import settings
 from core.security import decode_token
 from core.llm_client import groq_key_pool
 from models.portfolio_model import (
     ContactMessageSchema,
-    PortfolioAnalyticsModel,
     PortfolioProfileModel,
-    SkillCategoryModel,
 )
 from services.portfolio_service import (
     categorize_skills,
@@ -44,6 +41,10 @@ limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["Portfolio Generator"])
 
 
+def _authenticated_user_id(current_user) -> str:
+    return str(getattr(current_user, "id", None) or current_user["_id"])
+
+
 # ─── Helper to optionally get current user ID ─────────────────────────────────
 async def get_optional_user(credentials=Depends(security), db: AsyncDatabase = Depends(get_db)):
     if not credentials:
@@ -58,14 +59,22 @@ async def get_optional_user(credentials=Depends(security), db: AsyncDatabase = D
 
 # ─── 1. Resume Parsing & Hybrid Extraction ────────────────────────────────────
 @router.post("/parse-resume", summary="Extract structured data and categorized skills from PDF")
-async def parse_resume_for_portfolio(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
+async def parse_resume_for_portfolio(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+):
+    if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only PDF resume documents are supported."
         )
     try:
         content = await file.read()
+        if not content or len(content) > 10 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Resume PDF must be smaller than 10 MB.",
+            )
         
         # 1. Extract raw text with Azure Document Intelligence + guardrail fallback
         raw_text = ""
@@ -119,7 +128,7 @@ async def parse_resume_for_portfolio(file: UploadFile = File(...)):
 @router.post("/upload-photo", summary="Upload candidate profile photo to Cloudinary")
 async def upload_portfolio_photo(
     file: UploadFile = File(...),
-    user_id: Optional[str] = Depends(get_optional_user),
+    current_user=Depends(get_current_user),
     db: AsyncDatabase = Depends(get_db)
 ):
     """
@@ -142,7 +151,8 @@ async def upload_portfolio_photo(
             detail="Image size exceeds 5MB limit."
         )
 
-    target_id = str(user_id) if user_id else f"user_{int(datetime.utcnow().timestamp())}"
+    user_id = _authenticated_user_id(current_user)
+    target_id = user_id
     
     try:
         secure_url, public_id = await upload_profile_picture(
@@ -239,10 +249,9 @@ async def enhance_portfolio_content(req: EnhanceRequest):
         logger.warning("Groq content enhancer fallback triggered", error=str(err))
 
     if not enhanced:
-        enhanced = (
-            f"Architected and deployed a scalable solution for {raw}. "
-            f"Optimized end-to-end performance, ensured clean modular code principles, "
-            f"and delivered production-ready features tailored for modern {req.target_role} environments."
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI enhancement is temporarily unavailable. Please retry.",
         )
 
     # Synthesize smart quantifiable metric highlights matching this project
@@ -339,7 +348,7 @@ async def check_slug_availability(
 @router.post("/publish", summary="Publish user portfolio profile")
 async def save_portfolio(
     profile: PortfolioProfileModel,
-    user_id: Optional[str] = Depends(get_optional_user),
+    current_user=Depends(require_plan("pro")),
     db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = profile.username.strip().lower()
@@ -350,7 +359,7 @@ async def save_portfolio(
             detail="Portfolio URL slug must be at least 3 alphanumeric characters."
         )
 
-    uid = str(user_id or profile.user_id or "")
+    uid = _authenticated_user_id(current_user)
 
     # Check if this slug is claimed by a DIFFERENT user
     existing_by_slug = await db.user_profiles.find_one({
@@ -374,6 +383,7 @@ async def save_portfolio(
     if uid:
         profile_dict["user_id"] = uid
     profile_dict["is_published"] = True
+    profile_dict["email"] = str(current_user.email)
     profile_dict["updated_at"] = datetime.utcnow()
 
     # Preserve and sanitize dynamic domain-agnostic skills dictionary
@@ -441,6 +451,25 @@ async def save_portfolio(
         "username": clean_username,
         "public_url": f"/portfolio/{clean_username}"
     }
+
+
+@router.post("/unpublish", summary="Make the current user's portfolio private")
+async def unpublish_portfolio(
+    current_user=Depends(get_current_user),
+    db: AsyncDatabase = Depends(get_db),
+):
+    uid = _authenticated_user_id(current_user)
+    result = await db.user_profiles.update_one(
+        {"user_id": uid},
+        {"$set": {"is_published": False, "updated_at": datetime.utcnow()}},
+    )
+    await db.users.update_one(
+        {"_id": uid},
+        {"$set": {"is_portfolio_published": False, "updated_at": datetime.utcnow()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portfolio not found.")
+    return {"status": "success", "message": "Portfolio unpublished."}
 
 
 # ─── 4. Get Current User's Saved Portfolio ────────────────────────────────────
@@ -815,103 +844,30 @@ async def get_public_portfolio(username: str, db: AsyncDatabase = Depends(get_db
     clean_username = username.strip().lower()
     norm_query = re.sub(r'[\s\-_]', '', clean_username)
     
-    # 1. Check user_profiles collection (case-insensitive & slug variations)
+    # Only explicitly published profiles are public.
     doc = await db.user_profiles.find_one({
         "$or": [
-            {"username": clean_username},
-            {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}},
-            {"username": clean_username.replace("-", "_")},
-            {"username": clean_username.replace("_", "-")},
-            {"username": norm_query}
+            {"username": clean_username, "is_published": True},
+            {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}, "is_published": True},
+            {"username": clean_username.replace("-", "_"), "is_published": True},
+            {"username": clean_username.replace("_", "-"), "is_published": True},
+            {"username": norm_query, "is_published": True},
         ]
     })
 
-    # 1b. Try matching by portfolio_slug or username in db.users
+    # Resolve a saved published profile through the user's indexed slug.
     if not doc:
         matched_user_doc = await db.users.find_one({
             "$or": [
-                {"portfolio_slug": clean_username},
-                {"portfolio_slug": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}},
-                {"username": clean_username},
-                {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}}
+                {"portfolio_slug": clean_username, "is_portfolio_published": True},
+                {"portfolio_slug": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}, "is_portfolio_published": True},
+                {"username": clean_username, "is_portfolio_published": True},
+                {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}, "is_portfolio_published": True},
             ]
         })
         if matched_user_doc:
             uid = str(matched_user_doc["_id"])
-            doc = await db.user_profiles.find_one({"user_id": uid})
-
-    # 1c. Try matching by full_name or email in user_profiles
-    if not doc:
-        doc = await db.user_profiles.find_one({
-            "$or": [
-                {"full_name": {"$regex": f"^{re.escape(clean_username.replace('-', ' '))}$", "$options": "i"}},
-                {"full_name": {"$regex": f"^{re.escape(clean_username.replace('_', ' '))}$", "$options": "i"}},
-                {"email": {"$regex": f"^{re.escape(clean_username)}@", "$options": "i"}}
-            ]
-        })
-    
-    # 2. Fallback: Check if user exists in db.users and generate profile on-the-fly
-    if not doc:
-        user_matches = await db.users.find({}).to_list(length=300)
-        matched_user = None
-        for u in user_matches:
-            name_slug = u.get("full_name", "").lower().replace(" ", "-")
-            name_norm = re.sub(r'[\s\-_]', '', u.get("full_name", "").lower())
-            email_slug = u.get("email", "").split("@")[0].lower()
-            email_norm = re.sub(r'[\s\-_.]', '', email_slug)
-            user_uname = u.get("username", "").lower()
-
-            if clean_username in (name_slug, email_slug, user_uname) or norm_query in (name_norm, email_norm):
-                matched_user = u
-                break
-
-        if matched_user:
-            uid = str(matched_user.get("_id"))
-            resume_doc = await db.resumes.find_one(
-                {"$or": [{"user_id": uid}, {"user_id": matched_user.get("email")}, {"email": matched_user.get("email")}]},
-                sort=[("created_at", -1)]
-            )
-            
-            extracted_skills = []
-            if resume_doc and "parsed_data" in resume_doc and isinstance(resume_doc["parsed_data"], dict):
-                extracted_skills = resume_doc["parsed_data"].get("skills", [])
-            elif resume_doc and "skills" in resume_doc:
-                extracted_skills = resume_doc.get("skills", [])
-
-            categorized = categorize_skills(extracted_skills if isinstance(extracted_skills, list) else [])
-
-            # Extract projects from resume
-            pub_raw_text = ""
-            if resume_doc and "parsed_data" in resume_doc and isinstance(resume_doc["parsed_data"], dict):
-                pub_raw_text = resume_doc["parsed_data"].get("raw_text", "")
-            if not pub_raw_text and resume_doc:
-                pub_raw_text = resume_doc.get("extracted_text") or resume_doc.get("raw_text") or ""
-
-            pub_projects = []
-            if pub_raw_text:
-                pub_projects = extract_all_projects(pub_raw_text, extracted_skills if isinstance(extracted_skills, list) else [])
-
-            doc = {
-                "_id": uid,
-                "user_id": uid,
-                "username": clean_username,
-                "full_name": matched_user.get("full_name", "Developer"),
-                "headline": matched_user.get("headline") or "Software & AI Engineer",
-                "bio": matched_user.get("bio") or "Passionate software engineer building modern intelligent platforms.",
-                "email": "protected@careershal.internal",
-                "phone": matched_user.get("phone", ""),
-                "avatar_url": matched_user.get("profile_picture") or matched_user.get("profile_photo_url") or matched_user.get("avatar_url", ""),
-                "resume_file_url": resume_doc.get("file_url") if resume_doc else "",
-                "skills": categorized,
-                "projects": pub_projects,
-                "social_links": {
-                    "github": matched_user.get("github_url", ""),
-                    "linkedin": matched_user.get("linkedin_url", ""),
-                    "twitter": "",
-                    "website": ""
-                },
-                "is_published": True
-            }
+            doc = await db.user_profiles.find_one({"user_id": uid, "is_published": True})
 
     if not doc:
         raise HTTPException(
@@ -921,6 +877,8 @@ async def get_public_portfolio(username: str, db: AsyncDatabase = Depends(get_db
 
     doc["_id"] = str(doc.get("_id", ""))
     doc["email"] = "protected@careershal.internal"
+    if not doc.get("show_resume_publicly"):
+        doc["resume_file_url"] = ""
     if doc.get("skills"):
         doc["skills"] = sanitize_portfolio_skills(doc["skills"])
     return {"status": "success", "data": doc}
@@ -981,11 +939,17 @@ async def send_contact_message(
     db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
-    profile = await db.user_profiles.find_one({"username": clean_username})
+    profile = await db.user_profiles.find_one({"username": clean_username, "is_published": True})
     if not profile or "email" not in profile:
         raise HTTPException(status_code=404, detail="Candidate not found.")
 
     target_email = profile["email"]
+    safe_candidate_name = html.escape(str(profile.get("full_name") or username))
+    safe_sender_name = html.escape(msg.sender_name)
+    safe_sender_email = html.escape(str(msg.sender_email), quote=True)
+    safe_subject = html.escape(msg.subject)
+    safe_message = html.escape(msg.message)
+    safe_company = html.escape(msg.company) if msg.company else ""
 
     # Increment messages received in analytics
     await db.portfolio_analytics.update_one(
@@ -1005,7 +969,7 @@ async def send_contact_message(
             # We can use the existing EmailService if available
             email_svc = EmailService()
             subject = f"💼 [Recruiter Inquiry] {msg.subject} — CareerShala Portfolio"
-            candidate_name = profile.get("full_name") or username
+            candidate_name = safe_candidate_name
             frontend_base = settings.FRONTEND_URL.rstrip('/')
 
             body_html = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -1063,7 +1027,7 @@ async def send_contact_message(
                 New Opportunity Message
               </h1>
               <p style="margin: 0; font-size: 14px; color: #475569; line-height: 1.6;">
-                Hi <strong>{candidate_name}</strong>, a recruiter or collaborator viewed your developer portfolio and sent you a message directly through CareerShala.
+                Hi <strong>{safe_candidate_name}</strong>, a recruiter or collaborator viewed your developer portfolio and sent you a message directly through CareerShala.
               </p>
             </td>
           </tr>
@@ -1074,11 +1038,11 @@ async def send_contact_message(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
                 <tr>
                   <td style="padding-bottom: 8px; font-size: 13px; color: #64748b;">
-                    <strong>From:</strong> {msg.sender_name} &lt;<a href="mailto:{msg.sender_email}" style="color: #0284c7; text-decoration: none;">{msg.sender_email}</a>&gt;
+                    <strong>From:</strong> {safe_sender_name} &lt;<a href="mailto:{safe_sender_email}" style="color: #0284c7; text-decoration: none;">{safe_sender_email}</a>&gt;
                   </td>
                 </tr>
-                {f'<tr><td style="padding-bottom: 8px; font-size: 13px; color: #64748b;"><strong>Company:</strong> {msg.company}</td></tr>' if msg.company else ''}
-                {f'<tr><td style="padding-bottom: 8px; font-size: 13px; color: #64748b;"><strong>Subject:</strong> {msg.subject}</td></tr>' if msg.subject else ''}
+                {f'<tr><td style="padding-bottom: 8px; font-size: 13px; color: #64748b;"><strong>Company:</strong> {safe_company}</td></tr>' if safe_company else ''}
+                {f'<tr><td style="padding-bottom: 8px; font-size: 13px; color: #64748b;"><strong>Subject:</strong> {safe_subject}</td></tr>' if safe_subject else ''}
               </table>
             </td>
           </tr>
@@ -1087,7 +1051,7 @@ async def send_contact_message(
           <tr>
             <td style="padding: 0 40px 32px 40px;">
               <div style="background-color: #ffffff; border-left: 3px solid #0284c7; padding: 16px 20px; margin: 0; font-size: 14px; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">
-                {msg.message}
+                {safe_message}
               </div>
             </td>
           </tr>
@@ -1098,8 +1062,8 @@ async def send_contact_message(
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td align="center" style="background-color: #0f172a; border-radius: 8px;">
-                    <a href="mailto:{msg.sender_email}?subject=Re:%20{msg.subject}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
-                      Reply directly to {msg.sender_name} &rarr;
+                    <a href="mailto:{safe_sender_email}?subject=Re:%20{safe_subject}" target="_blank" style="display: inline-block; padding: 12px 28px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">
+                      Reply directly to {safe_sender_name} &rarr;
                     </a>
                   </td>
                 </tr>

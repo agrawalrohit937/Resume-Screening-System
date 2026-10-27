@@ -85,20 +85,10 @@ async def list_all_tickets(
         status=status_filter,
         priority=priority,
         category=category,
+        search=search,
         skip=skip,
         limit=page_size,
     )
-
-    # If search query is provided, do a secondary text filter (repo doesn't support it natively)
-    if search and search.strip():
-        search_lower = search.lower().strip()
-        tickets = [
-            t for t in tickets
-            if search_lower in (t.subject or "").lower()
-            or search_lower in (t.email or "").lower()
-            or search_lower in (t.ticket_id or "").lower()
-            or search_lower in (t.description or "").lower()
-        ]
 
     total_pages = (total + page_size - 1) // page_size
 

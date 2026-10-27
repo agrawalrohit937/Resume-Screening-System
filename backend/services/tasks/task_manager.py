@@ -13,10 +13,9 @@ import asyncio
 import hashlib
 import time
 from datetime import datetime, timezone
-from typing import Any, Callable, Coroutine, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Coroutine, Dict, Optional, Tuple
 import structlog
 
-from core.feature_flags import FEATURE_ASYNC_WORKERS
 
 logger = structlog.get_logger(__name__)
 
@@ -319,7 +318,7 @@ class TaskManager:
         base_backoff_sec: float = 0.5,
     ) -> Dict[str, Any]:
         """
-        Dispatches a task via Celery worker if available & enabled, or in-process async worker fallback.
+        Dispatches background tasks via native FastAPI async worker with exponential retry and idempotency tracking.
         """
         key = idempotency_key or hashlib.sha256(f"{task_name}:{sorted(payload.items())}".encode()).hexdigest()
 
@@ -329,20 +328,7 @@ class TaskManager:
 
         await self.mark_task_status(key, "QUEUED")
 
-        # Celery Dispatch
-        from services.tasks.celery_app import celery_app
-        if FEATURE_ASYNC_WORKERS and celery_app is not None:
-            try:
-                celery_task = celery_app.send_task(
-                    f"careershala.{task_name}",
-                    kwargs={"payload": payload, "idempotency_key": key},
-                )
-                logger.info("Dispatched task to Celery worker", task_id=celery_task.id, task_name=task_name)
-                return {"enqueued": True, "broker": "celery", "task_id": celery_task.id, "idempotency_key": key}
-            except Exception as e:
-                logger.warning("Celery dispatch failed, falling back to in-process execution", error=str(e))
-
-        # In-Process Fallback: run in background async task
+        # Native In-Process Async Worker: run in background async task with retry & backoff
         asyncio.create_task(
             self.execute_with_retry(
                 task_func=task_coro_func,

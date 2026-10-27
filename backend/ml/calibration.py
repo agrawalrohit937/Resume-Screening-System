@@ -6,8 +6,7 @@ using Isotonic Regression (non-parametric) and Platt Scaling (parametric logisti
 """
 
 from pathlib import Path
-import json
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 import numpy as np
 import structlog
 from sklearn.isotonic import IsotonicRegression

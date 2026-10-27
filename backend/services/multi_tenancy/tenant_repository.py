@@ -9,8 +9,7 @@ Provably prevents cross-tenant data leaks and unauthorized cross-tenant mutation
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
-from bson import ObjectId
+from typing import Any, Dict, List, Optional
 import structlog
 
 from services.multi_tenancy.tenant_context import (

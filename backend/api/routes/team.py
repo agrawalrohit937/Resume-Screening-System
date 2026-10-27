@@ -9,11 +9,10 @@ Enterprise Phase 5:
 """
 
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from bson import ObjectId
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
 
 from api.deps import get_database, get_current_user, get_user_repo, get_email_service
 from services.email_service import EmailService

@@ -5,15 +5,13 @@ Repository Layer — Revenue Recovery Cases & Attempts
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from bson import ObjectId
-from pymongo import DESCENDING, ASCENDING
+from pymongo import DESCENDING
 from pymongo.asynchronous.database import AsyncDatabase
 
 from models.revenue_recovery_model import (
     RecoveryCaseModel,
     RecoveryStatus,
-    RiskLevel,
     RecoveryChannel,
-    AuditLogEntry,
     ActorType,
 )
 

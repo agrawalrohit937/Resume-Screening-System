@@ -81,6 +81,8 @@ export default function LandingHeroSection({ user }) {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full sm:w-auto mb-12">
           {user ? (
             <button
+              onMouseEnter={() => import('../../pages/Dashboard')}
+              onFocus={() => import('../../pages/Dashboard')}
               onClick={() => navigate('/dashboard')}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl font-extrabold text-sm sm:text-base text-white bg-gradient-to-r from-[#2E9BDA] via-[#248bc7] to-indigo-600 hover:from-[#2380b8] hover:to-indigo-700 shadow-lg shadow-[#2E9BDA]/25 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
@@ -118,11 +120,11 @@ export default function LandingHeroSection({ user }) {
               <span className="w-3 h-3 rounded-full bg-rose-400/80" />
               <span className="w-3 h-3 rounded-full bg-amber-400/80" />
               <span className="w-3 h-3 rounded-full bg-emerald-400/80" />
-              <span className="ml-2 text-xs font-mono font-bold text-slate-400 hidden sm:inline">
+              <span className="ml-2 text-xs font-semibold text-slate-400 hidden sm:inline">
                 https://careershala.tech/dashboard/overview
               </span>
             </div>
-            <div className="flex items-center gap-2 text-xs font-mono font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               <span>AI COGNITIVE ENGINE ACTIVE</span>
             </div>
@@ -138,7 +140,7 @@ export default function LandingHeroSection({ user }) {
                   <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200 text-[#2E9BDA] flex items-center justify-center font-black shadow-xs">
                     <FileText size={18} />
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10.5px] font-mono font-black border border-emerald-200">
+                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10.5px] font-bold border border-emerald-200">
                     PASSED 96%
                   </span>
                 </div>
@@ -155,7 +157,7 @@ export default function LandingHeroSection({ user }) {
                   ].map((s, i) => (
                     <div key={i} className="flex justify-between items-center text-xs bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70 font-bold text-slate-700">
                       <span>{s.name}</span>
-                      <span className="text-[#2E9BDA] font-mono">{s.score}</span>
+                      <span className="text-[#2E9BDA] font-extrabold">{s.score}</span>
                     </div>
                   ))}
                 </div>
@@ -174,7 +176,7 @@ export default function LandingHeroSection({ user }) {
                   <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center font-black shadow-xs">
                     <Video size={18} />
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10.5px] font-mono font-black border border-indigo-200">
+                  <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10.5px] font-bold border border-indigo-200">
                     60 FPS PROCTOR
                   </span>
                 </div>
@@ -186,15 +188,15 @@ export default function LandingHeroSection({ user }) {
                 <div className="space-y-1.5 bg-slate-50/90 p-2.5 rounded-xl border border-slate-200/70 text-xs">
                   <div className="flex justify-between items-center text-slate-700 font-medium">
                     <span>Iris Gaze Tracking:</span>
-                    <span className="text-emerald-600 font-bold font-mono">98% Focused</span>
+                    <span className="text-emerald-600 font-bold">98% Focused</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-700 font-medium">
                     <span>Speech Cadence:</span>
-                    <span className="text-indigo-600 font-bold font-mono">142 WPM</span>
+                    <span className="text-indigo-600 font-bold">142 WPM</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-700 font-medium">
                     <span>Anti-Cheat Status:</span>
-                    <span className="text-emerald-600 font-bold font-mono">0 Flags</span>
+                    <span className="text-emerald-600 font-bold">0 Flags</span>
                   </div>
                 </div>
               </div>
@@ -212,7 +214,7 @@ export default function LandingHeroSection({ user }) {
                   <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-black shadow-xs">
                     <Award size={18} />
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10.5px] font-mono font-black border border-amber-200">
+                  <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10.5px] font-bold border border-amber-200">
                     100% CLUB
                   </span>
                 </div>
@@ -248,28 +250,28 @@ export default function LandingHeroSection({ user }) {
             <div className="w-8 h-8 rounded-lg bg-sky-50 text-[#2E9BDA] flex items-center justify-center mb-2">
               <FileText size={16} />
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">10,000+</p>
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">10,000+</p>
             <p className="text-xs text-slate-500 font-bold mt-0.5">Resumes Scored</p>
           </div>
           <div className="px-4 py-2 sm:py-0 flex flex-col items-center">
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
               <ShieldCheck size={16} />
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-[#2E9BDA] font-mono">99.4%</p>
+            <p className="text-2xl sm:text-3xl font-black text-[#2E9BDA] tracking-tight">99.4%</p>
             <p className="text-xs text-slate-500 font-bold mt-0.5">ATS Pass Rate</p>
           </div>
           <div className="px-4 py-2 sm:py-0 flex flex-col items-center">
             <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
               <Zap size={16} />
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-indigo-600 font-mono">4.2x</p>
+            <p className="text-2xl sm:text-3xl font-black text-indigo-600 tracking-tight">4.2x</p>
             <p className="text-xs text-slate-500 font-bold mt-0.5">Faster Callbacks</p>
           </div>
           <div className="px-4 py-2 sm:py-0 flex flex-col items-center">
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
               <Globe size={16} />
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono">100% Free</p>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">100% Free</p>
             <p className="text-xs text-slate-500 font-bold mt-0.5">GitHub Portfolio Site</p>
           </div>
         </div>

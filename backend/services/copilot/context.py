@@ -4,7 +4,7 @@ Copilot Tool Execution Context
 Carries all user, tenant, repository, and session context required for tool execution.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Awaitable
 
 

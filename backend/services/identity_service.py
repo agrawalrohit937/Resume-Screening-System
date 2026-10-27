@@ -5,10 +5,9 @@ and multi-part surnames without imposing Western naming biases.
 CRITICAL INVARIANT: NEVER infers gender, caste, religion, or ethnicity from names.
 """
 
-import re
 import unicodedata
-from typing import Optional, List, Dict
-from pydantic import BaseModel, Field
+from typing import Optional
+from pydantic import BaseModel
 import structlog
 
 logger = structlog.get_logger(__name__)

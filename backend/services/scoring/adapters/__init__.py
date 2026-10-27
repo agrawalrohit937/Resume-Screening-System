@@ -17,11 +17,6 @@ from services.scoring.adapters.definitions import (
     LogisticsOperationsAdapter,
     DataAnalyticsAdapter,
     GenericAdapter,
-    HealthcareLicenceRule,
-    ProfessionalCharterRule,
-    TeacherCertificationRule,
-    PortfolioURLRule,
-    CommercialDriverLicenceRule,
 )
 
 __all__ = [

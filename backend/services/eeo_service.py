@@ -9,13 +9,11 @@ the core scoring engine, feature vectors, and recruiter candidate screening inte
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from bson import ObjectId
 import structlog
 
-from core.feature_flags import FEATURE_EEO_ISOLATION
 from models.eeo import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
-from services.multi_tenancy import tenant_context
 
 logger = structlog.get_logger(__name__)
 

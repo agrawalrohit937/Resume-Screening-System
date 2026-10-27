@@ -18,14 +18,14 @@ from api.deps import get_current_user, get_user_repo, get_database
 
 logger = structlog.get_logger(__name__)
 from core.config import settings
-from core.security import decode_token, verify_password, verify_password_async, verify_token_type, hash_password, hash_password_async
+from core.security import decode_token, verify_password_async, hash_password_async
 from models.user_model import UserModel, UserStatus
 from repositories.user_repo import UserRepository
 from schemas.user_schema import (
     RefreshTokenRequest, TokenResponse, UserPublicResponse,
     MessageResponse, ChangePasswordRequest, UpdateProfileRequest,
 )
-from api.routes.auth_helpers import user_to_public, build_and_persist_tokens, set_auth_cookies
+from api.routes.auth_helpers import user_to_public, set_auth_cookies
 from api.routes import auth_otp, auth_google, auth_linkedin, auth_github
 
 router = APIRouter()

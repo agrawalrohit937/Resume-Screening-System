@@ -3,25 +3,20 @@ Revenue Recovery API Routes — Unified endpoints for AI-driven revenue recovery
 voice interactions, admin queue management, and analytics.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 import structlog
 
 from api.deps import get_admin_user, get_current_user, get_db
 from models.user_model import UserModel
 from models.revenue_recovery_model import (
-    RecoveryCaseModel,
     RecoveryStatus,
-    RiskLevel,
-    RecoveryStrategy,
-    RecoveryChannel,
     ActorType,
 )
 from repositories.revenue_recovery_repo import RevenueRecoveryRepository
 from repositories.user_repo import UserRepository
-from services.risk_scoring_service import risk_scoring_service
 from services.voice_recovery_service import voice_recovery_service
 from services.email_service import EmailService
 from workflows.revenue_recovery_graph import revenue_recovery_pipeline

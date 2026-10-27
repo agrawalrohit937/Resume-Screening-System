@@ -4,7 +4,6 @@ CareerShala ATS v2.0.0.
 
 import pytest
 from xml.etree import ElementTree as ET
-from datetime import datetime
 
 from services.integrations.webhooks import WebhookService, compute_webhook_signature
 from services.integrations.adapters import GreenhouseAdapter, LeverAdapter, WorkdayAdapter

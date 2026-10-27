@@ -21,9 +21,16 @@ export const useCopilot = () => {
 const INITIAL_GREETING = {
   id: 'greeting',
   role: 'assistant',
-  content: "Hi, I'm CareerShala AI Copilot 👋\n\nI can analyze your resume, optimize ATS scores, conduct mock interview practice, and draft personalized career roadmaps. Try asking a question or typing `/ats` or `/interview`!",
+  content: "Hi there! 👋 I'm CareerMitra, your personal AI career mentor.\n\nHow can I help boost your career today?",
   created_at: new Date().toISOString(),
 };
+
+const DEFAULT_SUGGESTIONS = [
+  { label: '🎯 ATS Match', prompt: 'Review my ATS match score and readiness' },
+  { label: '✨ Polish Resume', prompt: 'Rewrite my top 3 resume bullets for higher impact' },
+  { label: '🎙️ Mock Interview', prompt: 'Practice a mock interview for my role' },
+  { label: '🚀 Career Roadmap', prompt: 'Build a 4-week learning roadmap for my career' },
+];
 
 export function CopilotProvider({ children }) {
   const auth = useAuth?.() || {};
@@ -35,19 +42,12 @@ export function CopilotProvider({ children }) {
   const messagesKey = userId ? `careershala:copilot:${userId}:continuous_messages` : null;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([INITIAL_GREETING]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState('');
-  const [currentTools, setCurrentTools] = useState([]);
-  const [suggestions, setSuggestions] = useState([
-    'Review my ATS match score',
-    'Rewrite my top 3 resume bullets',
-    'Practice mock interview',
-    'Build 4-week learning roadmap',
-  ]);
+  const [suggestions, setSuggestions] = useState(DEFAULT_SUGGESTIONS);
 
   const abortControllerRef = useRef(null);
 
@@ -60,19 +60,13 @@ export function CopilotProvider({ children }) {
     }
     setIsGenerating(false);
     setCurrentStatus('');
-    setCurrentTools([]);
 
     // 2. If logged out, reset all internal state to default
     if (!userId) {
       setSessions([]);
       setCurrentSessionId(null);
       setMessages([INITIAL_GREETING]);
-      setSuggestions([
-        'Review my ATS match score',
-        'Rewrite my top 3 resume bullets',
-        'Practice mock interview',
-        'Build 4-week learning roadmap',
-      ]);
+      setSuggestions(DEFAULT_SUGGESTIONS);
       return;
     }
 
@@ -171,7 +165,6 @@ export function CopilotProvider({ children }) {
       }
       setIsGenerating(false);
       setCurrentStatus('');
-      setCurrentTools([]);
       setSessions([]);
       setCurrentSessionId(null);
       setMessages([INITIAL_GREETING]);
@@ -192,7 +185,8 @@ export function CopilotProvider({ children }) {
     if (isGenerating) stopGeneration();
     setCurrentSessionId(sessionId);
     if (sessionKey) localStorage.setItem(sessionKey, sessionId);
-    await loadSessionMessages(sessionId);
+    const result = await fetchSessionMessages(sessionId);
+    if (result?.messages) setMessages(result.messages);
   };
 
   // Start fresh session
@@ -205,12 +199,7 @@ export function CopilotProvider({ children }) {
       setCurrentSessionId(newSession.id);
       if (sessionKey) localStorage.setItem(sessionKey, newSession.id);
       setMessages([INITIAL_GREETING]);
-      setSuggestions([
-        'Review my ATS match score',
-        'Rewrite my top 3 resume bullets',
-        'Practice mock interview',
-        'Build 4-week learning roadmap',
-      ]);
+      setSuggestions(DEFAULT_SUGGESTIONS);
     } catch {
       if (messagesKey) localStorage.removeItem(messagesKey);
       setCurrentSessionId(null);
@@ -239,7 +228,6 @@ export function CopilotProvider({ children }) {
     }
     setIsGenerating(false);
     setCurrentStatus('');
-    setCurrentTools([]);
   };
 
   // Send message
@@ -269,7 +257,6 @@ export function CopilotProvider({ children }) {
     setMessages((prev) => [...prev, userMsg, botMsg]);
     setIsGenerating(true);
     setCurrentStatus('Analyzing request...');
-    setCurrentTools([]);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -296,16 +283,12 @@ export function CopilotProvider({ children }) {
 
             case 'tool_call': {
               const toolName = ev.tool || ev.name || 'tool';
-              setCurrentTools((prev) => [...prev, { name: toolName, input: ev.args }]);
               setCurrentStatus(`Executing ${toolName.replace(/_/g, ' ')}...`);
               break;
             }
 
             case 'tool_result': {
               const toolName = ev.tool || ev.name || '';
-              setCurrentTools((prev) =>
-                prev.map((t) => (t.name === toolName ? { ...t, done: true, summary: ev.summary } : t))
-              );
               break;
             }
 
@@ -368,7 +351,6 @@ export function CopilotProvider({ children }) {
             case 'done':
               setIsGenerating(false);
               setCurrentStatus('');
-              setCurrentTools([]);
               break;
 
             case 'error':
@@ -406,7 +388,6 @@ export function CopilotProvider({ children }) {
     } finally {
       setIsGenerating(false);
       setCurrentStatus('');
-      setCurrentTools([]);
       abortControllerRef.current = null;
     }
   };
@@ -428,14 +409,11 @@ export function CopilotProvider({ children }) {
       value={{
         isOpen,
         setIsOpen,
-        isExpanded,
-        setIsExpanded,
         sessions,
         currentSessionId,
         messages,
         isGenerating,
         currentStatus,
-        currentTools,
         suggestions,
         sendMessage,
         stopGeneration,

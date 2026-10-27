@@ -14,7 +14,6 @@ v3 changes (HITL wizard):
     to risk that when we already have the verbatim, human-provided value.
 """
 
-import json
 import re
 from typing import TypedDict, List, Optional, Dict, Any
 
@@ -24,8 +23,7 @@ try:
 except ImportError:
     genai = None
 from langgraph.graph import StateGraph, END
-from core.llm_client import gemini_key_pool
-from schemas.enhancement_schema import EnhancedResumeSection
+from core.llm_client import gemini_key_pool, groq_key_pool
 from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)
@@ -181,6 +179,7 @@ STRICT ETHICAL GUARDRAILS (ZERO HALLUCINATION)
 =========================
 1. DO NOT invent, fabricate, or add any skills, tools, degrees, metrics, or years of experience that the candidate does not actually possess. 
 2. Ensure the output remains 100% truthful to the candidate's original background.
+3. CRITICAL: PRESERVE ALL ORIGINAL SECTIONS, ALL PROJECTS, ALL EDUCATION, AND ALL CERTIFICATIONS. Never omit, drop, or truncate any projects, education history, or certifications from the candidate's original resume!
 
 =========================
 OPTIMIZATION STRATEGY (HOW TO MAXIMIZE SCORE)
@@ -190,6 +189,7 @@ OPTIMIZATION STRATEGY (HOW TO MAXIMIZE SCORE)
 3. **STAR Method Rewriting:** You MUST rewrite the `highlights` (bullet points) in the `experience` and `projects` arrays. Convert weak, short sentences into strong, context-rich bullet points using Action Verbs. Focus on the *how* and *what* by weaving in the `strict_missing_keywords`.
 4. **Formatting Internships:** Format internships formally under the `experience` array so ATS parsers recognize them as valid professional experience.
 5. **Skill Categorization:** Group skills into 4 to 6 specialized domains (e.g., "Generative AI", "Backend Development") with exactly 6 to 10 curated skills per category. Include all Human-Verified Ground Truth skills.
+6. **Retain All Projects & Education:** Output EVERY project mentioned in the original resume (do not stop after 1 project). Output all educational degrees and certifications.
 
 =========================
 INPUT DATA
@@ -234,11 +234,52 @@ Output ONLY valid JSON matching this exact schema:
             raise ValueError("Could not parse valid JSON from Gemini enhancement response")
         return parsed
 
+    enhanced_dict = None
     try:
         enhanced_dict = await gemini_key_pool.execute_async_with_fallback(_enhance_with_gemini)
     except Exception as e:
-        logger.error("Gemini LLM enhancement failed after retries", error=str(e))
-        raise RuntimeError("Unable to enhance the resume using the Gemini AI model.") from e
+        logger.warning("Gemini LLM enhancement failed, triggering Groq LLM failover...", error=str(e))
+        
+        async def _enhance_with_groq(api_key: str):
+            from groq import AsyncGroq
+            client = AsyncGroq(api_key=api_key)
+            
+            # Use gpt-oss-120b or gpt-oss-20b which are verified available on this Groq account
+            models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+            last_err = None
+            
+            for m in models_to_try:
+                try:
+                    chat_completion = await client.chat.completions.create(
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are an Expert ATS Resume Optimizer. You MUST output ONLY valid JSON matching the exact schema provided in the prompt without markdown wrappings."
+                            },
+                            {"role": "user", "content": prompt_text}
+                        ],
+                        model=m,
+                        response_format={"type": "json_object"},
+                        temperature=0.2,
+                    )
+                    content = chat_completion.choices[0].message.content
+                    parsed = parse_llm_json(content, default=None)
+                    if isinstance(parsed, dict) and parsed:
+                        logger.info("Successfully enhanced resume using Groq model", model=m)
+                        return parsed
+                except Exception as model_err:
+                    last_err = model_err
+                    logger.warning("Groq model attempt failed, trying next fallback...", model=m, error=str(model_err))
+                    continue
+            
+            raise ValueError(f"Could not parse valid JSON from Groq enhancement response: {last_err}")
+
+        try:
+            enhanced_dict = await groq_key_pool.execute_async_with_fallback(_enhance_with_groq)
+            logger.info("Successfully enhanced resume using Groq fallback")
+        except Exception as groq_err:
+            logger.error("Both Gemini and Groq enhancement attempts failed", groq_error=str(groq_err), gemini_error=str(e))
+            raise RuntimeError(f"Unable to enhance resume: Gemini ({e}) and Groq ({groq_err})") from groq_err
 
     # Restore any masked PII throughout the generated JSON structure
     enhanced_dict = unmask_pii(enhanced_dict, pii_map)
@@ -257,7 +298,8 @@ Output ONLY valid JSON matching this exact schema:
             proj["highlights"] = []
 
     # Deterministically ensure contact details (email, phone) are accurately preserved
-    orig_contact = (state.get("original_parsed_dict") or {}).get("contact") or {}
+    orig_parsed = state.get("original_parsed_dict") or {}
+    orig_contact = orig_parsed.get("contact") or {}
     contact = enhanced_dict.get("contact") or {}
     if not isinstance(contact, dict):
         contact = dict(contact) if hasattr(contact, "__dict__") else {}
@@ -268,6 +310,56 @@ Output ONLY valid JSON matching this exact schema:
         contact["phone"] = orig_contact["phone"]
 
     enhanced_dict["contact"] = contact
+
+    # 1. Deterministic Education Preservation: Never lose degree/college info
+    orig_edu = orig_parsed.get("education") or []
+    curr_edu = enhanced_dict.get("education") or []
+    if not curr_edu and orig_edu:
+        enhanced_dict["education"] = orig_edu
+    elif orig_edu:
+        curr_insts = {str(e.get("institution", "")).lower().strip() for e in curr_edu if isinstance(e, dict)}
+        for e in orig_edu:
+            if isinstance(e, dict):
+                inst = str(e.get("institution", "")).lower().strip()
+                if inst and inst not in curr_insts:
+                    curr_edu.append(e)
+                    curr_insts.add(inst)
+        enhanced_dict["education"] = curr_edu
+
+    # 2. Deterministic Projects Preservation: Ensure all candidate projects are retained
+    orig_proj = orig_parsed.get("projects") or []
+    curr_proj = enhanced_dict.get("projects") or []
+    if not curr_proj and orig_proj:
+        enhanced_dict["projects"] = orig_proj
+    elif orig_proj:
+        curr_titles = {
+            re.sub(r'[^a-z0-9]', '', str(p.get("title") or p.get("name") or "").lower())
+            for p in curr_proj if isinstance(p, dict)
+        }
+        for op in orig_proj:
+            if isinstance(op, dict):
+                clean_title = re.sub(r'[^a-z0-9]', '', str(op.get("title") or op.get("name") or "").lower())
+                if clean_title and clean_title not in curr_titles:
+                    curr_proj.append(op)
+                    curr_titles.add(clean_title)
+        enhanced_dict["projects"] = curr_proj
+
+    # 3. Deterministic Certifications & Achievements Preservation
+    orig_certs = orig_parsed.get("certifications") or []
+    curr_certs = enhanced_dict.get("certifications") or []
+    if not curr_certs and orig_certs:
+        enhanced_dict["certifications"] = orig_certs
+    elif orig_certs:
+        curr_cert_set = {str(c).lower().strip() for c in curr_certs}
+        for oc in orig_certs:
+            if str(oc).lower().strip() not in curr_cert_set:
+                curr_certs.append(oc)
+                curr_cert_set.add(str(oc).lower().strip())
+        enhanced_dict["certifications"] = curr_certs
+
+    orig_achieve = orig_parsed.get("achievements") or []
+    if not enhanced_dict.get("achievements") and orig_achieve:
+        enhanced_dict["achievements"] = orig_achieve
 
     # Deterministic, LLM-free merge of confirmed links
     enhanced_dict = _merge_verified_links(enhanced_dict, verified_links)

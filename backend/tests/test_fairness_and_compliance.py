@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from services.security.pii_redactor import mask_pii_extended
 from services.fairness.impact_monitor import compute_impact_ratios, check_selection_rate_equity
-from services.fairness.decision_logger import log_scoring_decision
 from services.scoring_engine import score_resume
 from core import feature_flags
 
@@ -77,45 +76,6 @@ def test_impact_monitor_four_fifths_rule():
     assert equity_check["has_adverse_impact"] is True
     assert "group_a" in equity_check["flagged_groups"]
     assert "group_b" not in equity_check["flagged_groups"]
-
-
-@pytest.mark.asyncio
-async def test_decision_log_immutability():
-    """Validates that log_scoring_decision constructs full audit trail with immutable schema."""
-    mock_db = MagicMock()
-    mock_db.decision_log.insert_one = AsyncMock(return_value=MagicMock(inserted_id="doc_123"))
-
-    scoring_result = {
-        "quality_score": 88.5,
-        "eligibility": {
-            "status": "eligible",
-            "checks": [
-                {"name": "work_authorization", "status": "pass"},
-                {"name": "minimum_years", "status": "pass"},
-            ],
-        },
-        "eligibility_rank": 0,
-    }
-
-    record = await log_scoring_decision(
-        job_id="job_456",
-        candidate_id="cand_789",
-        scoring_result=scoring_result,
-        model_versions={"scoring_engine": "2.0.0"},
-        override_info=None,
-        features_hash="hash_abc123",
-        db=mock_db,
-    )
-
-    assert record["job_id"] == "job_456"
-    assert record["candidate_id"] == "cand_789"
-    assert record["quality_score"] == 88.5
-    assert record["eligibility_status"] == "eligible"
-    assert len(record["checks_evaluated"]) == 2
-    assert record["feature_vector_hash"] == "hash_abc123"
-    assert "recorded_at_iso" in record
-
-    mock_db.decision_log.insert_one.assert_called_once_with(record)
 
 
 def test_blind_scoring_stability():

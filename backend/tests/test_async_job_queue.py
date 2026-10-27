@@ -9,18 +9,13 @@ Tests:
 5. Background Copilot LRU memory eviction compaction.
 """
 
-import asyncio
 import pytest
-from httpx import AsyncClient, ASGITransport
 from unittest.mock import MagicMock, AsyncMock
 
-from main import app
 from models.task_job_model import JobStatus, JobType
 from repositories.task_job_repo import TaskJobRepository
 from services.tasks import task_manager
 from services.tasks.workers import (
-    execute_resume_upload_pipeline,
-    execute_batch_ats_scoring,
     execute_copilot_lru_eviction,
 )
 from core.security import create_access_token

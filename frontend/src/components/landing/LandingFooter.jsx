@@ -24,7 +24,7 @@ export default function LandingFooter({
             <Link to="/" className="flex items-center gap-3 group">
               <div className="w-10 h-10 rounded-xl bg-white shadow-md p-1.5 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
                 <img
-                  src="/logo.png"
+                  src="/logo.webp"
                   alt="CareerShala Logo"
                   width={36}
                   height={36}

@@ -91,7 +91,7 @@ export default function CheatingWarningModal({
                 {cfg.icon}
               </motion.span>
               <div style={{ flex:1 }}>
-                <p style={{ fontFamily:"'Poppins',sans-serif", fontWeight:800, fontSize:16, color:cfg.text, marginBottom:3 }}>
+                <p style={{ fontFamily:"'Inter',sans-serif", fontWeight:800, fontSize:16, color:cfg.text, marginBottom:3 }}>
                   {cfg.title}
                 </p>
                 <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, color:cfg.text, fontWeight:600, lineHeight:1.5 }}>
@@ -123,7 +123,7 @@ export default function CheatingWarningModal({
                 <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:cfg.text }}>
                   Session Warnings
                 </span>
-                <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:14, fontWeight:800, color:cfg.accent }}>
+                <span style={{ fontFamily:"'Inter',sans-serif", fontSize:14, fontWeight:800, color:cfg.accent }}>
                   {warningCount} / {maxWarnings}
                 </span>
               </div>
@@ -139,7 +139,7 @@ export default function CheatingWarningModal({
               </div>
               {isLast && (
                 <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }}
-                  style={{ fontFamily:"'Poppins',sans-serif", fontSize:12, fontWeight:700, color:'#7F1D1D', marginTop:8, textAlign:'center' }}>
+                  style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:700, color:'#7F1D1D', marginTop:8, textAlign:'center' }}>
                   ⛔ Next violation will terminate your session!
                 </motion.p>
               )}
@@ -155,7 +155,7 @@ export default function CheatingWarningModal({
               <button onClick={onDismiss}
                 style={{
                   flex:1, padding:'10px 0', borderRadius:12, border:'none', cursor:'pointer',
-                  fontFamily:"'Poppins',sans-serif", fontWeight:600, fontSize:13, color:'white',
+                  fontFamily:"'Inter',sans-serif", fontWeight:600, fontSize:13, color:'white',
                   background:`linear-gradient(135deg,${cfg.accent},${cfg.accent}CC)`,
                   boxShadow:`0 3px 10px ${cfg.accent}40`,
                 }}>

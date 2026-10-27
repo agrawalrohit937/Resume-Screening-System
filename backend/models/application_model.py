@@ -1,15 +1,4 @@
-"""
-Domain model for the AI Apply Assistant module.
-
-Follows the models/ vs schemas/ split already used in this codebase:
-models/ = enums + plain dict "document builders" for the repository layer,
-schemas/ = Pydantic request/response models for the API layer.
-
-ASSUMPTION FLAG: I don't have your actual resume_model.py / certificate_model.py,
-so the ObjectId/timestamp conventions below are a best guess based on the
-README's described patterns. Diff this against a real model file before
-merging and swap in your actual helpers if they differ.
-"""
+"""Domain model and status transitions for the AI Apply Assistant."""
 
 from datetime import datetime, timezone
 from enum import Enum
@@ -19,7 +8,6 @@ from bson import ObjectId
 class ApplicationStatus(str, Enum):
     DRAFT = "draft"
     READY_FOR_REVIEW = "ready_for_review"
-    APPROVED = "approved"
     SENDING = "sending"
     SENT = "sent"
     FAILED = "failed"
@@ -80,16 +68,10 @@ def new_application_document(
 # if-statement that someone could forget to check.
 VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
     ApplicationStatus.DRAFT.value: {ApplicationStatus.READY_FOR_REVIEW.value},
-    # READY_FOR_REVIEW -> SENDING directly: the "Approve & Send" button IS the
-    # approval act (confirmed client-side + re-checked server-side in the
-    # service). APPROVED is kept as a reachable state for a future explicit
-    # "approve without sending yet" UI, but today's flow doesn't require it.
     ApplicationStatus.READY_FOR_REVIEW.value: {
         ApplicationStatus.READY_FOR_REVIEW.value,
-        ApplicationStatus.APPROVED.value,
         ApplicationStatus.SENDING.value,
     },
-    ApplicationStatus.APPROVED.value: {ApplicationStatus.SENDING.value},
     ApplicationStatus.SENDING.value: {ApplicationStatus.SENT.value, ApplicationStatus.FAILED.value},
     ApplicationStatus.FAILED.value: {ApplicationStatus.SENDING.value},   # allow retry-send without regenerating
     ApplicationStatus.SENT.value: set(),                                 # terminal state

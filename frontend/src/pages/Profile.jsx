@@ -544,35 +544,51 @@ export default function Profile() {
             {/* Dropzone Container */}
             <div
               {...getResumeRootProps()}
-              className={`flex flex-col items-center justify-center p-5 sm:p-6 rounded-xl sm:rounded-2xl border-2 border-dashed transition-all cursor-pointer min-h-[160px] sm:min-h-[190px] select-none touch-manipulation ${
-                resumeDrag
-                  ? 'border-indigo-500 bg-indigo-50/70 scale-[1.01]'
-                  : uploadDone
-                    ? 'border-emerald-300 bg-emerald-50/30 hover:border-emerald-400'
-                    : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/60 hover:border-indigo-300'
+              className={`relative overflow-hidden flex flex-col items-center justify-center p-5 sm:p-6 rounded-xl sm:rounded-2xl border-2 border-dashed transition-all cursor-pointer min-h-[160px] sm:min-h-[190px] select-none touch-manipulation ${
+                uploadingResume
+                  ? 'border-emerald-400 bg-emerald-50/20 shadow-inner'
+                  : resumeDrag
+                    ? 'border-[#2E9BDA] bg-[#2E9BDA]/5 scale-[1.01]'
+                    : uploadDone
+                      ? 'border-emerald-300 bg-emerald-50/30 hover:border-emerald-400'
+                      : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/60 hover:border-slate-300'
               }`}
             >
               <input {...getResumeInputProps()} />
 
               {uploadingResume ? (
-                <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="flex flex-col items-center py-2">
-                  <div className="relative w-14 h-14 mb-3">
-                    <svg width="56" height="56" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="28" cy="28" r="24" fill="none" stroke="#E2E8F0" strokeWidth="5" />
-                      <circle
-                        cx="28" cy="28" r="24" fill="none" stroke="#4F46E5" strokeWidth="5"
-                        strokeLinecap={uploadProgress > 0 ? "round" : "butt"}
-                        strokeDasharray={150} strokeDashoffset={150 - (uploadProgress / 100) * 150}
-                        style={{ transition: 'stroke-dashoffset 0.3s ease', opacity: uploadProgress > 0 ? 1 : 0 }}
+                <>
+                  {/* Moving Green Laser Scan Line across the entire parent box */}
+                  <motion.div
+                    animate={{ top: ['2%', '96%', '2%'] }}
+                    transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                    className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_18px_#10b981] pointer-events-none z-10"
+                  >
+                    <div className="w-full h-8 bg-gradient-to-b from-emerald-500/15 to-transparent pointer-events-none" />
+                  </motion.div>
+
+                  <div className="relative z-20 flex flex-col items-center text-center">
+                    <FileText size={36} className="text-emerald-600 mb-2.5 animate-pulse drop-shadow-[0_2px_8px_rgba(16,185,129,0.25)]" />
+                    <p className="text-xs sm:text-sm font-bold text-slate-800 mb-1">
+                      {resumeFile?.name || 'Uploading & Parsing Resume...'}
+                    </p>
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span className="text-[11px] font-semibold text-emerald-700">Extracting skills & experience</span>
+                      <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.2 rounded border border-emerald-200">
+                        {uploadProgress}%
+                      </span>
+                    </div>
+
+                    <div className="w-44 sm:w-56 bg-slate-200/80 h-1.5 rounded-full overflow-hidden p-0.5 shadow-inner">
+                      <motion.div
+                        className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                        style={{ width: `${uploadProgress}%` }}
+                        transition={{ duration: 0.2 }}
                       />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-bold text-indigo-600">{uploadProgress}%</span>
                     </div>
                   </div>
-                  <p className="text-xs sm:text-sm font-bold text-slate-700">Uploading & Parsing...</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Extracting skills & experience</p>
-                </motion.div>
+                </>
               ) : uploadDone ? (
                 <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="flex flex-col items-center text-center max-w-full px-2 py-1">
                   <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-2.5 shrink-0 shadow-xs">

@@ -1,5 +1,5 @@
 /**
- * CareerShala Copilot v2 API Service
+ * CareerMitra chat API service
  * Handles durable server sessions, SSE typed streaming, feedback, and memory.
  */
 
@@ -56,7 +56,7 @@ export async function streamChatV2({
 
   if (!response.ok) {
     const errText = await response.text();
-    let friendlyMessage = 'Failed to connect to AI Copilot.';
+    let friendlyMessage = 'Failed to connect to CareerMitra.';
     try {
       const errJson = JSON.parse(errText);
       if (errJson.detail) {

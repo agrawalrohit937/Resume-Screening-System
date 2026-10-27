@@ -70,3 +70,10 @@ tools/zrok/*.zip
 tools/temp_*.json
 *.exe
 scratch_synopsis.txt
+
+# Local experiments and generated evaluation artifacts
+backend/scratch/
+live_evaluation_result.json
+parsed_jd_structured.json
+parsed_resume_*.json
+backend/data/esco_raw/

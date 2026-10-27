@@ -97,12 +97,6 @@ def _sync_delete(public_id: str, resource_type: str = "auto") -> dict:
     return cloudinary.uploader.destroy(public_id, resource_type=resource_type)
 
 
-async def delete_file(public_id: str, resource_type: str = "raw") -> dict:
-    """Async delete file from Cloudinary."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _sync_delete, public_id, resource_type)
-
-
 async def upload_file(
     file_bytes: bytes,
     folder: str,
@@ -135,12 +129,12 @@ async def upload_file(
     return secure_url, pid
 
 
-async def delete_file(public_id: str, resource_type: str = "auto") -> None:
+async def delete_file(public_id: str, resource_type: str = "auto") -> dict:
     """
     Delete a Cloudinary asset by public_id. Silently ignores missing assets.
     """
     if not public_id:
-        return
+        return {"result": "not found"}
     loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(
@@ -151,8 +145,10 @@ async def delete_file(public_id: str, resource_type: str = "auto") -> None:
             logger.warning("Cloudinary delete unexpected result", public_id=public_id, result=result)
         else:
             logger.info("Cloudinary delete success", public_id=public_id)
+        return result
     except Exception as exc:
         logger.error("Cloudinary delete error", public_id=public_id, error=str(exc))
+        return {"result": "error", "error": str(exc)}
 
 
 # ── Convenience upload helpers per asset category ────────────────────────────

@@ -24,7 +24,7 @@ class ScoringFeatures:
     # Schema Metadata
     feature_schema_version: str = FEATURE_SCHEMA_VERSION
     scoring_version: str = "2.0.0"
-    embedding_model_version: str = "bge-m3-v1.0"
+    embedding_model_version: str = "bge-small-en-v1.5"
     created_at_iso: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     # Quality & Component Scores
@@ -96,7 +96,7 @@ class ScoringFeatures:
 def extract_scoring_features(
     result: Dict[str, Any],
     flags_active: Optional[List[str]] = None,
-    embedding_version: str = "bge-m3-v1.0",
+    embedding_version: str = "bge-small-en-v1.5",
 ) -> ScoringFeatures:
     """Extracts a stable, standardized ScoringFeatures record from a scoring engine result dictionary."""
     elig = result.get("eligibility") or {}
@@ -115,14 +115,14 @@ def extract_scoring_features(
         feature_schema_version=FEATURE_SCHEMA_VERSION,
         scoring_version=str(result.get("scoring_version", "2.0.0")),
         embedding_model_version=embedding_version,
-        quality_score=float(result.get("quality_score", result.get("final_score", 0.0))),
-        final_score=float(result.get("final_score", 0.0)),
-        skills_score=float(result.get("skills_score", 0.0)),
-        experience_score=float(result.get("experience_score", 0.0)),
-        education_score=float(result.get("education_score", 0.0)),
-        vector_score=float(result.get("vector_score", 0.0)),
-        keyword_score=float(result.get("keyword_score", 0.0)),
-        strict_score=float(result.get("strict_score", 0.0)),
+        quality_score=float(result.get("quality_score") or result.get("final_score") or 0.0),
+        final_score=float(result.get("final_score") or 0.0),
+        skills_score=float(result.get("skills_score") or 0.0),
+        experience_score=float(result.get("experience_score") or 0.0),
+        education_score=float(result.get("education_score") or 0.0),
+        vector_score=float(result.get("vector_score") or 0.0),
+        keyword_score=float(result.get("keyword_score") or 0.0),
+        strict_score=float(result.get("strict_score") or 0.0),
         total_required_skills=total_skills,
         matched_skills_count=matched_cnt,
         transferable_skills_count=transf_cnt,

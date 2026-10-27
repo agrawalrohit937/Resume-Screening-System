@@ -1,7 +1,5 @@
-import pytest
 from services.portfolio_service import (
     sanitize_portfolio_skills,
-    categorize_skills,
 )
 from models.portfolio_model import PortfolioProfileModel, PortfolioProject, MetricModel
 from models.user_model import UserModel

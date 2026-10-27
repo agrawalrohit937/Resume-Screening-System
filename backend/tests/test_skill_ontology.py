@@ -2,14 +2,11 @@
 Unit tests for Skill Ontology & Knowledge Graph Service.
 """
 
-import pytest
 from services.skill_ontology import (
     normalize_skill,
     expand_skills,
     get_all_known_skills,
-    evaluate_skill_fulfillment,
-    SKILL_TAXONOMY,
-    SKILL_ALIASES
+    evaluate_skill_fulfillment
 )
 
 
@@ -28,7 +25,8 @@ def test_normalize_skill_casing_and_unknown():
     assert normalize_skill("pinecone") == "Pinecone"
     assert normalize_skill("chromadb") == "ChromaDB"
     assert normalize_skill("fastapi") == "FastAPI"
-    assert normalize_skill("custom rare skill") == "Custom Rare Skill"
+    # Per requirement 5, unknown skills must preserve raw string without unsafe .title() invention
+    assert normalize_skill("custom rare skill") == "custom rare skill"
 
 
 def test_expand_skills():

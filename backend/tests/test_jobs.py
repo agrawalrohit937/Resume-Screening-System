@@ -3,7 +3,7 @@ Unit Tests for Phase A: Jobs Foundation — Models, BGE Local Embeddings & Jobs 
 """
 
 import pytest
-from models.job import JobModel, JobCreateRequest, JobResponse, WorkMode
+from models.job import JobModel, WorkMode
 from models.application import ApplicationModel, ApplicationStage
 from services.embedding_service import embedding_model, EMBEDDING_DIMENSIONS
 
@@ -55,7 +55,7 @@ def test_local_bge_job_embedding_generation():
     embedding = vectors[0]
 
     assert len(embedding) == EMBEDDING_DIMENSIONS
-    assert EMBEDDING_DIMENSIONS in (768, 1024)
+    assert EMBEDDING_DIMENSIONS in (384, 768, 1024)
     assert all(isinstance(val, float) for val in embedding)
 
 
@@ -296,7 +296,7 @@ async def test_recruiter_can_view_all_jobs_in_same_tenant():
     Recruiters view all jobs belonging to their tenant organization (tenant_id),
     not just jobs created by their individual user ID.
     """
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import MagicMock, patch
     from api.routes.jobs import get_my_posted_jobs
     from models.user_model import UserModel, UserRole
 

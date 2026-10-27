@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -11,7 +14,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
 } from 'recharts'
 import {
   TrendingUp,
@@ -31,11 +33,10 @@ import {
   Inbox,
   FileText,
   Table,
-  Sparkles,
   Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getExecAnalytics, seedDemoEEOData } from '../../services/api'
+import { getExecAnalytics } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useTenant } from '../../context/TenantContext'
 import CustomDropdown from '../../components/common/CustomDropdown'
@@ -48,7 +49,6 @@ export default function ExecDashboard() {
   const [analyticsError, setAnalyticsError] = useState(false)
   const [selectedQuarter, setSelectedQuarter] = useState('Q3 2026')
   const [diversityTab, setDiversityTab] = useState('summary') // 'summary' | 'race' | 'gender'
-  const [seeding, setSeeding] = useState(false)
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true)
@@ -81,6 +81,7 @@ export default function ExecDashboard() {
   const attainmentPct = Number(kpis.headcount_attainment_pct || 0)
   const offerRate = Number(kpis.offer_acceptance_rate || 0)
   const avgTimeToFill = Number(kpis.avg_time_to_fill_days || 0)
+  const hasCompletedHires = filledHires > 0
 
   const headcountData = Array.isArray(analytics?.headcount_by_department) ? analytics.headcount_by_department : []
   const diversityData = Array.isArray(analytics?.diversity_distribution) ? analytics.diversity_distribution : []
@@ -88,21 +89,9 @@ export default function ExecDashboard() {
   const raceData = Array.isArray(analytics?.race_distribution) ? analytics.race_distribution : []
   const velocityData = Array.isArray(analytics?.hiring_velocity) ? analytics.hiring_velocity : []
   const totalEeoResponses = Number(analytics?.total_eeo_responses || 0)
-
-  // Seed sample EEO dataset for instant executive demonstration
-  const handleSeedDemoData = async () => {
-    try {
-      setSeeding(true)
-      const res = await seedDemoEEOData()
-      toast.success(res.data?.message || 'Seeded 10 demo EEO responses into compliance vault!')
-      await fetchAnalytics()
-    } catch (err) {
-      console.error('Demo seed error:', err)
-      toast.error(err.response?.data?.detail || 'Failed to seed sample demographic records.')
-    } finally {
-      setSeeding(false)
-    }
-  }
+  const hasVelocityActivity = velocityData.some((item) => (
+    Number(item.hires || 0) > 0 || Number(item.target || 0) > 0
+  ))
 
   // ── 1. Export as Excel Spreadsheet (.csv) ──────────────────────────────────
   const handleExportExcel = () => {
@@ -530,8 +519,8 @@ export default function ExecDashboard() {
                   <Building className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-3xl font-black text-slate-900 mt-3 font-mono">
-                {approvedHeadcount} <span className="text-base font-bold text-slate-500 font-sans">Roles</span>
+              <p className="text-3xl font-black text-slate-900 mt-3">
+                {approvedHeadcount} <span className="text-base font-bold text-slate-500">Roles</span>
               </p>
               <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-indigo-600">
                 <TrendingUp className="w-3.5 h-3.5" />
@@ -549,8 +538,8 @@ export default function ExecDashboard() {
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-3xl font-black text-slate-900 mt-3 font-mono">
-                {filledHires} <span className="text-base font-bold text-slate-500 font-sans">Filled</span>
+              <p className="text-3xl font-black text-slate-900 mt-3">
+                {filledHires} <span className="text-base font-bold text-slate-500">Filled</span>
               </p>
               <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-emerald-600">
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -568,7 +557,7 @@ export default function ExecDashboard() {
                   <Users className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-3xl font-black text-slate-900 mt-3 font-mono">
+              <p className="text-3xl font-black text-slate-900 mt-3">
                 {offerRate}%
               </p>
               <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-blue-600">
@@ -587,8 +576,8 @@ export default function ExecDashboard() {
                   <Clock className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-3xl font-black text-slate-900 mt-3 font-mono">
-                {avgTimeToFill} <span className="text-base font-bold text-slate-500 font-sans">Days</span>
+              <p className="text-3xl font-black text-slate-900 mt-3">
+              {hasCompletedHires ? avgTimeToFill : '—'} <span className="text-base font-bold text-slate-500">{hasCompletedHires ? 'Days' : ''}</span>
               </p>
               <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-purple-600">
                 <Clock className="w-3.5 h-3.5" />
@@ -610,14 +599,7 @@ export default function ExecDashboard() {
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">Authorized target headcount vs confirmed candidate hires.</p>
                 </div>
-                <div className="flex items-center gap-4 text-xs font-medium">
-                  <span className="flex items-center gap-1.5 text-slate-600">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-200" /> Target
-                  </span>
-                  <span className="flex items-center gap-1.5 text-slate-900 font-bold">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600" /> Actual Hires
-                  </span>
-                </div>
+                <span className="text-[11px] font-semibold text-slate-400">Live requisition attainment</span>
               </div>
 
               {headcountData.length === 0 ? (
@@ -627,25 +609,86 @@ export default function ExecDashboard() {
                   <p className="text-[11px] text-slate-400 max-w-sm">Approved headcount allocations and hires across departments will appear here once requisitions are initiated.</p>
                 </div>
               ) : (
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={headcountData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis dataKey="department" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#0F172A',
-                          color: '#fff',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          border: 'none'
-                        }}
-                      />
-                      <Bar dataKey="approved" fill="#E2E8F0" radius={[6, 6, 0, 0]} name="Approved Target" />
-                      <Bar dataKey="filled" fill="#2563EB" radius={[6, 6, 0, 0]} name="Actual Hires" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Portfolio allocation</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">
+                        {filledHires} of {approvedHeadcount} authorized roles filled
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-indigo-700">{attainmentPct}%</p>
+                      <p className="text-[10px] font-semibold text-indigo-500">attainment</p>
+                    </div>
+                  </div>
+
+                  <div className="h-28 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={headcountData.map((item) => ({
+                          department: item.department || 'General',
+                          approved: Number(item.approved || 0),
+                          filled: Number(item.filled || 0)
+                        }))}
+                        layout="vertical"
+                        margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
+                        barCategoryGap="28%"
+                      >
+                        <XAxis type="number" hide domain={[0, 'dataMax']} />
+                        <YAxis type="category" dataKey="department" hide />
+                        <Tooltip
+                          cursor={{ fill: '#EEF2FF' }}
+                          contentStyle={{
+                            backgroundColor: '#0F172A',
+                            color: '#fff',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            border: 'none'
+                          }}
+                          formatter={(value, name) => [value, name === 'approved' ? 'Approved roles' : 'Filled hires']}
+                        />
+                        <Bar dataKey="approved" fill="#CBD5E1" radius={[0, 8, 8, 0]} barSize={14} name="approved" />
+                        <Bar dataKey="filled" fill="#4F46E5" radius={[0, 8, 8, 0]} barSize={14} name="filled" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-[10px] font-semibold text-slate-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Approved roles
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Filled hires
+                    </span>
+                  </div>
+
+                  <div className="space-y-4 pt-1 border-t border-slate-100">
+                  {headcountData.map((item) => {
+                    const approved = Number(item.approved || 0)
+                    const filled = Number(item.filled || 0)
+                    const attainment = approved > 0 ? Math.min(100, Math.round((filled / approved) * 100)) : 0
+                    return (
+                      <div key={item.department || 'General'} className="space-y-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-800 truncate">{item.department || 'General'}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {approved - filled > 0 ? `${approved - filled} open requisition${approved - filled === 1 ? '' : 's'}` : 'Fully staffed'}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-extrabold text-slate-900">{filled} <span className="text-slate-400 font-semibold">/ {approved}</span></p>
+                            <p className="text-[10px] font-bold text-indigo-600">{attainment}% filled</p>
+                          </div>
+                        </div>
+                        <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all" style={{ width: `${attainment}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  </div>
                 </div>
               )}
             </div>
@@ -714,15 +757,7 @@ export default function ExecDashboard() {
                       Aggregate demographics will populate here as candidates complete voluntary EEO disclosures during job application.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSeedDemoData}
-                    disabled={seeding}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition cursor-pointer shadow-2xs"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${seeding ? 'animate-spin' : ''}`} />
-                    <span>{seeding ? 'Seeding...' : 'Seed Demo EEO Sample'}</span>
-                  </button>
+                  <p className="text-[10px] font-semibold text-slate-400">Data appears when candidates voluntarily complete the EEO disclosure.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -775,15 +810,7 @@ export default function ExecDashboard() {
                 <span className="inline-flex items-center gap-1">
                   <Lock className="w-3 h-3 text-emerald-600" /> Statutory EEO-1 standard
                 </span>
-                {totalEeoResponses > 0 && (
-                  <button
-                    onClick={handleSeedDemoData}
-                    disabled={seeding}
-                    className="text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold cursor-pointer"
-                  >
-                    + Add Test Sample
-                  </button>
-                )}
+                <span>Privacy protected</span>
               </div>
             </div>
 
@@ -800,25 +827,29 @@ export default function ExecDashboard() {
                   Monthly candidate hires completed vs approved target headcount over the last 6 months.
                 </p>
               </div>
-              <div className="flex items-center gap-4 text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Planned Target
-                </span>
-                <span className="flex items-center gap-1.5 text-slate-900 font-bold">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Confirmed Hires
-                </span>
-              </div>
+              <span className="text-[11px] font-semibold text-slate-400">Last 6 months</span>
             </div>
 
-            {velocityData.length === 0 ? (
-              <div className="h-48 flex flex-col items-center justify-center p-6 text-center space-y-2 bg-slate-50/50 rounded-2xl border border-slate-100">
-                <Clock className="w-8 h-8 text-slate-300" />
-                <p className="text-xs font-semibold text-slate-600">No monthly hiring velocity recorded</p>
+            {!hasVelocityActivity ? (
+              <div className="h-56 relative overflow-hidden flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-indigo-100 bg-gradient-to-br from-slate-50 via-white to-indigo-50/60">
+                <div className="absolute inset-x-8 bottom-12 border-b border-dashed border-slate-200" />
+                <div className="absolute inset-x-12 bottom-12 flex justify-between">
+                  {velocityData.map((item) => (
+                    <span key={item.month} className="w-2.5 h-2.5 rounded-full bg-indigo-200 ring-4 ring-indigo-50" />
+                  ))}
+                </div>
+                <div className="relative w-12 h-12 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center justify-center mb-3">
+                  <TrendingUp className="w-6 h-6 text-indigo-400" />
+                </div>
+                <p className="relative text-sm font-bold text-slate-700">Hiring activity will appear here</p>
+                <p className="relative text-[11px] text-slate-400 mt-1 max-w-md">
+                  No confirmed hires have been recorded in the last six months. The live trend graph will populate as candidates reach the hired stage.
+                </p>
               </div>
             ) : (
               <div className="h-56 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={velocityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={velocityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                     <XAxis dataKey="month" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -831,9 +862,11 @@ export default function ExecDashboard() {
                         border: 'none'
                       }}
                     />
-                    <Bar dataKey="target" fill="#E2E8F0" radius={[6, 6, 0, 0]} name="Monthly Target" />
-                    <Bar dataKey="hires" fill="#4F46E5" radius={[6, 6, 0, 0]} name="Confirmed Hires" />
-                  </BarChart>
+                    <Area type="monotone" dataKey="hires" stroke="#4F46E5" strokeWidth={3} fill="#6366F1" fillOpacity={0.14} name="Confirmed Hires" />
+                    {velocityData.some((item) => Number(item.target || 0) > 0) && (
+                      <Line type="monotone" dataKey="target" stroke="#94A3B8" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Planning Target" />
+                    )}
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -844,4 +877,3 @@ export default function ExecDashboard() {
     </div>
   )
 }
-

@@ -3,7 +3,7 @@ CareerShala ATS v2.0.0 - Enterprise ATS Marketplace.
 """
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.deps import get_database, get_current_user

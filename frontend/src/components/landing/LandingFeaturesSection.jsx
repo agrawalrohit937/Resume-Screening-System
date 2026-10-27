@@ -86,7 +86,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
                       <Video size={22} className="text-indigo-600" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600 font-mono block">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600 block">
                         AI VISION &amp; SPEECH PROCTOR
                       </span>
                       <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight group-hover:text-indigo-950 transition-colors">
@@ -95,7 +95,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
                     </div>
                   </div>
 
-                  <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-mono font-extrabold text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs shrink-0">
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-300 shadow-2xs shrink-0">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> 60 FPS WASM
                   </span>
                 </div>
@@ -149,7 +149,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-300 text-[#2E9BDA] flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <FileText size={22} />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-[#2E9BDA] font-mono block mb-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#2E9BDA] block mb-1">
                 SMART ATS ENGINE
               </span>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-[#2E9BDA] transition-colors">
@@ -180,7 +180,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-300 text-emerald-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <Globe size={22} />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 font-mono block mb-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 block mb-1">
                 100% FREE FOREVER
               </span>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-emerald-700 transition-colors">
@@ -211,7 +211,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-300 text-purple-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <Users size={22} />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-purple-700 font-mono block mb-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-purple-700 block mb-1">
                 ENTERPRISE PORTAL
               </span>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-purple-700 transition-colors">
@@ -242,7 +242,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-300 text-amber-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <Send size={20} />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 font-mono block mb-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 block mb-1">
                 AI OUTREACH AGENT
               </span>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-amber-700 transition-colors">
@@ -273,7 +273,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-300 text-rose-600 flex items-center justify-center mb-5 shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
                 <Trophy size={22} />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-rose-700 font-mono block mb-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-rose-700 block mb-1">
                 GAMIFIED QUESTS &amp; XP
               </span>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 group-hover:text-rose-700 transition-colors">

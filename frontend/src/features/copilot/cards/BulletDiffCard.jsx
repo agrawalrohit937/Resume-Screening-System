@@ -22,7 +22,7 @@ export default function BulletDiffCard({ data }) {
             <Sparkles size={13} />
           </div>
           <div>
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">STAR Resume Enhancer</h4>
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Resume Bullet Enhancer</h4>
             <p className="text-[11px] text-emerald-600 font-semibold">Quantified Impact Added</p>
           </div>
         </div>
@@ -47,7 +47,7 @@ export default function BulletDiffCard({ data }) {
 
         <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
           <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-700 block mb-0.5">
-            After (STAR + Metrics)
+            After (High Impact + Metrics)
           </span>
           <p className="text-emerald-900 font-medium leading-relaxed">{enhanced}</p>
         </div>

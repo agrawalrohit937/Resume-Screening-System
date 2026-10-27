@@ -216,7 +216,7 @@ export default function LandingCertificateSection({ user }) {
                   <picture>
                     <source srcSet="/certificate_sample.webp" type="image/webp" />
                     <img
-                      src="/certificate_sample.png"
+                      src="/certificate_sample.webp"
                       alt="CareerShala Python Assessment Certificate of Achievement awarded to Aadhya Agarwal"
                       width={1024}
                       height={1024}
@@ -237,7 +237,7 @@ export default function LandingCertificateSection({ user }) {
                 </div>
 
                 {/* 2. Bottom-Right: Highest Distinction & 100/100 Badge */}
-                <div className="absolute -bottom-3.5 -right-2 sm:-right-3 bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white px-3.5 py-1.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-mono font-bold pointer-events-none">
+                <div className="absolute -bottom-3.5 -right-2 sm:-right-3 bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white px-3.5 py-1.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold pointer-events-none">
                   <Trophy size={14} className="text-amber-400 shrink-0 fill-amber-400" />
                   <span>Highest Distinction • 100/100</span>
                 </div>
@@ -286,7 +286,7 @@ export default function LandingCertificateSection({ user }) {
                 <picture>
                   <source srcSet="/certificate_sample.webp" type="image/webp" />
                   <img
-                    src="/certificate_sample.png"
+                    src="/certificate_sample.webp"
                     alt="CareerShala Python Assessment Certificate of Achievement"
                     className="w-full h-auto max-h-[80vh] object-contain block mx-auto"
                   />

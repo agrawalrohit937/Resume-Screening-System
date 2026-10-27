@@ -2,9 +2,8 @@
 Unit tests for Scoring Features and Replay (Phase 1.5).
 """
 
-import pytest
 
-from services.scoring.features import ScoringFeatures, extract_scoring_features
+from services.scoring.features import extract_scoring_features
 from services.scoring.replay import replay_score_from_features
 from services.scoring_engine import score_resume
 

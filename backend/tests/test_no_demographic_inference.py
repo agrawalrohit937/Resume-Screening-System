@@ -6,12 +6,9 @@ educational institutions, or locations.
 """
 
 import ast
-import os
 import re
 from pathlib import Path
-import pytest
 from services.identity_service import parse_cultural_name
-from services.scoring_engine import score_resume_dual
 
 
 # Prohibited demographic inference identifiers / keywords

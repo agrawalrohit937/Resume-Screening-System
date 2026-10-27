@@ -10,11 +10,9 @@ import pytest
 from services.scoring.contextual_skills import (
     build_resume_section_index,
     evaluate_skill_context,
-    compute_contextual_skills_breakdown,
 )
 from services.scoring_engine import score_resume
 import core.feature_flags as ff
-import services.embedding_service as emb_svc
 
 
 @pytest.fixture(autouse=True)

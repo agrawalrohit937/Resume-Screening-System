@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Briefcase,
@@ -41,7 +41,7 @@ import {
 import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getJobs, getJobDetail, createJob, applyToJob, matchJobATS, getMyApplications } from '../services/api'
+import { getJobs, getJobDetail, applyToJob, matchJobATS, getMyApplications } from '../services/api'
 import CompanyLogo from '../components/common/CompanyLogo'
 import CustomDropdown from '../components/common/CustomDropdown'
 import EEOSurveyModal from '../components/common/EEOSurveyModal'
@@ -218,14 +218,16 @@ export default function JobFeed() {
   const [selectedExp, setSelectedExp] = useState('all')
   const [selectedSkill, setSelectedSkill] = useState('')
   const [locationQuery, setLocationQuery] = useState('')
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
 
   // Modals & Drawers
   const [activeJobDetail, setActiveJobDetail] = useState(null)
   const [matchTargetJob, setMatchTargetJob] = useState(null)
-  const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [isMatchModalOpen, setIsMatchModalOpen] = useState(false)
   const [matchResult, setMatchResult] = useState(null)
   const [matchLoading, setMatchLoading] = useState(false)
+  const jobsCacheKey = `careershala_jobs_cache:${user?.id || user?._id || user?.email || 'anonymous'}`
+  const hasCachedJobs = useRef(false)
   const getAppliedCacheKey = (userId) => `applied_jobs_${userId || 'guest'}`
 
   const [appliedJobs, setAppliedJobs] = useState(() => new Set())
@@ -342,75 +344,7 @@ export default function JobFeed() {
       })
   }, [user?.id])
 
-  // Post Job form state
-  const [postFormData, setPostFormData] = useState({
-    title: '',
-    company_name: '',
-    jd_text_raw: '',
-    required_skills: '',
-    min_years: 0,
-    location: 'Remote',
-    work_mode: 'Remote',
-    salary_range: '$100,000 - $140,000',
-    department: 'Engineering',
-    company_logo: '',
-    company_website: '',
-    company_about: '',
-    company_industry: 'Software & Technology',
-  })
-  const [postingLoading, setPostingLoading] = useState(false)
 
-  // Smart skills input state
-  const [skillsList, setSkillsList] = useState(['React', 'TypeScript', 'TailwindCSS'])
-  const [skillInput, setSkillInput] = useState('')
-
-  const handleAddSkill = (val) => {
-    const trimmed = (val !== undefined ? val : skillInput).trim().replace(/,/g, '')
-    if (trimmed && !skillsList.includes(trimmed)) {
-      setSkillsList(prev => [...prev, trimmed])
-    }
-    setSkillInput('')
-  }
-
-  const handleRemoveSkill = (skillToRemove) => {
-    setSkillsList(prev => prev.filter(s => s !== skillToRemove))
-  }
-
-  const handleSkillKeyDown = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      handleAddSkill()
-    } else if (e.key === 'Backspace' && !skillInput && skillsList.length > 0) {
-      handleRemoveSkill(skillsList[skillsList.length - 1])
-    }
-  }
-
-  // AI JD Generation Handler
-  const handleGenerateJDWithAI = () => {
-    const title = postFormData.title?.trim() || 'Software Engineer'
-    const dept = postFormData.department?.trim() || 'Engineering'
-    const mode = postFormData.work_mode || 'Remote'
-    const exp = postFormData.min_years ? `${postFormData.min_years}+ years` : '1+ years'
-    const skills = skillsList.length ? skillsList.join(', ') : 'modern technology stacks, clean architecture, automated testing'
-
-    const generated = `About the Role:
-We are looking for a talented and driven ${title} to join our ${dept} team. You will play a crucial role in building high-performance systems, collaborating with world-class engineers, and delivering impactful products to our users.
-
-Key Responsibilities:
-• Design, implement, and maintain scalable, robust application features.
-• Work in a fast-paced ${mode.toLowerCase()} team environment with agile workflows.
-• Write clean, well-tested, and maintainable code adhering to engineering best practices.
-• Collaborate with design, product, and QA stakeholders across the software development lifecycle.
-
-What We Are Looking For:
-• ${exp} of professional software engineering experience.
-• Strong hands-on proficiency with: ${skills}.
-• Passion for building intuitive user experiences and resilient backend architectures.
-• Excellent communication, documentation, and problem-solving abilities.`
-
-    setPostFormData(prev => ({ ...prev, jd_text_raw: generated }))
-    toast.success('AI-crafted Job Description generated! ✨')
-  }
 
   // Helper to extract jobs array from diverse response shapes
   const extractJobsArray = (response) => {
@@ -437,7 +371,7 @@ What We Are Looking For:
 
   // Fetch jobs with optional override parameters
   const fetchJobListings = async (overrideParams = null) => {
-    setLoading(true)
+    setLoading(!hasCachedJobs.current && jobs.length === 0)
     try {
       let params = {}
       if (overrideParams !== null) {
@@ -468,6 +402,17 @@ What We Are Looking For:
 
       setJobs(fetchedJobs)
       setTotal(totalCount)
+      try {
+        const isDefaultRequest = Object.values(params).every((value) => value === undefined)
+        if (isDefaultRequest) {
+          sessionStorage.setItem(jobsCacheKey, JSON.stringify({
+            jobs: fetchedJobs,
+            total: totalCount,
+          }))
+        }
+      } catch {
+        // Session storage is an optional performance cache.
+      }
 
       const serverAppliedIds = fetchedJobs.filter((j) => Boolean(j.has_applied)).map((j) => j.id)
       if (serverAppliedIds.length > 0) {
@@ -656,90 +601,153 @@ What We Are Looking For:
     return 'CareerShala Technologies'
   }
 
-  // Submit New Job Posting (Draft vs Publish)
-  const handleCreateJob = async (e, isDraft = false) => {
-    if (e) e.preventDefault()
-    if (!postFormData.title?.trim()) {
-      toast.error('Please enter a Job Title.')
-      return
-    }
-    if (!postFormData.jd_text_raw?.trim()) {
-      toast.error('Please enter or generate a Job Description.')
-      return
-    }
-    setPostingLoading(true)
-    try {
-      const companyName = resolveCompany()
-      const payload = {
-        ...postFormData,
-        title: postFormData.title.trim(),
-        company_name: companyName,
-        jd_text_raw: postFormData.jd_text_raw.trim(),
-        min_years: parseFloat(postFormData.min_years) || 0,
-        required_skills: skillsList,
-        status: isDraft ? 'draft' : 'open',
-      }
 
-      await createJob(payload)
-      toast.success(isDraft ? 'Job saved as draft! 📋' : 'Job published successfully! 🚀')
-      setIsPostModalOpen(false)
-      setSkillsList(['React', 'TypeScript', 'TailwindCSS'])
-      setSkillInput('')
-      setPostFormData({
-        title: '',
-        company_name: '',
-        jd_text_raw: '',
-        required_skills: '',
-        min_years: 0,
-        location: 'Remote',
-        work_mode: 'Remote',
-        salary_range: '$100,000 - $140,000',
-        department: 'Engineering',
-      })
-      fetchJobListings()
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to post job. Recruiter/admin access may be required.'
-      toast.error(msg)
-    } finally {
-      setPostingLoading(false)
-    }
-  }
 
   return (
-    <div className="w-full space-y-6 font-sans text-slate-800 antialiased pb-20">
+    <div className="w-full space-y-3 sm:space-y-6 font-sans text-slate-800 antialiased pb-20">
 
       {/* ── 1. Top Header & Clean Filter Toolbar ────────────────── */}
-      <div className="w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-3 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 font-poppins tracking-tight">
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-tight">
               Explore Jobs
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-0.5">
               Browse verified tech roles matched directly with your skills, projects, and ATS score.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold bg-slate-100 text-slate-700">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              {total || jobs.length} {jobs.length === 1 ? 'Open Role' : 'Open Roles'}
+              {total || jobs.length} {jobs.length === 1 ? 'Role' : 'Roles'}
             </span>
             {isRecruiterOrAdmin && (
               <button
                 type="button"
-                onClick={() => setIsPostModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                onClick={() => navigate('/recruiter/jobs')}
+                className="inline-flex items-center gap-1.5 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                title="Manage & Post Jobs in Recruiter Portal"
               >
                 <PlusCircle size={14} />
-                Post Job
+                <span className="hidden sm:inline">Recruiter Portal</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* ── Single Unified Search & Filter Bar ── */}
-        <div className="mt-4 bg-slate-50 p-2 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center gap-2 shadow-2xs">
+        {/* ── Mobile Compact Search & Filter Toggle Bar (Takes only ~44px height) ── */}
+        <div className="md:hidden mt-2.5 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              type="text"
+              placeholder="Search title, skill, company..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200/80 focus:border-indigo-500 focus:bg-white rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer shrink-0 ${
+              showMobileFilters || activeFiltersCount > (searchQuery ? 1 : 0)
+                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-2xs'
+            }`}
+          >
+            <SlidersHorizontal size={13} />
+            <span>Filters</span>
+            {activeFiltersCount > (searchQuery ? 1 : 0) && (
+              <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-extrabold">
+                {activeFiltersCount - (searchQuery ? 1 : 0)}
+              </span>
+            )}
+          </button>
+
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="p-2 rounded-xl text-rose-600 bg-rose-50 border border-rose-200/80 transition cursor-pointer shrink-0"
+              title="Clear all filters"
+            >
+              <RotateCcw size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* ── Mobile Collapsible Advanced Filters Drawer ── */}
+        {showMobileFilters && (
+          <div className="md:hidden mt-2 pt-2.5 border-t border-slate-100 flex flex-col gap-2 animate-fade-in">
+            {/* Location Search */}
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <input
+                type="text"
+                placeholder="Filter by city / remote..."
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-200/80 focus:border-indigo-500 focus:bg-white rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition shadow-2xs"
+              />
+              {locationQuery && (
+                <button
+                  type="button"
+                  onClick={() => setLocationQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: 'All Modes' },
+                  { value: 'Remote', label: 'Remote' },
+                  { value: 'Hybrid', label: 'Hybrid' },
+                  { value: 'Onsite', label: 'Onsite' },
+                ]}
+                value={selectedMode}
+                onChange={setSelectedMode}
+                className="w-full"
+                buttonClassName="py-2 px-2.5 text-xs font-semibold rounded-xl"
+                menuClassName="min-w-[140px]"
+              />
+
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: 'All Experience' },
+                  { value: 'fresher', label: 'Fresher (0-1y)' },
+                  { value: 'mid', label: 'Associate (1-3y)' },
+                  { value: 'senior', label: 'Senior (3+y)' },
+                ]}
+                value={selectedExp}
+                onChange={setSelectedExp}
+                className="w-full"
+                buttonClassName="py-2 px-2.5 text-xs font-semibold rounded-xl"
+                menuClassName="min-w-[150px]"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Desktop Full Search & Filter Bar (Unchanged for screens >= md) ── */}
+        <div className="hidden md:flex mt-4 bg-slate-50 p-2 rounded-2xl border border-slate-200/90 flex-row items-center gap-2 shadow-2xs">
 
           {/* Keyword Search */}
           <div className="relative flex-1">
@@ -764,7 +772,7 @@ What We Are Looking For:
           </div>
 
           {/* Location Search */}
-          <div className="relative md:w-52">
+          <div className="relative w-52">
             <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
             <input
               type="text"
@@ -795,7 +803,7 @@ What We Are Looking For:
             ]}
             value={selectedMode}
             onChange={setSelectedMode}
-            className="w-full md:w-36"
+            className="w-36"
             buttonClassName="py-2.5 px-3 text-xs font-semibold rounded-xl"
             menuClassName="min-w-[150px]"
           />
@@ -810,12 +818,12 @@ What We Are Looking For:
             ]}
             value={selectedExp}
             onChange={setSelectedExp}
-            className="w-full md:w-44"
+            className="w-44"
             buttonClassName="py-2.5 px-3 text-xs font-semibold rounded-xl"
             menuClassName="min-w-[180px]"
           />
 
-          {/* Reset Filters (Only appears if any filter is set) */}
+          {/* Reset Filters */}
           {activeFiltersCount > 0 && (
             <button
               type="button"
@@ -861,7 +869,7 @@ What We Are Looking For:
           </span>
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
             <Sparkles size={13} className="text-indigo-600" />
-            <span>Click <strong>Calculate Match %</strong> to evaluate ATS compatibility</span>
+            <span>Click <strong>Check Profile Fit</strong> to evaluate role compatibility</span>
           </div>
         </div>
 
@@ -971,7 +979,7 @@ What We Are Looking For:
                   <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4 shadow-2xs">
                     <Briefcase size={28} />
                   </div>
-                  <h3 className="text-lg font-extrabold text-slate-900 font-poppins mb-1">
+                  <h3 className="text-lg font-extrabold text-slate-900 mb-1">
                     No matching opportunities found
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 mb-6 max-w-sm mx-auto leading-relaxed">
@@ -1054,7 +1062,7 @@ What We Are Looking For:
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <h2 className="text-base sm:text-xl font-black text-slate-900 font-poppins tracking-tight break-words" title={activeJobDetail.title}>
+                            <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tight break-words" title={activeJobDetail.title}>
                               {activeJobDetail.title}
                             </h2>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -1207,7 +1215,7 @@ What We Are Looking For:
                 {(activeJobDetail.company_about || activeJobDetail.company_website) && (
                   <div className="mt-4 p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100/70 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 font-poppins">About {activeJobDetail.company_name}</span>
+                      <span className="text-xs font-bold text-slate-800">About {activeJobDetail.company_name}</span>
                       {activeJobDetail.company_website && (
                         <a
                           href={activeJobDetail.company_website.startsWith('http') ? activeJobDetail.company_website : `https://${activeJobDetail.company_website}`}
@@ -1237,7 +1245,7 @@ What We Are Looking For:
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition cursor-pointer shadow-2xs"
                 >
                   <Sparkles size={14} className="text-indigo-600" />
-                  <span>Check ATS Match</span>
+                  <span>Check Profile Fit</span>
                 </button>
 
                 <button
@@ -1286,7 +1294,7 @@ What We Are Looking For:
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mb-2">
                       <Sparkles size={12} /> ATS Engine Evaluation
                     </span>
-                    <h3 className="text-lg font-extrabold text-slate-900 font-poppins">
+                    <h3 className="text-lg font-extrabold text-slate-900">
                       {targetMatchJob?.title}
                     </h3>
                     <p className="text-xs text-slate-500 font-medium">
@@ -1309,7 +1317,7 @@ What We Are Looking For:
                 {matchLoading ? (
                   <div className="py-12 flex flex-col items-center justify-center text-center">
                     <div className="w-12 h-12 rounded-2xl border-4 border-[#2E9BDA] border-t-transparent animate-spin mb-4" />
-                    <p className="text-sm font-bold text-slate-800 font-poppins">
+                    <p className="text-sm font-bold text-slate-800">
                       Evaluating Match Percentage...
                     </p>
                     <p className="text-xs text-slate-500 mt-1 max-w-xs">
@@ -1339,9 +1347,9 @@ What We Are Looking For:
                       <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100 flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Estimated Match
+                            Profile Compatibility Fit
                           </p>
-                          <h4 className="text-3xl font-black text-slate-900 font-poppins mt-0.5">
+                          <h4 className="text-3xl font-black text-slate-900 mt-0.5">
                             {Math.round(matchResult.final_score)}%
                           </h4>
                           <p className="text-xs font-bold text-indigo-700 mt-0.5">
@@ -1463,205 +1471,7 @@ What We Are Looking For:
       </AnimatePresence>
 
 
-      {/* ── 5. Post Job Modal (Refactored Premium SaaS ATS Aesthetic) ───────── */}
-      <AnimatePresence>
-        {isPostModalOpen && isRecruiterOrAdmin && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 sm:p-8 relative my-8"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 font-poppins">
-                    Post a New Job
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                    Publish a new open role or save it as a draft to attract top-tier talent.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPostModalOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              <form onSubmit={(e) => handleCreateJob(e, false)} className="mt-6 space-y-5">
-
-                {/* 1. Job Title (Full width row) */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Job Title *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Senior AI / Frontend Engineer"
-                    value={postFormData.title}
-                    onChange={e => setPostFormData({ ...postFormData, title: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  />
-                </div>
-
-                {/* 2. 3-Column Grid: Work Mode, Min Exp, Department */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Work Mode</label>
-                    <CustomDropdown
-                      value={postFormData.work_mode}
-                      onChange={val => setPostFormData({ ...postFormData, work_mode: val })}
-                      options={[
-                        { value: 'Remote', label: 'Remote' },
-                        { value: 'Hybrid', label: 'Hybrid' },
-                        { value: 'Onsite', label: 'Onsite' }
-                      ]}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Min Exp (Years)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      value={postFormData.min_years}
-                      onChange={e => setPostFormData({ ...postFormData, min_years: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Department</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Engineering"
-                      value={postFormData.department}
-                      onChange={e => setPostFormData({ ...postFormData, department: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. 2-Column Grid: Location & Salary Range */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. San Francisco, CA or Remote"
-                      value={postFormData.location}
-                      onChange={e => setPostFormData({ ...postFormData, location: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Salary Range</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. $120,000 - $160,000"
-                      value={postFormData.salary_range}
-                      onChange={e => setPostFormData({ ...postFormData, salary_range: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Smart Skills Input (Tag/Pill UI) */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Required Skills
-                  </label>
-                  <div className="w-full min-h-[46px] p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-1.5 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all cursor-text">
-                    {skillsList.map((skill, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-xs font-medium"
-                      >
-                        <span>{skill}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill)}
-                          className="text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 rounded p-0.5 transition cursor-pointer"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                    <input
-                      type="text"
-                      value={skillInput}
-                      onChange={e => setSkillInput(e.target.value)}
-                      onKeyDown={handleSkillKeyDown}
-                      onBlur={() => handleAddSkill()}
-                      placeholder={skillsList.length === 0 ? "Type a skill and press Enter or comma..." : "Add skill..."}
-                      className="flex-1 min-w-[120px] bg-transparent border-0 outline-none text-sm text-slate-900 placeholder:text-slate-400 py-1 px-1.5 focus:ring-0"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Press Enter or comma to add a skill tag.</p>
-                </div>
-
-                {/* 5. Job Description with AI Generation button */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-slate-700">Job Description *</label>
-                    <button
-                      type="button"
-                      onClick={handleGenerateJDWithAI}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <Sparkles size={14} className="text-indigo-600" />
-                      Generate with AI
-                    </button>
-                  </div>
-                  <textarea
-                    required
-                    rows={6}
-                    placeholder="Describe role responsibilities, team impact, and required qualifications..."
-                    value={postFormData.jd_text_raw}
-                    onChange={e => setPostFormData({ ...postFormData, jd_text_raw: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-sans leading-relaxed custom-scrollbar"
-                  />
-                </div>
-
-                {/* 6. Action Footer (Draft vs Publish) */}
-                <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setIsPostModalOpen(false)}
-                    className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={postingLoading}
-                      onClick={(e) => handleCreateJob(e, true)}
-                      className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                    >
-                      Save as Draft
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={postingLoading}
-                      onClick={(e) => handleCreateJob(e, false)}
-                      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {postingLoading ? 'Publishing...' : 'Publish Job'}
-                    </button>
-                  </div>
-                </div>
-
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Voluntary EEO Self-Identification Modal (Statutory EEOC Compliance) */}
       <EEOSurveyModal
@@ -1739,7 +1549,7 @@ export function JobCard({
                 e.stopPropagation()
                 onViewDetail()
               }}
-              className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-sky-600 transition font-poppins tracking-tight line-clamp-1 leading-snug cursor-pointer"
+              className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-sky-600 transition tracking-tight line-clamp-1 leading-snug cursor-pointer"
               title={companyName}
             >
               {companyName}
@@ -1837,10 +1647,10 @@ export function JobCard({
             onCalculateMatch()
           }}
           className="inline-flex items-center gap-1 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs font-bold bg-sky-50 hover:bg-sky-100/80 text-sky-600 border border-sky-200/70 transition-all cursor-pointer shadow-2xs active:scale-95"
-          title="Calculate ATS Match %"
+          title="Check Profile Compatibility Fit"
         >
           <TrendingUp size={13} className="text-sky-600 shrink-0" />
-          <span>Match %</span>
+          <span>Profile Fit</span>
         </button>
 
         {/* Right: Share + Apply Button */}

@@ -67,6 +67,7 @@ def compute_single_project_score(
     criticality_map: Optional[Dict[str, float]] = None,
     embedding_model_fn: Optional[Any] = None,
     jd_vector: Optional[np.ndarray] = None,
+    p_vector: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Evaluates a single project for tech overlap, relevance, and evidence quality.
@@ -106,34 +107,36 @@ def compute_single_project_score(
 
     # 2. Project Relevance (Embedding similarity mapped to [0.2, 1.0])
     relevance = 0.5
-    if embedding_model_fn and combined_text and jd_text:
+    if (embedding_model_fn or p_vector is not None) and combined_text and (jd_text or jd_vector is not None):
         try:
-            if jd_vector is None:
-                jd_vec_res = embedding_model_fn.encode([jd_text[:1500]])
-                jd_vec = np.array(jd_vec_res[0])
+            if jd_vector is None and embedding_model_fn:
+                jd_vec_res = embedding_model_fn.encode([jd_text[:1200]])
+                jd_vec = np.array(jd_vec_res[0], dtype=np.float32)
                 jd_norm = np.linalg.norm(jd_vec)
-                if jd_norm > 0:
-                    jd_vec = jd_vec / jd_norm
+                jd_vec = (jd_vec / jd_norm) if jd_norm > 0 else None
             else:
                 jd_vec = jd_vector
 
-            p_vec_res = embedding_model_fn.encode([combined_text[:1500]])
-            p_vec = np.array(p_vec_res[0])
-            p_norm = np.linalg.norm(p_vec)
-            if p_norm > 0:
-                p_vec = p_vec / p_norm
+            if p_vector is None and embedding_model_fn:
+                p_vec_res = embedding_model_fn.encode([combined_text[:1200]])
+                p_vec = np.array(p_vec_res[0], dtype=np.float32)
+                p_norm = np.linalg.norm(p_vec)
+                p_vec = (p_vec / p_norm) if p_norm > 0 else None
+            else:
+                p_vec = p_vector
 
-            cos = float(np.dot(p_vec, jd_vec))
-            # Linear mapping: [0.30, 0.85] -> [0.20, 1.00]
-            mapped = 0.20 + ((cos - 0.30) / 0.55) * 0.80
-            relevance = max(0.20, min(1.00, mapped))
+            if p_vec is not None and jd_vec is not None:
+                cos = float(np.dot(p_vec, jd_vec))
+                # Linear mapping: [0.30, 0.85] -> [0.20, 1.00]
+                mapped = 0.20 + ((cos - 0.30) / 0.55) * 0.80
+                relevance = max(0.20, min(1.00, mapped))
         except Exception as e:
             logger.debug("Project embedding relevance failed, falling back", error=str(e))
             relevance = 0.5
 
     # 3. Evidence Quality
     # A. GitHub / Live link
-    link_in_fields = bool(project.get("link") or project.get("github") or project.get("url") or project.get("live_url"))
+    link_in_fields = bool(project.get("link") or project.get("github") or project.get("github_url") or project.get("url") or project.get("live_url"))
     link_in_text = bool(_LINK_RE.search(combined_text))
     has_link = link_in_fields or link_in_text
 
@@ -179,34 +182,42 @@ def compute_projects_score(
 ) -> Tuple[float, List[Dict[str, Any]]]:
     """
     Computes overall S_projects in [0.0, 1.0] across all candidate projects.
-    
-    Formula:
-    - Zero projects -> 0.0
-    - Multiple projects -> weighted top-3 aggregator (0.55 * p1 + 0.30 * p2 + 0.15 * p3)
-    - Capped strictly at 1.0.
-
-    Time Complexity: O(P * (S + L)) where P is number of projects.
-    Space Complexity: O(P)
+    Uses single-batch embedding for instant execution (<100ms).
     """
     if not projects:
         return 0.0, []
 
-    # Encode JD vector once if embedding model provided
+    valid_projects = [p for p in projects if isinstance(p, dict)]
+    if not valid_projects:
+        return 0.0, []
+
+    # Batch encode JD and all candidate project texts in ONE single pass (<100ms)
     jd_vector: Optional[np.ndarray] = None
+    project_vectors: List[Optional[np.ndarray]] = [None] * len(valid_projects)
     if embedding_model_fn and jd_text:
         try:
-            res = embedding_model_fn.encode([jd_text[:1500]])
-            v = np.array(res[0])
-            norm = np.linalg.norm(v)
-            if norm > 0:
-                jd_vector = v / norm
-        except Exception:
-            jd_vector = None
+            texts_to_encode = [jd_text[:1200]]
+            for p in valid_projects:
+                title = str(p.get("title") or "Project").strip()
+                desc = str(p.get("description") or "").strip()
+                hl = p.get("highlights") or []
+                hl_str = " ".join([str(h) for h in hl]) if isinstance(hl, list) else str(hl)
+                texts_to_encode.append(f"{title}. {desc}. {hl_str}"[:1200])
+
+            encoded = embedding_model_fn.encode(texts_to_encode)
+            jd_raw = np.array(encoded[0], dtype=np.float32)
+            n_jd = np.linalg.norm(jd_raw)
+            jd_vector = (jd_raw / n_jd) if n_jd > 0 else None
+
+            for i in range(len(valid_projects)):
+                p_raw = np.array(encoded[i + 1], dtype=np.float32)
+                n_p = np.linalg.norm(p_raw)
+                project_vectors[i] = (p_raw / n_p) if n_p > 0 else None
+        except Exception as e:
+            logger.debug("Batch project encoding fallback", error=str(e))
 
     evaluated = []
-    for p in projects:
-        if not isinstance(p, dict):
-            continue
+    for idx, p in enumerate(valid_projects):
         eval_dict = compute_single_project_score(
             p,
             jd_text=jd_text,
@@ -214,6 +225,7 @@ def compute_projects_score(
             criticality_map=criticality_map,
             embedding_model_fn=embedding_model_fn,
             jd_vector=jd_vector,
+            p_vector=project_vectors[idx],
         )
         evaluated.append(eval_dict)
 

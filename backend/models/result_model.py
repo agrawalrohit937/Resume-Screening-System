@@ -58,6 +58,7 @@ class ATSResultModel(BaseModel):
     # ── Skills & Keywords ─────────────────────────────────────────────────────
     matched_skills: List[str] = []
     missing_skills: List[str] = []
+    soft_skills: List[str] = []
     matched_keywords: List[str] = []
     missing_keywords: List[str] = []
 
@@ -68,12 +69,23 @@ class ATSResultModel(BaseModel):
     weaknesses: List[str] = []
     overall_assessment: str = ""
 
+    # ── Strict Engine & v2.3 Engine Fields ──────────────────────────────────────
+    strict_ats_score: Optional[float] = 0.0
+    is_knockout: Optional[bool] = False
+    knockout_reasons: List[str] = []
+    knockout_advisories: List[str] = []
+    match_band: Optional[str] = None
+    confidence: Optional[Dict[str, Any]] = None
+    needs_input: List[str] = []
+    dropped_components: List[str] = []
+
     processing_time_ms: int = 0
-    scoring_version: Optional[str] = "1.0.0"
+    scoring_version: Optional[str] = "2.3.0"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = ConfigDict(
         populate_by_name=True,
         protected_namespaces=(),
+        extra="allow",
     )
 

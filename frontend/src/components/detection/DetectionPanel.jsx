@@ -115,7 +115,7 @@ function EmotionBadge({ emotion }) {
       <span style={{ fontSize:18 }}>{cfg.icon}</span>
       <div>
         <p style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#64748B', fontWeight:600 }}>Emotion</p>
-        <p style={{ fontFamily:"'Poppins',sans-serif", fontSize:13, fontWeight:700, color:cfg.color }}>{cfg.label}</p>
+        <p style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:700, color:cfg.color }}>{cfg.label}</p>
       </div>
     </div>
   )
@@ -157,7 +157,7 @@ function ConfidenceMeter({ value = 1 }) {
         <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:'#64748B', fontWeight:600 }}>
           Interview Confidence
         </span>
-        <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:12, fontWeight:700, color:c }}>{label}</span>
+        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:700, color:c }}>{label}</span>
       </div>
       <div style={{ height:8, background:'#F1F5F9', borderRadius:100, overflow:'hidden' }}>
         <motion.div animate={{ width:`${pct}%` }} transition={{ duration:0.6, ease:[0.16,1,0.3,1] }}
@@ -322,7 +322,7 @@ export default function DetectionPanel({
         border:`1.5px solid ${cheatPct > 60 ? '#FECDD3' : cheatPct > 30 ? '#FDE68A' : '#A7F3D0'}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:7 }}>
           <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:'#475569' }}>Integrity Score</span>
-          <span style={{ fontFamily:"'Poppins',sans-serif", fontSize:12, fontWeight:800,
+          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:800,
             color: cheatPct > 60 ? '#B91C1C' : cheatPct > 30 ? '#92400E' : '#065F46' }}>
             {100 - cheatPct}%
           </span>

@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
 import sys
 from typing import Any, Dict, List, Optional, Tuple
@@ -22,18 +21,14 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from eval.dataset_schema import EvaluationDataset, LabeledPair
+from eval.dataset_schema import EvaluationDataset
 from eval.build_dataset import load_from_csv, generate_synthetic_smoke_dataset
 from eval.metrics import (
     evaluate_cohort,
     bootstrap_ci,
-    compute_ndcg,
-    compute_precision_at_k,
-    compute_average_precision,
     compute_rank_correlations,
 )
-from services.scoring_engine import score_resume, WeightProfile, CANDIDATE_PROFILE, RECRUITER_PROFILE
-import core.feature_flags as ff
+from services.scoring_engine import score_resume, WeightProfile, RECRUITER_PROFILE
 
 logger = structlog.get_logger(__name__)
 

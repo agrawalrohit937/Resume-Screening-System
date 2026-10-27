@@ -7,8 +7,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from models.resume_model import (
-    ResumeStatus, ContactInfo, WorkExperience, Education,
-    Project, Certification, ParsedResumeData
+    ResumeStatus, ParsedResumeData
 )
 
 # ── NEW: Human-in-the-Loop (HITL) Wizard Payloads ─────────
@@ -114,6 +113,7 @@ class EnhanceResumeRequest(BaseModel):
     
     # ── Strict ATS Engine Integration ──
     strict_missing_keywords: Optional[List[str]] = None
+    current_score: Optional[float] = Field(default=80.0, description="Current match score before enhancement")
 
     # ── NEW: Human-in-the-Loop Integration ──
     # The HITL wizard bundle. None/absent = user was never shown a wizard (e.g. quick path).

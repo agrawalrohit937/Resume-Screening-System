@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
-import { useLocation, Navigate, Outlet } from 'react-router-dom'
+import { useLocation, Navigate, Outlet, Link } from 'react-router-dom'
 import { Menu, Crown } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
@@ -68,31 +68,30 @@ function MobileHeader({ onMenuToggle }) {
     <>
       <header className="shrink-0 sticky top-0 z-40 md:hidden border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 min-h-[58px]">
-          {/* Left: Hamburger Menu */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onMenuToggle()
-            }}
-            className="inline-flex min-h-[48px] min-w-[48px] h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-slate-700 shadow-sm active:scale-95 transition-all shrink-0 touch-manipulation cursor-pointer"
-            aria-label="Open navigation menu"
+          {/* Left: Brand Identity (Clean, native app feel) */}
+          <Link
+            to={user?.role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'}
+            className="flex items-center gap-2.5 min-w-0 select-none group touch-manipulation focus:outline-none"
+            aria-label="Go to dashboard"
           >
-            <Menu className="w-5 h-5 text-slate-800" strokeWidth={2.2} />
-          </button>
-
-          {/* Center: Brand Identity */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-center px-1">
-            <img src="/logo_t.webp" alt="CareerShala" width={28} height={28} decoding="async" loading="eager" className="w-7 h-7 object-contain shrink-0" />
+            <img
+              src="/logo_t.webp"
+              alt="CareerShala"
+              width={32}
+              height={32}
+              decoding="async"
+              loading="eager"
+              className="w-8 h-8 object-contain shrink-0 group-hover:scale-105 transition-transform"
+            />
             <div className="min-w-0 text-left">
-              <p className="truncate text-sm font-extrabold text-slate-900 leading-tight">
+              <p className="truncate text-base font-extrabold text-slate-900 tracking-tight leading-tight">
                 Career<span className="text-[#2E9BDA]">Shala</span>
               </p>
               <p className="truncate text-[10.5px] font-semibold text-slate-500 leading-none mt-0.5">
                 {meta.title}
               </p>
             </div>
-          </div>
+          </Link>
 
           {/* Right: User Avatar */}
           <div className="relative shrink-0" ref={profileMenuRef}>
@@ -150,10 +149,6 @@ function MobileHeader({ onMenuToggle }) {
 }
 
 export default function AppLayout() {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return window.innerWidth < 1024
-  })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
@@ -167,14 +162,15 @@ export default function AppLayout() {
   }, [location.pathname, location.key])
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024 && !collapsed) {
-        setCollapsed(true)
-      }
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [collapsed])
+    const roles = [
+      ...(Array.isArray(user?.roles) ? user.roles : []),
+      user?.role,
+    ].map((role) => String(role || '').toLowerCase())
+    const isRecruiter = roles.some((role) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(role))
+    if (!isRecruiter) return
+
+    import('../pages/recruiter/RecruiterDashboard').catch(() => {})
+  }, [user])
 
   useEffect(() => {
     if (!isMobileMenuOpen) return undefined
@@ -221,7 +217,7 @@ export default function AppLayout() {
       <div className={`flex h-screen w-full overflow-hidden ${isFullscreenActive ? 'bg-[#F5F7FB] p-0' : 'bg-slate-50'}`}>
         {!isFullscreenActive && (
           <div className="hidden md:block h-full shrink-0">
-            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(p => !p)} />
+            <Sidebar collapsed={false} />
           </div>
         )}
 
@@ -263,11 +259,22 @@ export default function AppLayout() {
           {!isFullscreenActive && <MobileHeader onMenuToggle={() => setIsMobileMenuOpen(true)} />}
           {!isFullscreenActive && (
             <div className="hidden md:block shrink-0">
-              <Navbar sidebarCollapsed={collapsed} onMenuToggle={() => setCollapsed(p => !p)} />
+              <Navbar />
             </div>
           )}
-          <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive ? 'p-0 overflow-hidden' : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6'}`}>
-            <div key={location.pathname} className={`mx-auto w-full min-w-0 ${isFullscreenActive ? 'max-w-none' : 'max-w-7xl animate-fade-in'}`}>
+          <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive
+              ? 'p-0 overflow-hidden'
+              : (location.pathname === '/results' || location.pathname === '/live-interview' || location.pathname === '/github')
+                ? 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-4 lg:px-6 py-3 pb-8 md:pb-6'
+                : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6'
+            }`}>
+            <div key={location.pathname} className={`mx-auto w-full min-w-0 ${
+              isFullscreenActive || location.pathname === '/live-interview' || location.pathname === '/github'
+                ? 'max-w-none'
+                : location.pathname === '/results'
+                  ? 'max-w-[1600px]'
+                  : 'max-w-7xl'
+            } animate-fade-in`}>
               <RouteErrorBoundary>
                 <Outlet />
               </RouteErrorBoundary>

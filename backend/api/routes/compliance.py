@@ -5,8 +5,8 @@ Provides:
 - Candidate Data Rights Portal (/api/v1/compliance/candidate-portal/{candidate_id})
 """
 
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Any, Dict
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from api.deps import get_database, get_current_user

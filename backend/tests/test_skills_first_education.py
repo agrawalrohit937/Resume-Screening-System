@@ -4,9 +4,8 @@ Verifies Indian degree overrides, mode toggles (required | preferred | ignored),
 and elimination of institution prestige bias.
 """
 
-import pytest
-from services.education_service import resolve_degree_level, candidate_highest_education
-from services.scoring_engine import _evaluate_eligibility, score_resume, WeightProfile
+from services.education_service import resolve_degree_level
+from services.scoring_engine import _evaluate_eligibility, score_resume
 
 
 def test_indian_degree_isced_and_rank_overrides():

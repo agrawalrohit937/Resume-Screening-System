@@ -2,13 +2,12 @@
 CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from typing import Any, Dict, List
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from api.deps import get_database, get_current_user
+from api.deps import get_database
 from models.job import JobModel
-from models.user_model import UserModel
 from services.integrations.adapters import GreenhouseAdapter, LeverAdapter, WorkdayAdapter
 from services.integrations.syndication import generate_indeed_xml_feed, generate_google_job_posting_ld_json
 

@@ -8,16 +8,11 @@ Tests for Phase 3: Copilot Hybrid RAG Pipeline.
 """
 
 import pytest
-import numpy as np
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-from models.copilot_rag_model import CopilotChunkModel, RetrievedChunk
 from services.copilot.rag.chunker import DocumentChunker
-from services.copilot.rag.retriever import CopilotRetriever, _reciprocal_rank_fusion, _cosine_similarity
-from services.copilot.rag.semantic_cache import SemanticResponseCache, compute_context_version
-from services.copilot.rag.ingestion import ingest_resume_chunks, ingest_job_chunks
-from services.copilot.registry import tool_registry
+from services.copilot.rag.retriever import CopilotRetriever, _reciprocal_rank_fusion
+from services.copilot.rag.semantic_cache import SemanticResponseCache
 from services.copilot.context import ToolExecutionContext
 from services.copilot.tools.read_tools import RetrieveContextArgs, RetrieveContextTool, SearchResumeArgs, SearchResumeTool
 

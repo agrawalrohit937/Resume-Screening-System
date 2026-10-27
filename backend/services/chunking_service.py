@@ -193,13 +193,23 @@ def chunk_jd(
             req_index += 1
 
     # 2. Extract bullet points and requirement statements from text
+    _IRRELEVANT_JD_PATTERNS = re.compile(
+        r"\b(about\s+us|about\s+the\s+company|who\s+we\s+are|company\s+overview|company\s+profile|"
+        r"equal\s+opportunity|affirmative\s+action|diversity\s+and\s+inclusion|eeo|accommodations|"
+        r"benefits|perks|what\s+we\s+offer|why\s+join\s+us|life\s+at\s+[\w\s]+|compensation|salary|stipend|ctc|lpa|"
+        r"health\s+insurance|401\(k\)|dental|vision|pto|paid\s+time\s+off|vacation|"
+        r"minimum\s+\d+%\s*marks?|percentage\s+criteria|aggregate\s+marks?|"
+        r"how\s+to\s+apply|recruitment\s+process|interview\s+rounds?|selection\s+process|headquartered|iso\s+\d+)\b",
+        re.IGNORECASE,
+    )
+
     lines = [line.strip() for line in (jd_text or "").split("\n") if line.strip()]
     for line in lines:
         cleaned_line = re.sub(r"^[-*•\d\.]+\s*", "", line).strip()
         if len(cleaned_line) < 25 or len(cleaned_line) > 300:
             continue
         lower_line = cleaned_line.lower()
-        if lower_line in seen_texts:
+        if lower_line in seen_texts or _IRRELEVANT_JD_PATTERNS.search(lower_line):
             continue
         seen_texts.add(lower_line)
 
@@ -264,13 +274,13 @@ def compute_max_sim_vector_score(
     best_chunk_indices = np.argmax(similarity_matrix, axis=1)
     max_sim_values = np.max(similarity_matrix, axis=1)
 
-    # Convert cosine [-1.0, 1.0] to percentage score [0.0, 100.0]
-    # Linear scale [MAXSIM_FLOOR, MAXSIM_CEIL] -> [40.0, 98.0]
+    # Convert cosine [-1.0, 1.0] to true percentage score [0.0, 100.0]
+    # Linear scale [MAXSIM_FLOOR, MAXSIM_CEIL] -> [0.0, 100.0] without artificial floor
     import os
-    maxsim_floor = float(os.getenv("MAXSIM_FLOOR", "0.30"))
-    maxsim_ceil = float(os.getenv("MAXSIM_CEIL", "0.85"))
+    maxsim_floor = float(os.getenv("MAXSIM_FLOOR", "0.22"))
+    maxsim_ceil = float(os.getenv("MAXSIM_CEIL", "0.78"))
     span = max(1e-5, maxsim_ceil - maxsim_floor)
-    scaled_scores = np.clip(40.0 + ((max_sim_values - maxsim_floor) / span) * 58.0, 30.0, 99.0)
+    scaled_scores = np.clip(((max_sim_values - maxsim_floor) / span) * 100.0, 0.0, 100.0)
 
     # Weighted mean by requirement criticality
     total_weights = np.sum(weights)

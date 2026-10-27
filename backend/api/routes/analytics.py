@@ -303,21 +303,31 @@ async def get_enterprise_analytics(
 ):
     """Computes executive talent, headcount, hiring velocity, and anonymized diversity metrics with high-speed parallel execution."""
     import asyncio
-    from bson import ObjectId
 
     tenant_id = getattr(current_user, "tenant_id", "default") or "default"
 
+    user_roles = getattr(current_user, "roles", [getattr(current_user, "role", "candidate")])
+    is_admin_or_exec = any(r in {"admin", "platform_admin", "executive", "exec"} for r in user_roles)
+
     # ── 1. Tenant jobs (open + closed) ───────────────────────────────────────
     job_query: dict = {}
-    if tenant_id and tenant_id != "default":
-        job_query["tenant_id"] = tenant_id
+    if is_admin_or_exec or tenant_id == "default":
+        job_query = {}
     else:
-        job_query["created_by"] = str(current_user.id)
+        job_query = {
+            "$or": [
+                {"tenant_id": tenant_id},
+                {"tenant_id": "default"},
+                {"tenant_id": {"$exists": False}},
+                {"tenant_id": None},
+                {"created_by": str(current_user.id)},
+            ]
+        }
 
     jobs_cursor = db.jobs.find(job_query, {"_id": 1, "title": 1, "department": 1, "openings": 1, "status": 1})
     jobs_list = await jobs_cursor.to_list(length=500)
     job_ids = [str(j["_id"]) for j in jobs_list]
-    open_jobs = [j for j in jobs_list if j.get("status", "open") == "open"]
+    open_jobs = [j for j in jobs_list if str(j.get("status", "open")).lower() in ("open", "active")]
 
     # Approved headcount = sum of openings from active (open) jobs; fallback 1 per job
     approved_headcount = sum(int(j.get("openings", 1) or 1) for j in open_jobs) if open_jobs else 0
@@ -365,7 +375,7 @@ async def get_enterprise_analytics(
             {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
             {"created_at": 1, "updated_at": 1},
         ).to_list(length=500)
-        velocity_task = db.applications.aggregate([
+        velocity_cursor = db.applications.aggregate([
             {
                 "$match": {
                     "job_id": {"$in": job_ids},
@@ -374,7 +384,10 @@ async def get_enterprise_analytics(
                 }
             },
             {"$project": {"updated_at": 1}}
-        ]).to_list(length=5000)
+        ])
+        if hasattr(velocity_cursor, "__await__"):
+            velocity_cursor = await velocity_cursor
+        velocity_task = velocity_cursor.to_list(length=5000)
     else:
         hired_count_task = db.applications.count_documents({
             "tenant_id": tenant_id,
@@ -412,16 +425,16 @@ async def get_enterprise_analytics(
     # ── 3. Department breakdown ──────────────────────────────────────────────
     dept_map: dict = {}
     for j in jobs_list:
-        dept = j.get("department") or "General"
+        dept = j.get("department") or "Engineering"
         if dept not in dept_map:
             dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
-        if j.get("status", "open") == "open":
+        if str(j.get("status", "open")).lower() in ("open", "active"):
             dept_map[dept]["approved"] += int(j.get("openings", 1) or 1)
 
     if hired_apps:
-        job_dept_map = {str(j["_id"]): (j.get("department") or "General") for j in jobs_list}
+        job_dept_map = {str(j["_id"]): (j.get("department") or "Engineering") for j in jobs_list}
         for ha in hired_apps:
-            dept = job_dept_map.get(str(ha.get("job_id")), "General")
+            dept = job_dept_map.get(str(ha.get("job_id")), "Engineering")
             if dept not in dept_map:
                 dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
             dept_map[dept]["filled"] += 1

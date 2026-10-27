@@ -4,7 +4,7 @@ Phase A2 Security Verification Tests: JWT Lifecycle, Token Rotation & Revocation
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from core.security import (
     create_access_token,

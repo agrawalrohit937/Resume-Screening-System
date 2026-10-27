@@ -101,7 +101,7 @@ export default function PremiumSupportCard({ onGetSupport }) {
             </span>
           </div>
 
-          <h3 className="text-base sm:text-lg font-black text-slate-900 font-poppins leading-tight">
+          <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
             {config.title}
           </h3>
 

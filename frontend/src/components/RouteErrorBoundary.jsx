@@ -32,7 +32,7 @@ class RouteErrorBoundary extends React.Component {
           padding: 18,
         }}
       >
-        <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, color: '#881337', marginBottom: 8 }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, color: '#881337', marginBottom: 8 }}>
           Something went wrong
         </div>
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>

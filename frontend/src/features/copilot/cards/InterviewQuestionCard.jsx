@@ -51,7 +51,7 @@ export default function InterviewQuestionCard({ data }) {
             className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer transition-colors"
           >
             <Sparkles size={11} />
-            <span>{showStarGuide ? 'Hide STAR Answering Rubric' : 'View STAR Answering Rubric'}</span>
+            <span>{showStarGuide ? 'Hide Sample Answer Guide' : 'View Sample Answer Guide'}</span>
             {showStarGuide ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
           {showStarGuide && (

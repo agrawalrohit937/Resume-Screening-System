@@ -3,7 +3,7 @@ Admin routes for Ontology Human Review Gate.
 Allows approving, merging, or rejecting pending unverified skills to keep the graph from rotting.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 

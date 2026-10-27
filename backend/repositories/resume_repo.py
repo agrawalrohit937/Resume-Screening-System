@@ -19,6 +19,7 @@ from repositories.base_repo import BaseRepository
 
 class ResumeRepository(BaseRepository):
     def __init__(self, db: AsyncDatabase):
+        self._db = db
         self.collection = db.resumes
 
     async def create(self, resume_data: dict) -> ResumeModel:

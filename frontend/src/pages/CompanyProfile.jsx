@@ -74,7 +74,7 @@ export default function CompanyProfile() {
         </div>
 
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 font-poppins">
+          <h2 className="text-xl font-extrabold text-slate-900">
             Redirecting to {companyName || 'Company'}
           </h2>
           <p className="text-xs text-slate-500 mt-1 leading-relaxed">

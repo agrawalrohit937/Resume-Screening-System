@@ -13,7 +13,6 @@ Tests:
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, AsyncMock, patch
 
 from models.revenue_recovery_model import (
     RecoveryCaseModel,
@@ -28,8 +27,6 @@ from services.razorpay_service import razorpay_service
 from workflows.revenue_recovery_graph import (
     revenue_recovery_pipeline,
     MAX_DISCOUNT_PERCENT,
-    MAX_AUTOMATED_ATTEMPTS,
-    HIGH_VALUE_THRESHOLD_INR,
 )
 
 

@@ -12,7 +12,6 @@ Strictly enforces multi-tenant boundary: all queries scoped by `tenant_id` and `
 from __future__ import annotations
 
 import asyncio
-import math
 from typing import Any, Dict, List, Optional, Sequence
 import numpy as np
 import structlog
@@ -214,27 +213,8 @@ class CopilotRetriever:
         limit: int,
     ) -> List[Dict[str, Any]]:
         """
-        Performs lexical text search using OpenSearch native BM25 if enabled,
-        falling back to MongoDB $text or regex word matching.
+        Performs lexical text search using MongoDB $text or regex word matching.
         """
-        # 1. Native OpenSearch BM25 (k1=1.5, b=0.75)
-        from core import feature_flags
-        from services.search.opensearch_service import opensearch_service
-
-        if feature_flags.FEATURE_OPENSEARCH_HYBRID and opensearch_service.is_healthy():
-            try:
-                opensearch_docs = await opensearch_service.search_chunks(
-                    query_text=query_text,
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    source_type=source_type,
-                    limit=limit,
-                )
-                if opensearch_docs:
-                    return opensearch_docs
-            except Exception as e:
-                logger.warning("OpenSearch retrieval attempt failed, falling back to local search", error=str(e))
-
         filter_query: Dict[str, Any] = {
             "tenant_id": tenant_id,
             "$or": [{"user_id": user_id}, {"user_id": "system"}],

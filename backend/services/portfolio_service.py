@@ -6,14 +6,12 @@ and multi-project extraction engine for high-impact developer portfolios.
 import io
 import re
 import urllib.parse
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 from services.skill_ontology import (
-    SKILL_TAXONOMY as ONTOLOGY_TAXONOMY,
-    SKILL_ALIASES,
     CHILD_TO_PARENTS,
     normalize_skill,
 )
@@ -218,8 +216,8 @@ def categorize_skills(raw_skills: Any) -> Dict[str, List[str]]:
 
 def extract_smart_metrics(title: str, description: str, raw_highlights: List[str] = None) -> List[Dict[str, str]]:
     """
-    Extracts or smartly synthesizes concise, high-impact quantifiable metrics (e.g. 92.4% Accuracy, < 150ms Latency).
-    Strictly guarantees that long bullet points are NEVER dumped into metric value fields.
+    Extracts only concise, verifiable metrics already present in the source text.
+    Long bullet points are never converted into metric values.
     """
     metrics = []
     combined_text = f"{title} {description} {' '.join(raw_highlights or [])}"
@@ -248,38 +246,6 @@ def extract_smart_metrics(title: str, description: str, raw_highlights: List[str
     scale_match = re.search(r'(\b\d+[\+kKmMbB]?\+?)\s*(?:users|qps|rps|queries|requests|downloads|records|items)', combined_text, re.I)
     if scale_match:
         metrics.append({"value": scale_match.group(1).strip(), "label": "Throughput / Scale"})
-
-    # 5. Smart Domain Synthesis if missing or fewer than 2 metrics
-    t_lower = (title + " " + description).lower()
-    if len(metrics) < 2:
-        if any(ai_term in t_lower for ai_term in ["agent", "rag", "llm", "ai", "model", "neural", "deep learning", "prediction", "classifier", "nlp", "vision", "detector", "heart", "disease"]):
-            defaults = [
-                {"value": "92.4%", "label": "Model Accuracy"},
-                {"value": "0.935", "label": "ROC-AUC"},
-                {"value": "< 180ms", "label": "Inference Latency"}
-            ]
-        elif any(web_term in t_lower for web_term in ["platform", "portal", "website", "system", "dashboard", "screening", "recruitment", "app", "auth", "api", "backend", "full-stack", "full stack"]):
-            defaults = [
-                {"value": "99.9%", "label": "Uptime SLA"},
-                {"value": "< 150ms", "label": "API Latency"},
-                {"value": "100%", "label": "Deterministic"}
-            ]
-        elif any(data_term in t_lower for data_term in ["data", "pipeline", "etl", "analytics", "analysis", "spark", "hadoop", "eda", "visualization"]):
-            defaults = [
-                {"value": "100k+", "label": "Records Processed"},
-                {"value": "3.5x", "label": "Query Speedup"}
-            ]
-        else:
-            defaults = [
-                {"value": "Production", "label": "Deployment Status"},
-                {"value": "100%", "label": "Clean Architecture"}
-            ]
-
-        for d in defaults:
-            if len(metrics) >= 2:
-                break
-            if not any(m["label"].lower() == d["label"].lower() for m in metrics):
-                metrics.append(d)
 
     return metrics[:3]
 
@@ -406,11 +372,6 @@ def extract_all_projects(raw_text: str, detected_skills: List[str]) -> List[Dict
     return projects
 
 
-def parse_resume_to_portfolio_data(file_bytes: bytes, filename: str = "resume.pdf") -> Dict[str, Any]:
-    """
-    Extracts text from PDF and parses candidate profile, all categorized skills,
-    all projects, education, and professional experience dynamically.
-    """
 def extract_all_experience(raw_text: str) -> List[Dict[str, Any]]:
     """
     Extracts ALL work experiences and internships from resume text.

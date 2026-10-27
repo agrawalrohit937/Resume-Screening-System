@@ -140,7 +140,7 @@ export default function SupportModal({ isOpen, onClose, onTicketCreated }) {
                     <LifeBuoy size={18} strokeWidth={2} />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-sm font-black text-slate-900 font-poppins truncate">Support Center</h2>
+                    <h2 className="text-sm font-black text-slate-900 truncate">Support Center</h2>
                     <p className="text-[11px] font-medium text-slate-500 truncate">We're here to help & resolve any issues</p>
                   </div>
                 </div>

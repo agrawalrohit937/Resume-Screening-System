@@ -3,7 +3,7 @@ Pydantic Schemas for Multi-Tenant Team Management & Invitations
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from models.user_model import UserRole

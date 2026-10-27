@@ -74,6 +74,8 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
         <div className="hidden lg:flex items-center gap-3">
           {user ? (
             <button
+              onMouseEnter={() => import('../../pages/Dashboard')}
+              onFocus={() => import('../../pages/Dashboard')}
               onClick={() => navigate('/dashboard')}
               className="px-5 py-2 rounded-full font-extrabold text-[13px] text-white bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] hover:from-[#248bc7] hover:to-[#175d8d] shadow-md shadow-[#2E9BDA]/20 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center gap-1.5 cursor-pointer"
             >

@@ -22,22 +22,22 @@ export default function GuidelinesStep({ onBack, onContinue }) {
   const [agreed, setAgreed] = useState(false)
 
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-80px)] bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased flex flex-col justify-center">
-      
-      {/* Ambient backdrop glow */}
-      <div className="pointer-events-none absolute -top-32 -left-32 h-[440px] w-[440px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
+    <div className="w-full relative overflow-hidden text-slate-900 antialiased flex flex-col py-2">
 
-      <div className="relative mx-auto max-w-[1150px] w-full px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-6">
+      {/* Soft, centered ambient lighting behind cards — no harsh color boundary against sidebar or navbar */}
+      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] bg-gradient-to-br from-sky-100/40 via-blue-50/25 to-transparent rounded-full blur-3xl" />
+
+      <div className="relative w-full h-full flex flex-col flex-1">
+        <div className="flex items-center justify-center mb-5">
           <FlowStepper current={2} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-          
+
           {/* ── LEFT PANEL (Unified Card) ── */}
           <motion.div initial="hidden" animate="show" custom={0} variants={fadeUp} className="lg:col-span-5 h-full">
             <div className="bg-white border border-blue-100 rounded-[28px] p-7 shadow-sm flex flex-col h-full justify-between">
-              
+
               <div>
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#1d6fa5] mb-5">
                   <ShieldCheck className="h-3.5 w-3.5" /> Step 2 of 3
@@ -92,7 +92,7 @@ export default function GuidelinesStep({ onBack, onContinue }) {
 
           {/* ── RIGHT PANEL (2-Column Rules Grid) ── */}
           <div className="lg:col-span-7 flex flex-col justify-between">
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               {RULES.slice(0, 6).map((rule, i) => {
                 const Icon = rule.icon
@@ -129,9 +129,8 @@ export default function GuidelinesStep({ onBack, onContinue }) {
 
             <motion.label
               initial="hidden" animate="show" custom={8} variants={fadeUp}
-              className={`flex cursor-pointer items-center gap-3 rounded-2xl p-4 transition-all border shadow-sm ${
-                agreed ? 'border-[#2E9BDA] bg-[#2E9BDA]/[0.06]' : 'border-blue-100 bg-white hover:border-blue-300'
-              }`}
+              className={`flex cursor-pointer items-center gap-3 rounded-2xl p-4 transition-all border shadow-sm ${agreed ? 'border-[#2E9BDA] bg-[#2E9BDA]/[0.06]' : 'border-blue-100 bg-white hover:border-blue-300'
+                }`}
             >
               <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="h-4 w-4 cursor-pointer rounded border-blue-300 text-[#2E9BDA] accent-[#2E9BDA]" />
               <span className="text-[12.5px] font-bold text-blue-950 select-none">

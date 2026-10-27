@@ -186,10 +186,10 @@ export default function LandingEnterpriseSection({ user }) {
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-900">Enterprise Talent Shortlist</h4>
-                      <p className="text-[10px] text-slate-400 font-mono">Requisition: Lead Backend Engineer</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Requisition: Lead Backend Engineer</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono text-[10px] font-black border border-emerald-200 flex items-center gap-1">
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> 18 Matched
                   </span>
                 </div>
@@ -233,16 +233,16 @@ export default function LandingEnterpriseSection({ user }) {
                         <div>
                           <div className="flex items-center gap-1.5">
                             <p className="text-xs font-black text-slate-900">{cand.name}</p>
-                            <span className="text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded font-mono">
+                            <span className="text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded">
                               {cand.badge}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{cand.skills}</p>
+                          <p className="text-[10px] text-slate-400 font-medium mt-0.5">{cand.skills}</p>
                         </div>
                       </div>
 
                       <div className="text-right">
-                        <span className="text-xs font-black text-emerald-600 font-mono">{cand.match} Match</span>
+                        <span className="text-xs font-black text-emerald-600">{cand.match} Match</span>
                         <p className="text-[9.5px] text-indigo-600 font-bold mt-0.5">{cand.proctor}</p>
                       </div>
                     </div>
@@ -255,7 +255,7 @@ export default function LandingEnterpriseSection({ user }) {
                     <Send size={13} className="text-[#2E9BDA]" />
                     <span className="text-[11px] font-bold text-slate-200">1-Click Direct Interview Invite</span>
                   </div>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold">✓ Automated Dispatch</span>
+                  <span className="text-[10px] text-emerald-400 font-bold">✓ Automated Dispatch</span>
                 </div>
 
               </div>

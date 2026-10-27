@@ -5,7 +5,7 @@ enforcing the EEOC / OFCCP 4/5ths Rule (80% rule) and generating NYC LL144 audit
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 import structlog
 
 logger = structlog.get_logger(__name__)

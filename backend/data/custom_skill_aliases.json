@@ -1,0 +1,23 @@
+{
+  "fastapi": "FastAPI",
+  "langchain": "LangChain",
+  "langgraph": "LangGraph",
+  "nextjs": "Next.js",
+  "next.js": "Next.js",
+  "tailwind": "Tailwind CSS",
+  "tailwindcss": "Tailwind CSS",
+  "docker": "Docker",
+  "kubernetes": "Kubernetes",
+  "k8s": "Kubernetes",
+  "pydantic": "Pydantic",
+  "qdrant": "Qdrant",
+  "pinecone": "Pinecone",
+  "chromadb": "ChromaDB",
+  "celery": "Celery",
+  "redis": "Redis",
+  "postgresql": "PostgreSQL",
+  "mongodb": "MongoDB",
+  "react": "React",
+  "vue": "Vue.js",
+  "typescript": "TypeScript"
+}

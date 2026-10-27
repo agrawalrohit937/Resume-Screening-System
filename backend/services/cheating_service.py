@@ -2,8 +2,7 @@
 Cheating Detection Service — Tracks and scores suspicious behavior during interviews
 """
 
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 from pydantic import BaseModel
 
 import structlog

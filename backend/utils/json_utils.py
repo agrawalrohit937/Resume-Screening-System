@@ -10,7 +10,7 @@ Features:
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 import structlog
 
 try:

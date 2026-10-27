@@ -49,7 +49,7 @@ export default function CompanyLogo({
       }`}
     >
       <div
-        className={`${sizeConfig.box} overflow-hidden flex items-center justify-center font-black font-poppins shadow-xs border border-slate-200/90 bg-white transition-transform duration-200`}
+        className={`${sizeConfig.box} overflow-hidden flex items-center justify-center font-black shadow-xs border border-slate-200/90 bg-white transition-transform duration-200`}
       >
         {resolvedUrl && !imgError ? (
           <img

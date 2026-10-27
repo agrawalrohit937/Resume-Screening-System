@@ -138,7 +138,7 @@ export default function NeonDeveloperTheme({
       
       {/* ── IDE TOP TITLE BAR ── */}
       <header className="sticky top-0 left-0 w-full z-40 bg-[#161b22] border-b border-slate-800 shadow-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-rose-500/90 inline-block" />
@@ -212,10 +212,10 @@ export default function NeonDeveloperTheme({
       </header>
 
       {/* ── MAIN IDE WORKSPACE ── */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-24 space-y-28">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-14 pb-32 space-y-36">
         
         {/* ── HERO & CLI BAR (main.py) ── */}
-        <section id="home" className="space-y-8">
+        <section id="home" className="min-h-[76vh] space-y-10 flex flex-col justify-center">
           <div className="bg-[#161b22] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
             <div className="px-5 py-3 bg-[#0f141c] border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
               <span className="flex items-center gap-2">
@@ -230,12 +230,12 @@ export default function NeonDeveloperTheme({
               </button>
             </div>
 
-            <div className="p-6 sm:p-10 space-y-6">
+            <div className="p-7 sm:p-14 space-y-8">
               <div className="space-y-3">
                 <div className="text-xs text-slate-500">
                   # Developer Profile Specification // Python 3.12
                 </div>
-                <div className="text-sm font-bold text-purple-400">
+                <div className="text-base sm:text-lg font-bold text-purple-400">
                   class <span className="text-yellow-400">{profile.full_name.replace(/\s+/g, '')}</span>(SeniorEngineer):
                 </div>
 

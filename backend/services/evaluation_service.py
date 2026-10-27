@@ -2,8 +2,6 @@
 Answer Evaluation Service — Groq LLM (llama-3.3-70b-versatile) powered evaluation
 Scores 0-100 per answer and generates structured feedback
 """
-import json
-import re
 from typing import Dict, List, Optional, Any
 
 import httpx

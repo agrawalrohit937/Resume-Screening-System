@@ -48,8 +48,8 @@ export default function CopilotSurface() {
       <button
         ref={fabRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-[72px] right-3.5 md:bottom-6 md:right-6 w-12 h-12 md:w-14 md:h-14 bg-slate-800/95 backdrop-blur-md rounded-full shadow-lg shadow-slate-900/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 z-50 cursor-pointer border border-slate-700/50"
-        aria-label={isOpen ? "Close AI Copilot" : "Open AI Copilot"}
+        className="hidden md:flex fixed md:bottom-6 md:right-6 w-14 h-14 bg-slate-800/95 backdrop-blur-md rounded-full shadow-lg shadow-slate-900/25 items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 z-50 cursor-pointer border border-slate-700/50"
+        aria-label={isOpen ? "Close CareerMitra" : "Open CareerMitra"}
       >
         <AnimatePresence mode="wait" initial={false}>
           {isOpen ? (
@@ -74,7 +74,7 @@ export default function CopilotSurface() {
             >
               <img
                 src="/copilot-bot.svg"
-                alt="Copilot"
+                alt="CareerMitra"
                 className="w-10 h-10 md:w-12 md:h-12 object-contain drop-shadow-md"
               />
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 bg-emerald-400 border-2 border-slate-800 rounded-full pointer-events-none" />
@@ -100,7 +100,7 @@ export default function CopilotSurface() {
                 <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                   <Sparkles size={15} />
                 </div>
-                <h3 className="text-sm font-bold text-slate-800 truncate">Career Copilot</h3>
+                <h3 className="text-sm font-bold text-slate-800 truncate">CareerMitra</h3>
               </div>
 
               {/* Header Action Buttons */}
@@ -120,7 +120,7 @@ export default function CopilotSurface() {
                   onClick={() => setIsOpen(false)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                   title="Close"
-                  aria-label="Close Copilot"
+                  aria-label="Close CareerMitra"
                 >
                   <X size={16} />
                 </button>

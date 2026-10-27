@@ -2,7 +2,6 @@
 Unit tests for Job Cleanup Service (Automated removal of stale external jobs).
 """
 
-from datetime import datetime, timedelta, timezone
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 

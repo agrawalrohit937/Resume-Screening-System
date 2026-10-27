@@ -38,7 +38,7 @@ export const applyAssistantApi = {
   // If Gmail is not connected, the backend returns HTTP 428 — the frontend
   // should redirect the user to connect Gmail first.
   sendApplication: (applicationId) =>
-    api.post(`${BASE}/draft/${applicationId}/send`).then((r) => r.data),
+    api.post(`${BASE}/draft/${applicationId}/send`, { confirm: true }).then((r) => r.data),
 
   getHistory: (page = 1, pageSize = 20) =>
     api.get(`${BASE}/history`, { params: { page, page_size: pageSize } }).then((r) => r.data),

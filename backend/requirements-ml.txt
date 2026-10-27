@@ -1,0 +1,10 @@
+# ─── Optional Local ML & Learning-to-Rank (LTR) Dependencies ───
+# Install only if running offline local model benchmarks or LTR training:
+# pip install -r requirements-ml.txt
+
+sentence-transformers>=2.6.0
+torch>=2.2.0
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+lightgbm>=4.3.0
+pandas>=2.2.0

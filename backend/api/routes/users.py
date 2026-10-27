@@ -15,7 +15,7 @@ from core.config import settings
 from scheduler.subscription_expiry import expire_overdue_subscriptions
 from models.user_model import UserModel
 from repositories.user_repo import UserRepository
-from schemas.user_schema import UserPublicResponse, UpdateProfileRequest, MessageResponse, SetPrimaryResumeRequest
+from schemas.user_schema import UserPublicResponse, UpdateProfileRequest, SetPrimaryResumeRequest
 from services.cloudinary_service import delete_file, extract_public_id_from_url
 from utils.image_utils import validate_and_save_profile_image, delete_profile_image
 

@@ -3,7 +3,6 @@ Unit tests for Real Experience Model (Phase 1.4).
 """
 
 from datetime import date
-import pytest
 
 from services.scoring.experience_model import (
     RoleInterval,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -22,6 +22,8 @@ import { getMyPostedJobs, getRecruiterStats } from '../../services/api'
 export default function RecruiterDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const cacheKey = `careershala_recruiter_dashboard:${user?.id || user?._id || user?.email || 'anonymous'}`
+  const hasCachedData = useRef(false)
   const [jobs, setJobs] = useState([])
   const [stats, setStats] = useState({
     active_openings: 0,
@@ -39,8 +41,21 @@ export default function RecruiterDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        const data = JSON.parse(cached)
+        setJobs(data.jobs || [])
+        setStats(data.stats || {})
+        hasCachedData.current = true
+        setLoading(false)
+      }
+    } catch {
+      sessionStorage.removeItem(cacheKey)
+    }
+
     async function loadData() {
-      setLoading(true)
+      setLoading(!hasCachedData.current)
       try {
         const [jobsRes, statsRes] = await Promise.all([
           getMyPostedJobs().catch((err) => {
@@ -64,21 +79,28 @@ export default function RecruiterDashboard() {
           ? payload.results
           : []
         setJobs(loadedJobs)
-        if (statsRes.data) {
+        let nextStats = statsRes.data
+        if (nextStats) {
           setStats(statsRes.data)
         } else {
           const active = loadedJobs.filter(j => j.status === 'open').length
           const totalApps = loadedJobs.reduce((acc, curr) => acc + (curr.applicant_count || 0), 0)
-          setStats(prev => ({
-            ...prev,
+          nextStats = {
+            ...stats,
             active_openings: active,
             total_candidates: totalApps,
             action_required: totalApps,
-            funnel: {
-              ...prev.funnel,
-              applied: totalApps,
-            },
+            funnel: { ...stats.funnel, applied: totalApps },
+          }
+          setStats(nextStats)
+        }
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            jobs: loadedJobs,
+            stats: nextStats,
           }))
+        } catch {
+          // Session storage is an optional performance cache.
         }
       } catch (err) {
         console.error('Failed to load recruiter stats:', err)
@@ -87,7 +109,7 @@ export default function RecruiterDashboard() {
       }
     }
     loadData()
-  }, [])
+  }, [cacheKey])
 
   // Header Name Helper: Render full first name (e.g. "Rohit") or full name, never a single initial
   const greetingName = (() => {
@@ -138,7 +160,7 @@ export default function RecruiterDashboard() {
             <Sparkles size={13} className="text-indigo-600" />
             Talent Acquisition Suite
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-poppins">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Welcome back, {greetingName} 👋
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -168,7 +190,7 @@ export default function RecruiterDashboard() {
               <Briefcase size={18} />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 font-poppins mt-3">{stats.active_openings}</p>
+          <p className="text-3xl font-black text-slate-900 mt-3">{stats.active_openings}</p>
           <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[11px] font-semibold text-emerald-600">
             <TrendingUp size={13} />
             <span>{stats.active_openings === 1 ? '1 role live' : `${stats.active_openings} roles live`}</span>
@@ -183,7 +205,7 @@ export default function RecruiterDashboard() {
               <Users size={18} />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 font-poppins mt-3">{stats.total_candidates}</p>
+          <p className="text-3xl font-black text-slate-900 mt-3">{stats.total_candidates}</p>
           <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[11px] font-semibold text-slate-500">
             <Users size={13} className="text-indigo-500" />
             <span>{stats.total_candidates === 1 ? '1 total applicant' : `${stats.total_candidates} total applicants`}</span>
@@ -198,7 +220,7 @@ export default function RecruiterDashboard() {
               <AlertCircle size={18} />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 font-poppins mt-3">
+          <p className="text-3xl font-black text-slate-900 mt-3">
             {stats.action_required}
           </p>
           <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[11px] font-semibold text-amber-700">
@@ -215,7 +237,7 @@ export default function RecruiterDashboard() {
               <Clock size={18} />
             </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 font-poppins mt-3">
+          <p className="text-3xl font-black text-slate-900 mt-3">
             {stats.time_to_screen != null ? (
               <>
                 {stats.time_to_screen} <span className="text-sm font-semibold text-slate-400">days</span>
@@ -245,7 +267,7 @@ export default function RecruiterDashboard() {
         <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-6 shadow-sm">
           <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 font-poppins">Active Job Requisitions</h2>
+              <h2 className="text-base font-extrabold text-slate-900">Active Job Requisitions</h2>
               <p className="text-xs text-slate-400 mt-0.5">Click into any role to manage candidates and view ATS scoring</p>
             </div>
             <Link
@@ -343,7 +365,7 @@ export default function RecruiterDashboard() {
           {/* Recruiting Pipeline Funnel (Unified Brand Palette) */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-extrabold text-slate-900 font-poppins">Recruiting Pipeline Funnel</h3>
+              <h3 className="text-sm font-extrabold text-slate-900">Recruiting Pipeline Funnel</h3>
               <span className="text-[11px] font-bold text-slate-400">{stats.total_candidates} total</span>
             </div>
             <p className="text-xs text-slate-400 mb-5">Stage progression across all active requisitions</p>
@@ -440,7 +462,7 @@ export default function RecruiterDashboard() {
             <div className="w-9 h-9 rounded-xl bg-indigo-100/80 text-indigo-700 flex items-center justify-center mb-3">
               <Building2 size={18} />
             </div>
-            <h3 className="text-sm font-extrabold text-slate-900 font-poppins mb-1">Employer Brand Profile</h3>
+            <h3 className="text-sm font-extrabold text-slate-900 mb-1">Employer Brand Profile</h3>
             <p className="text-xs text-slate-600 mb-4 leading-relaxed">
               Showcase your company culture, perks, and open positions to attract top-tier talent across CareerShala.
             </p>

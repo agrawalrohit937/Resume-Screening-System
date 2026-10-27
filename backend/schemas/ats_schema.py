@@ -61,6 +61,7 @@ class ATSMatchResponse(BaseModel):
     recommendation: str
     matched_skills: List[str]
     missing_skills: List[str]
+    soft_skills: List[str] = Field(default_factory=list)
     experience_score: float     # 0-1 scale
     education_score: float      # 0-1 scale
     feedback_suggestions: List[str]
@@ -81,6 +82,15 @@ class ATSMatchResponse(BaseModel):
 
     # ── HITL wizard support ──
     contact_snapshot: Optional[Dict[str, Any]] = None
+
+    # ── ATS Scoring Engine v2.3 Fields ──
+    match_band: Optional[str] = None
+    confidence: Optional[Dict[str, Any]] = None
+    needs_input: List[str] = Field(default_factory=list)
+    dropped_components: List[str] = Field(default_factory=list)
+    skills_score: Optional[float] = None
+    projects_score: Optional[float] = None
+    active_weights: Optional[Dict[str, float]] = Field(default_factory=dict)
 
 
 class BulkATSResultItem(BaseModel):

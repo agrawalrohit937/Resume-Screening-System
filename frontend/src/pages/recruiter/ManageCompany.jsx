@@ -361,7 +361,7 @@ export default function ManageCompany() {
                 <Building2 size={18} />
               </div>
               <div>
-                <h2 className="text-sm font-extrabold text-slate-900 font-poppins">
+                <h2 className="text-sm font-extrabold text-slate-900">
                   Company Identity
                 </h2>
                 <p className="text-[11.5px] text-slate-400">
@@ -532,7 +532,7 @@ export default function ManageCompany() {
               <FileText size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900 font-poppins">
+              <h2 className="text-sm font-extrabold text-slate-900">
                 Overview &amp; Key Details
               </h2>
               <p className="text-[11.5px] text-slate-400">
@@ -621,7 +621,7 @@ export default function ManageCompany() {
               <Heart size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900 font-poppins">
+              <h2 className="text-sm font-extrabold text-slate-900">
                 Culture, Benefits &amp; Perks
               </h2>
               <p className="text-[11.5px] text-slate-400">
@@ -727,7 +727,7 @@ export default function ManageCompany() {
               <Share2 size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900 font-poppins">
+              <h2 className="text-sm font-extrabold text-slate-900">
                 Social Presence
               </h2>
               <p className="text-[11.5px] text-slate-400">

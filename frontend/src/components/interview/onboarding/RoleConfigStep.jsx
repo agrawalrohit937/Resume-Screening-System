@@ -56,14 +56,15 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
   const isFormValid = form.job_title.trim().length > 1
 
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-80px)] bg-[#FAFBFC] relative overflow-hidden text-blue-950 antialiased flex flex-col">
-      <div className="pointer-events-none absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-[#2E9BDA]/10 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-indigo-400/5 blur-3xl" />
+    <div className="w-full relative overflow-hidden text-blue-950 antialiased flex flex-col py-2">
+      {/* Soft, centered ambient lighting behind cards — no harsh color boundary against sidebar or navbar */}
+      <div className="pointer-events-none absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] bg-gradient-to-br from-sky-100/40 via-blue-50/25 to-transparent rounded-full blur-3xl" />
 
-      <div className="relative mx-auto max-w-[1200px] w-full px-4 sm:px-6 lg:px-8 py-4 h-full flex flex-col flex-1">
+      {/* Cards expanded horizontally (full width) to fill side spaces */}
+      <div className="relative w-full h-full flex flex-col flex-1 px-1 sm:px-2">
         
         <div className="flex justify-end mb-3">
-          <div className="w-[70%]">
+          <div className="w-full sm:w-[60%] lg:w-[45%]">
             <FlowStepper current={1} />
           </div>
         </div>
@@ -143,7 +144,7 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
 
           {/* ── RIGHT PANEL ── */}
           <motion.div initial="hidden" animate="show" custom={2} variants={fadeUp} className="lg:col-span-8 flex flex-col gap-4">
-            
+
             {/* 1. ROLE INPUT */}
             <div>
               <label className="flex items-center gap-1.5 text-[#1d6fa5] font-extrabold text-[13px] mb-2">
@@ -168,7 +169,7 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
                     key={role}
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, job_title: role }))}
-                    className={`flex items-center gap-1 text-[12px] font-bold px-3 py-1.5 rounded-full border transition-all ${
+                    className={`flex items-center gap-1 text-[12px] font-bold px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
                       form.job_title === role ? 'bg-[#2E9BDA]/10 border-[#2E9BDA] text-[#1d6fa5]' : 'bg-white border-blue-100 text-blue-900/50 hover:border-blue-300'
                     }`}
                   >
@@ -198,7 +199,7 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
                       key={t.id}
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, interview_type: t.id }))}
-                      className={`relative flex flex-col items-center text-center p-3 rounded-xl border-2 transition-all ${
+                      className={`relative flex flex-col items-center text-center p-3 rounded-xl border-2 transition-all cursor-pointer ${
                         active ? 'bg-[#F0F7FF] border-[#2E9BDA] shadow-sm' : 'bg-white border-blue-50 hover:border-blue-200'
                       }`}
                     >
@@ -232,7 +233,7 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
                       key={d.id}
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, difficulty: d.id }))}
-                      className={`relative text-left p-3.5 rounded-xl border-2 transition-all ${
+                      className={`relative text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
                         active ? `${d.bg} ${d.border} shadow-sm` : 'bg-white border-blue-50 hover:border-blue-200'
                       }`}
                     >
@@ -268,7 +269,7 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
                       key={p.id}
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, num_questions: p.count }))}
-                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-all ${
+                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-all cursor-pointer ${
                         active ? 'bg-white shadow-[0_2px_8px_rgba(15,23,42,0.06)] border border-blue-100' : 'hover:bg-blue-50/50 border border-transparent'
                       }`}
                     >
@@ -286,14 +287,14 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
             </div>
 
             {/* 5. CONTINUE BUTTON */}
-            <div className="mt-auto pt-1">
+            <div className="mt-auto pt-2">
               <motion.button
                 type="button"
                 whileHover={{ scale: isFormValid && !loading ? 1.01 : 1 }}
                 whileTap={{ scale: isFormValid && !loading ? 0.99 : 1 }}
                 disabled={loading || !isFormValid}
                 onClick={() => onContinue(form)}
-                className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8ba3c7] to-[#9cb2d4] hover:from-[#2E9BDA] hover:to-[#1d6fa5] px-8 text-[15px] font-bold text-white shadow-md transition-all duration-300 disabled:opacity-40"
+                className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] hover:from-[#2587bf] hover:to-[#1e74a8] px-8 text-[15px] font-bold text-white shadow-md shadow-sky-500/25 hover:shadow-lg transition-all duration-300 disabled:opacity-40 cursor-pointer"
               >
                 {loading ? 'Preparing setup...' : (
                   <>

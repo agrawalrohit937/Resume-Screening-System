@@ -11,7 +11,6 @@ from typing import Any, Optional
 import structlog
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, Query, UploadFile, status
-from fastapi.responses import RedirectResponse
 
 from services.tasks import task_manager, execute_resume_parse
 from services.tasks.workers import execute_resume_upload_pipeline
@@ -61,6 +60,7 @@ async def _parse_resume_background(
     """Background task: parse uploaded resume and save structured data."""
     try:
         await resume_repo.update_status(resume_id, ResumeStatus.PROCESSING)
+        parsed = await parser.parse_resume(file_path, file_type)
         parsed_dict = parsed.model_dump()
         await resume_repo.update_parsed_data(resume_id, parsed_dict)
         await user_repo.increment_counter(user_id, "total_resumes")
@@ -71,8 +71,9 @@ async def _parse_resume_background(
             from services.copilot.rag.ingestion import ingest_resume_chunks
             resume_doc = await resume_repo.get_by_id(resume_id)
             tenant_id = resume_doc.get("tenant_id", "default") if resume_doc else "default"
+            db_conn = getattr(resume_repo, "db", None) or getattr(resume_repo.collection, "database", None)
             await ingest_resume_chunks(
-                db=resume_repo.db,
+                db=db_conn,
                 tenant_id=tenant_id,
                 user_id=user_id,
                 parsed_resume=parsed_dict,
@@ -95,6 +96,38 @@ async def _parse_resume_background(
             os.remove(file_path)
 
 
+async def _bg_upload_to_cloudinary(
+    resume_bytes: bytes,
+    filename: str,
+    resume_id: str,
+    user_id_str: str,
+    original_filename: str,
+    db: Any,
+):
+    """Background task to upload resume to Cloudinary without delaying the upload response."""
+    try:
+        cloudinary_url, cloudinary_public_id = await upload_resume(resume_bytes, filename)
+        if cloudinary_url and db is not None:
+            await db["resumes"].update_one(
+                {"_id": ObjectId(resume_id)},
+                {"$set": {
+                    "file_url": cloudinary_url,
+                    "cloudinary_public_id": cloudinary_public_id,
+                }}
+            )
+            await db["users"].update_one(
+                {"_id": ObjectId(user_id_str)},
+                {"$set": {
+                    "profile_resume_url": cloudinary_url,
+                    "profile_resume_name": original_filename,
+                    "updated_at": datetime.now(timezone.utc),
+                }}
+            )
+            logger.info("Background Cloudinary upload finished", resume_id=resume_id, url=cloudinary_url)
+    except Exception as e:
+        logger.warning("Background Cloudinary upload warning", resume_id=resume_id, error=str(e))
+
+
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume_endpoint(
     background_tasks: BackgroundTasks,
@@ -112,25 +145,16 @@ async def upload_resume_endpoint(
         file, str(current_user.id)
     )
 
-    # Upload to Cloudinary
-    try:
-        with open(storage_path, "rb") as f:
-            resume_bytes = f.read()
-
-        cloudinary_url, cloudinary_public_id = await upload_resume(resume_bytes, filename)
-
-        if not cloudinary_url:
-            raise HTTPException(status_code=500, detail="Cloudinary upload failed")
-
-        file_url = cloudinary_url
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+    # Read bytes for hash and async Cloudinary upload
+    with open(storage_path, "rb") as f:
+        resume_bytes = f.read()
 
     original_filename = sanitize_filename(file.filename or "resume")
     user_id_str = str(current_user.id)
+    file_hash = hashlib.sha256(resume_bytes).hexdigest()
+
+    # Fast-path local URL placeholder; Cloudinary populates this asynchronously
+    file_url = f"/api/v1/resumes/download/{filename}"
 
     # Prepare document data
     resume_data = {
@@ -140,8 +164,8 @@ async def upload_resume_endpoint(
         "file_type": file_type,
         "file_size_bytes": file_size,
         "storage_path": storage_path,       # for parsing (local temp path)
-        "file_url": file_url,               # Cloudinary URL for recruiter view
-        "cloudinary_public_id": cloudinary_public_id,
+        "file_url": file_url,               # URL for recruiter view (enriched in bg)
+        "cloudinary_public_id": None,
         "status": ResumeStatus.PENDING,
         "tags": [],
         "is_primary": True,
@@ -162,6 +186,18 @@ async def upload_resume_endpoint(
             "profile_resume_name": original_filename,
             "updated_at": datetime.now(timezone.utc),
         }},
+    )
+
+    # Non-blocking Cloudinary background upload
+    db_conn = resume_repo.db or getattr(resume_repo.collection, "database", None)
+    background_tasks.add_task(
+        _bg_upload_to_cloudinary,
+        resume_bytes,
+        filename,
+        str(resume.id),
+        user_id_str,
+        original_filename,
+        db_conn,
     )
 
     # Compensating post-check: ensure user has exactly 1 primary resume

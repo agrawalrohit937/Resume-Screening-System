@@ -65,10 +65,10 @@ function BadgeIcon({ icon, className, tier, earned }) {
     bronze: {},
   }
 
-  const animationProps = earned 
+  const animationProps = earned && tier === 'legendary'
     ? {
         animate: animations[tier] || {},
-        transition: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+        transition: { duration: 4, repeat: Infinity, ease: "easeInOut" }
       }
     : {}
 
@@ -96,13 +96,17 @@ function Medal({ badge, earnedAt, index }) {
         hidden: { opacity: 0, y: 30, scale: 0.8 },
         visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', bounce: 0.6, duration: 0.8 } }
       }}
-      className={`group flex flex-col items-center text-center p-4 rounded-3xl transition-colors duration-500 ${earned ? `hover:${style.bgLight}` : 'hover:bg-slate-50'}`}
+      className={`group flex flex-col items-center text-center p-4 rounded-2xl border transition-colors duration-200 ${
+        earned
+          ? `bg-white border-slate-200/80 hover:${style.bgLight} hover:border-slate-300`
+          : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100'
+      }`}
     >
       {/* 3D Medal Container with Hover Tilt */}
       <motion.div 
         className="relative mb-4 cursor-pointer"
-        whileHover={{ scale: 1.15, rotateY: 15, rotateX: -10, y: -5 }}
-        transition={{ type: "spring", stiffness: 300, damping: 15 }}
+        whileHover={{ scale: 1.05, y: -2 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
         style={{ perspective: 1000 }}
       >
         {/* Legendary Sparkles */}
@@ -127,16 +131,6 @@ function Medal({ badge, earnedAt, index }) {
           {/* Inner metallic highlight */}
           {earned && (
             <div className={`absolute inset-1 rounded-full bg-gradient-to-tr ${style.innerGradient} opacity-60 mix-blend-overlay`} />
-          )}
-
-          {/* Sweeping Shine Effect on Hover */}
-          {earned && (
-            <motion.div
-              initial={{ x: '-150%' }}
-              whileHover={{ x: '150%' }}
-              transition={{ duration: 1, ease: "easeInOut" }}
-              className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent skew-x-12 z-20 pointer-events-none"
-            />
           )}
 
           {/* Icon */}
@@ -192,8 +186,8 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
       
       {/* Background Decorative Elements */}
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
-      <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-200/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-200/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-200/15 rounded-full pointer-events-none" />
+      <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-200/15 rounded-full pointer-events-none" />
 
       {/* Premium Header */}
       <div className="relative p-5 sm:p-8 lg:p-10 border-b border-slate-100/50 backdrop-blur-sm">
@@ -271,7 +265,7 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
       </div>
 
       {/* Vault Content */}
-      <div className="p-4 sm:p-8 lg:p-10 relative z-10">
+      <div className="p-4 sm:p-8 lg:p-10 relative z-10 bg-slate-50/35">
         {total === 0 ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -295,7 +289,7 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
               return (
                 <div key={tier} className="relative">
                   {/* Glowing Tier Divider */}
-                  <div className="flex items-center gap-5 mb-8">
+                  <div className="flex items-center gap-4 mb-6">
                     <h4 className={`text-sm font-black uppercase tracking-[0.2em] ${tierStyle.text} bg-white pr-4 relative z-10 flex items-center gap-2`}>
                       {tier} Tier
                     </h4>
@@ -308,7 +302,7 @@ export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
                     whileInView="visible" 
                     viewport={{ once: true, margin: "-100px" }}
                     variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-10 gap-x-4"
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-6 gap-x-3"
                   >
                     {tierBadges.map((badge, i) => (
                       <Medal key={badge.id} badge={badge} earnedAt={earnedMap.get(badge.id)} index={i} />

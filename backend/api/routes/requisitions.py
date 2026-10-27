@@ -3,15 +3,14 @@ CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from bson import ObjectId
 from api.deps import get_database, get_current_user
 from models.user_model import UserModel
-from models.requisition import RequisitionModel, RequisitionStatus, ApprovalDecision, ApprovalStep
+from models.requisition import RequisitionModel, ApprovalDecision, ApprovalStep
 from services.requisition_service import RequisitionService
-from services.multi_tenancy.tenant_context import get_current_tenant_id
 
 router = APIRouter()
 

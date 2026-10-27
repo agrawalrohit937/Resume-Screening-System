@@ -119,10 +119,6 @@ def generate_challenge_token(subject: str, purpose: str, expires_minutes: int = 
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-# ─── JWT & Token Lifecycle ───────────────────────────────────────────────────
-import hashlib
-import uuid
-
 def hash_token(token: str) -> str:
     """Computes a deterministic SHA-256 hash of a token for secure database indexing."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()

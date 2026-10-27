@@ -36,7 +36,7 @@ import CustomDropdown from '../common/CustomDropdown'
 const INTERVIEW_MODES = [
   { value: 'mixed', label: 'All-in-One Assessment (5 Resume + 5 JD Balanced)' },
   { value: 'technical', label: 'Technical Core (Deep Architecture & Code Design)' },
-  { value: 'behavioral', label: 'Behavioral & Leadership (STAR Scenario Evaluation)' },
+  { value: 'behavioral', label: 'Behavioral & Leadership (Real-world Scenario Evaluation)' },
   { value: 'situational', label: 'Situational Judgment (Real-world Problem Solving)' },
 ]
 
@@ -391,7 +391,7 @@ export default function ScheduleLiveInterviewModal({
                     <Sparkles size={20} />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-black text-slate-900 font-poppins">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900">
                       Schedule Live AI Interview
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">

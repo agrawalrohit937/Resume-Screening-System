@@ -3,7 +3,6 @@ AI Career Co-Pilot & Smart ATS + Interview Platform
 FastAPI Application Entry Point & Production Bootstrap
 """
 import asyncio
-import os
 import sys
 import time
 from contextlib import asynccontextmanager

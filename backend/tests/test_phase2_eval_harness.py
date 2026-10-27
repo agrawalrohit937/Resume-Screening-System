@@ -2,16 +2,12 @@
 Phase 2 Verification Tests: Evaluation Harness, Dataset Schemas, Ranking Metrics, and Ablations.
 """
 
-import pytest
-from eval.dataset_schema import EvaluationDataset, LabeledPair, RecruiterLabel
-from eval.build_dataset import generate_synthetic_smoke_dataset, load_from_csv
+from eval.dataset_schema import RecruiterLabel
+from eval.build_dataset import generate_synthetic_smoke_dataset
 from eval.metrics import (
-    compute_dcg,
     compute_ndcg,
     compute_precision_at_k,
     compute_average_precision,
-    compute_rank_correlations,
-    compute_knockout_accuracy,
     bootstrap_ci,
 )
 from eval.run_eval import (

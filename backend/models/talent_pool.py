@@ -4,7 +4,7 @@ CareerShala ATS v2.0.0 - Enterprise ATS Marketplace.
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import List, Optional
 from pydantic import BaseModel, Field
 import uuid
 

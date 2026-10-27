@@ -67,6 +67,26 @@ SKILL_ALIASES: Dict[str, str] = {
     "large language model": "Large Language Models",
     "rag": "Retrieval-Augmented Generation",
     "retrieval augmented generation": "Retrieval-Augmented Generation",
+    "vllm": "vLLM",
+    "ollama": "Ollama",
+    "deepseek": "DeepSeek",
+    "crewai": "CrewAI",
+    "crew-ai": "CrewAI",
+    "crew ai": "CrewAI",
+    "langgraph": "LangGraph",
+    "lang-graph": "LangGraph",
+    "autogen": "AutoGen",
+    "groq": "Groq",
+    "litellm": "LiteLLM",
+    "peft": "PEFT",
+    "lora": "LoRA",
+    "qlora": "QLoRA",
+    "unsloth": "Unsloth",
+    "claude": "Anthropic",
+    "anthropic": "Anthropic",
+    "gemini": "Google Gemini",
+    "mistral": "Mistral AI",
+    "cohere": "Cohere",
 
     # Cloud & DevOps
     "amazon web services": "AWS",
@@ -194,6 +214,38 @@ SKILL_ALIASES: Dict[str, str] = {
     "rust": "Rust",
     "graphql": "GraphQL",
     "kafka": "Apache Kafka",
+
+    # Healthcare / Clinical
+    "triage": "Triage",
+    "patient triage": "Triage",
+    "vital signs": "Vital Signs Monitoring",
+    "vitals": "Vital Signs Monitoring",
+    "phlebotomy": "Phlebotomy",
+    "venipuncture": "Phlebotomy",
+    "blood draw": "Phlebotomy",
+    "acls": "Advanced Cardiac Life Support",
+    "bls": "Basic Life Support",
+    "cpr": "Cardiopulmonary Resuscitation",
+    "patient care": "Nursing Care",
+    "clinical nursing": "Nursing Care",
+    "bedside care": "Nursing Care",
+
+    # Finance & Accounting
+    "gaap": "Generally Accepted Accounting Principles",
+    "us gaap": "Generally Accepted Accounting Principles",
+    "statutory audit": "Statutory Auditing",
+    "internal audit": "Internal Auditing",
+    "financial audit": "Statutory Auditing",
+    "balance sheet": "Financial Reporting",
+    "general ledger": "Financial Reporting",
+    "financial reporting": "Financial Reporting",
+
+    # Legal & Compliance
+    "contract review": "Contract Review",
+    "contract drafting": "Contract Drafting",
+    "regulatory compliance": "Regulatory Compliance",
+    "compliance": "Regulatory Compliance",
+    "corporate law": "Corporate Law",
 }
 
 # ─── 2. HIERARCHICAL TAXONOMY / KNOWLEDGE GRAPH ────────────────────────────────

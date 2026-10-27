@@ -4,12 +4,11 @@ Provides hierarchical skill relationships, alias normalization, taxonomy expansi
 and semantic domain equivalence matching.
 """
 
-from typing import Dict, List, Set, Tuple, Optional, Any
+from typing import Dict, List, Set, Optional
 import re
 import structlog
 
 from services.scoring.constants import SkillMatch, get_skill_credit_table
-import hashlib
 
 logger = structlog.get_logger(__name__)
 
@@ -369,8 +368,8 @@ def normalize_skill(raw_skill: str) -> str:
         if category.lower() == cleaned:
             return category
             
-    # 3. Capitalize words if unknown
-    return raw_skill.strip().title()
+    # 3. Preserve original string if unknown without inventing capitalization
+    return raw_skill.strip()
 
 
 def canonicalize_skills(skills: Optional[List[str]]) -> List[str]:
@@ -433,8 +432,18 @@ def expand_skills(raw_skills: List[str]) -> Dict[str, Set[str]]:
 def get_all_known_skills() -> Set[str]:
     """
     Returns a comprehensive set of all known canonical skills and alias strings
-    for deterministic NLP pattern matching.
+    for deterministic NLP pattern matching across all supported domains.
     """
+    from core.feature_flags import FEATURE_OCCUPATION_GRAPH
+    if FEATURE_OCCUPATION_GRAPH:
+        try:
+            from services.ontology.graph import get_ontology_graph
+            graph_skills = get_ontology_graph().get_all_known_skills()
+            if graph_skills:
+                return graph_skills
+        except Exception as e:
+            logger.warning("Failed to fetch skills from OccupationSkillGraph, falling back to overlay", error=str(e))
+
     known = set()
     known.update(SKILL_ALIASES.keys())
     for canonical in CHILD_TO_PARENTS.keys():

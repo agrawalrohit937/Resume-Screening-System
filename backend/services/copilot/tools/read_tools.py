@@ -5,7 +5,7 @@ Copilot Read Tools (Auto-run, No Confirmation)
 Never invents scores, missing skills, credentials, or repositories.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 from bson import ObjectId
 import structlog

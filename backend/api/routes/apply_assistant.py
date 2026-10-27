@@ -2,8 +2,8 @@
 API routes for the AI Apply Assistant.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status as http_status, File, UploadFile, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status as http_status, Request, Query
 from fastapi.responses import FileResponse
 
 from api.deps import get_current_user, get_user_repo
@@ -12,6 +12,7 @@ from schemas.application_schema import (
     ApplyDraftRequest,
     ApplyDraftUpdateRequest,
     ApplyDraftResponse,
+    ApplySendRequest,
     ApplySendResponse,
     ApplicationHistoryResponse,
     ApplicationHistoryItem,
@@ -26,6 +27,10 @@ from config.db import get_database
 
 router = APIRouter(prefix="/apply", tags=["Apply Assistant"])
 service = ApplyAssistantService()
+
+MAX_SCREENSHOT_FILES = 5
+MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 
 def _user_id(current_user) -> str:
@@ -57,17 +62,29 @@ async def extract_from_screenshot(
         )
 
     image_data_list = []
+    if len(upload_list) > MAX_SCREENSHOT_FILES:
+        raise HTTPException(
+            status_code=http_status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Upload no more than {MAX_SCREENSHOT_FILES} screenshots.",
+        )
+
     for f in upload_list:
-        filename = f.filename or ""
-        ext = filename.split(".")[-1].lower() if "." in filename else ""
         content_type = getattr(f, "content_type", "") or ""
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(
+                status_code=http_status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Only PNG, JPEG, and WebP screenshots are supported.",
+            )
 
         content = await f.read()
         if not content:
             continue
-
-        mime_type = content_type if content_type.startswith("image/") else f"image/{ext if ext != 'jpg' else 'jpeg'}"
-        image_data_list.append((content, mime_type))
+        if len(content) > MAX_SCREENSHOT_BYTES:
+            raise HTTPException(
+                status_code=http_status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Each screenshot must be no larger than {MAX_SCREENSHOT_BYTES // (1024 * 1024)} MB.",
+            )
+        image_data_list.append((content, content_type))
 
     if not image_data_list:
         raise HTTPException(
@@ -115,8 +132,6 @@ async def check_ats_score(
     db = get_database()
     resume_repo = ResumeRepository(db)
     resume = await resume_repo.get_by_id_and_user(payload.resume_id, user_id)
-    if not resume:
-        resume = await resume_repo.get_by_id(payload.resume_id)
     if not resume:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Resume not found")
     
@@ -187,7 +202,7 @@ async def get_draft(application_id: str, current_user=Depends(get_current_user))
 async def get_active_draft(current_user=Depends(get_current_user)):
     items, total = await service.get_history(user_id=_user_id(current_user), page=1, page_size=5)
     for item in items:
-        if item.get("status") in ("ready_for_review", "sending", "created"):
+        if item.get("status") in ("draft", "ready_for_review", "sending"):
             full_doc = await service.repo.get_by_id(str(item["_id"]), _user_id(current_user))
             if full_doc:
                 return _to_draft_response(full_doc)
@@ -203,6 +218,7 @@ async def preview_draft(application_id: str, current_user=Depends(get_current_us
 @router.post("/draft/{application_id}/send", response_model=ApplySendResponse)
 async def send_application(
     application_id: str,
+    payload: Optional[ApplySendRequest] = None,
     current_user=Depends(get_current_user),
     user_repo: UserRepository = Depends(get_user_repo),
 ):
@@ -212,6 +228,11 @@ async def send_application(
     from the frontend. The backend auto-refreshes the token as needed.
     Returns HTTP 428 if the user has not yet connected their Gmail account.
     """
+    if payload is not None and not payload.confirm:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Application send was not confirmed.",
+        )
     doc = await service.send_application(
         application_id=application_id,
         user_id=_user_id(current_user),
@@ -225,7 +246,11 @@ async def send_application(
 
 
 @router.get("/history", response_model=ApplicationHistoryResponse)
-async def get_history(page: int = 1, page_size: int = 20, current_user=Depends(get_current_user)):
+async def get_history(
+    page: int = Query(default=1, ge=1, le=100),
+    page_size: int = Query(default=20, ge=1, le=100),
+    current_user=Depends(get_current_user),
+):
     items, total = await service.get_history(user_id=_user_id(current_user), page=page, page_size=page_size)
     return ApplicationHistoryResponse(
         items=[

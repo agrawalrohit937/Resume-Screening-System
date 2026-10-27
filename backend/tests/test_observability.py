@@ -5,36 +5,29 @@ Tests for Observability Infrastructure:
 - Prometheus metrics collectors & /metrics endpoint
 """
 
-import asyncio
 import pytest
 from httpx import ASGITransport, AsyncClient
+from opentelemetry import trace
 try:
-    from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
+    from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 except ImportError:
     pytest.skip("opentelemetry-sdk not installed", allow_module_level=True)
 
 from core.logging import add_trace_id, clear_trace_id, set_trace_id, trace_context
 from core.metrics import (
-    ATS_MATCH_REQUESTS_TOTAL,
-    COPILOT_TOKENS_TOTAL,
-    HTTP_REQUESTS_TOTAL,
-    QUEUE_JOBS_TOTAL,
     generate_prometheus_metrics,
-    get_metrics_content_type,
     record_ats_match_metrics,
     record_copilot_tokens,
     record_http_request_metrics,
     record_queue_job_metrics,
 )
 from core.telemetry import (
-    clear_actor_id,
-    get_actor_id,
     get_current_trace_and_span_id,
     init_telemetry,
     set_actor_id,
     trace_span,
 )
-from services.multi_tenancy.tenant_context import set_current_tenant_id, tenant_context
+from services.multi_tenancy.tenant_context import tenant_context
 
 
 class InMemorySpanExporter(SpanExporter):

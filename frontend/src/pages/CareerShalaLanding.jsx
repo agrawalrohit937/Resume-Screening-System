@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react'
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { motion, MotionConfig } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
@@ -7,17 +7,53 @@ import { isMobileViewport } from '../utils/motionUtils'
 import LandingNavbar from '../components/landing/LandingNavbar'
 import LandingHeroSection from '../components/landing/LandingHeroSection'
 import LandingFeaturesSection from '../components/landing/LandingFeaturesSection'
-import LandingCertificateSection from '../components/landing/LandingCertificateSection'
-import LandingEnterpriseSection from '../components/landing/LandingEnterpriseSection'
-import LandingWorkflowSection from '../components/landing/LandingWorkflowSection'
-import LandingComparisonSection from '../components/landing/LandingComparisonSection'
-import LandingTestimonialsSection from '../components/landing/LandingTestimonialsSection'
-import LandingPricingSection from '../components/landing/LandingPricingSection'
-import LandingFaqSection from '../components/landing/LandingFaqSection'
-import LandingFinalCtaSection from '../components/landing/LandingFinalCtaSection'
-import LandingFooter from '../components/landing/LandingFooter'
 
 const AmbientMotionBg = lazy(() => import('../components/landing/AmbientMotionBg'))
+const LandingCertificateSection = lazy(() => import('../components/landing/LandingCertificateSection'))
+const LandingEnterpriseSection = lazy(() => import('../components/landing/LandingEnterpriseSection'))
+const LandingWorkflowSection = lazy(() => import('../components/landing/LandingWorkflowSection'))
+const LandingComparisonSection = lazy(() => import('../components/landing/LandingComparisonSection'))
+const LandingTestimonialsSection = lazy(() => import('../components/landing/LandingTestimonialsSection'))
+const LandingPricingSection = lazy(() => import('../components/landing/LandingPricingSection'))
+const LandingFaqSection = lazy(() => import('../components/landing/LandingFaqSection'))
+const LandingFinalCtaSection = lazy(() => import('../components/landing/LandingFinalCtaSection'))
+const LandingFooter = lazy(() => import('../components/landing/LandingFooter'))
+
+function DeferredLandingSection({ children, minHeight = 'min-h-[520px]' }) {
+  const sectionRef = useRef(null)
+  const [shouldRender, setShouldRender] = useState(false)
+
+  useEffect(() => {
+    const node = sectionRef.current
+    if (!node) return undefined
+
+    if (!('IntersectionObserver' in window)) {
+      setShouldRender(true)
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        setShouldRender(true)
+        observer.disconnect()
+      },
+      { rootMargin: '700px 0px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={sectionRef} className={shouldRender ? '' : minHeight}>
+      {shouldRender ? (
+        <Suspense fallback={<div className={`${minHeight} w-full`} aria-hidden="true" />}>
+          {children}
+        </Suspense>
+      ) : null}
+    </div>
+  )
+}
 
 const AmbientFallback = () => (
   <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden hidden md:flex justify-center">
@@ -141,7 +177,7 @@ export default function CareerShalaLanding() {
 
   return (
     <MotionConfig reducedMotion={isMobile ? 'always' : 'user'}>
-      <div className="min-h-screen w-full bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA] pt-14 sm:pt-16">
+      <div className="landing-page min-h-screen w-full bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA] pt-14 sm:pt-16">
         {/* Background Ambient Lighting & Mesh (Lazy Loaded with Instant Fallback) */}
         <Suspense fallback={<AmbientFallback />}>
           <AmbientMotionBg />
@@ -161,36 +197,54 @@ export default function CareerShalaLanding() {
         <LandingFeaturesSection fadeInUp={fadeInUp} />
 
         {/* 4. Verifiable Skill Certificate Showcase Section (3D Stacked Pedestal) */}
-        <LandingCertificateSection user={user} fadeInUp={fadeInUp} />
+        <DeferredLandingSection>
+          <LandingCertificateSection user={user} fadeInUp={fadeInUp} />
+        </DeferredLandingSection>
 
         {/* 5. Enterprise Recruiter & Talent Portal Section */}
-        <LandingEnterpriseSection user={user} />
+        <DeferredLandingSection>
+          <LandingEnterpriseSection user={user} />
+        </DeferredLandingSection>
 
         {/* 6. Step-by-Step Workflow Journey Section */}
-        <LandingWorkflowSection activeStep={activeStep} setActiveStep={setActiveStep} />
+        <DeferredLandingSection>
+          <LandingWorkflowSection activeStep={activeStep} setActiveStep={setActiveStep} />
+        </DeferredLandingSection>
 
         {/* 6. Comparison Matrix Table Section */}
-        <LandingComparisonSection data={COMPARISON_DATA} />
+        <DeferredLandingSection>
+          <LandingComparisonSection data={COMPARISON_DATA} />
+        </DeferredLandingSection>
 
         {/* 7. Developer Testimonials Section */}
-        <LandingTestimonialsSection testimonials={TESTIMONIALS} />
+        <DeferredLandingSection>
+          <LandingTestimonialsSection testimonials={TESTIMONIALS} />
+        </DeferredLandingSection>
 
         {/* 8. Transparent Pricing Section (with Recruiter ROI Framing) */}
-        <LandingPricingSection isAnnual={isAnnual} setIsAnnual={setIsAnnual} />
+        <DeferredLandingSection>
+          <LandingPricingSection isAnnual={isAnnual} setIsAnnual={setIsAnnual} />
+        </DeferredLandingSection>
 
         {/* 9. FAQ Accordion Section */}
-        <LandingFaqSection items={FAQ_ITEMS} openFaq={openFaq} setOpenFaq={setOpenFaq} />
+        <DeferredLandingSection>
+          <LandingFaqSection items={FAQ_ITEMS} openFaq={openFaq} setOpenFaq={setOpenFaq} />
+        </DeferredLandingSection>
 
         {/* 10. Final Closing High-Conversion CTA Banner */}
-        <LandingFinalCtaSection user={user} />
+        <DeferredLandingSection>
+          <LandingFinalCtaSection user={user} />
+        </DeferredLandingSection>
 
         {/* 11. Mega Footer */}
-        <LandingFooter
-          newsletterEmail={newsletterEmail}
-          setNewsletterEmail={setNewsletterEmail}
-          subscribing={subscribing}
-          handleNewsletterSubmit={handleNewsletterSubmit}
-        />
+        <DeferredLandingSection minHeight="min-h-[280px]">
+          <LandingFooter
+            newsletterEmail={newsletterEmail}
+            setNewsletterEmail={setNewsletterEmail}
+            subscribing={subscribing}
+            handleNewsletterSubmit={handleNewsletterSubmit}
+          />
+        </DeferredLandingSection>
       </div>
     </MotionConfig>
   )
