@@ -576,7 +576,12 @@ class GamificationService:
             {"$limit": limit},
         ]
 
-        docs = await self.collection.aggregate(pipeline).to_list(length=limit)
+        cursor_or_coro = self.collection.aggregate(pipeline)
+        if hasattr(cursor_or_coro, "__await__"):
+            cursor = await cursor_or_coro
+        else:
+            cursor = cursor_or_coro
+        docs = await cursor.to_list(length=limit)
 
         result = []
         rank = 1

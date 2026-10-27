@@ -67,27 +67,27 @@ function MobileHeader({ onMenuToggle }) {
   return (
     <>
       <header className="shrink-0 sticky top-0 z-40 md:hidden border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 min-h-[58px]">
+        <div className="flex items-center justify-between gap-3 px-4.5 py-3 min-h-[66px]">
           {/* Left: Brand Identity (Clean, native app feel) */}
           <Link
             to={user?.role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'}
-            className="flex items-center gap-2.5 min-w-0 select-none group touch-manipulation focus:outline-none"
+            className="flex items-center gap-3 min-w-0 select-none group touch-manipulation focus:outline-none"
             aria-label="Go to dashboard"
           >
             <img
               src="/logo_t.webp"
               alt="CareerShala"
-              width={32}
-              height={32}
+              width={36}
+              height={36}
               decoding="async"
               loading="eager"
-              className="w-8 h-8 object-contain shrink-0 group-hover:scale-105 transition-transform"
+              className="w-9 h-9 object-contain shrink-0 group-hover:scale-105 transition-transform"
             />
             <div className="min-w-0 text-left">
-              <p className="truncate text-base font-extrabold text-slate-900 tracking-tight leading-tight">
+              <p className="truncate text-[17px] font-extrabold text-slate-900 tracking-tight leading-tight">
                 Career<span className="text-[#2E9BDA]">Shala</span>
               </p>
-              <p className="truncate text-[10.5px] font-semibold text-slate-500 leading-none mt-0.5">
+              <p className="truncate text-[11.5px] font-semibold text-slate-500 leading-none mt-0.5">
                 {meta.title}
               </p>
             </div>
@@ -102,11 +102,11 @@ function MobileHeader({ onMenuToggle }) {
               aria-label="Open profile menu"
             >
               <div className="relative">
-                <AvatarRing user={user} ringSize={40} shape="circle">
+                <AvatarRing user={user} ringSize={44} shape="circle">
                   {userAvatar ? (
-                    <img src={userAvatar} alt={user?.full_name || 'User'} referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm" />
+                    <img src={userAvatar} alt={user?.full_name || 'User'} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm" />
                   ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
                       {user?.full_name?.[0]?.toUpperCase() || 'U'}
                     </div>
                   )}
@@ -135,7 +135,7 @@ function MobileHeader({ onMenuToggle }) {
           />
           <div
             ref={dropdownRef}
-            className="fixed top-[64px] right-3 left-3 sm:left-auto sm:w-[340px] max-w-[350px] ml-auto z-[110] shadow-2xl rounded-3xl overflow-hidden"
+            className="fixed top-[72px] right-3 left-3 sm:left-auto sm:w-[340px] max-w-[350px] ml-auto z-[110] shadow-2xl rounded-3xl overflow-hidden"
           >
             <ProfilePlanDropdown
               user={user}
@@ -265,7 +265,7 @@ export default function AppLayout() {
           <main className={`flex-1 min-w-0 overflow-x-hidden ${isFullscreenActive
               ? 'p-0 overflow-hidden'
               : (location.pathname === '/results' || location.pathname === '/live-interview' || location.pathname === '/github')
-                ? 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-4 lg:px-6 py-3 pb-8 md:pb-6'
+                ? 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-4 lg:px-6 py-3 pb-20 md:pb-6'
                 : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6'
             }`}>
             <div key={location.pathname} className={`mx-auto w-full min-w-0 ${
