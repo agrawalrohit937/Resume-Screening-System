@@ -199,6 +199,36 @@ async def get_current_user(
     # Lazy subscription expiration check
     user = await _check_and_apply_lazy_expiration(user, user_repo)
 
+    # 🏢 Company subscription inheritance:
+    # If this user belongs to a company/tenant and doesn't have an individual active subscription,
+    # inherit the company's active subscription if the company executive upgraded the tenant!
+    if user.tenant_id and user.tenant_id != "default" and not user.subscription_active:
+        try:
+            raw_db = _get_raw_database()
+            company_doc = await raw_db.companies.find_one({"tenant_id": user.tenant_id})
+            if company_doc and company_doc.get("subscription_active"):
+                c_end = company_doc.get("subscription_end_date")
+                now = datetime.now(timezone.utc)
+                if isinstance(c_end, str):
+                    try:
+                        c_end = datetime.fromisoformat(c_end.replace("Z", "+00:00"))
+                    except Exception:
+                        c_end = None
+                if isinstance(c_end, datetime):
+                    if c_end.tzinfo is None:
+                        c_end = c_end.replace(tzinfo=timezone.utc)
+                    else:
+                        c_end = c_end.astimezone(timezone.utc)
+
+                if c_end and c_end > now:
+                    user.plan = company_doc.get("plan", "recruiter_pro")
+                    user.subscription_active = True
+                    user.subscription_status = "active"
+                    user.subscription_start_date = company_doc.get("subscription_start_date")
+                    user.subscription_end_date = company_doc.get("subscription_end_date")
+        except Exception:
+            pass
+
     return user
 
 async def get_current_active_user(

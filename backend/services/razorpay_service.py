@@ -50,9 +50,18 @@ class RazorpayService:
                 detail="Razorpay payment gateway is not configured on the server. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET."
             )
 
+        # Affordable 3-Month (Quarterly) Plan Pricing Catalog
         pricing = {
-            "pro": 29900,
-            "premium": 49900
+            # Candidate 3-Month Tiers (Extremely affordable for students/job seekers)
+            "pro": 19900,                    # ₹199 for 3 months (~₹66/month)
+            "candidate_pro": 19900,
+            "premium": 39900,                # ₹399 for 3 months (~₹133/month)
+            "candidate_premium": 39900,
+            # Recruiter & Employer 3-Month Tiers (High-value, budget-friendly for startups)
+            "recruiter_pro": 99900,          # ₹999 for 3 months (~₹333/month)
+            "growth": 99900,
+            "recruiter_enterprise": 249900,  # ₹2,499 for 3 months (~₹833/month)
+            "enterprise": 249900,
         }
         
         amount = pricing.get(plan.lower())

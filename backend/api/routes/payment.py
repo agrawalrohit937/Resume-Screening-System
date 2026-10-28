@@ -35,27 +35,51 @@ class VerifyPaymentRequest(BaseModel):
     razorpay_signature: str
 
 
-# --- Helper Function ---
+# --- Helper Functions & Pricing Map ---
+
+VALID_PLANS = {
+    'free',
+    'pro',
+    'premium',
+    'candidate_pro',
+    'candidate_premium',
+    'recruiter_pro',
+    'recruiter_enterprise',
+    'growth',
+    'enterprise',
+}
+
+PLAN_PRICING_INR = {
+    'free': 0,
+    'pro': 199,
+    'candidate_pro': 199,
+    'premium': 399,
+    'candidate_premium': 399,
+    'recruiter_pro': 999,
+    'growth': 999,
+    'recruiter_enterprise': 2499,
+    'enterprise': 2499,
+}
 
 def _normalize(plan: str) -> str:
     p = (plan or '').strip().lower()
-    if p in ('free', 'pro', 'premium'):
+    if p in VALID_PLANS:
         return p
-    raise HTTPException(status_code=400, detail='Invalid plan. Use free | pro | premium')
+    raise HTTPException(status_code=400, detail='Invalid plan. Select a valid Candidate or Recruiter plan.')
 
 
 async def activate_user_subscription(
     user_repo: Any,
     user_id: str,
     plan_name: str,
-    days: int = 30,
+    days: int = 90,
 ) -> Optional[UserModel]:
     """
-    Bulletproof activation engine for user subscriptions:
-    - Normalizes plan name ('free', 'pro', 'premium').
+    Bulletproof activation engine for user subscriptions (Default 3 Months / 90 Days):
+    - Normalizes plan name.
     - If plan is 'free', downgrades account and resets active subscription states.
     - If paid, checks if user currently has active time remaining on their subscription:
-      * Early renewal: appends `days` to their existing `subscription_end_date`.
+      * Early renewal: appends `days` (90 days) to their existing `subscription_end_date`.
       * Fresh activation or expired: sets start_date = now and end_date = now + timedelta(days=days).
     - Transitions subscription_status = 'active', subscription_active = True.
     - Persists updates and returns updated UserModel.
@@ -99,9 +123,19 @@ async def activate_user_subscription(
     )
 
     if has_future_expiry:
-        # Early renewal: preserve remaining days and extend
-        start_date = _normalize_dt(user.subscription_start_date) or now
-        end_date = user_end_date + timedelta(days=days)
+        user_start_date = _normalize_dt(user.subscription_start_date)
+        is_same_recent_activation = (
+            user_start_date is not None 
+            and abs((now - user_start_date).total_seconds()) < 900
+        )
+        if is_same_recent_activation:
+            # Duplicate activation within 15 minutes (e.g. webhook + frontend verify): do NOT double-extend days!
+            start_date = user_start_date
+            end_date = user_end_date
+        else:
+            # Genuine early renewal: preserve remaining days and extend
+            start_date = user_start_date or now
+            end_date = user_end_date + timedelta(days=days)
     else:
         # Fresh activation or renewal after expiration
         start_date = now
@@ -116,7 +150,46 @@ async def activate_user_subscription(
         "plan_updated_at": now,
     }
 
-    return await user_repo.update(user_id, updates)
+    res = await user_repo.update(user_id, updates)
+
+    # 🏢 Automatic Company & Team Member Subscription Inheritance:
+    # If the user is an Executive / belongs to a company tenant and activates a plan,
+    # propagate the subscription immediately to the company profile and ALL team members (recruiters, interviewers) under that company!
+    tenant_id = getattr(user, "tenant_id", None)
+    if tenant_id and tenant_id != "default":
+        try:
+            from config.db import get_database as _get_raw_db
+            raw_db = _get_raw_db()
+            await raw_db.companies.update_one(
+                {"tenant_id": tenant_id},
+                {"$set": {
+                    "plan": normalized_plan,
+                    "subscription_active": True,
+                    "subscription_status": "active",
+                    "subscription_start_date": start_date,
+                    "subscription_end_date": end_date,
+                    "subscribed_by": str(user.id),
+                    "updated_at": now,
+                }},
+                upsert=True,
+            )
+            # Instantly unlock premium for all recruiters, interviewers, and team members of this company!
+            await raw_db.users.update_many(
+                {"tenant_id": tenant_id},
+                {"$set": {
+                    "plan": normalized_plan,
+                    "subscription_active": True,
+                    "subscription_status": "active",
+                    "subscription_start_date": start_date,
+                    "subscription_end_date": end_date,
+                    "company_subscription": True,
+                    "plan_updated_at": now,
+                }}
+            )
+        except Exception as e:
+            logger.error("Failed to propagate company subscription to team members", error=str(e))
+
+    return res
 
 
 # --- Routes ---
@@ -166,6 +239,36 @@ async def cancel_subscription(
     }
     await user_repo.add_payment_history(str(current_user.id), cancel_record)
 
+    # 🏢 Propagate cancellation to tenant company profile and members
+    tenant_id = getattr(current_user, "tenant_id", None)
+    if tenant_id and tenant_id != "default":
+        try:
+            from config.db import get_database as _get_raw_db
+            raw_db = _get_raw_db()
+            now_dt = datetime.now(timezone.utc)
+            await raw_db.companies.update_one(
+                {"tenant_id": tenant_id},
+                {"$set": {
+                    "plan": "free",
+                    "subscription_active": False,
+                    "subscription_status": "cancelled",
+                    "subscription_end_date": None,
+                    "updated_at": now_dt,
+                }}
+            )
+            await raw_db.users.update_many(
+                {"tenant_id": tenant_id},
+                {"$set": {
+                    "plan": "free",
+                    "subscription_active": False,
+                    "subscription_status": "cancelled",
+                    "subscription_end_date": None,
+                    "plan_updated_at": now_dt,
+                }}
+            )
+        except Exception:
+            pass
+
     # If user had an active recovery case, close it as churned
     try:
         from config.db import get_database
@@ -200,7 +303,7 @@ async def choose_plan(
     user_repo=Depends(get_user_repo),
 ):
     plan = _normalize(payload.plan)
-    days = 0 if plan == 'free' else 30
+    days = 0 if plan == 'free' else 90
     updated = await activate_user_subscription(user_repo, str(current_user.id), plan, days=days)
     if not updated:
         raise HTTPException(status_code=404, detail='User not found')
@@ -256,17 +359,24 @@ async def verify_payment(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Payment verification failed. Invalid signature."
         )
+
+    # Idempotency check: if this payment has already been verified and recorded, return successfully
+    existing_pids = [p.get("payment_id") for p in (getattr(current_user, "payment_history", []) or [])]
+    if payload.razorpay_payment_id in existing_pids:
+        return MessageResponse(message=f"Payment already verified. Plan is active.")
         
-    # Apply database persistence changes for the active tier upgrade via bulletproof activation engine
-    updated = await activate_user_subscription(user_repo, str(current_user.id), plan, days=30)
+    # Apply database persistence changes for the active tier upgrade via bulletproof activation engine (90 days / 3 months)
+    updated = await activate_user_subscription(user_repo, str(current_user.id), plan, days=90)
     if not updated:
         raise HTTPException(status_code=404, detail='User not found')
 
+    paid_amount = PLAN_PRICING_INR.get(plan, 199 if 'pro' in plan else 399)
     payment_record = {
         'order_id': payload.razorpay_order_id,
         'payment_id': payload.razorpay_payment_id,
-        'plan': plan.capitalize(),
-        'amount': 299 if plan == 'pro' else 499,
+        'plan': plan.replace('_', ' ').title(),
+        'amount': paid_amount,
+        'duration': '3 months (90 days)',
         'status': 'paid',
         'date': datetime.now(timezone.utc).isoformat(),
     }
@@ -560,7 +670,13 @@ async def razorpay_webhook(
             user_doc = await user_repo.get_by_email(user_email)
 
         if user_doc:
-            # Map plan from notes, or infer from amount (49900 paise = ₹499 -> premium, else pro)
+            payment_id = payment_entity.get("id")
+            order_id = payment_entity.get("order_id")
+            existing_pids = [p.get("payment_id") for p in (user_doc.payment_history or [])]
+            if payment_id and payment_id in existing_pids:
+                return {"status": "already_processed", "event": event}
+
+            # Map plan from notes, or infer from amount
             plan_from_notes = notes.get("plan")
             if plan_from_notes:
                 resolved_plan = plan_from_notes.strip().lower()
@@ -568,18 +684,16 @@ async def razorpay_webhook(
                 amount_val = float(payment_entity.get("amount", 29900)) / 100.0
                 resolved_plan = "premium" if amount_val >= 499.0 else "pro"
 
-            await activate_user_subscription(user_repo, str(user_doc.id), resolved_plan, days=30)
+            await activate_user_subscription(user_repo, str(user_doc.id), resolved_plan, days=90)
 
             # Record in payment_history if not already present
-            payment_id = payment_entity.get("id")
-            order_id = payment_entity.get("order_id")
-            existing_pids = [p.get("payment_id") for p in (user_doc.payment_history or [])]
-            if payment_id and payment_id not in existing_pids:
+            if payment_id:
                 payment_record = {
                     "order_id": order_id or "webhook_order",
                     "payment_id": payment_id,
-                    "plan": resolved_plan.capitalize(),
-                    "amount": 299 if resolved_plan == "pro" else 499,
+                    "plan": resolved_plan.replace('_', ' ').title(),
+                    "amount": int(payment_entity.get("amount", 29900)) / 100.0,
+                    "duration": "3 months (90 days)",
                     "status": "paid",
                     "date": datetime.now(timezone.utc).isoformat(),
                     "source": "razorpay_webhook",

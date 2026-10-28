@@ -16,7 +16,8 @@ import {
   Trash2,
   RotateCcw,
   Save,
-  Check
+  Check,
+  ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { recompileResumePdf } from '../../services/api'
@@ -35,10 +36,17 @@ export default function EnhancedResumeStudioModal({
   const [checkingATS, setCheckingATS] = useState(false)
   const [isRecompiling, setIsRecompiling] = useState(false)
   const [calculatedNewScore, setCalculatedNewScore] = useState(null)
+  const [mobileTab, setMobileTab] = useState('enhanced')
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024)
 
   useEffect(() => {
     setMounted(true)
-    return () => setMounted(false)
+    const handleResize = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener('resize', handleResize)
+    return () => {
+      setMounted(false)
+      window.removeEventListener('resize', handleResize)
+    }
   }, [])
 
   // ── Baseline Old Resume Data & PDF URL ─────────────────────────────────────
@@ -348,13 +356,65 @@ export default function EnhancedResumeStudioModal({
   return createPortal(
     <div className="fixed inset-0 z-[99999] w-screen h-screen bg-slate-100 flex flex-col p-2 sm:p-2.5 overflow-hidden font-sans select-none">
       
+      {/* ════ MOBILE UNIFIED TOP BAR (TABS + ACTIONS) ════ */}
+      <div className="lg:hidden h-12 px-2.5 bg-white border border-slate-200/90 rounded-2xl flex items-center justify-between shrink-0 mb-1.5 shadow-2xs">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+            title="Back to ATS Dashboard"
+          >
+            <ArrowLeft size={14} />
+          </button>
+
+          {/* Segmented Switcher */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileTab('original')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-xs ${
+                mobileTab === 'original'
+                  ? 'bg-white text-slate-800 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <FileText size={12} />
+              <span>Original ({oldScore}%)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMobileTab('enhanced')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-xs ${
+                mobileTab === 'enhanced'
+                  ? 'bg-white text-[#2E9BDA] shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Sparkles size={12} className="text-[#2E9BDA]" />
+              <span>Enhanced {calculatedNewScore ? `(${calculatedNewScore}%)` : ''}</span>
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center shrink-0 cursor-pointer text-xs font-bold"
+          title="Close Studio"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
       {/* ── 2-COLUMN FULL-SCREEN VIEWPORT ─────────────────────────────────── */}
       <div className="flex-1 w-full h-full flex flex-col lg:flex-row gap-2 sm:gap-2.5 relative overflow-hidden">
 
         {/* ════ LEFT COLUMN: ORIGINAL RESUME ════════════════════════════════ */}
-        <div className="flex-1 flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden h-full">
-          {/* Header */}
-          <div className="h-12 px-3.5 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className={`flex-1 flex-col bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden h-full ${mobileTab === 'original' ? 'flex' : 'hidden lg:flex'}`}>
+          {/* Desktop Header */}
+          <div className="hidden lg:flex h-12 px-3.5 bg-white border-b border-slate-100 items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
@@ -381,13 +441,28 @@ export default function EnhancedResumeStudioModal({
           </div>
 
           {/* Document Body */}
-          <div className="flex-1 w-full h-full overflow-hidden bg-slate-50">
+          <div className="flex-1 w-full h-full overflow-hidden bg-slate-50 flex flex-col">
             {originalPdfUrl ? (
-              <iframe
-                src={`${originalPdfUrl}#page=1&view=FitH,0&toolbar=0`}
-                title="Original Resume"
-                className="w-full h-full border-0 bg-white"
-              />
+              <>
+                {/* Mobile Helper Link for native PDF fallback */}
+                <div className="lg:hidden px-3 py-2 bg-sky-50 border-b border-sky-100 flex items-center justify-between text-xs text-sky-900 shrink-0">
+                  <span className="font-semibold text-[11px] truncate">Original Resume File</span>
+                  <a
+                    href={originalPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 bg-white hover:bg-sky-50 border border-sky-200 text-[#2E9BDA] rounded-lg font-bold text-[11px] shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <ExternalLink size={11} />
+                    Open PDF in Fullscreen
+                  </a>
+                </div>
+                <iframe
+                  src={`${originalPdfUrl}#page=1&view=FitH,0&toolbar=0`}
+                  title="Original Resume"
+                  className="flex-1 w-full border-0 bg-white"
+                />
+              </>
             ) : (
               <div className="w-full h-full p-6 text-center flex flex-col items-center justify-center text-slate-500">
                 <FileText size={28} className="text-slate-300 mb-2" />
@@ -403,9 +478,9 @@ export default function EnhancedResumeStudioModal({
         </div>
 
         {/* ════ RIGHT COLUMN: ENHANCED RESUME WITH INLINE WYSIWYG ═══════════ */}
-        <div className="flex-1 flex flex-col bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden h-full">
-          {/* Header */}
-          <div className="h-12 px-3.5 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className={`flex-1 flex-col bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden h-full ${mobileTab === 'enhanced' ? 'flex' : 'hidden lg:flex'}`}>
+          {/* Desktop Header */}
+          <div className="hidden lg:flex h-12 px-3.5 bg-white border-b border-slate-100 items-center justify-between shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-6 h-6 rounded-md bg-sky-50 border border-sky-100 flex items-center justify-center text-[#2E9BDA] shrink-0">
                 <Sparkles size={13} />
@@ -552,8 +627,8 @@ export default function EnhancedResumeStudioModal({
                   </span>
                 </div>
               </div>
-            ) : (!isEditMode && currentPdfUrl && !hasUnsavedChanges) ? (
-              /* PDF View when PDF URL is available and no pending edits */
+            ) : (!isEditMode && currentPdfUrl && !hasUnsavedChanges && !isMobile) ? (
+              /* PDF View when PDF URL is available and no pending edits (Desktop only where inline PDF iframes work) */
               <iframe
                 src={`${currentPdfUrl}#page=1&view=FitH,0&toolbar=0`}
                 title="Enhanced Resume PDF"
@@ -983,6 +1058,92 @@ export default function EnhancedResumeStudioModal({
 
               </div>
             )}
+          </div>
+
+          {/* ════ MOBILE BOTTOM ACTION BAR (Enhanced Resume) ════ */}
+          <div className="lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-3 py-2 flex items-center justify-between gap-1.5 shrink-0 shadow-lg pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+            {/* View / Edit Mode Switch */}
+            {!isGenerating && (
+              <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/90 text-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(false)}
+                  className={`h-7 px-2.5 rounded-md transition flex items-center gap-1 cursor-pointer text-xs font-semibold ${
+                    !isEditMode
+                      ? 'bg-white text-[#2E9BDA] shadow-2xs font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Eye size={12} />
+                  <span>Preview</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(true)}
+                  className={`h-7 px-2.5 rounded-md transition flex items-center gap-1 cursor-pointer text-xs font-semibold ${
+                    isEditMode
+                      ? 'bg-white text-[#2E9BDA] shadow-2xs font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Edit3 size={12} />
+                  <span>Edit</span>
+                  {hasUnsavedChanges && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* ATS Score / Check */}
+            {checkingATS ? (
+              <span className="px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-xs font-bold text-[#2E9BDA] flex items-center gap-1 shadow-2xs">
+                <Loader2 size={11} className="animate-spin" />
+                <span>Scoring...</span>
+              </span>
+            ) : calculatedNewScore ? (
+              <span className="px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 flex items-center gap-1 shadow-2xs">
+                <CheckCircle2 size={12} className="text-emerald-600" />
+                <span>{calculatedNewScore}%</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCheckATS}
+                disabled={isGenerating}
+                className="px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 text-[#2E9BDA] text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles size={11} />
+                <span>Check ATS</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Download PDF Button */}
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isGenerating || !currentPdfUrl}
+                title="Download PDF"
+                className="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 flex items-center justify-center cursor-pointer transition shadow-2xs"
+              >
+                <Download size={14} />
+              </button>
+
+              {/* Apply Version */}
+              {onSetPrimary && !isGenerating && (
+                <button
+                  type="button"
+                  onClick={onSetPrimary}
+                  disabled={primaryResumeUpdating}
+                  title="Apply This Version"
+                  className="px-2.5 py-1.5 rounded-lg bg-[#2E9BDA] hover:bg-[#2587bf] active:bg-[#1e74a6] disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-xs"
+                >
+                  <CheckCircle2 size={13} />
+                  <span>{primaryResumeUpdating ? '...' : 'Apply'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
