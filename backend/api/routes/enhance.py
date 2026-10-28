@@ -61,6 +61,34 @@ def _serialize_user_verified(payload: EnhanceResumeRequest) -> dict:
     }
 
 
+def _merge_for_pdf(parsed_data: dict, enhanced_data: dict) -> dict:
+    orig_contact = parsed_data.get("contact") or parsed_data.get("contact_info") or {}
+    enh_contact = enhanced_data.get("contact") or {}
+
+    contact = {
+        "full_name": (enh_contact.get("full_name") or enhanced_data.get("full_name") or orig_contact.get("full_name") or parsed_data.get("full_name") or "Candidate").strip(),
+        "email": (enh_contact.get("email") or orig_contact.get("email") or parsed_data.get("email") or "").strip(),
+        "phone": (enh_contact.get("phone") or orig_contact.get("phone") or parsed_data.get("phone") or "").strip(),
+        "location": (enh_contact.get("location") or orig_contact.get("location") or parsed_data.get("location") or "").strip(),
+        "linkedin": (enh_contact.get("linkedin") or orig_contact.get("linkedin") or "").strip(),
+        "github": (enh_contact.get("github") or orig_contact.get("github") or "").strip(),
+        "portfolio": (enh_contact.get("portfolio") or orig_contact.get("portfolio") or "").strip(),
+    }
+
+    return {
+        **contact,
+        "contact": contact,
+        "target_role": (enhanced_data.get("target_role") or parsed_data.get("target_role") or parsed_data.get("role_title") or "").strip(),
+        "summary": (enhanced_data.get("summary") or parsed_data.get("summary") or "").strip(),
+        "experience": enhanced_data.get("experience") or parsed_data.get("experience") or parsed_data.get("work_experience") or [],
+        "projects": enhanced_data.get("projects") or parsed_data.get("projects") or [],
+        "skills": enhanced_data.get("skills") or parsed_data.get("skills") or {},
+        "education": enhanced_data.get("education") or parsed_data.get("education") or [],
+        "certifications": enhanced_data.get("certifications") or parsed_data.get("certifications") or [],
+        "achievements": enhanced_data.get("achievements") or parsed_data.get("achievements") or [],
+    }
+
+
 # ── /enhance/resume ────────────────────────────────────────────────────────────
 @router.post("/resume", response_model=EnhanceResumeResponse)
 async def enhance_resume(
@@ -183,13 +211,15 @@ async def enhance_and_download(
                 detail="LLM returned an empty enhanced resume."
             )
 
-        # 4. Generate PDF
+        # 4. Generate PDF with complete merged data
         unique_id = uuid.uuid4().hex[:8]
         output_filename = f"resume_{current_user.id}_{unique_id}.pdf"
         output_path = os.path.join(_temp_storage_dir(), output_filename)
 
+        merged_pdf_data = _merge_for_pdf(parsed_data, enhanced_data)
+
         pdf_url = await pdf_generator.generate_resume_pdf(
-            resume_data=enhanced_data,
+            resume_data=merged_pdf_data,
             output_path=output_path
         )
 
