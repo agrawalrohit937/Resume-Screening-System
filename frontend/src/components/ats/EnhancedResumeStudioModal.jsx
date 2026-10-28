@@ -153,7 +153,18 @@ export default function EnhancedResumeStudioModal({
       highlights: Array.isArray(exp.highlights) ? exp.highlights.map(h => String(h).replace(/^[\s•▸–—*>\s]+/, '').trim()) : []
     }))
 
-    const rawSkills = Array.isArray(base.skills) ? base.skills : (Array.isArray(ext.skills) ? ext.skills : [])
+    let rawSkills = {}
+    if (base.skills && typeof base.skills === 'object' && !Array.isArray(base.skills) && Object.keys(base.skills).length > 0) {
+      rawSkills = base.skills
+    } else if (ext.skills && typeof ext.skills === 'object' && !Array.isArray(ext.skills) && Object.keys(ext.skills).length > 0) {
+      rawSkills = ext.skills
+    } else if (Array.isArray(base.skills) && base.skills.length > 0) {
+      rawSkills = base.skills
+    } else if (Array.isArray(ext.skills) && ext.skills.length > 0) {
+      rawSkills = ext.skills
+    } else if (typeof ext.skills === 'object' && ext.skills) {
+      rawSkills = ext.skills
+    }
 
     return {
       full_name: base.full_name || ext.full_name || ext.name || 'Rohit Agrawal',
@@ -177,17 +188,60 @@ export default function EnhancedResumeStudioModal({
   const [resumeData, setResumeData] = useState(buildInitialResume)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
+  // Auto-detect if resume is extensive enough for 2 pages
+  const isMultiPageContent = useMemo(() => {
+    const expCount = resumeData.experience?.length || 0
+    const projCount = resumeData.projects?.length || 0
+    const certCount = resumeData.certifications?.length || 0
+    const totalBullets = (resumeData.experience || []).reduce((acc, e) => acc + (e.highlights?.length || 0), 0) +
+                         (resumeData.projects || []).reduce((acc, p) => acc + (p.highlights?.length || 0), 0)
+    return (expCount + projCount >= 3) || totalBullets >= 5 || (expCount >= 1 && projCount >= 2) || certCount >= 3
+  }, [resumeData])
+
+  const [pageLayout, setPageLayout] = useState('auto') // 'auto' (2-page if multi-page), '1page', '2page'
+  const isTwoPage = pageLayout === '2page' || (pageLayout === 'auto' && isMultiPageContent)
+
   // Sync if initial data changes
   useEffect(() => {
     setResumeData(buildInitialResume())
   }, [data, result])
 
-  const handleDownload = () => {
-    if (currentPdfUrl) {
-      window.open(currentPdfUrl + '?fl_attachment=true', '_blank')
-      toast.success('Downloading ATS-approved PDF...', { icon: '📄' })
-    } else {
-      toast.error('Enhanced PDF is still preparing, please wait a moment.')
+  const handleDownload = async () => {
+    setIsRecompiling(true)
+    const toastId = toast.loading('Generating complete ATS-approved PDF...')
+    try {
+      const res = await recompileResumePdf({
+        resume_id: result?.resume_id || data?.resume_id,
+        enhanced_data: {
+          ...resumeData,
+          contact: {
+            full_name: resumeData.full_name,
+            email: resumeData.email,
+            phone: resumeData.phone,
+            location: resumeData.location,
+            linkedin: resumeData.linkedin,
+            github: resumeData.github,
+            portfolio: resumeData.portfolio
+          }
+        }
+      })
+      if (res?.data?.pdf_url) {
+        let newUrl = res.data.pdf_url
+        if (newUrl.startsWith('/api')) {
+          newUrl = (import.meta.env.VITE_API_URL?.replace('/api/v1', '') || window.location.origin) + newUrl
+        }
+        setCurrentPdfUrl(newUrl)
+        setHasUnsavedChanges(false)
+        toast.success('Download started! 📄', { id: toastId })
+        window.open(newUrl + (newUrl.includes('?') ? '&' : '?') + 'fl_attachment=true', '_blank')
+      } else {
+        toast.error('Could not compile PDF. Please try again.', { id: toastId })
+      }
+    } catch (err) {
+      console.error('Download error:', err)
+      toast.error('Download failed. Please try again.', { id: toastId })
+    } finally {
+      setIsRecompiling(false)
     }
   }
 
@@ -348,6 +402,377 @@ export default function EnhancedResumeStudioModal({
       certifications: [...prev.certifications, 'New Certification — Organization (2024)']
     }))
     setHasUnsavedChanges(true)
+  }
+
+  // ── Modular Section Renderers for 1-Page & 2-Page Canvas ──
+  const renderHeader = () => (
+    <div className="text-center pb-4 border-b border-slate-300 space-y-1">
+      {isEditMode ? (
+        <input
+          type="text"
+          value={resumeData.full_name}
+          onChange={(e) => updateField('full_name', e.target.value)}
+          placeholder="Your Full Name"
+          className="text-xl sm:text-2xl font-bold text-slate-900 text-center w-full focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent transition"
+        />
+      ) : (
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{resumeData.full_name}</h1>
+      )}
+
+      {resumeData.role_title && (
+        isEditMode ? (
+          <input
+            type="text"
+            value={resumeData.role_title}
+            onChange={(e) => updateField('role_title', e.target.value)}
+            placeholder="Target Role Title"
+            className="text-xs font-semibold text-[#1d4ed8] text-center w-full focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent transition"
+          />
+        ) : (
+          <p className="text-xs font-semibold text-[#1d4ed8]">{resumeData.role_title}</p>
+        )
+      )}
+
+      <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-600 pt-1">
+        {isEditMode ? (
+          <>
+            <input
+              type="text"
+              value={resumeData.email}
+              onChange={(e) => updateField('email', e.target.value)}
+              placeholder="email@example.com"
+              className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent"
+            />
+            <span className="text-slate-300">|</span>
+            <input
+              type="text"
+              value={resumeData.phone}
+              onChange={(e) => updateField('phone', e.target.value)}
+              placeholder="+91 Phone"
+              className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent"
+            />
+            <span className="text-slate-300">|</span>
+            <input
+              type="text"
+              value={resumeData.location}
+              onChange={(e) => updateField('location', e.target.value)}
+              placeholder="City, Country"
+              className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent"
+            />
+          </>
+        ) : (
+          <span>
+            {[resumeData.email, resumeData.phone, resumeData.location].filter(Boolean).join(' | ')}
+          </span>
+        )}
+      </div>
+
+      {(resumeData.linkedin || resumeData.github || resumeData.portfolio) && (
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-[#1d4ed8] font-medium pt-0.5">
+          {isEditMode ? (
+            <>
+              {resumeData.linkedin && (
+                <input
+                  type="text"
+                  value={resumeData.linkedin}
+                  onChange={(e) => updateField('linkedin', e.target.value)}
+                  placeholder="LinkedIn URL"
+                  className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent text-[#1d4ed8]"
+                />
+              )}
+              {resumeData.github && (
+                <input
+                  type="text"
+                  value={resumeData.github}
+                  onChange={(e) => updateField('github', e.target.value)}
+                  placeholder="GitHub URL"
+                  className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent text-[#1d4ed8]"
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {resumeData.linkedin && <span className="hover:underline cursor-pointer">LinkedIn</span>}
+              {resumeData.github && <span className="hover:underline cursor-pointer">GitHub</span>}
+              {resumeData.portfolio && <span className="hover:underline cursor-pointer">Portfolio</span>}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderSummary = () => (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between border-b border-slate-900 pb-0.5">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Summary</span>
+        <span className="text-[10px] text-sky-600 font-semibold flex items-center gap-1">
+          <Sparkles size={10} /> ATS Optimized
+        </span>
+      </div>
+      {isEditMode ? (
+        <textarea
+          value={resumeData.summary}
+          onChange={(e) => updateField('summary', e.target.value)}
+          rows={3}
+          className="w-full text-xs text-slate-700 leading-relaxed p-1.5 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30 rounded border border-transparent hover:border-slate-200 transition resize-y font-sans"
+          placeholder="Write a concise professional summary highlighting your strengths..."
+        />
+      ) : (
+        <p className="text-xs text-slate-700 leading-relaxed pt-1">{resumeData.summary}</p>
+      )}
+    </div>
+  )
+
+  const renderSkills = () => {
+    if (!resumeData.skills) return null
+    const hasObjSkills = typeof resumeData.skills === 'object' && !Array.isArray(resumeData.skills) && Object.keys(resumeData.skills).length > 0
+    const hasArrSkills = Array.isArray(resumeData.skills) && resumeData.skills.length > 0
+    if (!hasObjSkills && !hasArrSkills) return null
+
+    return (
+      <div className="space-y-1.5">
+        <div className="border-b border-slate-900 pb-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Technical Skills</span>
+        </div>
+        {hasObjSkills ? (
+          <div className="space-y-1 text-xs">
+            {Object.entries(resumeData.skills).map(([cat, list], idx) => (
+              <div key={idx} className="text-xs text-slate-700 leading-relaxed">
+                <strong className="text-slate-900 font-semibold">{cat}:</strong>{' '}
+                <span>{Array.isArray(list) ? list.join(', ') : String(list)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-700 leading-relaxed">
+            {Array.isArray(resumeData.skills) ? resumeData.skills.join(', ') : String(resumeData.skills)}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const renderExperience = () => {
+    if (!resumeData.experience || resumeData.experience.length === 0) return null
+    return (
+      <div className="space-y-3">
+        <div className="border-b border-slate-900 pb-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Experience</span>
+        </div>
+        {resumeData.experience.map((exp, expIdx) => (
+          <div key={expIdx} className="space-y-1.5 group/exp">
+            <div className="flex justify-between items-baseline text-xs">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-slate-900">{exp.role || 'Role'}</span>
+                <span className="text-slate-400">|</span>
+                <span className="font-semibold text-[#1d4ed8]">{exp.company || 'Company'}</span>
+              </div>
+              <span className="text-[11px] font-medium text-slate-600">{exp.duration}</span>
+            </div>
+
+            {/* Bullets */}
+            <div className="space-y-1 pl-1">
+              {isEditMode ? (
+                <>
+                  {(exp.highlights || []).map((bullet, bIdx) => (
+                    <div key={bIdx} className="flex items-start gap-1.5 group/b">
+                      <span className="text-slate-500 font-bold select-none mt-1 text-[11px]">•</span>
+                      <textarea
+                        value={bullet}
+                        onChange={(e) => updateExpHighlight(expIdx, bIdx, e.target.value)}
+                        rows={Math.max(1, Math.ceil(bullet.length / 80))}
+                        className="flex-1 text-xs text-slate-700 leading-relaxed p-1 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30 rounded border border-transparent hover:border-slate-200 resize-none font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeExpHighlight(expIdx, bIdx)}
+                        title="Delete bullet"
+                        className="opacity-0 group-hover/b:opacity-100 p-1 text-slate-400 hover:text-red-500 transition cursor-pointer shrink-0 mt-0.5"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addExpHighlight(expIdx)}
+                    className="inline-flex items-center gap-1 text-[11px] text-[#2E9BDA] font-semibold hover:text-[#2587bf] mt-1 pl-4 cursor-pointer"
+                  >
+                    <Plus size={11} />
+                    <span>Add bullet</span>
+                  </button>
+                </>
+              ) : (
+                <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 leading-relaxed">
+                  {(exp.highlights || []).map((bullet, bIdx) => (
+                    <li key={bIdx}>{bullet}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const renderProjects = () => {
+    if (!resumeData.projects || resumeData.projects.length === 0) return null
+    return (
+      <div className="space-y-3">
+        <div className="border-b border-slate-900 pb-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Projects</span>
+        </div>
+        {resumeData.projects.map((proj, projIdx) => (
+          <div key={projIdx} className="space-y-1.5">
+            <div className="flex justify-between items-baseline text-xs">
+              <span className="font-bold text-slate-900">{proj.name}</span>
+              {proj.link && (
+                <span className="text-[11px] text-[#1d4ed8] font-medium">{proj.link}</span>
+              )}
+            </div>
+            {proj.technologies && proj.technologies.length > 0 && (
+              <div className="text-[11px] text-slate-600">
+                <strong className="text-slate-800">Technologies:</strong> {proj.technologies.join(', ')}
+              </div>
+            )}
+
+            {/* Project Bullets */}
+            <div className="space-y-1 pl-1">
+              {isEditMode ? (
+                <>
+                  {(proj.highlights || []).map((bullet, bIdx) => (
+                    <div key={bIdx} className="flex items-start gap-1.5 group/pb">
+                      <span className="text-slate-500 font-bold select-none mt-1 text-[11px]">•</span>
+                      <textarea
+                        value={bullet}
+                        onChange={(e) => updateProjHighlight(projIdx, bIdx, e.target.value)}
+                        rows={Math.max(1, Math.ceil(bullet.length / 80))}
+                        className="flex-1 text-xs text-slate-700 leading-relaxed p-1 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30 rounded border border-transparent hover:border-slate-200 resize-none font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeProjHighlight(projIdx, bIdx)}
+                        title="Delete bullet"
+                        className="opacity-0 group-hover/pb:opacity-100 p-1 text-slate-400 hover:text-red-500 transition cursor-pointer shrink-0 mt-0.5"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addProjHighlight(projIdx)}
+                    className="inline-flex items-center gap-1 text-[11px] text-[#2E9BDA] font-semibold hover:text-[#2587bf] mt-1 pl-4 cursor-pointer"
+                  >
+                    <Plus size={11} />
+                    <span>Add highlight</span>
+                  </button>
+                </>
+              ) : (
+                <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 leading-relaxed">
+                  {(proj.highlights || []).map((bullet, bIdx) => (
+                    <li key={bIdx}>{bullet}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const renderEducation = () => {
+    if (!resumeData.education || resumeData.education.length === 0) return null
+    return (
+      <div className="space-y-2">
+        <div className="border-b border-slate-900 pb-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Education</span>
+        </div>
+        {resumeData.education.map((edu, eduIdx) => (
+          <div key={eduIdx} className="text-xs space-y-0.5">
+            <div className="flex justify-between items-baseline">
+              <span className="font-bold text-slate-900">{edu.institution}</span>
+              <span className="text-[11px] font-medium text-slate-600">{edu.year}</span>
+            </div>
+            <div className="font-semibold text-[#1d4ed8] text-[11.5px]">{edu.degree}</div>
+            {edu.score && <div className="text-[11px] text-slate-600 font-medium">{edu.score}</div>}
+            {edu.coursework && (
+              <div className="text-[11px] text-slate-600">
+                <strong className="text-slate-800">Relevant Coursework:</strong> {edu.coursework}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const renderCertifications = () => {
+    if (!resumeData.certifications || resumeData.certifications.length === 0) return null
+    return (
+      <div className="space-y-2">
+        <div className="border-b border-slate-900 pb-0.5 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Certifications</span>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={addCert}
+              className="text-[11px] text-[#2E9BDA] font-semibold hover:text-[#2587bf] flex items-center gap-0.5 cursor-pointer"
+            >
+              <Plus size={11} /> Add
+            </button>
+          )}
+        </div>
+        <ul className="space-y-1 pl-1">
+          {resumeData.certifications.map((cert, certIdx) => (
+            <li key={certIdx} className="flex items-center gap-1.5 group/cert">
+              <span className="text-slate-500 font-bold select-none text-[11px]">•</span>
+              {isEditMode ? (
+                <>
+                  <input
+                    type="text"
+                    value={cert}
+                    onChange={(e) => updateCert(certIdx, e.target.value)}
+                    className="flex-1 text-xs text-slate-800 p-1 rounded border border-transparent hover:border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCert(certIdx)}
+                    className="opacity-0 group-hover/cert:opacity-100 p-1 text-slate-400 hover:text-red-500 transition cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </>
+              ) : (
+                <span className="text-xs text-slate-700">{cert}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  const renderAchievements = () => {
+    if (!resumeData.achievements || resumeData.achievements.length === 0) return null
+    return (
+      <div className="space-y-2">
+        <div className="border-b border-slate-900 pb-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Achievements</span>
+        </div>
+        <ul className="space-y-1 pl-1">
+          {resumeData.achievements.map((ach, achIdx) => (
+            <li key={achIdx} className="flex items-center gap-1.5">
+              <span className="text-slate-500 font-bold select-none text-[11px]">•</span>
+              <span className="text-xs text-slate-800">{ach}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
   }
 
   if (!mounted) return null
@@ -627,13 +1052,6 @@ export default function EnhancedResumeStudioModal({
                   </span>
                 </div>
               </div>
-            ) : (!isEditMode && currentPdfUrl && !hasUnsavedChanges && !isMobile) ? (
-              /* PDF View when PDF URL is available and no pending edits (Desktop only where inline PDF iframes work) */
-              <iframe
-                src={`${currentPdfUrl}#page=1&view=FitH,0&toolbar=0`}
-                title="Enhanced Resume PDF"
-                className="w-full h-full border-0 bg-white"
-              />
             ) : (
               /* ── LIVE INTERACTIVE DOCUMENT / PREVIEW CANVAS ── */
               <div className="w-full h-full flex flex-col relative bg-slate-200/60 overflow-hidden">
@@ -648,7 +1066,7 @@ export default function EnhancedResumeStudioModal({
                     <span className="text-slate-600 hidden sm:inline">
                       {isEditMode 
                         ? 'Click and edit any text directly on the resume below.' 
-                        : (currentPdfUrl ? 'Viewing enhanced resume content.' : 'Live content preview (Compiling PDF in background...).')}
+                        : 'Review your ATS-optimized resume. Toggle "Edit" above to make live adjustments.'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -683,339 +1101,25 @@ export default function EnhancedResumeStudioModal({
                   </div>
                 </div>
 
-                {/* Paper Canvas */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar flex justify-center select-text">
-                  <div className="w-full max-w-2xl bg-white shadow-lg rounded-sm border border-slate-300 p-8 sm:p-10 space-y-5 text-slate-800 text-[13px] leading-relaxed font-sans min-h-[900px]">
-                    
-                    {/* ── HEADER ── */}
-                    <div className="text-center pb-4 border-b border-slate-300 space-y-1">
-                      {isEditMode ? (
-                        <input
-                          type="text"
-                          value={resumeData.full_name}
-                          onChange={(e) => updateField('full_name', e.target.value)}
-                          placeholder="Your Full Name"
-                          className="text-xl sm:text-2xl font-bold text-slate-900 text-center w-full focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent transition"
-                        />
-                      ) : (
-                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{resumeData.full_name}</h1>
-                      )}
+                {/* Paper Canvas Container — standard block scroll so white sheet naturally encloses 100% of content */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar select-text">
+                  <div className="w-full max-w-2xl mx-auto bg-white shadow-2xl rounded-sm border border-slate-300 p-8 sm:p-12 space-y-6 text-slate-800 text-[13px] leading-relaxed font-sans my-4 min-h-[960px] h-auto">
+                    {renderHeader()}
+                    {renderSummary()}
+                    {renderSkills()}
+                    {renderExperience()}
+                    {renderProjects()}
+                    {renderEducation()}
+                    {renderCertifications()}
+                    {renderAchievements()}
 
-                      {resumeData.role_title && (
-                        isEditMode ? (
-                          <input
-                            type="text"
-                            value={resumeData.role_title}
-                            onChange={(e) => updateField('role_title', e.target.value)}
-                            placeholder="Target Role Title"
-                            className="text-xs font-semibold text-[#1d4ed8] text-center w-full focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent transition"
-                          />
-                        ) : (
-                          <p className="text-xs font-semibold text-[#1d4ed8]">{resumeData.role_title}</p>
-                        )
-                      )}
-
-                      <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-600 pt-1">
-                        {isEditMode ? (
-                          <>
-                            <input
-                              type="text"
-                              value={resumeData.email}
-                              onChange={(e) => updateField('email', e.target.value)}
-                              placeholder="email@example.com"
-                              className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent"
-                            />
-                            <span className="text-slate-300">|</span>
-                            <input
-                              type="text"
-                              value={resumeData.phone}
-                              onChange={(e) => updateField('phone', e.target.value)}
-                              placeholder="+91 Phone"
-                              className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent"
-                            />
-                            <span className="text-slate-300">|</span>
-                            <input
-                              type="text"
-                              value={resumeData.location}
-                              onChange={(e) => updateField('location', e.target.value)}
-                              placeholder="City, Country"
-                              className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent"
-                            />
-                          </>
-                        ) : (
-                          <span>
-                            {[resumeData.email, resumeData.phone, resumeData.location].filter(Boolean).join(' | ')}
-                          </span>
-                        )}
-                      </div>
-
-                      {(resumeData.linkedin || resumeData.github || resumeData.portfolio) && (
-                        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-[#1d4ed8] font-medium pt-0.5">
-                          {isEditMode ? (
-                            <>
-                              {resumeData.linkedin && (
-                                <input
-                                  type="text"
-                                  value={resumeData.linkedin}
-                                  onChange={(e) => updateField('linkedin', e.target.value)}
-                                  placeholder="LinkedIn URL"
-                                  className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent text-[#1d4ed8]"
-                                />
-                              )}
-                              {resumeData.github && (
-                                <input
-                                  type="text"
-                                  value={resumeData.github}
-                                  onChange={(e) => updateField('github', e.target.value)}
-                                  placeholder="GitHub URL"
-                                  className="text-center focus:outline-none focus:bg-sky-50/50 rounded px-1 hover:border-slate-300 border border-transparent text-[#1d4ed8]"
-                                />
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              {resumeData.linkedin && <span className="hover:underline cursor-pointer">LinkedIn</span>}
-                              {resumeData.github && <span className="hover:underline cursor-pointer">GitHub</span>}
-                              {resumeData.portfolio && <span className="hover:underline cursor-pointer">Portfolio</span>}
-                            </>
-                          )}
-                        </div>
-                      )}
+                    {/* Clean Document Footer */}
+                    <div className="pt-6 border-t border-slate-200/90 flex items-center justify-between text-[11px] text-slate-500 select-none">
+                      <span>{resumeData.full_name} • Master ATS-Optimized Resume</span>
+                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                        ATS Ready • Verified
+                      </span>
                     </div>
-
-                    {/* ── PROFESSIONAL SUMMARY ── */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between border-b border-slate-900 pb-0.5">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Summary</span>
-                        <span className="text-[10px] text-sky-600 font-semibold flex items-center gap-1">
-                          <Sparkles size={10} /> ATS Optimized
-                        </span>
-                      </div>
-                      {isEditMode ? (
-                        <textarea
-                          value={resumeData.summary}
-                          onChange={(e) => updateField('summary', e.target.value)}
-                          rows={3}
-                          className="w-full text-xs text-slate-700 leading-relaxed p-1.5 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30 rounded border border-transparent hover:border-slate-200 transition resize-y font-sans"
-                          placeholder="Write a concise professional summary highlighting your strengths..."
-                        />
-                      ) : (
-                        <p className="text-xs text-slate-700 leading-relaxed pt-1">{resumeData.summary}</p>
-                      )}
-                    </div>
-
-                    {/* ── WORK EXPERIENCE ── */}
-                    {resumeData.experience && resumeData.experience.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="border-b border-slate-900 pb-0.5">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Experience</span>
-                        </div>
-                        {resumeData.experience.map((exp, expIdx) => (
-                          <div key={expIdx} className="space-y-1.5 group/exp">
-                            <div className="flex justify-between items-baseline text-xs">
-                              <div className="flex items-center gap-1">
-                                <span className="font-bold text-slate-900">{exp.role || 'Role'}</span>
-                                <span className="text-slate-400">|</span>
-                                <span className="font-semibold text-[#1d4ed8]">{exp.company || 'Company'}</span>
-                              </div>
-                              <span className="text-[11px] font-medium text-slate-600">{exp.duration}</span>
-                            </div>
-
-                            {/* Bullets */}
-                            <div className="space-y-1 pl-1">
-                              {isEditMode ? (
-                                <>
-                                  {(exp.highlights || []).map((bullet, bIdx) => (
-                                    <div key={bIdx} className="flex items-start gap-1.5 group/b">
-                                      <span className="text-slate-500 font-bold select-none mt-1 text-[11px]">•</span>
-                                      <textarea
-                                        value={bullet}
-                                        onChange={(e) => updateExpHighlight(expIdx, bIdx, e.target.value)}
-                                        rows={Math.max(1, Math.ceil(bullet.length / 80))}
-                                        className="flex-1 text-xs text-slate-700 leading-relaxed p-1 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30 rounded border border-transparent hover:border-slate-200 resize-none font-sans"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => removeExpHighlight(expIdx, bIdx)}
-                                        title="Delete bullet"
-                                        className="opacity-0 group-hover/b:opacity-100 p-1 text-slate-400 hover:text-red-500 transition cursor-pointer shrink-0 mt-0.5"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    </div>
-                                  ))}
-                                  <button
-                                    type="button"
-                                    onClick={() => addExpHighlight(expIdx)}
-                                    className="inline-flex items-center gap-1 text-[11px] text-[#2E9BDA] font-semibold hover:text-[#2587bf] mt-1 pl-4 cursor-pointer"
-                                  >
-                                    <Plus size={11} />
-                                    <span>Add bullet</span>
-                                  </button>
-                                </>
-                              ) : (
-                                <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 leading-relaxed">
-                                  {(exp.highlights || []).map((bullet, bIdx) => (
-                                    <li key={bIdx}>{bullet}</li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* ── PROJECTS ── */}
-                    {resumeData.projects && resumeData.projects.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="border-b border-slate-900 pb-0.5">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Projects</span>
-                        </div>
-                        {resumeData.projects.map((proj, projIdx) => (
-                          <div key={projIdx} className="space-y-1.5">
-                            <div className="flex justify-between items-baseline text-xs">
-                              <span className="font-bold text-slate-900">{proj.name}</span>
-                              {proj.link && (
-                                <span className="text-[11px] text-[#1d4ed8] font-medium">{proj.link}</span>
-                              )}
-                            </div>
-                            {proj.technologies && proj.technologies.length > 0 && (
-                              <div className="text-[11px] text-slate-600">
-                                <strong className="text-slate-800">Technologies:</strong> {proj.technologies.join(', ')}
-                              </div>
-                            )}
-
-                            {/* Project Bullets */}
-                            <div className="space-y-1 pl-1">
-                              {isEditMode ? (
-                                <>
-                                  {(proj.highlights || []).map((bullet, bIdx) => (
-                                    <div key={bIdx} className="flex items-start gap-1.5 group/pb">
-                                      <span className="text-slate-500 font-bold select-none mt-1 text-[11px]">•</span>
-                                      <textarea
-                                        value={bullet}
-                                        onChange={(e) => updateProjHighlight(projIdx, bIdx, e.target.value)}
-                                        rows={Math.max(1, Math.ceil(bullet.length / 80))}
-                                        className="flex-1 text-xs text-slate-700 leading-relaxed p-1 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30 rounded border border-transparent hover:border-slate-200 resize-none font-sans"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => removeProjHighlight(projIdx, bIdx)}
-                                        title="Delete bullet"
-                                        className="opacity-0 group-hover/pb:opacity-100 p-1 text-slate-400 hover:text-red-500 transition cursor-pointer shrink-0 mt-0.5"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    </div>
-                                  ))}
-                                  <button
-                                    type="button"
-                                    onClick={() => addProjHighlight(projIdx)}
-                                    className="inline-flex items-center gap-1 text-[11px] text-[#2E9BDA] font-semibold hover:text-[#2587bf] mt-1 pl-4 cursor-pointer"
-                                  >
-                                    <Plus size={11} />
-                                    <span>Add highlight</span>
-                                  </button>
-                                </>
-                              ) : (
-                                <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 leading-relaxed">
-                                  {(proj.highlights || []).map((bullet, bIdx) => (
-                                    <li key={bIdx}>{bullet}</li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* ── EDUCATION ── */}
-                    {resumeData.education && resumeData.education.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="border-b border-slate-900 pb-0.5">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Education</span>
-                        </div>
-                        {resumeData.education.map((edu, eduIdx) => (
-                          <div key={eduIdx} className="text-xs space-y-0.5">
-                            <div className="flex justify-between items-baseline">
-                              <span className="font-bold text-slate-900">{edu.institution}</span>
-                              <span className="text-[11px] font-medium text-slate-600">{edu.year}</span>
-                            </div>
-                            <div className="font-semibold text-[#1d4ed8] text-[11.5px]">{edu.degree}</div>
-                            {edu.score && <div className="text-[11px] text-slate-600 font-medium">{edu.score}</div>}
-                            {edu.coursework && (
-                              <div className="text-[11px] text-slate-600">
-                                <strong className="text-slate-800">Relevant Coursework:</strong> {edu.coursework}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* ── CERTIFICATIONS ── */}
-                    {resumeData.certifications && resumeData.certifications.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="border-b border-slate-900 pb-0.5 flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Certifications</span>
-                          {isEditMode && (
-                            <button
-                              type="button"
-                              onClick={addCert}
-                              className="text-[11px] text-[#2E9BDA] font-semibold hover:text-[#2587bf] flex items-center gap-0.5 cursor-pointer"
-                            >
-                              <Plus size={11} /> Add
-                            </button>
-                          )}
-                        </div>
-                        <ul className="space-y-1 pl-1">
-                          {resumeData.certifications.map((cert, certIdx) => (
-                            <li key={certIdx} className="flex items-center gap-1.5 group/cert">
-                              <span className="text-slate-500 font-bold select-none text-[11px]">•</span>
-                              {isEditMode ? (
-                                <>
-                                  <input
-                                    type="text"
-                                    value={cert}
-                                    onChange={(e) => updateCert(certIdx, e.target.value)}
-                                    className="flex-1 text-xs text-slate-800 p-1 rounded border border-transparent hover:border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#2E9BDA] focus:bg-sky-50/30"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeCert(certIdx)}
-                                    className="opacity-0 group-hover/cert:opacity-100 p-1 text-slate-400 hover:text-red-500 transition cursor-pointer"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="text-xs text-slate-700">{cert}</span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* ── ACHIEVEMENTS ── */}
-                    {resumeData.achievements && resumeData.achievements.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="border-b border-slate-900 pb-0.5">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Achievements</span>
-                        </div>
-                        <ul className="space-y-1 pl-1">
-                          {resumeData.achievements.map((ach, achIdx) => (
-                            <li key={achIdx} className="flex items-center gap-1.5">
-                              <span className="text-slate-500 font-bold select-none text-[11px]">•</span>
-                              <span className="text-xs text-slate-800">{ach}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
                   </div>
                 </div>
 

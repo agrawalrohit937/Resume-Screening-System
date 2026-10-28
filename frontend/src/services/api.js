@@ -199,7 +199,7 @@ export const matchATS = (p) => {
 }
 
 export const getATSHistory = (p, config) => api.get('/ats/history', { params: p, ...config })
-
+export const getLatestATSResult = () => api.get('/ats/latest')
 export const getATSResult = (id) => api.get(`/ats/result/${id}`)
 
 export const enhanceResume = (p) => api.post('enhance/enhance-and-download', p)

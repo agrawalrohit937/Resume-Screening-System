@@ -25,7 +25,7 @@ import {
   Code2
 } from 'lucide-react'
 
-import api, { uploadResume, getResumes, getResumeById, matchATS, extractJDText, generatePDF, setPrimaryResume } from '../services/api'
+import api, { uploadResume, getResumes, getResumeById, matchATS, extractJDText, generatePDF, setPrimaryResume, getLatestATSResult } from '../services/api'
 import { PRESET_ROLES, extractJobDescriptionText, formatApiError } from '../components/ats/ATSHelpers'
 import {
   InvalidDocumentError,
@@ -37,25 +37,38 @@ import {
 import UnifiedATSReadinessCard from '../components/ats/UnifiedATSReadinessCard'
 import EnhancedResumeStudioModal from '../components/ats/EnhancedResumeStudioModal'
 
+const SESSION_KEY = 'careershala_ats_session'
+
+const getSavedSession = () => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) {
+    return null
+  }
+}
+
 export default function Results() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()
 
-  const [resumeFile, setResumeFile] = useState(null)
-  const [resumeId, setResumeId] = useState('')
+  const saved = getSavedSession()
+
+  const [resumeFile, setResumeFile] = useState(() => saved?.resumeFile || null)
+  const [resumeId, setResumeId] = useState(() => saved?.resumeId || '')
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
-  const [uploadDone, setUploadDone] = useState(false)
+  const [uploadDone, setUploadDone] = useState(() => !!saved?.uploadDone || !!saved?.resumeId)
   const [uploadStage, setUploadStage] = useState('Uploading Document...')
 
   const [jdMode, setJdMode] = useState('paste')
-  const [jdText, setJdText] = useState('')
+  const [jdText, setJdText] = useState(() => saved?.jdText || '')
   const [jdFile, setJdFile] = useState(null)
-  const [jobTitle, setJobTitle] = useState('')
-  const [requiredSkills, setRequiredSkills] = useState('')
+  const [jobTitle, setJobTitle] = useState(() => saved?.jobTitle || '')
+  const [requiredSkills, setRequiredSkills] = useState(() => saved?.requiredSkills || '')
 
   const [analyzing, setAnalyzing] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState(() => saved?.result || null)
   const [enhancing, setEnhancing] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [showSuperchargeScanner, setShowSuperchargeScanner] = useState(false)
@@ -65,16 +78,43 @@ export default function Results() {
   const [showPrimaryPopup, setShowPrimaryPopup] = useState(false)
   const [primaryResumeData, setPrimaryResumeData] = useState(null)
   const [selectedPreset, setSelectedPreset] = useState(null)
-  const [showEnhancedStudio, setShowEnhancedStudio] = useState(false)
-  const [enhancedStudioData, setEnhancedStudioData] = useState(null)
+  const [showEnhancedStudio, setShowEnhancedStudio] = useState(() => !!saved?.showEnhancedStudio)
+  const [enhancedStudioData, setEnhancedStudioData] = useState(() => saved?.enhancedStudioData || null)
   const [primaryUpdating, setPrimaryUpdating] = useState(false)
 
   const resultRef = useRef(null)
+
+  // Sync active scan state to sessionStorage so page refresh NEVER loses progress
+  useEffect(() => {
+    try {
+      if (result || jdText || showEnhancedStudio || enhancedStudioData || resumeId) {
+        sessionStorage.setItem(
+          SESSION_KEY,
+          JSON.stringify({
+            resumeId,
+            resumeFile: resumeFile ? { name: resumeFile.name, file_url: resumeFile.file_url } : null,
+            uploadDone,
+            jdText,
+            jobTitle,
+            requiredSkills,
+            result,
+            showEnhancedStudio,
+            enhancedStudioData,
+          })
+        )
+      }
+    } catch (e) {
+      console.warn('Failed to sync to sessionStorage', e)
+    }
+  }, [resumeId, resumeFile, uploadDone, jdText, jobTitle, requiredSkills, result, showEnhancedStudio, enhancedStudioData])
 
   useEffect(() => {
     let isMounted = true
 
     const resetState = () => {
+      try {
+        sessionStorage.removeItem(SESSION_KEY)
+      } catch (e) {}
       setResumeId('')
       setResumeFile(null)
       setUploadDone(false)
@@ -85,6 +125,8 @@ export default function Results() {
       setShowPrimaryPopup(false)
       setInvalidDocument(false)
       setInvalidDocData(null)
+      setShowEnhancedStudio(false)
+      setEnhancedStudioData(null)
     }
 
     if (!user) {
@@ -92,7 +134,33 @@ export default function Results() {
       return () => { isMounted = false }
     }
 
-    const fetchExistingResume = async () => {
+    const initData = async () => {
+      // 1. If result was already restored from sessionStorage, keep it intact
+      const cached = getSavedSession()
+      if (cached?.result) {
+        return
+      }
+
+      // 2. Auto-restore user's most recent ATS scan & JD from database on first load/refresh
+      try {
+        const { data: latestScan } = await getLatestATSResult()
+        if (latestScan?.has_result && isMounted) {
+          setResult(latestScan.result)
+          if (latestScan.job_description) setJdText(latestScan.job_description)
+          if (latestScan.job_title) setJobTitle(latestScan.job_title)
+          if (latestScan.required_skills?.length > 0) setRequiredSkills(latestScan.required_skills.join(', '))
+          if (latestScan.resume) {
+            setResumeId(latestScan.resume.id)
+            setResumeFile({ name: latestScan.resume.file_name, file_url: latestScan.resume.file_url })
+            setUploadDone(true)
+          }
+          return
+        }
+      } catch (err) {
+        // Fallback to basic resume fetch if no previous ATS scan found
+      }
+
+      // 3. Fallback: fetch parsed resume if user hasn't scanned yet
       try {
         const { data: list } = await getResumes({ page: 1, page_size: 5 })
         const resumes = list?.resumes || []
@@ -109,7 +177,7 @@ export default function Results() {
       } catch (err) { }
     }
 
-    fetchExistingResume()
+    initData()
 
     const handleLogout = () => {
       if (isMounted) resetState()
@@ -322,6 +390,9 @@ export default function Results() {
   }
 
   const handleNewScan = () => {
+    try {
+      sessionStorage.removeItem(SESSION_KEY)
+    } catch (e) {}
     setResult(null)
     setAnalyzing(false)
     setInvalidDocument(false)
