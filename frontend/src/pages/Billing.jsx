@@ -112,24 +112,24 @@ export default function Billing() {
   const planId = (user?.plan || 'free').toLowerCase()
   const isFree = planId === 'free'
   const subscriptionActive = user?.subscription_active ?? false
-  const startedOn = user?.plan_updated_at || user?.created_at
+  const startedOn = user?.subscription_start_date || user?.plan_updated_at || user?.created_at
   
-  // Dynamic Renewal Calculation
+  // Dynamic Renewal Calculation (Quarterly / 3 Months System)
   const nextRenewal = useMemo(() => {
-    if (isFree) return 'Lifetime (No Expiry)'
+    if (isFree || !subscriptionActive) return 'Lifetime (No Expiry)'
     if (user?.subscription_end_date) return formatDate(user.subscription_end_date)
     if (!startedOn) return '—'
     try {
       const d = new Date(startedOn)
       if (Number.isNaN(d.getTime())) return '—'
-      d.setMonth(d.getMonth() + 1)
+      d.setDate(d.getDate() + 90) // Default 90 days quarterly extension
       return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
     } catch {
       return '—'
     }
-  }, [startedOn, isFree, user?.subscription_end_date])
+  }, [startedOn, isFree, subscriptionActive, user?.subscription_end_date])
 
-  // Plan Configurations
+  // Plan Configurations for Candidate & Recruiter Tiers (3 Months)
   const planConfigs = {
     free: {
       name: 'Free Tier',
@@ -139,18 +139,60 @@ export default function Billing() {
       accent: 'bg-slate-300'
     },
     pro: {
-      name: 'Pro Plan',
-      price: '₹299',
-      period: '/ month',
+      name: 'Candidate Pro',
+      price: '₹199',
+      period: '/ 3 months',
+      badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      accent: 'bg-indigo-600'
+    },
+    candidate_pro: {
+      name: 'Candidate Pro',
+      price: '₹199',
+      period: '/ 3 months',
       badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       accent: 'bg-indigo-600'
     },
     premium: {
-      name: 'Premium Plan',
-      price: '₹499',
-      period: '/ month',
+      name: 'Job Seeker VIP',
+      price: '₹399',
+      period: '/ 3 months',
       badge: 'bg-amber-50 text-amber-700 border-amber-200',
       accent: 'bg-gradient-to-r from-amber-400 to-orange-500'
+    },
+    candidate_premium: {
+      name: 'Job Seeker VIP',
+      price: '₹399',
+      period: '/ 3 months',
+      badge: 'bg-amber-50 text-amber-700 border-amber-200',
+      accent: 'bg-gradient-to-r from-amber-400 to-orange-500'
+    },
+    recruiter_pro: {
+      name: 'Recruiter Growth',
+      price: '₹999',
+      period: '/ 3 months',
+      badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      accent: 'bg-emerald-600'
+    },
+    growth: {
+      name: 'Recruiter Growth',
+      price: '₹999',
+      period: '/ 3 months',
+      badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      accent: 'bg-emerald-600'
+    },
+    recruiter_enterprise: {
+      name: 'Recruiter Enterprise',
+      price: '₹2,499',
+      period: '/ 3 months',
+      badge: 'bg-purple-50 text-purple-700 border-purple-200',
+      accent: 'bg-purple-600'
+    },
+    enterprise: {
+      name: 'Recruiter Enterprise',
+      price: '₹2,499',
+      period: '/ 3 months',
+      badge: 'bg-purple-50 text-purple-700 border-purple-200',
+      accent: 'bg-purple-600'
     }
   }
 

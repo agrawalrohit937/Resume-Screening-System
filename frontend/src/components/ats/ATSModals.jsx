@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   XCircle, 
@@ -207,12 +208,14 @@ export function ResumeSuperchargeScanningModal({ onComplete, onClose }) {
     { label: 'Ready for Quick Verification', detail: 'Opening step-by-step assistant' },
   ]
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md"
     >
       <motion.div
         initial={{ scale: 0.92, y: 15 }}
@@ -303,7 +306,8 @@ export function ResumeSuperchargeScanningModal({ onComplete, onClose }) {
           </button>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   )
 }
 
@@ -341,6 +345,12 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
   if (missingLinks.length > 0) groups.push('identity')
   if (skillOptions.length > 0) groups.push('skills')
   groups.push('metrics')
+
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
 
   const [step, setStep] = useState(0)
   const [links, setLinks] = useState({ linkedin: '', github: '', portfolio: '' })
@@ -384,15 +394,17 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
     metrics: '3. Measurable Impact'
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-md overflow-hidden">
+  if (!mounted) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md overflow-hidden">
       <motion.div 
         initial={{ scale: 0.95, opacity: 0 }} 
         animate={{ scale: 1, opacity: 1 }} 
-        className="w-full max-w-xl max-h-[85vh] bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col"
+        className="w-full max-w-xl max-h-[88vh] sm:max-h-[85vh] bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col"
       >
         {/* Clean Header */}
-        <div className="p-5 sm:p-6 bg-white border-b border-slate-100 flex items-start justify-between shrink-0">
+        <div className="p-4 sm:p-6 bg-white border-b border-slate-100 flex items-start justify-between shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-sky-50 text-[#2E9BDA] border border-sky-200 font-mono">
@@ -421,7 +433,7 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
         </div>
 
         {/* Step Indicator Progress Bar */}
-        <div className="px-6 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2 shrink-0">
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2 shrink-0">
           {groups.map((grp, idx) => {
             const isDone = step > idx
             const isCurrent = step === idx
@@ -429,7 +441,7 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
             return (
               <div 
                 key={grp}
-                className={`flex-1 py-1 px-2 rounded-xl text-center text-[10.5px] font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1 px-2 rounded-xl text-center text-[10px] sm:text-[10.5px] font-bold transition flex items-center justify-center gap-1.5 ${
                   isCurrent 
                     ? 'bg-white text-[#2E9BDA] border border-sky-200 shadow-2xs font-bold' 
                     : isDone 
@@ -437,15 +449,15 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
                       : 'bg-transparent text-slate-400'
                 }`}
               >
-                {isDone ? <Check size={11} className="text-emerald-600" /> : <span className="w-1.5 h-1.5 rounded-full bg-[#2E9BDA]" />}
-                <span>{groupLabels[grp]}</span>
+                {isDone ? <Check size={11} className="text-emerald-600 shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full bg-[#2E9BDA] shrink-0" />}
+                <span className="truncate">{groupLabels[grp]}</span>
               </div>
             )
           })}
         </div>
 
         {/* Form Body with Smooth Transition & Zero Viewport Cutoff */}
-        <div className="flex-1 p-5 sm:p-6 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentGroup}
@@ -503,30 +515,37 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
               {currentGroup === 'metrics' && (
                 <div className="space-y-4">
                   <p className="text-xs text-slate-600 font-medium">
-                    Quantify your achievements to stand out (pick an option or type your own):
+                    Quantify your achievements to stand out (pick a preset below or enter your own):
                   </p>
                   {METRIC_QUESTIONS.map((q, i) => (
                     <div key={i} className="space-y-2 p-3.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl">
-                      <label className="block text-xs font-bold text-slate-800">{q}</label>
+                      <label className="block text-xs font-bold text-slate-800 leading-snug">{q}</label>
                       <input
                         type="text"
-                        placeholder="e.g. Reduced API latency by 40% with Redis caching"
+                        placeholder="Type custom impact or select a preset below..."
                         value={metrics[`m${i}`]}
                         onChange={e => setMetrics(prev => ({ ...prev, [`m${i}`]: e.target.value }))}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:ring-2 focus:ring-[#2E9BDA]/50 focus:border-[#2E9BDA] focus:outline-none font-medium"
                       />
-                      {/* Clean 2-Option Smart Metric Chips */}
+                      {/* Responsive Smart Metric Chips with Selection & Full Wrap */}
                       <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
-                        {METRIC_PRESETS[i]?.map((preset, pIdx) => (
-                          <button
-                            key={pIdx}
-                            type="button"
-                            onClick={() => setMetrics(prev => ({ ...prev, [`m${i}`]: preset }))}
-                            className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-white hover:bg-sky-50 text-[#2E9BDA] border border-sky-200 transition cursor-pointer text-left shadow-2xs active:scale-95 flex-1"
-                          >
-                            {preset}
-                          </button>
-                        ))}
+                        {METRIC_PRESETS[i]?.map((preset, pIdx) => {
+                          const isSelected = metrics[`m${i}`] === preset
+                          return (
+                            <button
+                              key={pIdx}
+                              type="button"
+                              onClick={() => setMetrics(prev => ({ ...prev, [`m${i}`]: preset }))}
+                              className={`text-[11px] font-medium px-3 py-2 rounded-xl transition cursor-pointer text-left shadow-2xs active:scale-98 flex-1 break-words leading-relaxed border ${
+                                isSelected
+                                  ? 'bg-sky-50 text-[#2E9BDA] border-[#2E9BDA] ring-1 ring-[#2E9BDA]/40 font-semibold'
+                                  : 'bg-white hover:bg-sky-50/60 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {preset}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   ))}
@@ -536,8 +555,8 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
           </AnimatePresence>
         </div>
 
-        {/* Footer Navigation */}
-        <div className="p-4 sm:p-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0">
+        {/* Footer Navigation with Mobile Safe Area */}
+        <div className="p-4 sm:p-5 bg-white border-t border-slate-100 flex justify-between items-center shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {step > 0 ? (
             <button 
               type="button"
@@ -576,7 +595,8 @@ export function EnhancementWizard({ result, onClose, onSubmit, onSkip }) {
           )}
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

@@ -322,6 +322,15 @@ async def accept_team_invite(
         if company_name and not getattr(existing_user, "company_name", None):
             updates["company_name"] = company_name
 
+        # 🏢 Inherit active company subscription if company executive has upgraded
+        if company_doc and company_doc.get("subscription_active"):
+            updates["plan"] = company_doc.get("plan", "recruiter_pro")
+            updates["subscription_active"] = True
+            updates["subscription_status"] = "active"
+            updates["subscription_start_date"] = company_doc.get("subscription_start_date")
+            updates["subscription_end_date"] = company_doc.get("subscription_end_date")
+            updates["company_subscription"] = True
+
         # Preserve full name if already set, or update if provided in payload
         if payload.full_name and payload.full_name.strip():
             updates["full_name"] = payload.full_name.strip()
@@ -340,6 +349,7 @@ async def accept_team_invite(
         hashed = hash_password(payload.password)
         assigned_role_val = assigned_role_enum.value.lower()
         new_roles = ["candidate", assigned_role_val] if assigned_role_val != "candidate" else ["candidate"]
+        has_co_sub = bool(company_doc and company_doc.get("subscription_active"))
         new_user_data = {
             "email": email,
             "full_name": payload.full_name,
@@ -354,6 +364,12 @@ async def accept_team_invite(
             "email_verified": True,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
+            "plan": company_doc.get("plan", "recruiter_pro") if has_co_sub else "free",
+            "subscription_active": has_co_sub,
+            "subscription_status": "active" if has_co_sub else "expired",
+            "subscription_start_date": company_doc.get("subscription_start_date") if has_co_sub else None,
+            "subscription_end_date": company_doc.get("subscription_end_date") if has_co_sub else None,
+            "company_subscription": has_co_sub,
             "auth_methods": ["password"],
             "last_login_method": "password",
             "linked_accounts": {

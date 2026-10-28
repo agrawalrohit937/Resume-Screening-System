@@ -104,12 +104,15 @@ const Icons = {
 
 const Crown = ({ size = 22, variant = 'gold', className = '' }) => {
   const isSilver = variant === 'silver'
+  const isEmerald = variant === 'emerald'
   return (
     <LucideCrown
       size={size}
       strokeWidth={2.2}
       className={`${
-        isSilver
+        isEmerald
+          ? 'text-emerald-400 fill-emerald-400 drop-shadow-[0_2px_8px_rgba(52,211,153,0.7)]'
+          : isSilver
           ? 'text-slate-300 fill-slate-200 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]'
           : 'text-amber-400 fill-amber-400 drop-shadow-[0_2px_8px_rgba(243,194,75,0.7)]'
       } ${className}`}
@@ -984,6 +987,141 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             </motion.div>
           )}
         </div>
+        )}
+
+        {/* ── Employer / Executive Hiring Suite Card ── */}
+        {viewContext === 'employer' && !isAdmin && (
+          <div className="pt-2 px-0.5">
+            {isCompact ? (
+              <div className="flex justify-center">
+                {user?.subscription_active ? (
+                  <button
+                    title="Company Suite Active (Manage)"
+                    aria-label="Manage Company Suite"
+                    onClick={() => handleItemClick('/billing')}
+                    className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(150deg, #0b1f19, #06130f)',
+                      boxShadow: '0 6px 16px -4px rgba(0,0,0,0.35)',
+                    }}
+                  >
+                    <Crown size={16} variant="emerald" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white" />
+                  </button>
+                ) : (
+                  <button
+                    title="Upgrade Company"
+                    aria-label="Upgrade Company Plan"
+                    onClick={() => handleItemClick('/premium')}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(150deg, #0b1f19, #06130f)',
+                      boxShadow: '0 6px 16px -4px rgba(0,0,0,0.35)',
+                    }}
+                  >
+                    <Crown size={16} variant="gold" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                {user?.subscription_active ? (
+                  <div
+                    className="relative overflow-hidden rounded-2xl p-4 ring-1 ring-emerald-500/30"
+                    style={{ background: 'linear-gradient(165deg, #0d221b 0%, #081813 70%, #040c0a 100%)' }}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-80" />
+                    <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <div
+                          className="flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-emerald-400/25 bg-emerald-950/60"
+                        >
+                          <Crown size={22} variant="emerald" />
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+                          <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Suite Active</span>
+                        </div>
+                      </div>
+
+                      <h4 className="font-bold text-white text-[13.5px] tracking-tight mb-1">
+                        Enterprise <span className="text-emerald-400">Hiring Suite</span>
+                      </h4>
+                      <p className="text-[11px] font-medium text-white/50 leading-relaxed mb-4">
+                        {isExecutive 
+                          ? 'Your entire company team has unlimited AI resume screening & proctoring.' 
+                          : 'Company premium subscription active. Sponsored by your executive.'}
+                      </p>
+
+                      <button
+                        onClick={() => handleItemClick('/billing')}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-bold text-white/90 transition-all hover:bg-white/10 hover:text-white border border-emerald-500/30 cursor-pointer"
+                      >
+                        Manage Hiring Plan
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="relative overflow-hidden rounded-2xl p-4 ring-1 ring-emerald-500/25"
+                    style={{ background: 'linear-gradient(165deg, #0d221b 0%, #081813 70%, #040c0a 100%)' }}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-[2.5px]" style={{ background: 'linear-gradient(90deg, transparent, #10b981, transparent)' }} />
+                    <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <div
+                          className="flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-emerald-400/25 bg-emerald-950/70"
+                        >
+                          <Crown size={22} variant="gold" />
+                        </div>
+                        <span
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md text-emerald-300 bg-emerald-500/15 border border-emerald-500/20"
+                        >
+                          Hiring Suite
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-white text-[13.5px] tracking-tight mb-1">
+                        Upgrade <span className="text-emerald-400">Company</span>
+                      </h4>
+                      <p className="text-[11px] font-medium text-white/50 leading-relaxed mb-3">
+                        {isExecutive 
+                          ? 'Empower all your recruiters & interviewers with unlimited AI screening.' 
+                          : 'Ask your Company Executive to unlock Recruiter Growth for the team.'}
+                      </p>
+
+                      <ul className="space-y-2 mb-4">
+                        {['Unlimited candidate ATS parsing', 'Team seats & AI proctoring'].map((feat) => (
+                          <li key={feat} className="flex items-center gap-2 text-[10.5px] text-white/80 font-medium">
+                            <span
+                              className="flex h-3.5 w-3.5 items-center justify-center rounded-full shrink-0 text-slate-950 bg-emerald-400"
+                            >
+                              {Icons.check}
+                            </span>
+                            {feat}
+                          </li>
+                        ))}
+                      </ul>
+
+                      <button
+                        onClick={() => handleItemClick('/premium')}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11.5px] font-black transition-transform hover:scale-[1.02] text-slate-950 shadow-lg shadow-emerald-500/20 cursor-pointer"
+                        style={{
+                          background: 'linear-gradient(135deg, #6ee7b7, #10b981 55%, #059669)',
+                        }}
+                      >
+                        {isExecutive ? 'Upgrade Company Plan' : 'View Enterprise Plans'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
         )}
       </nav>
 
