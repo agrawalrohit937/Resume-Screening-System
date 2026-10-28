@@ -562,13 +562,13 @@ export default function EnhancedResumeStudioModal({
         </div>
         {resumeData.experience.map((exp, expIdx) => (
           <div key={expIdx} className="space-y-1.5 group/exp">
-            <div className="flex justify-between items-baseline text-xs">
-              <div className="flex items-center gap-1">
+            <div className="flex flex-wrap sm:flex-nowrap justify-between items-baseline gap-1 text-xs">
+              <div className="flex items-center gap-1 flex-wrap">
                 <span className="font-bold text-slate-900">{exp.role || 'Role'}</span>
                 <span className="text-slate-400">|</span>
                 <span className="font-semibold text-[#1d4ed8]">{exp.company || 'Company'}</span>
               </div>
-              <span className="text-[11px] font-medium text-slate-600">{exp.duration}</span>
+              <span className="text-[11px] font-medium text-slate-600 shrink-0">{exp.duration}</span>
             </div>
 
             {/* Bullets */}
@@ -626,10 +626,10 @@ export default function EnhancedResumeStudioModal({
         </div>
         {resumeData.projects.map((proj, projIdx) => (
           <div key={projIdx} className="space-y-1.5">
-            <div className="flex justify-between items-baseline text-xs">
+            <div className="flex flex-wrap sm:flex-nowrap justify-between items-baseline gap-1 text-xs">
               <span className="font-bold text-slate-900">{proj.name}</span>
               {proj.link && (
-                <span className="text-[11px] text-[#1d4ed8] font-medium">{proj.link}</span>
+                <span className="text-[11px] text-[#1d4ed8] font-medium truncate max-w-[200px]">{proj.link}</span>
               )}
             </div>
             {proj.technologies && proj.technologies.length > 0 && (
@@ -693,9 +693,9 @@ export default function EnhancedResumeStudioModal({
         </div>
         {resumeData.education.map((edu, eduIdx) => (
           <div key={eduIdx} className="text-xs space-y-0.5">
-            <div className="flex justify-between items-baseline">
+            <div className="flex flex-wrap sm:flex-nowrap justify-between items-baseline gap-1">
               <span className="font-bold text-slate-900">{edu.institution}</span>
-              <span className="text-[11px] font-medium text-slate-600">{edu.year}</span>
+              <span className="text-[11px] font-medium text-slate-600 shrink-0">{edu.year}</span>
             </div>
             <div className="font-semibold text-[#1d4ed8] text-[11.5px]">{edu.degree}</div>
             {edu.score && <div className="text-[11px] text-slate-600 font-medium">{edu.score}</div>}
@@ -782,55 +782,125 @@ export default function EnhancedResumeStudioModal({
     <div className="fixed inset-0 z-[99999] w-screen h-screen bg-slate-100 flex flex-col p-2 sm:p-2.5 overflow-hidden font-sans select-none">
       
       {/* ════ MOBILE UNIFIED TOP BAR (TABS + ACTIONS) ════ */}
-      <div className="lg:hidden h-12 px-2.5 bg-white border border-slate-200/90 rounded-2xl flex items-center justify-between shrink-0 mb-1.5 shadow-2xs">
-        <div className="flex items-center gap-1.5 min-w-0">
+      <div className="lg:hidden flex flex-col bg-white border border-slate-200/90 rounded-2xl shrink-0 mb-1.5 shadow-2xs overflow-hidden">
+        <div className="h-11 px-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+              title="Back to ATS Dashboard"
+            >
+              <ArrowLeft size={14} />
+            </button>
+
+            {/* Segmented Switcher */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setMobileTab('original')}
+                className={`px-2 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-xs ${
+                  mobileTab === 'original'
+                    ? 'bg-white text-slate-800 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <FileText size={11} />
+                <span>Original ({oldScore}%)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileTab('enhanced')}
+                className={`px-2 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-xs ${
+                  mobileTab === 'enhanced'
+                    ? 'bg-white text-[#2E9BDA] shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Sparkles size={11} className="text-[#2E9BDA]" />
+                <span>Enhanced {calculatedNewScore ? `(${calculatedNewScore}%)` : ''}</span>
+              </button>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
-            title="Back to ATS Dashboard"
+            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center shrink-0 cursor-pointer text-xs font-bold"
+            title="Close Studio"
           >
-            <ArrowLeft size={14} />
+            <X size={14} />
           </button>
-
-          {/* Segmented Switcher */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-xs shrink-0">
-            <button
-              type="button"
-              onClick={() => setMobileTab('original')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-xs ${
-                mobileTab === 'original'
-                  ? 'bg-white text-slate-800 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <FileText size={12} />
-              <span>Original ({oldScore}%)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMobileTab('enhanced')}
-              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-xs ${
-                mobileTab === 'enhanced'
-                  ? 'bg-white text-[#2E9BDA] shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Sparkles size={12} className="text-[#2E9BDA]" />
-              <span>Enhanced {calculatedNewScore ? `(${calculatedNewScore}%)` : ''}</span>
-            </button>
-          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center shrink-0 cursor-pointer text-xs font-bold"
-          title="Close Studio"
-        >
-          <X size={14} />
-        </button>
+        {/* Mobile Action Ribbon when viewing Enhanced Resume */}
+        {mobileTab === 'enhanced' && !isGenerating && (
+          <div className="px-2.5 py-1.5 bg-slate-50/90 border-t border-slate-200/70 flex items-center justify-between gap-1 text-xs">
+            <div className="flex items-center gap-1">
+              <div className="inline-flex items-center bg-white p-0.5 rounded-lg border border-slate-200 text-xs shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(false)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition ${
+                    !isEditMode ? 'bg-[#2E9BDA] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(true)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition ${
+                    isEditMode ? 'bg-[#2E9BDA] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Edit
+                </button>
+              </div>
+
+              {checkingATS ? (
+                <span className="text-[10px] text-[#2E9BDA] font-bold flex items-center gap-1">
+                  <Loader2 size={10} className="animate-spin" /> Evaluating...
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCheckATS}
+                  className="px-2 py-0.5 rounded-md bg-white border border-sky-200 text-[#2E9BDA] text-[10px] font-bold cursor-pointer shadow-2xs"
+                >
+                  ATS
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isGenerating || !currentPdfUrl}
+                className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-2xs disabled:opacity-50"
+                title="Download PDF"
+              >
+                <Download size={12} />
+                <span>PDF</span>
+              </button>
+
+              {onSetPrimary && (
+                <button
+                  type="button"
+                  onClick={onSetPrimary}
+                  disabled={primaryResumeUpdating}
+                  className="px-2.5 py-1 rounded-lg bg-[#2E9BDA] hover:bg-[#2587bf] text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-2xs disabled:opacity-50"
+                  title="Apply This Version"
+                >
+                  <CheckCircle2 size={12} />
+                  <span>{primaryResumeUpdating ? 'Applying...' : 'Apply'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── 2-COLUMN FULL-SCREEN VIEWPORT ─────────────────────────────────── */}
@@ -1101,9 +1171,9 @@ export default function EnhancedResumeStudioModal({
                   </div>
                 </div>
 
-                {/* Paper Canvas Container — standard block scroll so white sheet naturally encloses 100% of content */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar select-text">
-                  <div className="w-full max-w-2xl mx-auto bg-white shadow-2xl rounded-sm border border-slate-300 p-8 sm:p-12 space-y-6 text-slate-800 text-[13px] leading-relaxed font-sans my-4 min-h-[960px] h-auto">
+                {/* Paper Canvas Container — fully responsive standard block scroll */}
+                <div className="flex-1 overflow-y-auto p-2 sm:p-6 md:p-8 custom-scrollbar select-text">
+                  <div className="w-full max-w-2xl mx-auto bg-white shadow-xl sm:shadow-2xl rounded-sm border border-slate-200 sm:border-slate-300 p-4 sm:p-8 md:p-12 space-y-4 sm:space-y-6 text-slate-800 text-[12px] sm:text-[13px] leading-relaxed font-sans my-2 sm:my-4 min-h-[960px] h-auto">
                     {renderHeader()}
                     {renderSummary()}
                     {renderSkills()}
