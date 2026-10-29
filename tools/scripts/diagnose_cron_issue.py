@@ -46,22 +46,15 @@ async def main():
     for j in latest_jobs:
         print(f"  Job: {j.get('title')} | Company: {j.get('company_name') or j.get('company')} | External: {j.get('is_external')} | Created: {j.get('created_at')} | Updated: {j.get('updated_at')}")
 
-    print("\n=== 4. REDIS LOCKS & CACHE ===")
+    print("\n=== 4. MONGODB DISTRIBUTED LOCKS ===")
     try:
-        from services.redis_service import get_redis
-        redis = await get_redis()
-        if redis:
-            keys = await redis.keys("*")
-            print(f"Redis keys ({len(keys)}): {keys}")
-            for k in keys:
-                if b"lock" in k or b"cron" in k or "cron" in str(k) or "lock" in str(k):
-                    val = await redis.get(k)
-                    ttl = await redis.ttl(k)
-                    print(f"  Lock Key: {k} = {val} (TTL: {ttl}s)")
-        else:
-            print("Redis client is None or not connected")
+        coll = db["distributed_locks"]
+        locks = await coll.find().to_list(10)
+        print(f"MongoDB Active Locks ({len(locks)}):")
+        for lk in locks:
+            print(f"  Lock Key: {lk.get('key')} | Token: {lk.get('token')} | Expires: {lk.get('expires_at')}")
     except Exception as e:
-        print(f"Redis check error: {e}")
+        print(f"Lock check error: {e}")
 
     print("\n=== 5. RAPIDAPI KEY & JSEARCH TEST ===")
     rapid_key = os.getenv("RAPIDAPI_KEY", settings.RAPIDAPI_KEY if hasattr(settings, "RAPIDAPI_KEY") else "")

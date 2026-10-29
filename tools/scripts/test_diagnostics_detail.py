@@ -37,9 +37,9 @@ async def test_all():
         for r in recs:
             print(f"  Job: {r.get('title')} at {r.get('company_name')} | Score: {r.get('match_score')}% | Applied: {r.get('is_applied')}")
 
-    print("\n--- Checking Lock Status in DB or Redis ---")
+    print("\n--- Checking Lock Status in MongoDB ---")
     # check if there's any lock in db
-    lock_doc = await db.locks.find().to_list(10) if hasattr(db, "locks") else []
+    lock_doc = await db.distributed_locks.find().to_list(10) if hasattr(db, "distributed_locks") else []
     print(f"Locks in DB: {lock_doc}")
     
     await disconnect_db()

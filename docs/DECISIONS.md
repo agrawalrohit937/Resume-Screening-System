@@ -204,11 +204,10 @@
 - **Context**:
   CareerShala ATS v2.0.0 required enterprise-grade scalability, resilient asynchronous background task execution, distributed deduplication across multi-replica cloud environments, CPU-sparing embedding caching, cursor pagination to avoid memory bloat, structured observability, and parallel shadow scoring for safe model rollout.
 - **Decisions**:
-  1. **Asynchronous Task Workers (Celery & Redis Broker)**:
-     - Built `backend/services/tasks/` architecture with Celery task queues (`parsing`, `scoring`, `dlq`).
-     - Added `TaskManager` implementing deterministic idempotency keys (`parse:{resume_id}:{file_hash}`), exponential backoff retries with jitter, dead-letter queue routing (`db.task_dlq`), and in-process async worker fallback for local development without external Redis/Celery infra.
+  1. **Asynchronous Task Workers & Idempotency**:
+     - Built `backend/services/tasks/` architecture with `TaskManager` implementing deterministic idempotency keys (`parse:{resume_id}:{file_hash}`), exponential backoff retries with jitter, dead-letter queue routing (`db.task_dlq`), and in-process async worker execution with MongoDB persistence.
   2. **Distributed Scheduling & Deduplication**:
-     - Built `backend/services/locking/distributed_lock.py` providing atomic Redis `SET NX EX` distributed locking with safe Lua script release, MongoDB `find_one_and_update` with TTL expiration, and local fallback.
+     - Built `backend/services/locking/distributed_lock.py` providing atomic MongoDB `find_one_and_update` document locking with TTL expiration and safe token comparison release.
      - Protected critical batch jobs (nightly job alerts, stuck resume sweepers) from duplicate concurrent executions across replicas.
   3. **Dedicated Embedding Cache & Int8 Quantization**:
      - Built `backend/services/embedding_cache.py` keyed deterministically on `sha256(text) + model_version` with a 30-day TTL.

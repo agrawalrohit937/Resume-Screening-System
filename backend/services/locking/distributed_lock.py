@@ -2,9 +2,8 @@
 Distributed Lock Mechanism for CareerShala ATS Multi-Replica Scheduling & Deduplication.
 Guarantees:
   - Mutual exclusion across multi-replica deployments (Kubernetes, Azure App Service, Docker).
-  - Redis-backed atomic distributed locking via SET NX EX.
-  - Safe lock release via token comparison Lua script.
-  - Transparent MongoDB atomic fallback when Redis is offline.
+  - Native MongoDB atomic document locking via find_one_and_update with TTL expiration.
+  - Safe lock release via token comparison deletion.
 """
 
 from __future__ import annotations
@@ -18,19 +17,10 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Lua script to ensure safe release only by the lock owner
-_LUA_RELEASE_LOCK = """
-if redis.call("get", KEYS[1]) == ARGV[1] then
-    return redis.call("del", KEYS[1])
-else
-    return 0
-end
-"""
-
 
 class DistributedLock:
     """
-    Distributed lock supporting Redis with MongoDB atomic document lock fallback.
+    Distributed lock utilizing MongoDB atomic document locks.
 
     Complexity:
         Time: O(1) for acquire and release operations.
@@ -47,35 +37,17 @@ class DistributedLock:
         self.lock_key = f"lock:{lock_key}"
         self.ttl_seconds = ttl_seconds
         self.token = str(uuid.uuid4())
-        self.redis = redis_client
         self.db = db
         self._acquired = False
 
     async def acquire(self) -> bool:
         """
-        Attempts to acquire the lock atomically from a Single Source of Truth.
-        - If Redis is configured: Redis is the sole lock authority (returns False on failure/disconnect).
-        - If Redis is not configured: MongoDB is the sole lock authority.
-        Never crosses between databases to prevent split-brain duplicate task executions.
+        Attempts to acquire the lock atomically from MongoDB.
+        Uses find_one_and_update to ensure mutual exclusion across replicas.
         """
         now = time.time()
         expires_at = now + self.ttl_seconds
 
-        # 1. Authoritative Redis lock
-        if self.redis is not None:
-            try:
-                # set with NX (not exists) and EX (expire seconds)
-                acquired = await self.redis.set(self.lock_key, self.token, nx=True, ex=self.ttl_seconds)
-                if acquired:
-                    self._acquired = True
-                    logger.debug("Acquired distributed lock via Redis", key=self.lock_key)
-                    return True
-                return False
-            except Exception as e:
-                logger.warning("Redis distributed lock failed to acquire (aborting to prevent split-brain)", error=str(e))
-                return False
-
-        # 2. Authoritative MongoDB atomic lock (used only when Redis is not configured)
         if self.db is not None:
             try:
                 coll = self.db["distributed_locks"]
@@ -124,17 +96,6 @@ class DistributedLock:
         if not self._acquired:
             return False
 
-        # 1. Release Redis if configured as authority
-        if self.redis is not None:
-            try:
-                res = await self.redis.eval(_LUA_RELEASE_LOCK, 1, self.lock_key, self.token)
-                released = bool(res == 1)
-            except Exception as e:
-                logger.debug("Redis distributed lock release failed", error=str(e))
-            self._acquired = False
-            return released
-
-        # 2. Release MongoDB if configured as authority
         if self.db is not None:
             try:
                 coll = self.db["distributed_locks"]
@@ -144,6 +105,9 @@ class DistributedLock:
                 released = True
             except Exception as e:
                 logger.debug("MongoDB distributed lock release failed", error=str(e))
+                released = False
+        else:
+            released = False
 
         self._acquired = False
         return released
@@ -159,7 +123,7 @@ async def distributed_lock(
     """
     Asynchronous context manager for distributed locking.
     Usage:
-        async with distributed_lock("nightly_cron", ttl_seconds=3600) as acquired:
+        async with distributed_lock("nightly_cron", ttl_seconds=3600, db=db) as acquired:
             if not acquired:
                 return  # Skip duplicate execution on another pod
             do_work()
@@ -171,3 +135,4 @@ async def distributed_lock(
     finally:
         if acquired:
             await lock.release()
+
