@@ -141,7 +141,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 | **PDF Resume Reading** | Cloud OCR (Azure Document Intelligence) | Local `pdfplumber` layout-aware text extractor | Clean raw text extraction |
 | **Resume Matching Score** | Local BGE-M3 Neural Embedding model | Google Gemini Cloud Vector Embeddings | Deterministic skill & keyword overlap calculation |
 | **AI Output Parsing** | Standard `json.loads` | Auto-repairing `json-repair` tool (fixes markdown blocks) | Safe default response bank |
-| **Task Synchronization** | Distributed Redis atomic lock | MongoDB atomic document lock | Aborts duplicate overlapping jobs safely |
+| **Task Synchronization** | MongoDB atomic document lock (`find_one_and_update`) | In-memory atomic lock | Aborts duplicate overlapping jobs safely |
 | **Background Scheduling** | Azure Cloud Timer Triggers | Admin Webhook endpoints (`/admin/trigger-*`) | Built-in fallback task sweep |
 | **Payment Activation** | Instant checkout verification | Background Razorpay webhook listener | Auto-checks status when user next logs in |
 
@@ -274,7 +274,7 @@ Resume-Screening-System/
 ├── README.md                          # Complete project documentation
 ├── run_dev.bat                        # Windows 1-click startup launcher
 ├── run_dev.sh                         # Linux/Mac 1-click startup launcher
-├── docker-compose.yml                 # Local Docker setup (MongoDB + Redis)
+├── docker-compose.yml                 # Local Docker setup (MongoDB)
 │
 ├── backend/                           # FastAPI Python Backend
 │   ├── main.py                        # Entry point, middleware, CORS, and route registrations

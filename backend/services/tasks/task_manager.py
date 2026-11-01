@@ -4,7 +4,7 @@ Provides:
   - Idempotent task dispatching keyed on (resume_id, file_hash) or custom keys.
   - Exponential backoff retry execution.
   - Dead-Letter Queue (DLQ) tracking for unrecoverable failures into db.task_dlq.
-  - Automatic in-process fallback when Celery/Redis is offline.
+  - Automatic in-process async worker execution with MongoDB persistence.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Local in-memory store for idempotency & DLQ fallback when Redis / DB is offline
+# Local in-memory store for idempotency & DLQ fallback when DB is offline
 _IN_MEMORY_IDEMPOTENCY: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_DLQ: list[Dict[str, Any]] = []
 
@@ -55,16 +55,7 @@ class TaskManager:
         """
         now = time.time()
 
-        # 1. Try Redis
-        if self.redis is not None:
-            try:
-                status = await self.redis.get(f"task:idempotency:{idempotency_key}")
-                if status:
-                    return True, status.decode("utf-8") if isinstance(status, bytes) else str(status)
-            except Exception as e:
-                logger.debug("Redis idempotency check failed, checking fallback", error=str(e))
-
-        # 2. Try MongoDB
+        # 1. Try MongoDB
         if self.db is not None:
             try:
                 coll = self.db[self._idempotency_collection_name]
@@ -76,7 +67,7 @@ class TaskManager:
             except Exception as e:
                 logger.debug("DB idempotency check failed", error=str(e))
 
-        # 3. In-memory fallback
+        # 2. In-memory fallback
         mem = _IN_MEMORY_IDEMPOTENCY.get(idempotency_key)
         if mem and mem.get("expires_at", 0) > now:
             return True, mem.get("status")
@@ -93,13 +84,6 @@ class TaskManager:
         """Updates task lifecycle state (QUEUED, PROCESSING, COMPLETED, FAILED)."""
         now = time.time()
         expires_at = now + ttl_seconds
-
-        # Redis
-        if self.redis is not None:
-            try:
-                await self.redis.set(f"task:idempotency:{idempotency_key}", status, ex=ttl_seconds)
-            except Exception:
-                pass
 
         # DB
         if self.db is not None:

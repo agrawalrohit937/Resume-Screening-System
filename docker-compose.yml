@@ -1,8 +1,8 @@
 version: "3.8"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CareerShala — Local Development Services (MongoDB + Redis)
-# Run `docker compose up -d` to spin up databases with zero local configuration.
+# CareerShala — Local Development Services (MongoDB)
+# Run `docker compose up -d` to spin up MongoDB with zero local configuration.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 services:
@@ -23,21 +23,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis 7.2 (Optional In-Memory Cache) ────────────────────────────────────
-  redis:
-    image: redis:7.2-alpine
-    container_name: careershala_redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - careershala_redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   careershala_mongo_data:
-  careershala_redis_data:
+
