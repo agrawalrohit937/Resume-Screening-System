@@ -28,12 +28,12 @@ router = APIRouter()
 _eval_svc = EvaluationService()
 
 
-def get_gamification_service(db=Depends(get_database)) -> GamificationService:
-    return GamificationService(db)
-
-
 def get_svc(db=Depends(get_database)) -> LiveInterviewService:
     return LiveInterviewService(db)
+
+
+def get_gamification_service(db=Depends(get_database)) -> GamificationService:
+    return GamificationService(db)
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -105,7 +105,6 @@ async def create_session(
     payload: CreateSessionRequest,
     user:    UserModel = Depends(get_current_user),
     svc:     LiveInterviewService = Depends(get_svc),
-    gamification: GamificationService = Depends(get_gamification_service),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
 ):
     # Extract resume context if provided (optional — for personalized questions)
@@ -134,7 +133,6 @@ async def create_session(
         experience_titles=experience_titles,
     )
 
-    await gamification.mark_daily_activity(str(user.id))
     return {"success": True, **data}
 
 
@@ -224,7 +222,6 @@ async def complete_session(
     payload:    CompleteSessionRequest,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
-    gamification: GamificationService = Depends(get_gamification_service),
 ):
     """Finalize session — compute aggregated stats + AI summary report."""
     session = await svc.get_session(session_id, str(user.id))

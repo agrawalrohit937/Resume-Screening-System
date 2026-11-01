@@ -1,33 +1,42 @@
-# 📚 CareerShala — Tab-by-Tab Interview Preparation Guide
-### *Deep-Dive Explanations in Super Easy Spoken English + Hindi*
+# 📚 CareerShala — Complete Tab-by-Tab Interview Mastery Collection
+### *Architectural Flowcharts, Super Easy Hindi Explanations & High-Impact English Scripts*
 
-Welcome to the **CareerShala Tab-by-Tab Interview Mastery Collection**.  
-Every single tab and feature in the project has its own dedicated markdown file explaining:
-1. **What is on the screen** (UI Walkthrough)
-2. **Hindi Mein Samjho** (Mental clarity in simple Hindi)
-3. **What to Speak in Simple English** (Exact spoken script)
-4. **Hum Kya Use Kar Rahe Hain Aur Kyu** (Tech stack, algorithms, libraries, and backend files)
-5. **Top 3 Interview Questions & Easy Answers** (Ready-to-speak counter-answers)
+Welcome to the **CareerShala Master Interview Preparation System**.  
+Every single tab, subsystem, and production feature in the platform has a dedicated deep-dive guide structured specifically for technical and behavioral interviews:
 
----
-
-## 🗂️ Table of Contents (Click Any File to Open)
-
-| File | Tab / Feature | Core Tech Stack & Algorithms |
-| :--- | :--- | :--- |
-| **[`01_ATS_MATCHER.md`](./01_ATS_MATCHER.md)** | **ATS Resume Matcher & Score** (`/results`) | ESCO Skill Ontology, BGE-M3 Neural Embeddings, Max-Sim Late Interaction, Fresher Calibration, Recharts Radar, Anti-Cheat White-Text Check |
-| **[`02_LIVE_AI_INTERVIEW_PROCTORING.md`](./02_LIVE_AI_INTERVIEW_PROCTORING.md)** | **Live AI Video Interview** (`/live-interview`) | Client-Side MediaPipe FaceMesh (468+10 iris landmarks), COCO-SSD Object Detection, WebRTC Speech Synthesis & Recognition, Tab Switch Detection |
-| **[`03_AI_APPLY_ASSISTANT_AND_JOBS.md`](./03_AI_APPLY_ASSISTANT_AND_JOBS.md)** | **Jobs Marketplace & Apply Assistant** (`/jobs`, `/apply-assistant`) | LangGraph StateGraph agent workflow, Groq LLaMA-3 (500 tok/sec), Gemini 1.5 Flash Vision OCR for job screenshots, KeyPool rotation |
-| **[`04_PORTFOLIO_BUILDER.md`](./04_PORTFOLIO_BUILDER.md)** | **Developer Portfolio Generator** (`/portfolio-builder`, `/portfolio/:username`) | 6-Domain Skill Classification (`CATEGORY_MAP`), MongoDB Sparse Indexing (`sparse=True`), OpenGraph Social Meta Tags, Recruiter Contact Relay |
-| **[`05_AI_COPILOT_AND_GAMIFICATION.md`](./05_AI_COPILOT_AND_GAMIFICATION.md)** | **Floating AI Copilot & Gamification** (`/gamification`, `/verify/:id`) | Server-Sent Events (SSE) streaming chat, Playwright Headless Chromium PDF Generator, XP rules & daily streaks, QR code verification |
-| **[`06_AUTH_SECURITY_AND_DASHBOARD.md`](./06_AUTH_SECURITY_AND_DASHBOARD.md)** | **Authentication, Security & Dashboard** (`/dashboard`, `/login`) | Argon2id password hashing, non-blocking `asyncio.to_thread`, JWT token lifecycle, zero-plaintext HMAC-SHA256 OTPs with MongoDB TTL index |
-| **[`07_RECRUITER_KANBAN_AND_JOBS.md`](./07_RECRUITER_KANBAN_AND_JOBS.md)** | **Recruiter Dashboard & Kanban Board** (`/recruiter/jobs`) | Multi-Tenant `tenant_id` isolation, 6-Stage drag-and-drop Kanban pipeline, Optimistic UI Updates in React, Compound MongoDB indexes |
-| **[`08_BLIND_SCREENING_AND_KNOCKOUT_RULES.md`](./08_BLIND_SCREENING_AND_KNOCKOUT_RULES.md)** | **Blind Screening & Knockout Rules** | PII Redactor (`pii_redactor.py`) masking names/photos/colleges, Automated Knockout Criteria, US EEOC 4/5ths Rule bias auditing |
-| **[`09_SYSTEM_ARCHITECTURE_AND_FALLBACKS.md`](./09_SYSTEM_ARCHITECTURE_AND_FALLBACKS.md)** | **System Architecture & 2-Tier Fallback** | FastAPI ASGI async event loop, MongoDB Motor async driver, Brevo HTTPS Port 443 vs blocked SMTP, Razorpay Idempotency, 390+ tests |
+1. **System Flow Graph (End-to-End Mermaid Architecture)** — visual diagrams showing data flow from React to FastAPI, ML services, and MongoDB Atlas.
+2. **Complete File Directory & Code Responsibilities** — exact filenames, functions, and modules.
+3. **Hindi Mein Samjho (Apne Words Mein Bolne Ke Liye)** — simple, natural Hinglish explanations so you understand the core logic without rote memorization.
+4. **What to Show & Speak on Screen (Demo Presentation Script)** — exact step-by-step clicks and spoken English scripts.
+5. **Hum Kya Use Kar Rahe Hain Aur Kyu (Behind-the-Scenes Deep Dive)** — architectural decisions, tradeoffs, why we picked library X over Y, and real bugs solved.
+6. **Top 5 Interview Questions & Impressive Model Answers** — ready-to-speak counter-answers that sound like a senior software engineer.
 
 ---
 
-## 💡 How to Prepare with These Guides:
-1. Open **[`INTERVIEW_DEMO_SCRIPT.md`](../../INTERVIEW_DEMO_SCRIPT.md)** to see the full, continuous flow of the presentation from start to finish.
-2. If an interviewer stops you on a specific feature (for example: *"Tell me more about how you built this camera proctoring"*), open the matching file like **[`02_LIVE_AI_INTERVIEW_PROCTORING.md`](./02_LIVE_AI_INTERVIEW_PROCTORING.md)** and read the simple points.
-3. Every file has **Hindi hints** so you never get confused about the core concept!
+## 🗂️ Master Table of Contents (Click Any Tab to Open)
+
+| Tab # | Feature / Tab Name | Route URL | Core Tech Stack, Architecture & Algorithms |
+| :---: | :--- | :--- | :--- |
+| **01** | **[`01_ATS_MATCHER.md`](./01_ATS_MATCHER.md)**<br>*(ATS Resume Matcher & Score)* | `/results`<br>`/dashboard` | ESCO Skill Ontology, BGE-M3 Neural Embeddings (1024-d), Max-Sim Late Interaction, Saturating Exponential Experience Curve, ISCED Education Resolver, Anti-Cheat White-Text Detection. |
+| **02** | **[`02_LIVE_AI_INTERVIEW_PROCTORING.md`](./02_LIVE_AI_INTERVIEW_PROCTORING.md)**<br>*(Live AI Video Interview & Edge Proctoring)* | `/live-interview` | Client-Side MediaPipe FaceMesh (468 3D + 10 Iris landmarks), 3D Head Pose Math (Yaw/Pitch/Roll), COCO-SSD Background Device Detection, Web Speech API (TTS/STT), Page Visibility API. |
+| **03** | **[`03_EXPLORE_JOBS_AND_APPLICATION_TRACKER.md`](./03_EXPLORE_JOBS_AND_APPLICATION_TRACKER.md)**<br>*(Explore Jobs Feed & Application Tracker)* | `/jobs`<br>`/applications` | In-Memory Cosine Similarity Match Badges (`job_matcher.py`), MongoDB Compound & Text Indexes, 1-Click Instant Apply, Voluntary EEO Survey, Real-Time Application Lifecycle Stepper. |
+| **04** | **[`03_AI_APPLY_ASSISTANT_AND_JOBS.md`](./03_AI_APPLY_ASSISTANT_AND_JOBS.md)**<br>*(AI Apply Assistant & LangGraph Workflow)* | `/apply-assistant` | 4-Node LangGraph StateGraph (JD Parser $\rightarrow$ Evidence Retrieval $\rightarrow$ Draft Generator $\rightarrow$ Critique Guard), Gemini 1.5 Flash Vision OCR for screenshots, Groq LLaMA-3 (500 tok/sec), KeyPool rotation. |
+| **05** | **[`04_PORTFOLIO_BUILDER.md`](./04_PORTFOLIO_BUILDER.md)**<br>*(One-Click Developer Portfolio Generator)* | `/portfolio-builder`<br>`/portfolio/:username` | 6-Domain Skill Classification (`CATEGORY_MAP`), MongoDB Sparse Unique Indexing (`sparse=True`, <5ms lookups), OpenGraph Social Media Meta Tags, In-Page Recruiter Contact Relay. |
+| **06** | **[`05_AI_COPILOT_AND_GAMIFICATION.md`](./05_AI_COPILOT_AND_GAMIFICATION.md)**<br>*(Floating AI Copilot & CareerQuest)* | `/gamification`<br>`/verify/:id` | Server-Sent Events (SSE) streaming chat, Contextual resume memory injection, CareerQuest XP rules & daily streaks, Playwright Headless Chromium PDF Generation, Cryptographic Public QR Verification. |
+| **07** | **[`06_AUTH_SECURITY_AND_DASHBOARD.md`](./06_AUTH_SECURITY_AND_DASHBOARD.md)**<br>*(Authentication, Security & Dashboard)* | `/dashboard`<br>`/login` | Argon2id password hashing offloaded to threadpools (`asyncio.to_thread`), Dual-token JWT lifecycle (HttpOnly cookies), Zero-plaintext HMAC-SHA256 OTPs with MongoDB TTL index, 40/60 Blended Readiness Score ring. |
+| **08** | **[`07_RECRUITER_KANBAN_AND_JOBS.md`](./07_RECRUITER_KANBAN_AND_JOBS.md)**<br>*(Recruiter Dashboard & 6-Stage Kanban)* | `/recruiter/dashboard`<br>`/recruiter/jobs` | Multi-Tenant `tenant_id` cryptographic isolation, 6-Stage drag-and-drop Kanban pipeline, React Optimistic UI updates, Comprehensive Candidate Scorecard Modal, Automated Brevo status notifications. |
+| **09** | **[`08_BLIND_SCREENING_AND_KNOCKOUT_RULES.md`](./08_BLIND_SCREENING_AND_KNOCKOUT_RULES.md)**<br>*(Blind Screening & Knockout Engine)* | `/results`<br>`/recruiter/jobs` | Automated PII Redaction (`pii_redactor.py`) masking names, photos, gender pronouns & elite college prestige, Deterministic Knockout Rules Engine, US EEOC 4/5ths (80%) Rule statistical bias auditing. |
+| **10** | **[`09_SYSTEM_ARCHITECTURE_AND_FALLBACKS.md`](./09_SYSTEM_ARCHITECTURE_AND_FALLBACKS.md)**<br>*(System Architecture & 2-Tier Fallback Net)* | Global Platform | FastAPI ASGI async event loop, Motor async driver, Brevo REST API over HTTPS Port 443 vs blocked cloud SMTP, File Upload Magic-Byte hardening, Razorpay Webhook Idempotency, 2-Tier Fallback Matrix, 390+ Tests. |
+
+---
+
+## 🎯 How to Use These Guides During Interview Preparation
+
+1. **Before the Interview (Mental Clarity):**
+   - Read Section 3 (**Hindi Mein Samjho**) for each tab first. This builds an intuitive mental picture of *why* the feature exists, *what real problem it solves*, and *how it works behind the scenes* without memorizing complex sentences.
+2. **Practicing Your Demo Pitch:**
+   - Stand in front of your screen or mirror and read Section 4 (**What to Show & Speak on Screen**).
+   - Follow the step-by-step clicks on your screen while speaking the exact simple English dialogue.
+3. **Answering Tough Architectural Counter-Questions:**
+   - Read Section 5 (**Hum Kya Use Kar Rahe Hain Aur Kyu**) to understand the deep technical reasons (e.g. *Why client-side MediaPipe over server WebRTC? Why Playwright over WeasyPrint? Why Argon2id with asyncio.to_thread? Why Brevo HTTPS over SMTP?*).
+   - Review Section 6 (**Top 5 Interview Questions & Impressive Model Answers**) to practice speaking crisp, confident answers.

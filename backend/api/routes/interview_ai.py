@@ -60,7 +60,6 @@ class InterviewCompleteRequest(BaseModel):
     session_id: str
     interview_score: float = Field(ge=0.0, le=1.0)
     questions_answered: int
-    clean_session: bool = True
 
 
 # ─── POST /interview/ai/generate ──────────────────────────────────────────────
@@ -162,7 +161,6 @@ async def complete_interview_session(
         user_id=str(current_user.id),
         interview_score=payload.interview_score,
         questions_answered=payload.questions_answered,
-        clean_session=payload.clean_session,
     )
     return {
         "session_id": payload.session_id,
@@ -182,6 +180,15 @@ async def get_gamification_profile(
     return await gamification.get_profile(str(current_user.id))
 
 
+@router.post("/gamification/daily-visit")
+async def claim_daily_visit_reward(
+    current_user: UserModel = Depends(get_current_user),
+    gamification: GamificationService = Depends(get_gamification_service),
+):
+    """Award the once-per-day visit bonus."""
+    return await gamification.claim_daily_visit_reward(str(current_user.id))
+
+
 # ─── GET /interview/gamification/leaderboard ─────────────────────────────────
 @router.get("/gamification/leaderboard")
 async def get_leaderboard(
@@ -192,31 +199,13 @@ async def get_leaderboard(
     """Global leaderboard — top performers by total points."""
     board = await gamification.get_leaderboard(limit=min(limit, 50))
 
-    # Find current user's rank
-    my_profile = await gamification.get_profile(str(current_user.id))
     my_rank = next((e["rank"] for e in board if e["user_id"] == str(current_user.id)), None)
 
     return {
         "leaderboard": board,
         "my_rank": my_rank,
-        "my_profile": my_profile,
         "total_participants": len(board),
     }
-
-
-# ─── GET /interview/gamification/levels ───────────────────────────────────────
-# NEW: exposes the server-side LEVEL_THRESHOLDS so the frontend can render a
-# full level roadmap without hardcoding a copy of it. No auth requirement
-# would also be reasonable here since it's static reference data, but this
-# keeps it consistent with the other gamification routes.
-@router.get("/gamification/levels")
-async def get_level_catalog(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """List every level with its XP threshold, name, and icon, in order."""
-    return {"levels": gamification.get_level_catalog()}
-
 
 # ─── GET /interview/badges/catalog ───────────────────────────────────────────
 @router.get("/badges/catalog")
@@ -226,142 +215,6 @@ async def get_badge_catalog(current_user: UserModel = Depends(get_current_user))
     return {"badges": [{"id": k, **v} for k, v in BADGES.items()]}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# NEW: Daily Activity (first visit bonus)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class DailyActivityResponse(BaseModel):
-    streak: int
-    daily_bonus_awarded: bool
-    message: str
-
-
-@router.post("/gamification/daily-activity")
-async def mark_daily_activity(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Mark daily activity — awards +25 daily practice bonus if first activity today."""
-    result = await gamification.mark_daily_activity(str(current_user.id))
-    return {
-        "streak": result["new_streak"],
-        "daily_bonus_awarded": result["streak_bonus"] > 0 or result["new_streak"] == 1,
-        "message": "Daily activity recorded.",
-    }
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# NEW: Daily Reward (7-Day Claim Track)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/gamification/daily-reward/status")
-async def get_daily_reward_status(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Get the current daily reward state (which days are claimed/available)."""
-    return await gamification.get_daily_reward_status(str(current_user.id))
-
-
-class DailyRewardClaimResponse(BaseModel):
-    claimed: bool
-    day: int
-    reward_type: str
-    points_awarded: int
-    bonus_label: Optional[str] = None
-    cycle_completed: bool
-    reward_streak: int
-    next_day: int
-
-
-@router.post("/gamification/daily-reward/claim", response_model=DailyRewardClaimResponse)
-async def claim_daily_reward(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Claim today's daily reward."""
-    result = await gamification.claim_daily_reward(str(current_user.id))
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# NEW: Daily Missions
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/gamification/daily-missions")
-async def get_daily_missions(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Get daily missions with real progress from user's activity today."""
-    return await gamification.get_daily_missions(str(current_user.id))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# NEW: Weekly Challenge
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/gamification/weekly-challenge")
-async def get_weekly_challenge(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Get the current weekly challenge with progress."""
-    return await gamification.get_weekly_challenge(str(current_user.id))
-
-
-class WeeklyChallengeClaimResponse(BaseModel):
-    claimed: bool
-    reward_xp: int
-    badge_awarded: Optional[str] = None
-    challenge_id: str
-
-
-@router.post("/gamification/weekly-challenge/claim")
-async def claim_weekly_challenge(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Claim the weekly challenge reward (must be completed)."""
-    result = await gamification.claim_weekly_challenge(str(current_user.id))
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# NEW: Reward Chests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/gamification/reward-chests")
-async def get_reward_chests(
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Get all reward chests with their claimable status."""
-    return {"chests": await gamification.get_reward_chests(str(current_user.id))}
-
-
-class ChestClaimRequest(BaseModel):
-    chest_id: str
-
-
-@router.post("/gamification/reward-chest/claim")
-async def claim_reward_chest(
-    payload: ChestClaimRequest,
-    current_user: UserModel = Depends(get_current_user),
-    gamification: GamificationService = Depends(get_gamification_service),
-):
-    """Claim a reward chest."""
-    result = await gamification.claim_reward_chest(str(current_user.id), payload.chest_id)
-    if result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return result
-
-
-# ─── WebSocket /interview/ws/{session_id} ─────────────────────────────────────
 class ConnectionManager:
     def __init__(self):
         self.active: dict[str, WebSocket] = {}
