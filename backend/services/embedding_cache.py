@@ -1,8 +1,8 @@
 """
 Embedding Cache and Quantization Engine for CareerShala ATS.
 Provides:
-  - Redis-backed cache for embedding vectors keyed on sha256(text) + model_version with 30-day TTL.
-  - Zero-RAM footprint pass-through when Redis is offline (prevents Azure memory bloat).
+  - High-performance, thread-safe in-memory LRU cache for embedding vectors keyed on sha256(text) + model_version.
+  - Zero external cache dependencies (100% cloud-safe, zero network failure points).
   - Dynamic batching to prevent CPU thread blocking during request spikes.
   - Int8 quantization and dequantization abstractions for compact memory footprint.
 """
@@ -19,8 +19,6 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# 30 days TTL in seconds (30 * 24 * 3600)
-DEFAULT_CACHE_TTL_SECONDS = 2592000
 DEFAULT_MAX_MEM_ENTRIES = 2000
 
 
@@ -68,17 +66,14 @@ def dequantize_embeddings_int8(
 
 class EmbeddingCacheManager:
     """
-    Manages embedding caching across Redis store with zero-RAM pass-through fallback.
+    Manages embedding caching using a thread-safe, high-speed in-memory LRU cache.
+    Eliminates external Redis network latency and memory overhead.
     """
 
     def __init__(
         self,
-        redis_client: Optional[Any] = None,
-        ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
         max_mem_entries: int = DEFAULT_MAX_MEM_ENTRIES,
     ):
-        self.redis = redis_client
-        self.ttl_seconds = ttl_seconds
         self.max_mem_entries = max_mem_entries
         self._lock = threading.Lock()
         self._mem_cache: OrderedDict[str, List[float]] = OrderedDict()
@@ -89,7 +84,7 @@ class EmbeddingCacheManager:
         model_version: str,
     ) -> Tuple[Dict[int, List[float]], List[int], List[str]]:
         """
-        Retrieves cached embeddings for a list of texts.
+        Retrieves cached embeddings for a list of texts from in-memory LRU cache.
         Returns:
             cached_map: {original_index: embedding_vector}
             missing_indices: list of original indices that were NOT in cache
@@ -101,25 +96,7 @@ class EmbeddingCacheManager:
 
         keys = [compute_embedding_cache_key(t, model_version) for t in texts]
 
-        # 1. Try Redis batch fetch if available
-        redis_results = None
-        if self.redis is not None:
-            try:
-                if hasattr(self.redis, "mget"):
-                    redis_results = self.redis.mget(keys)
-            except Exception as e:
-                logger.debug("Redis mget failed, calculating vectors on-demand", error=str(e))
-
         for idx, (text, key) in enumerate(zip(texts, keys)):
-            if redis_results and idx < len(redis_results) and redis_results[idx]:
-                try:
-                    val = json.loads(redis_results[idx])
-                    cached_map[idx] = val
-                    continue
-                except Exception:
-                    pass
-
-            # Fallback to local thread-safe LRU in-memory cache
             with self._lock:
                 if key in self._mem_cache:
                     self._mem_cache.move_to_end(key)
@@ -138,9 +115,8 @@ class EmbeddingCacheManager:
         model_version: str,
     ) -> None:
         """
-        Caches newly computed embeddings into Redis store and bounded in-memory cache.
+        Caches newly computed embeddings into bounded in-memory cache with thread safety and O(1) LRU eviction.
         """
-        # Populate bounded in-memory cache with thread safety and O(1) LRU eviction
         with self._lock:
             for text, emb in zip(texts, embeddings):
                 key = compute_embedding_cache_key(text, model_version)
@@ -149,16 +125,6 @@ class EmbeddingCacheManager:
                 elif len(self._mem_cache) >= self.max_mem_entries:
                     self._mem_cache.popitem(last=False)
                 self._mem_cache[key] = emb
-
-        if self.redis is not None:
-            try:
-                pipe = self.redis.pipeline()
-                for text, emb in zip(texts, embeddings):
-                    key = compute_embedding_cache_key(text, model_version)
-                    pipe.set(key, json.dumps(emb), ex=self.ttl_seconds)
-                pipe.execute()
-            except Exception as e:
-                logger.debug("Redis store embeddings failed", error=str(e))
 
 
 # Singleton instance

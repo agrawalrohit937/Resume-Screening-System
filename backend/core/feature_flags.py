@@ -33,6 +33,5 @@ FEATURE_JD_QUALITY_ASSISTANT: bool = _bool_flag("FEATURE_JD_QUALITY_ASSISTANT", 
 
 # Infrastructure & Multi-Tenancy
 FEATURE_MULTI_TENANCY: bool = _bool_flag("FEATURE_MULTI_TENANCY", default=True)
-FEATURE_REDIS_CACHE: bool = _bool_flag("FEATURE_REDIS_CACHE", default=False)
 FEATURE_DISTRIBUTED_LOCK: bool = _bool_flag("FEATURE_DISTRIBUTED_LOCK", default=False)
 FEATURE_BLIND_SCORING: bool = _bool_flag("FEATURE_BLIND_SCORING", default=False)
