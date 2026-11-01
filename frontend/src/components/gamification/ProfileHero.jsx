@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import { Flame, Medal, TrendingUp, Sparkles, Trophy } from 'lucide-react'
-import { deriveLeagueName } from './mockConfig'
 import Card from '../Card'
 
 function StatChip({ icon: Icon, value, label, color }) {
@@ -35,8 +34,6 @@ export default function ProfileHero({ profile, name, badgeCount, leaderboard = [
   const pointsToNext = profile?.level_info?.points_to_next || 0
   const streak = profile?.current_streak || 0
   const avgPct = Math.round((profile?.average_score || 0) * 100)
-  const league = deriveLeagueName(profile)
-
   const myEntry = leaderboard.find((e) => e.user_id === currentUserId || e.user_id === profile?.user_id)
   const userRank = profile?.rank || myEntry?.rank || (totalPoints > 0 ? 1 : '-')
 
@@ -56,7 +53,7 @@ export default function ProfileHero({ profile, name, badgeCount, leaderboard = [
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-200">
                 <Sparkles className="w-2.5 h-2.5 text-[#2E9BDA]" />
-                Lvl {level} • {league}
+                Lvl {level}
               </span>
               <span className="text-[10px] text-slate-400 font-medium truncate">• {levelName}</span>
             </div>
@@ -133,7 +130,7 @@ export default function ProfileHero({ profile, name, badgeCount, leaderboard = [
             <div className="min-w-0 flex-1">
               <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider mb-1 border border-slate-200 max-w-full truncate">
                 <Sparkles className="w-3 h-3 text-[#2E9BDA] shrink-0" />
-                Level {level} • {league}
+                Level {level}
               </div>
               <h1 className="font-extrabold text-xl sm:text-3xl text-slate-900 leading-tight truncate tracking-tight">
                 {name ? name : levelName}

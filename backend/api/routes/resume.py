@@ -32,17 +32,12 @@ from schemas.resume_schema import (
 )
 from services.parser_service import ParserService
 from services.cloudinary_service import upload_resume, delete_file as cloudinary_delete
-from services.gamification_service import GamificationService
 from utils.file_utils import validate_and_save_file, delete_file, sanitize_filename
 from utils.validators import validate_object_id
 from scheduler.job_alerts import sweep_stuck_pending_resumes
 
 
 logger = structlog.get_logger(__name__)
-
-
-def get_gamification_service(db=Depends(get_database)) -> GamificationService:
-    return GamificationService(db)
 
 
 router = APIRouter()
@@ -136,7 +131,6 @@ async def upload_resume_endpoint(
     resume_repo: ResumeRepository = Depends(get_resume_repo),
     user_repo: UserRepository = Depends(get_user_repo),
     parser: ParserService = Depends(get_parser_service),
-    gamification: GamificationService = Depends(get_gamification_service),
 ):
     """Upload a resume (PDF/DOCX) — triggers async parsing."""
 
@@ -212,9 +206,6 @@ async def upload_resume_endpoint(
             {"user_id": user_id_str, "_id": {"$ne": ObjectId(str(resume.id))}},
             {"$set": {"is_primary": False}},
         )
-
-    # Gamification
-    await gamification.mark_daily_activity(str(current_user.id))
 
     # Task 4.1: Compute idempotency key on (resume_id, file_hash)
     file_hash = hashlib.sha256(resume_bytes).hexdigest()

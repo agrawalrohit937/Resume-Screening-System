@@ -1,314 +1,133 @@
-import React from 'react'
+import { createElement } from 'react'
 import { motion } from 'framer-motion'
-import { Lock, Award, Sparkles, Star } from 'lucide-react'
+import { Award, Lock } from 'lucide-react'
 import Card from '../Card'
 
-// ─── Premium Tier Styles ────────────────────────────────────────────────────
 const TIER_STYLES = {
-  legendary: { 
-    gradient: 'from-fuchsia-600 via-purple-600 to-indigo-700',
-    innerGradient: 'from-fuchsia-400 to-indigo-500', 
-    border: 'border-fuchsia-300',
-    ring: 'ring-4 ring-fuchsia-500/30',
-    shadow: 'shadow-[0_10px_40px_-10px_rgba(168,85,247,0.8)] shadow-[inset_0_-4px_8px_rgba(0,0,0,0.4)]', 
-    text: 'text-purple-700',
-    bgLight: 'bg-fuchsia-50/50',
-  },
-  platinum: { 
-    gradient: 'from-cyan-300 via-blue-500 to-blue-700',
-    innerGradient: 'from-cyan-200 to-blue-400', 
-    border: 'border-cyan-100',
-    ring: 'ring-4 ring-cyan-500/30',
-    shadow: 'shadow-[0_10px_30px_-10px_rgba(6,182,212,0.8)] shadow-[inset_0_-4px_8px_rgba(0,0,0,0.3)]', 
-    text: 'text-blue-700',
-    bgLight: 'bg-cyan-50/50',
-  },
-  gold: { 
-    gradient: 'from-yellow-300 via-amber-500 to-orange-600',
-    innerGradient: 'from-yellow-200 to-amber-400', 
-    border: 'border-yellow-100',
-    ring: 'ring-4 ring-amber-500/30',
-    shadow: 'shadow-[0_10px_30px_-10px_rgba(245,158,11,0.7)] shadow-[inset_0_-4px_8px_rgba(0,0,0,0.3)]', 
-    text: 'text-amber-700',
-    bgLight: 'bg-amber-50/50',
-  },
-  silver: { 
-    gradient: 'from-slate-200 via-slate-400 to-slate-500',
-    innerGradient: 'from-slate-100 to-slate-300', 
-    border: 'border-white',
-    ring: 'ring-4 ring-slate-400/20',
-    shadow: 'shadow-[0_8px_20px_-10px_rgba(148,163,184,0.6)] shadow-[inset_0_-4px_6px_rgba(0,0,0,0.2)]', 
-    text: 'text-slate-700',
-    bgLight: 'bg-slate-50/50',
-  },
-  bronze: { 
-    gradient: 'from-orange-200 via-orange-400 to-red-500',
-    innerGradient: 'from-orange-100 to-orange-300', 
-    border: 'border-orange-100',
-    ring: 'ring-4 ring-orange-500/20',
-    shadow: 'shadow-[0_8px_20px_-10px_rgba(234,88,12,0.6)] shadow-[inset_0_-4px_6px_rgba(0,0,0,0.2)]', 
-    text: 'text-orange-800',
-    bgLight: 'bg-orange-50/50',
-  },
+  legendary: { medal: 'bg-slate-700', border: 'border-slate-300', text: 'text-slate-700', line: 'bg-slate-300' },
+  platinum: { medal: 'bg-slate-600', border: 'border-slate-300', text: 'text-slate-700', line: 'bg-slate-300' },
+  gold: { medal: 'bg-amber-500', border: 'border-amber-200', text: 'text-amber-700', line: 'bg-amber-200' },
+  silver: { medal: 'bg-slate-700', border: 'border-slate-300', text: 'text-slate-700', line: 'bg-slate-300' },
+  bronze: { medal: 'bg-orange-500', border: 'border-orange-200', text: 'text-orange-800', line: 'bg-orange-200' },
 }
 
 const TIER_ORDER = ['legendary', 'platinum', 'gold', 'silver', 'bronze']
 
-// ─── Animated Icon Component ─────────────────────────────────────────────────
-function BadgeIcon({ icon, className, tier, earned }) {
-  // Define unique idle animations for different tiers
-  const animations = {
-    legendary: { y: [-2, 2, -2], rotate: [-5, 5, -5], scale: [1, 1.1, 1] },
-    platinum: { y: [-2, 2, -2], scale: [1, 1.05, 1] },
-    gold: { rotate: [-5, 5, -5] },
-    silver: { scale: [1, 1.02, 1] },
-    bronze: {},
+function BadgeIcon({ badge, earned }) {
+  if (!earned) return <Lock className="w-6 h-6 text-slate-400" />
+  if (typeof badge.icon === 'function' || (typeof badge.icon === 'object' && badge.icon !== null)) {
+    return createElement(badge.icon, { className: 'w-8 h-8 text-white drop-shadow-md' })
   }
+  if (typeof badge.icon === 'string' && badge.icon.length > 0) return <span className="text-2xl">{badge.icon}</span>
+  return <Award className="w-8 h-8 text-white" />
+}
 
-  const animationProps = earned && tier === 'legendary'
-    ? {
-        animate: animations[tier] || {},
-        transition: { duration: 4, repeat: Infinity, ease: "easeInOut" }
-      }
-    : {}
+function earnedDate(value) {
+  if (!value || typeof value !== 'string') return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? null
+    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function Medal({ badge, earnedAt }) {
+  const earned = Boolean(earnedAt)
+  const style = TIER_STYLES[badge.tier] || TIER_STYLES.bronze
+  const date = earnedDate(earnedAt)
 
   return (
-    <motion.div {...animationProps} className="relative z-20">
-      {typeof icon === 'function' ? (
-        React.createElement(icon, { className })
-      ) : typeof icon === 'string' && icon.length > 0 ? (
-        <span className="text-2xl leading-none drop-shadow-md">{icon}</span>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      whileHover={{ y: -3 }}
+      className={`flex flex-col items-center text-center rounded-2xl p-3 sm:p-4 ${
+        earned ? 'bg-white border border-slate-200 hover:shadow-md' : 'bg-slate-50/70 border border-slate-200'
+      }`}
+    >
+      <div className="relative mb-3">
+        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 ${
+          earned
+            ? `${style.medal} ${style.border} shadow-md`
+            : 'bg-slate-100 border-white shadow-inner grayscale opacity-75'
+        }`}>
+          <BadgeIcon badge={badge} earned={earned} />
+        </div>
+        {earned && (
+          <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
+            <span className="text-white text-[10px] font-black">✓</span>
+          </span>
+        )}
+      </div>
+
+      <p className={`text-xs sm:text-[13px] font-black leading-tight ${earned ? 'text-slate-800' : 'text-slate-400'}`}>
+        {badge.name}
+      </p>
+      <p className="text-[10px] sm:text-[11px] text-slate-500 leading-relaxed mt-1.5 min-h-8 line-clamp-2">
+        {badge.description}
+      </p>
+      {earned ? (
+        date && <span className="mt-2 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">{date}</span>
       ) : (
-        <Award className={className} />
+        <span className="mt-2 text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">+{badge.points || 0} XP</span>
       )}
     </motion.div>
   )
 }
 
-// ─── Enhanced Medal Component ────────────────────────────────────────────────
-function Medal({ badge, earnedAt, index }) {
-  const earned = Boolean(earnedAt)
-  const style = TIER_STYLES[badge.tier] || TIER_STYLES.bronze
-
-  return (
-    <motion.div
-      variants={{
-        hidden: { opacity: 0, y: 30, scale: 0.8 },
-        visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', bounce: 0.6, duration: 0.8 } }
-      }}
-      className={`group flex flex-col items-center text-center p-4 rounded-2xl border transition-colors duration-200 ${
-        earned
-          ? `bg-white border-slate-200/80 hover:${style.bgLight} hover:border-slate-300`
-          : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100'
-      }`}
-    >
-      {/* 3D Medal Container with Hover Tilt */}
-      <motion.div 
-        className="relative mb-4 cursor-pointer"
-        whileHover={{ scale: 1.05, y: -2 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        style={{ perspective: 1000 }}
-      >
-        {/* Legendary Sparkles */}
-        {earned && badge.tier === 'legendary' && (
-           <>
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} className="absolute -inset-4 z-0">
-              <Star className="absolute top-0 right-0 w-4 h-4 text-yellow-300 fill-yellow-300 drop-shadow-[0_0_8px_rgba(253,224,71,1)]" />
-              <Star className="absolute bottom-0 left-0 w-3 h-3 text-purple-300 fill-purple-300 drop-shadow-[0_0_8px_rgba(216,180,254,1)]" />
-            </motion.div>
-            <Sparkles className="absolute -top-3 -right-3 w-7 h-7 text-yellow-300 animate-pulse z-30 drop-shadow-lg" />
-           </>
-        )}
-
-        {/* Medal Base */}
-        <div
-          className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-3 sm:border-4 overflow-hidden z-10 transition-all duration-500 ${
-            earned 
-              ? `bg-gradient-to-br ${style.gradient} ${style.border} ${style.shadow} ${style.ring}` 
-              : 'bg-gradient-to-br from-slate-100 to-slate-200 border-white shadow-[inset_0_4px_8px_rgba(0,0,0,0.1)] shadow-md grayscale opacity-70'
-          }`}
-        >
-          {/* Inner metallic highlight */}
-          {earned && (
-            <div className={`absolute inset-1 rounded-full bg-gradient-to-tr ${style.innerGradient} opacity-60 mix-blend-overlay`} />
-          )}
-
-          {/* Icon */}
-          {earned ? (
-            <BadgeIcon icon={badge.icon} tier={badge.tier} earned={true} className="w-8 h-8 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]" />
-          ) : (
-            <Lock className="w-6 h-6 text-slate-400 drop-shadow-sm" />
-          )}
-        </div>
-        
-        {/* Floor Shadow */}
-        <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-12 h-2 rounded-full blur-md transition-opacity ${earned ? 'bg-black/30' : 'bg-black/10'}`} />
-      </motion.div>
-
-      {/* Badge Info */}
-      <div className="w-full flex flex-col items-center z-10">
-        <p className={`text-[13px] font-black leading-tight tracking-wide ${earned ? 'text-slate-800' : 'text-slate-400'}`}>
-          {badge.name}
-        </p>
-        <p className="text-[11px] font-medium text-slate-500 leading-relaxed mt-1.5 line-clamp-2 h-8">
-          {badge.description}
-        </p>
-        
-        {earned ? (
-          typeof earnedAt === 'string' && (
-            <motion.span 
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded-full border border-emerald-200/50 shadow-sm"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              {new Date(earnedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-            </motion.span>
-          )
-        ) : (
-          <span className="mt-3 inline-flex text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/50">
-            +{badge.points} XP
-          </span>
-        )}
-      </div>
-    </motion.div>
-  )
-}
-
-// ─── Main Vault Component ────────────────────────────────────────────────────
 export default function AchievementVault({ catalog = [], earnedBadges = [] }) {
-  const earnedMap = new Map(earnedBadges.map((b) => [b.id, b.earned_at || true]))
-  const total = catalog.length
-  const pct = total ? Math.round((earnedMap.size / total) * 100) : 0
+  const earnedMap = new Map(earnedBadges.map((badge) => [badge.id, badge.earned_at || true]))
+  const earnedCount = catalog.filter((badge) => earnedMap.has(badge.id)).length
+  const percentage = catalog.length ? Math.round((earnedCount / catalog.length) * 100) : 0
 
   return (
-    <Card className="p-0 overflow-hidden border-0 shadow-[0_20px_50px_rgb(0,0,0,0.08)] rounded-[2rem] bg-white relative">
-      
-      {/* Background Decorative Elements */}
-      <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
-      <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-200/15 rounded-full pointer-events-none" />
-      <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-200/15 rounded-full pointer-events-none" />
-
-      {/* Premium Header */}
-      <div className="relative p-5 sm:p-8 lg:p-10 border-b border-slate-100/50 backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 sm:gap-6">
+    <Card className="p-0 overflow-hidden border-0 shadow-sm rounded-3xl bg-white">
+      <div className="p-5 sm:p-8 border-b border-slate-100 bg-white">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <motion.h3 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="font-extrabold text-2xl sm:text-3xl text-slate-800 tracking-tight flex items-center gap-2.5 sm:gap-3"
-            >
-              <Award className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600 shrink-0" />
-              Achievement Vault
-            </motion.h3>
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-xs sm:text-base font-medium text-slate-500 mt-1 sm:mt-2"
-            >
-              Your legacy of accomplishments and milestones.
-            </motion.p>
+            <h3 className="flex items-center gap-2 text-xl sm:text-2xl font-extrabold text-slate-800">
+              <Award className="w-6 h-6 text-blue-600" /> Achievement Vault
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">Your milestones from interview practice.</p>
           </div>
-          
-          {/* Enhanced Progress Stats */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center justify-between sm:justify-start gap-4 sm:gap-5 bg-white/80 backdrop-blur-md px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-white shadow-xl shadow-slate-200/40"
-          >
-            <div className="text-left sm:text-right">
-              <p className="font-extrabold text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-br from-slate-800 to-slate-500 leading-none">
-                {earnedMap.size} <span className="text-xs sm:text-sm text-slate-400 font-bold">/ {total}</span>
-              </p>
-              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-blue-500 mt-1">Unlocked</p>
+          <div className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-3 py-2">
+            <div>
+              <p className="text-xl font-black text-slate-800">{earnedCount}<span className="text-sm text-slate-400">/{catalog.length}</span></p>
+              <p className="text-[9px] font-black uppercase tracking-wider text-blue-600">Unlocked</p>
             </div>
-            
-            {/* Animated Circular Progress */}
-            <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center shrink-0">
-              <svg className="w-full h-full transform -rotate-90 drop-shadow-sm" viewBox="0 0 36 36">
-                <path className="text-slate-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                <motion.path 
-                  initial={{ strokeDasharray: "0, 100" }}
-                  whileInView={{ strokeDasharray: `${pct}, 100` }}
-                  transition={{ type: "spring", bounce: 0.4, duration: 2 }}
-                  className="text-blue-600" 
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="3"
-                  strokeLinecap="round" 
-                />
+            <div className="relative w-10 h-10">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${percentage}, 100`} />
               </svg>
-              <span className="absolute text-[10px] sm:text-[11px] font-extrabold text-slate-700">{pct}%</span>
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-slate-700">{percentage}%</span>
             </div>
-          </motion.div>
+          </div>
         </div>
-
-        {/* Glowing Animated Progress Bar */}
-        <div className="h-3 sm:h-4 rounded-full bg-slate-100/80 overflow-hidden mt-6 sm:mt-8 shadow-inner relative border border-slate-200/50">
-          <motion.div
-            initial={{ width: 0 }}
-            whileInView={{ width: `${pct}%` }}
-            viewport={{ once: true }}
-            transition={{ type: "spring", bounce: 0.2, duration: 2, delay: 0.2 }}
-            className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-blue-500 to-purple-500 relative"
-          >
-            {/* Continuous shimmer sweep */}
-            <motion.div 
-              animate={{ x: ["-100%", "200%"] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12" 
-            />
-          </motion.div>
+        <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden mt-5">
+          <div className="h-full rounded-full bg-blue-500" style={{ width: `${percentage}%` }} />
         </div>
       </div>
 
-      {/* Vault Content */}
-      <div className="p-4 sm:p-8 lg:p-10 relative z-10 bg-slate-50/35">
-        {total === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-16"
-          >
-             <div className="w-24 h-24 mx-auto bg-slate-50/80 rounded-full flex items-center justify-center mb-6 border-4 border-white shadow-xl shadow-slate-200/50">
-               <Award className="w-12 h-12 text-slate-300" />
-             </div>
-             <p className="text-xl font-extrabold text-slate-800">Vault is Empty</p>
-             <p className="text-sm font-medium text-slate-500 mt-2">More challenges are being forged. Check back soon.</p>
-          </motion.div>
+      <div className="p-4 sm:p-8">
+        {catalog.length === 0 ? (
+          <div className="py-12 text-center text-sm text-slate-500">No achievements available yet.</div>
         ) : (
-          <div className="space-y-14">
+          <div className="space-y-8">
             {TIER_ORDER.map((tier) => {
-              const tierBadges = catalog.filter((b) => b.tier === tier)
-              if (!tierBadges.length) return null
-              
-              const tierStyle = TIER_STYLES[tier]
-
+              const badges = catalog.filter((badge) => badge.tier === tier)
+              if (!badges.length) return null
+              const style = TIER_STYLES[tier]
               return (
-                <div key={tier} className="relative">
-                  {/* Glowing Tier Divider */}
-                  <div className="flex items-center gap-4 mb-6">
-                    <h4 className={`text-sm font-black uppercase tracking-[0.2em] ${tierStyle.text} bg-white pr-4 relative z-10 flex items-center gap-2`}>
-                      {tier} Tier
-                    </h4>
-                    <div className={`h-px flex-1 bg-gradient-to-r ${tierStyle.gradient} opacity-20`} />
+                <section key={tier}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <h4 className={`text-xs font-black uppercase tracking-[0.18em] ${style.text}`}>{tier} Tier</h4>
+                    <div className={`h-px flex-1 ${style.line}`} />
                   </div>
-                  
-                  {/* Staggered Grid */}
-                  <motion.div 
-                    initial="hidden" 
-                    whileInView="visible" 
-                    viewport={{ once: true, margin: "-100px" }}
-                    variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-6 gap-x-3"
-                  >
-                    {tierBadges.map((badge, i) => (
-                      <Medal key={badge.id} badge={badge} earnedAt={earnedMap.get(badge.id)} index={i} />
-                    ))}
-                  </motion.div>
-                </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {badges.map((badge) => <Medal key={badge.id} badge={badge} earnedAt={earnedMap.get(badge.id)} />)}
+                  </div>
+                </section>
               )
             })}
           </div>
