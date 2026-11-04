@@ -7,7 +7,7 @@ cursor pagination across large collections.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from bson import ObjectId
+from core.id import DocumentId
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -19,8 +19,8 @@ async def stream_cursor(
     batch_size: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Streams documents from a MongoDB / Motor cursor into a list without silent truncation.
-    Safely supports Motor async cursors, PyMongo sync cursors, and mocked cursors.
+    Streams documents from a database cursor into a list without silent truncation.
+    Safely supports async database cursors and mocked cursors.
 
     Complexity:
         Time: O(N) streaming traversal.
@@ -66,7 +66,7 @@ async def paginate_by_cursor(
     cursor: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Executes efficient cursor-based pagination using MongoDB _id boundaries.
+    Executes efficient cursor-based pagination using document _id boundaries.
     Prevents deep offset skip() performance degradation (O(N) -> O(1) index seek).
 
     Returns:
@@ -81,15 +81,15 @@ async def paginate_by_cursor(
     query = dict(filter_query)
     effective_cursor = cursor or cursor_id
 
-    if effective_cursor and ObjectId.is_valid(effective_cursor):
+    if effective_cursor and DocumentId.is_valid(effective_cursor):
         op = "$lt" if sort_descending else "$gt"
         if "_id" in query:
             query["$and"] = [
                 {"_id": query.pop("_id")},
-                {"_id": {op: ObjectId(effective_cursor)}},
+                {"_id": {op: DocumentId(effective_cursor)}},
             ]
         else:
-            query["_id"] = {op: ObjectId(effective_cursor)}
+            query["_id"] = {op: DocumentId(effective_cursor)}
 
     sort_order = -1 if sort_descending else 1
     cursor = collection.find(query, projection or {}).sort("_id", sort_order)

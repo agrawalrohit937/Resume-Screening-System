@@ -12,71 +12,9 @@ from services.talent_crm_service import TalentCRMService
 from services.multi_tenancy.tenant_context import tenant_context
 
 
-class InMemoryCollection:
-    def __init__(self):
-        self.docs = []
-
-    async def insert_one(self, doc):
-        self.docs.append(dict(doc))
-        return type("InsertResult", (), {"inserted_id": doc.get("id")})()
-
-    async def find_one(self, query):
-        for d in self.docs:
-            if all(d.get(k) == v for k, v in query.items()):
-                return dict(d)
-        return None
-
-    def find(self, query):
-        results = []
-        for d in self.docs:
-            match = True
-            for k, v in query.items():
-                if k == "tags":
-                    if v not in d.get("tags", []):
-                        match = False
-                        break
-                elif d.get(k) != v:
-                    match = False
-                    break
-            if match:
-                results.append(dict(d))
-
-        class MockCursor:
-            def __init__(self, data):
-                self.data = data
-
-            async def to_list(self, length=100):
-                return self.data[:length]
-
-        return MockCursor(results)
-
-    async def update_one(self, query, update):
-        for d in self.docs:
-            if all(d.get(k) == v for k, v in query.items()):
-                if "$set" in update:
-                    d.update(update["$set"])
-                if "$addToSet" in update:
-                    for k, v in update["$addToSet"].items():
-                        current = d.get(k, [])
-                        if v not in current:
-                            current.append(v)
-                        d[k] = current
-                return type("UpdateResult", (), {"modified_count": 1})()
-        return type("UpdateResult", (), {"modified_count": 0})()
-
-
-class MockDB:
-    def __init__(self):
-        self.requisitions = InMemoryCollection()
-        self.interview_kits = InMemoryCollection()
-        self.scorecards = InMemoryCollection()
-        self.talent_crm = InMemoryCollection()
-
-
 @pytest.mark.asyncio
 async def test_requisition_lifecycle_and_approval_chain():
-    db = MockDB()
-    req_service = RequisitionService(db)
+    req_service = RequisitionService()
 
     with tenant_context("enterprise_tenant_1"):
         # 1. Create requisition in draft
@@ -137,8 +75,7 @@ async def test_requisition_lifecycle_and_approval_chain():
 
 @pytest.mark.asyncio
 async def test_requisition_rejection_flow():
-    db = MockDB()
-    req_service = RequisitionService(db)
+    req_service = RequisitionService()
 
     with tenant_context("enterprise_tenant_1"):
         req = await req_service.create_requisition(
@@ -158,8 +95,7 @@ async def test_requisition_rejection_flow():
 
 @pytest.mark.asyncio
 async def test_structured_interview_kits_and_calibration():
-    db = MockDB()
-    kit_service = InterviewKitService(db)
+    kit_service = InterviewKitService()
 
     with tenant_context("tenant_acme"):
         # 1. Create interview kit
@@ -227,8 +163,7 @@ async def test_structured_interview_kits_and_calibration():
 
 @pytest.mark.asyncio
 async def test_scorecard_submission_upsert_prevents_duplicates():
-    db = MockDB()
-    kit_service = InterviewKitService(db)
+    kit_service = InterviewKitService()
 
     with tenant_context("tenant_acme"):
         # 1. Initial submission from interviewer_1
@@ -243,7 +178,8 @@ async def test_scorecard_submission_upsert_prevents_duplicates():
         )
         assert sc1.id is not None
         assert sc1.ratings["Architecture"] == 4
-        assert len(db.scorecards.docs) == 1
+        saved_scorecards = await kit_service.kit_repo.get_scorecards_by_application("app_123")
+        assert len(saved_scorecards) == 1
 
         # 2. Resubmission / update from same interviewer for same candidate and stage
         sc2 = await kit_service.submit_scorecard(
@@ -257,19 +193,19 @@ async def test_scorecard_submission_upsert_prevents_duplicates():
         )
 
         # 3. Verify unique constraint: no duplicate record inserted, updated in place
-        assert len(db.scorecards.docs) == 1
+        saved_scorecards2 = await kit_service.kit_repo.get_scorecards_by_application("app_123")
+        assert len(saved_scorecards2) == 1
         assert sc2.id == sc1.id
         assert sc2.ratings["Architecture"] == 5
         assert sc2.recommendation == RecommendationEnum.STRONG_YES
         assert sc2.notes == "Revised assessment after deep dive."
-        assert db.scorecards.docs[0]["ratings"]["Architecture"] == 5
-        assert db.scorecards.docs[0]["notes"] == "Revised assessment after deep dive."
+        assert saved_scorecards2[0]["ratings"]["Architecture"] == 5
+        assert saved_scorecards2[0]["notes"] == "Revised assessment after deep dive."
 
 
 @pytest.mark.asyncio
 async def test_talent_crm_silver_medalist_reengagement():
-    db = MockDB()
-    crm_service = TalentCRMService(db)
+    crm_service = TalentCRMService()
 
     # 1. Register silver medalist under tenant_a
     with tenant_context("tenant_a"):

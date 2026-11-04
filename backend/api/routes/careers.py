@@ -2,7 +2,6 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 import structlog
 
-from config.db import get_database
 from repositories.career_application_repo import CareerApplicationRepository
 from services.cloudinary_service import upload_file, FOLDER_ROOT
 from services.email_service import EmailService
@@ -14,7 +13,7 @@ router = APIRouter()
 FOLDER_CAREER_RESUMES = f"{FOLDER_ROOT}/career_resumes"
 
 
-async def _background_send_email(db, repo_coll_name, app_id, full_name, email, role, linkedin_url, github_url, portfolio_url, cover_letter, resume_bytes, resume_filename):
+async def _background_send_email(app_id, full_name, email, role, linkedin_url, github_url, portfolio_url, cover_letter, resume_bytes, resume_filename):
     try:
         email_service = EmailService()
         result = await email_service.send_career_application(
@@ -29,11 +28,14 @@ async def _background_send_email(db, repo_coll_name, app_id, full_name, email, r
             resume_filename=resume_filename,
         )
         if result.get("sent") and app_id:
-            from bson import ObjectId
-            await db[repo_coll_name].update_one(
-                {"_id": ObjectId(app_id)},
-                {"$set": {"email_sent": True}},
-            )
+            from config.db import get_pg_session_factory
+            from sqlalchemy import update
+            from models import CareerApplication
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(CareerApplication).where(CareerApplication.id == str(app_id)).values(email_sent=True)
+                )
+                await session.commit()
     except Exception as exc:
         logger.exception("Failed to send career application email in background", error=str(exc))
 
@@ -84,8 +86,7 @@ async def submit_career_application(
             logger.error("Failed to upload resume to Cloudinary", error=str(e))
 
     # ── Save application to database ─────────────────────────────────────────
-    db = get_database()
-    repo = CareerApplicationRepository(db)
+    repo = CareerApplicationRepository()
 
     clean_name = full_name.strip()
     clean_email = email.strip()
@@ -123,8 +124,6 @@ async def submit_career_application(
     # ── Send email notification in background task ───────────────────────────
     background_tasks.add_task(
         _background_send_email,
-        db=db,
-        repo_coll_name=repo.collection.name,
         app_id=saved_app.id,
         full_name=clean_name,
         email=clean_email,

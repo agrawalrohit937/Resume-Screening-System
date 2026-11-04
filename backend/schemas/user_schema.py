@@ -42,6 +42,24 @@ class SignupRequest(BaseModel):
             raise ValueError("Please provide your full name (first and last)")
         return v
 
+    @field_validator("role")
+    @classmethod
+    def forbid_admin_role_signup(cls, v: UserRole) -> UserRole:
+        role_val = v.value if hasattr(v, "value") else str(v).lower()
+        if role_val in ("admin", "platform_admin"):
+            raise ValueError("Administrative roles cannot be self-assigned during public signup.")
+        return v
+
+    @field_validator("roles")
+    @classmethod
+    def forbid_admin_roles_signup(cls, v: Optional[List[UserRole]]) -> Optional[List[UserRole]]:
+        if not v:
+            return v
+        for r in v:
+            r_val = r.value if hasattr(r, "value") else str(r).lower()
+            if r_val in ("admin", "platform_admin"):
+                raise ValueError("Administrative roles cannot be self-assigned during public signup.")
+        return v
 
 class LoginRequest(BaseModel):
     email: EmailStr

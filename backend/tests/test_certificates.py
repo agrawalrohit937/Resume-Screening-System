@@ -21,7 +21,7 @@ async def test_certificate_record_creation_and_fields():
     assert record.status == "active"
 
 @pytest.mark.asyncio
-async def test_certificate_from_mongo_safely_filters_unknown_fields():
+async def test_certificate_from_doc_safely_filters_unknown_fields():
     doc = {
         "_id": "CERT-TEST-002",
         "certificate_type": "assessment",
@@ -35,16 +35,16 @@ async def test_certificate_from_mongo_safely_filters_unknown_fields():
         "unknown_legacy_field": "some_value",
         "extra_field_123": True,
     }
-    cert = CertificateRecord.from_mongo(doc)
+    cert = CertificateRecord.from_doc(doc)
     assert cert.id == "CERT-TEST-002"
     assert cert.topic == "react"
     assert not hasattr(cert, "unknown_legacy_field")
 
 @pytest.mark.asyncio
 async def test_certificate_persist_populates_topic_if_missing():
-    mock_db = MagicMock()
-    mock_col = AsyncMock()
-    mock_db.__getitem__.return_value = mock_col
+    mock_session = AsyncMock()
+    mock_factory = MagicMock(return_value=mock_session)
+    mock_session.__aenter__.return_value = mock_session
 
     record = CertificateRecord(
         id="CERT-TEST-003",
@@ -58,25 +58,20 @@ async def test_certificate_persist_populates_topic_if_missing():
         topic=None,  # Not provided initially
     )
 
-    with patch("models.certificate_model.get_database", return_value=mock_db):
+    with patch("config.db.get_pg_session_factory", return_value=mock_factory):
         await record.persist()
 
-    mock_col.insert_one.assert_called_once()
-    saved_doc = mock_col.insert_one.call_args[0][0]
-    assert saved_doc["_id"] == "CERT-TEST-003"
-    assert saved_doc["topic"] == "react-developer"
+    mock_session.add.assert_called_once()
+    cert_row = mock_session.add.call_args[0][0]
+    assert cert_row.id == "CERT-TEST-003"
+    assert cert_row.topic == "react-developer"
+    mock_session.commit.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_certificate_persist_catches_duplicate_index_and_retries():
-    mock_db = MagicMock()
-    mock_col = AsyncMock()
-    mock_db.__getitem__.return_value = mock_col
-
-    # First call simulates MongoDB duplicate key error on the old index
-    mock_col.insert_one.side_effect = [
-        Exception("E11000 duplicate key error collection: ai_career_platform.certificates index: certificate_user_topic_unique dup key: { user_id: '123', topic: null }"),
-        None  # Second call succeeds after dropping index
-    ]
+async def test_certificate_persist_relational_session_execution():
+    mock_session = AsyncMock()
+    mock_factory = MagicMock(return_value=mock_session)
+    mock_session.__aenter__.return_value = mock_session
 
     record = CertificateRecord(
         id="CERT-TEST-004",
@@ -90,8 +85,11 @@ async def test_certificate_persist_catches_duplicate_index_and_retries():
         topic="react",
     )
 
-    with patch("models.certificate_model.get_database", return_value=mock_db):
+    with patch("config.db.get_pg_session_factory", return_value=mock_factory):
         await record.persist()
 
-    mock_col.drop_index.assert_called_once_with("certificate_user_topic_unique")
-    assert mock_col.insert_one.call_count == 2
+    mock_session.add.assert_called_once()
+    cert_row = mock_session.add.call_args[0][0]
+    assert cert_row.id == "CERT-TEST-004"
+    assert cert_row.topic == "react"
+    mock_session.commit.assert_called_once()

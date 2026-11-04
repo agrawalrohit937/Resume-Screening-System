@@ -120,5 +120,5 @@ def setup_logging(log_level: Optional[str] = None) -> None:
     root_logger.setLevel(level)
 
     # Silence noisy third-party loggers
-    for noisy in ["uvicorn.access", "motor", "pymongo"]:
+    for noisy in ["uvicorn.access"]:
         logging.getLogger(noisy).setLevel(logging.WARNING)

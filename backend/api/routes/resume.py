@@ -1,3 +1,6 @@
+from config.db import get_pg_session_factory
+from sqlalchemy import update
+from models.tables import Resume, User
 """
 Resume Routes — Upload, Parse, List, Delete
 """
@@ -9,7 +12,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, Query, UploadFile, status
 
 from services.tasks import task_manager, execute_resume_parse
@@ -20,7 +22,6 @@ from api.deps import (
     get_current_user, get_resume_repo, get_parser_service, get_user_repo,
     PaginationParams
 )
-from config.db import get_database
 from core.config import settings
 from models.resume_model import ResumeModel, ResumeStatus
 from models.user_model import UserModel
@@ -81,10 +82,7 @@ async def _parse_resume_background(
         logger.exception("Resume parse background task failed", resume_id=resume_id, error=str(e))
         err_msg = f"Resume parse failed: {str(e)}"
         await resume_repo.update_status(resume_id, ResumeStatus.FAILED, error=err_msg)
-        await resume_repo.collection.update_one(
-            {"_id": ObjectId(resume_id)},
-            {"$set": {"error_message": err_msg, "parse_error": err_msg}},
-        )
+        await resume_repo.update(resume_id, {"error_message": err_msg, "parse_error": err_msg})
 
     finally:
         if os.path.exists(file_path):
@@ -97,27 +95,27 @@ async def _bg_upload_to_cloudinary(
     resume_id: str,
     user_id_str: str,
     original_filename: str,
-    db: Any,
 ):
     """Background task to upload resume to Cloudinary without delaying the upload response."""
     try:
         cloudinary_url, cloudinary_public_id = await upload_resume(resume_bytes, filename)
-        if cloudinary_url and db is not None:
-            await db["resumes"].update_one(
-                {"_id": ObjectId(resume_id)},
-                {"$set": {
-                    "file_url": cloudinary_url,
-                    "cloudinary_public_id": cloudinary_public_id,
-                }}
-            )
-            await db["users"].update_one(
-                {"_id": ObjectId(user_id_str)},
-                {"$set": {
-                    "profile_resume_url": cloudinary_url,
-                    "profile_resume_name": original_filename,
-                    "updated_at": datetime.now(timezone.utc),
-                }}
-            )
+        if cloudinary_url:
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(Resume).where(Resume.id == str(resume_id)).values(
+                        file_url=cloudinary_url,
+                        cloudinary_public_id=cloudinary_public_id,
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+                await session.execute(
+                    update(User).where(User.id == str(user_id_str)).values(
+                        profile_resume_url=cloudinary_url,
+                        profile_resume_name=original_filename,
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+                await session.commit()
             logger.info("Background Cloudinary upload finished", resume_id=resume_id, url=cloudinary_url)
     except Exception as e:
         logger.warning("Background Cloudinary upload warning", resume_id=resume_id, error=str(e))
@@ -166,24 +164,16 @@ async def upload_resume_endpoint(
     }
 
     # Set previous resumes to non-primary and create new resume document
-    await resume_repo.collection.update_many(
-        {"user_id": user_id_str},
-        {"$set": {"is_primary": False}},
-    )
     resume_data.pop("_id", None)
     resume = await resume_repo.create(resume_data)
+    await resume_repo.set_primary_resume(user_id_str, str(resume.id))
 
-    await user_repo.collection.update_one(
-        {"_id": ObjectId(user_id_str)},
-        {"$set": {
-            "profile_resume_url": file_url,
-            "profile_resume_name": original_filename,
-            "updated_at": datetime.now(timezone.utc),
-        }},
-    )
+    await user_repo.update(user_id_str, {
+        "profile_resume_url": file_url,
+        "profile_resume_name": original_filename,
+    })
 
     # Non-blocking Cloudinary background upload
-    db_conn = resume_repo.db or getattr(resume_repo.collection, "database", None)
     background_tasks.add_task(
         _bg_upload_to_cloudinary,
         resume_bytes,
@@ -191,21 +181,10 @@ async def upload_resume_endpoint(
         str(resume.id),
         user_id_str,
         original_filename,
-        db_conn,
     )
 
     # Compensating post-check: ensure user has exactly 1 primary resume
-    primary_count = await resume_repo.collection.count_documents({"user_id": user_id_str, "is_primary": True})
-    if primary_count == 0 and resume:
-        await resume_repo.collection.update_one(
-            {"_id": ObjectId(str(resume.id))},
-            {"$set": {"is_primary": True}},
-        )
-    elif primary_count > 1 and resume:
-        await resume_repo.collection.update_many(
-            {"user_id": user_id_str, "_id": {"$ne": ObjectId(str(resume.id))}},
-            {"$set": {"is_primary": False}},
-        )
+    await resume_repo.ensure_single_primary(user_id_str, str(resume.id))
 
     # Task 4.1: Compute idempotency key on (resume_id, file_hash)
     file_hash = hashlib.sha256(resume_bytes).hexdigest()
@@ -306,10 +285,7 @@ async def update_resume(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
     update_data = payload.model_dump(exclude_none=True)
     if update_data.get("is_primary") is True:
-        await resume_repo.collection.update_many(
-            {"user_id": str(current_user.id), "_id": {"$ne": ObjectId(resume_id)}},
-            {"$set": {"is_primary": False}},
-        )
+        await resume_repo.set_primary_resume(str(current_user.id), resume_id)
     updated = await resume_repo.update(resume_id, update_data)
     return _resume_to_response(updated)
 
@@ -360,7 +336,7 @@ async def delete_resume(
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
 ):
-    """Delete a resume — removes Cloudinary asset first, then MongoDB document."""
+    """Delete a resume — removes Cloudinary asset first, then database document."""
     validate_object_id(resume_id, "resume_id")
     resume = await resume_repo.get_by_id_and_user(resume_id, str(current_user.id))
     if not resume:
@@ -402,11 +378,9 @@ def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
     )
 
 
-# ─── POST /resume/admin/sweep-stuck ──────────────────────────────────────────
 @router.post("/admin/sweep-stuck")
 async def sweep_stuck_resumes_webhook(
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
-    db: Any = Depends(get_database),
 ):
     """
     Webhook endpoint to sweep stuck pending/processing resumes older than 10 minutes.
@@ -425,8 +399,7 @@ async def sweep_stuck_resumes_webhook(
             detail="Invalid or missing X-Cron-Secret header",
         )
 
-    raw_db = getattr(db, "_raw_db", db)
-    result = await sweep_stuck_pending_resumes(raw_db)
+    result = await sweep_stuck_pending_resumes()
     return {
         "status": "success",
         "message": "Sweep completed",

@@ -2,7 +2,7 @@
 Dataset Builder for ATS Evaluation Harness (Phase 2).
 Provides:
 1. CSV import for manual recruiter annotations (e.g. resumeJD2_pairs.csv).
-2. MongoDB export for production candidate evaluations.
+2. PostgreSQL export for production candidate evaluations.
 3. Synthetic label generator strictly for offline smoke tests (clearly marked synthetic).
 """
 
@@ -131,29 +131,33 @@ def generate_synthetic_smoke_dataset(
     )
 
 
-async def export_from_mongodb(
+async def export_from_database(
     output_json_path: str = "backend/eval/exported_db_dataset.json",
     limit: int = 200,
 ) -> EvaluationDataset:
-    """Exports candidate applications and matches directly from MongoDB collections."""
-    from config.db import connect_db, get_database, disconnect_db
-    await connect_db()
-    db = get_database()
+    """Exports candidate applications and matches directly from PostgreSQL tables."""
+    from config.db import get_pg_session_factory
+    from sqlalchemy import select
+    from models.tables import CandidateApplication, Resume, Job
 
     pairs: List[LabeledPair] = []
-    try:
-        cursor = db.applications.find({"recruiter_rating": {"$exists": True}}).limit(limit)
-        async for app_doc in cursor:
-            r_id = str(app_doc.get("resume_id"))
-            j_id = str(app_doc.get("job_id"))
-            rating = int(app_doc.get("recruiter_rating", 0))
+    async with get_pg_session_factory()() as session:
+        stmt = select(CandidateApplication).limit(limit)
+        apps = (await session.execute(stmt)).scalars().all()
+        for app_row in apps:
+            r_id = str(app_row.resume_id or "")
+            j_id = str(app_row.job_id or "")
+            rating = 3 if app_row.stage in ("hired", "offer", "interview") else (1 if app_row.stage == "screening" else 2)
 
-            res_doc = await db.resumes.find_one({"_id": r_id}) or {}
-            job_doc = await db.jobs.find_one({"_id": j_id}) or {}
+            res_row = (await session.execute(select(Resume).where(Resume.id == r_id))).scalar_one_or_none()
+            job_row = (await session.execute(select(Job).where(Job.id == j_id))).scalar_one_or_none()
+
+            res_doc = {c.name: getattr(res_row, c.name) for c in Resume.__table__.columns} if res_row else {}
+            job_doc = {c.name: getattr(job_row, c.name) for c in Job.__table__.columns} if job_row else {}
 
             pairs.append(
                 LabeledPair(
-                    pair_id=str(app_doc.get("_id")),
+                    pair_id=str(app_row.id),
                     resume_id=r_id,
                     jd_id=j_id,
                     recruiter_label=min(3, max(0, rating)),
@@ -162,12 +166,10 @@ async def export_from_mongodb(
                     is_synthetic=False,
                 )
             )
-    finally:
-        await disconnect_db()
 
     ds = EvaluationDataset(
-        dataset_name="MongoDB_Exported_Dataset",
-        description=f"Exported from MongoDB applications at {os.path.basename(output_json_path)}",
+        dataset_name="PostgreSQL_Exported_Dataset",
+        description=f"Exported from PostgreSQL applications at {os.path.basename(output_json_path)}",
         is_synthetic_dataset=False,
         pairs=pairs,
     )

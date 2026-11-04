@@ -3,7 +3,6 @@ Phase A1 Security Verification Tests: Strict Multi-Tenant Isolation & Repository
 """
 
 import pytest
-from bson import ObjectId
 from unittest.mock import AsyncMock, MagicMock
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -61,31 +60,32 @@ async def test_tenant_middleware_rejects_header_spoofing():
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_tenant_scoped_collection_cross_tenant_read_prevented():
-    mock_mongo_col = AsyncMock()
-    scoped_col = TenantScopedCollection(mock_mongo_col)
+    mock_repo = AsyncMock()
+    scoped_repo = TenantScopedCollection(mock_repo)
 
     with tenant_context("tenant_acme"):
-        doc_id = ObjectId()
+        doc_id = "rec_12345"
         # Query without tenant_id -> automatically scoped
-        await scoped_col.find_one({"_id": doc_id})
-        mock_mongo_col.find_one.assert_called_with({"_id": doc_id, "tenant_id": "tenant_acme"})
+        await scoped_repo.get({"id": doc_id})
+        mock_repo.get.assert_called_with({"id": doc_id, "tenant_id": "tenant_acme"})
 
         # Query with explicit mismatched tenant_id -> raises TenantAccessDeniedError
         with pytest.raises(TenantAccessDeniedError):
-            await scoped_col.find_one({"_id": doc_id, "tenant_id": "tenant_evil_corp"})
+            await scoped_repo.get({"id": doc_id, "tenant_id": "tenant_evil_corp"})
 
 
 @pytest.mark.asyncio
 async def test_platform_admin_bypass_tenant_filter():
-    mock_mongo_col = AsyncMock()
-    scoped_col = TenantScopedCollection(mock_mongo_col)
+    mock_repo = AsyncMock()
+    scoped_repo = TenantScopedCollection(mock_repo)
 
     with platform_admin_context(True):
-        doc_id = ObjectId()
-        await scoped_col.find_one({"_id": doc_id})
+        doc_id = "rec_12345"
+        await scoped_repo.get({"id": doc_id})
         # Root platform admin query is not forced to a single tenant
-        mock_mongo_col.find_one.assert_called_with({"_id": doc_id})
+        mock_repo.get.assert_called_with({"id": doc_id})
 
 
 def test_tenant_scoped_collections_contain_all_critical_entities():

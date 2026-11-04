@@ -1,17 +1,10 @@
-"""
-Admin API Routes — Secure endpoints for managing support tickets,
-career applications, and viewing platform statistics.
-
-All endpoints require admin role (enforced via get_admin_user dependency).
-"""
-
-from typing import Optional
-
+from typing import Optional, Any, List, Dict
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-
-from api.deps import get_admin_user
-from config.db import get_database
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from models.tables import User
+from api.deps import get_admin_user, get_db
 from models.user_model import UserModel
 from repositories.career_application_repo import CareerApplicationRepository
 from repositories.support_ticket_repo import SupportTicketRepository
@@ -23,12 +16,12 @@ router = APIRouter()
 
 # ── Dependency helpers ────────────────────────────────────────────────────────
 
-def get_ticket_repo(db=Depends(get_database)):
-    return SupportTicketRepository(db)
+def get_ticket_repo() -> SupportTicketRepository:
+    return SupportTicketRepository()
 
 
-def get_career_repo(db=Depends(get_database)):
-    return CareerApplicationRepository(db)
+def get_career_repo() -> CareerApplicationRepository:
+    return CareerApplicationRepository()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -38,19 +31,19 @@ def get_career_repo(db=Depends(get_database)):
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
     admin: UserModel = Depends(get_admin_user),
-    db=Depends(get_database),
+    session: AsyncSession = Depends(get_db),
 ):
     """Aggregated platform statistics for the admin dashboard overview."""
-    ticket_repo = SupportTicketRepository(db)
-    career_repo = CareerApplicationRepository(db)
+    ticket_repo = SupportTicketRepository()
+    career_repo = CareerApplicationRepository()
 
     # Parallel aggregation
     ticket_stats = await ticket_repo.get_ticket_stats()
     career_stats = await career_repo.count_by_status()
 
-    # User count
-    user_count = await db.users.count_documents({})
-    active_users = await db.users.count_documents({"status": "active"})
+    # User count via PostgreSQL
+    user_count = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
+    active_users = (await session.execute(select(func.count()).select_from(User).where(User.status == "active"))).scalar() or 0
 
     return {
         "users": {

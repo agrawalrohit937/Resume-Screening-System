@@ -1,13 +1,17 @@
-"""Structured Interview Kits, Scorecards & Calibration API Routes.
+"""Structured Interview Kits, Scorecards & Calibration API Routes (Pure PostgreSQL).
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
+from sqlalchemy import select, and_
 
-from bson import ObjectId
-from api.deps import get_database, get_current_user
+from config.db import get_pg_session_factory
+from models.tables import CandidateApplication, InterviewKit, Scorecard
+from api.deps import get_current_user, get_interview_kit_repo, get_job_repo
+from repositories.interview_kit_repo import InterviewKitRepository
+from repositories.job_repo import JobRepository
 from models.user_model import UserModel
 from models.interview_kit import (
     InterviewKitModel,
@@ -41,10 +45,10 @@ class SubmitScorecardPayload(BaseModel):
 async def create_interview_kit_route(
     payload: CreateKitPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
 ):
     """Creates a structured interview kit with standardized competency rubrics."""
-    service = InterviewKitService(db)
+    service = InterviewKitService(kit_repo=kit_repo)
     tenant_id = getattr(current_user, "tenant_id", "default")
     return await service.create_interview_kit(
         job_id=payload.job_id,
@@ -59,15 +63,11 @@ async def create_interview_kit_route(
 async def get_interview_kits_route(
     job_id: Optional[str] = Query(None, description="Filter by job ID"),
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
 ):
     """Lists structured interview kits for a job or organization."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    query: Dict[str, Any] = {"tenant_id": tenant_id}
-    if job_id:
-        query["job_id"] = job_id
-    cursor = db.interview_kits.find(query)
-    docs = await cursor.to_list(length=50)
+    docs = await kit_repo.list_kits_by_job(job_id or "", tenant_id)
     return [InterviewKitModel(**d) for d in docs]
 
 
@@ -75,10 +75,10 @@ async def get_interview_kits_route(
 async def submit_scorecard_route(
     payload: SubmitScorecardPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
 ):
     """Submits an interviewer scorecard with 1-5 ratings and recommendations."""
-    service = InterviewKitService(db)
+    service = InterviewKitService(kit_repo=kit_repo)
     tenant_id = getattr(current_user, "tenant_id", "default")
     interviewer_id_str = str(current_user.id) if current_user.id else "interviewer_user"
     return await service.submit_scorecard(
@@ -98,10 +98,10 @@ async def get_calibration_route(
     application_id: str = Query(..., description="Application ID"),
     stage_name: str = Query(..., description="Interview stage name"),
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
 ):
     """Calculates inter-rater agreement, score variance, and consensus recommendations."""
-    service = InterviewKitService(db)
+    service = InterviewKitService(kit_repo=kit_repo)
     tenant_id = getattr(current_user, "tenant_id", "default")
     return await service.calculate_calibration(
         application_id=application_id,
@@ -113,33 +113,28 @@ async def get_calibration_route(
 @router.get("/assigned", response_model=List[Dict[str, Any]])
 async def get_assigned_interviews_route(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
+    job_repo: JobRepository = Depends(get_job_repo),
 ):
     """Retrieves interviews scheduled/assigned for the current user and tenant."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    cursor = db.applications.find({
-        "tenant_id": tenant_id,
-        "$or": [
-            {"stage": {"$in": ["interview", "technical_interview", "onsite", "Interview", "Screening"]}},
-            {"interviewer_id": current_user.id or "interviewer_user"},
-            {"assigned_interviewer": current_user.id or "interviewer_user"},
-        ]
-    })
-    apps = await cursor.to_list(length=50)
+    async with get_pg_session_factory()() as session:
+        stmt = select(CandidateApplication).where(CandidateApplication.tenant_id == tenant_id).limit(50)
+        app_rows = (await session.execute(stmt)).scalars().all()
+        apps = [{c.name: getattr(r, c.name) for c in CandidateApplication.__table__.columns} for r in app_rows]
     results: List[Dict[str, Any]] = []
 
-    user_id_str = str(current_user.id) if current_user.id else "interviewer_user"
     for app in apps:
         app_id_str = str(app.get("id") or app.get("_id"))
         job_id = app.get("job_id")
         job = None
         if job_id:
-            try:
-                job = await db.jobs.find_one({"_id": ObjectId(job_id)})
-            except Exception:
-                job = None
+            job = await job_repo.get_by_id(job_id)
 
-        kit = await db.interview_kits.find_one({"job_id": job_id, "tenant_id": tenant_id})
+        async with get_pg_session_factory()() as session:
+            stmt = select(InterviewKit).where(and_(InterviewKit.job_id == str(job_id), InterviewKit.tenant_id == tenant_id))
+            kit_row = (await session.execute(stmt)).scalar_one_or_none()
+            kit = {c.name: getattr(kit_row, c.name) for c in InterviewKit.__table__.columns} if kit_row else None
         competencies = kit.get("competencies", []) if kit else [
             {"name": "Technical Problem Solving", "description": "Core engineering knowledge and architecture", "rubric": {1: "Sub-par", 3: "Solid", 5: "Mastery"}},
             {"name": "System Architecture", "description": "Scalability, fault-tolerance, data modeling", "rubric": {1: "Basic", 3: "Proficient", 5: "Expert"}},
@@ -149,22 +144,8 @@ async def get_assigned_interviews_route(
         resume_snapshot = app.get("resume_snapshot") or {}
         resume_url = app.get("resume_url") or resume_snapshot.get("file_url") or "#"
 
-        # Check if a scorecard was already submitted for THIS specific application
-        scorecard_doc = await db.scorecards.find_one({
-            "application_id": app_id_str,
-            "$or": [
-                {"interviewer_id": user_id_str},
-                {"interviewer_id": current_user.id or "interviewer_user"},
-                {"interviewer_id": str(current_user.id)}
-            ]
-        }, sort=[("submitted_at", -1), ("_id", -1)])
-
-        if not scorecard_doc and app.get(f"scorecard_{user_id_str}"):
-            scorecard_doc = app.get(f"scorecard_{user_id_str}")
-        if not scorecard_doc:
-            scorecard_doc = await db.scorecards.find_one({
-                "application_id": app_id_str
-            }, sort=[("submitted_at", -1), ("_id", -1)])
+        scorecards_list = await kit_repo.get_scorecards_by_application(app_id_str)
+        scorecard_doc = scorecards_list[0] if scorecards_list else None
 
         scorecard_data = None
         is_submitted = False
@@ -203,12 +184,13 @@ async def get_assigned_interviews_route(
 async def get_scorecards_by_application_route(
     application_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Retrieves scorecards submitted for a specific application."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    cursor = db.scorecards.find({"application_id": application_id, "tenant_id": tenant_id})
-    scorecards = await cursor.to_list(length=20)
+    async with get_pg_session_factory()() as session:
+        stmt = select(Scorecard).where(and_(Scorecard.application_id == str(application_id), Scorecard.tenant_id == tenant_id)).limit(20)
+        sc_rows = (await session.execute(stmt)).scalars().all()
+        scorecards = [{c.name: getattr(r, c.name) for c in Scorecard.__table__.columns} for r in sc_rows]
     results = []
     for sc in scorecards:
         d = dict(sc)
@@ -218,4 +200,3 @@ async def get_scorecards_by_application_route(
             d["submitted_at"] = d["submitted_at"].isoformat()
         results.append(d)
     return results
-

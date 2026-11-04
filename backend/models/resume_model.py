@@ -1,8 +1,8 @@
 """
-MongoDB Document Models — Resume & Parsed Database Entity Layer.
+Domain Model — Resume & Parsed Database Entity Layer.
 
 ARCHITECTURE NOTE [DUP-002]:
-- `ResumeModel` & `ParsedResumeData` represent MongoDB persistence models (Database Layer).
+- `ResumeModel` & `ParsedResumeData` represent Database persistence models (Database Layer).
 - For LLM structured output extraction (LangChain / Groq prompt I/O), see `schemas/extraction_schema.py` (`ResumeExtraction`).
 """
 

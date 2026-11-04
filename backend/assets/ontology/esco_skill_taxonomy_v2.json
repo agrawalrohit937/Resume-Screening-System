@@ -201,6 +201,46 @@
       "category": "Web & API Technologies",
       "aliases": ["apollo graphql", "graphql api"],
       "labels": {"en": "GraphQL"}
+    },
+    {
+      "id": "skill:health:nursing_care",
+      "canonical": "Nursing Care",
+      "category": "Healthcare",
+      "aliases": ["patient care"],
+      "labels": {
+        "en": "Nursing Care",
+        "de": "Krankenpflege",
+        "es": "Cuidados de enfermería",
+        "hi": "नर्सिंग देखभाल"
+      }
+    },
+    {
+      "id": "skill:trade:smaw",
+      "canonical": "Shielded Metal Arc Welding",
+      "category": "Skilled Trades",
+      "aliases": ["smaw"],
+      "labels": {"en": "Shielded Metal Arc Welding"}
+    },
+    {
+      "id": "skill:trade:tig",
+      "canonical": "Gas Tungsten Arc Welding",
+      "category": "Skilled Trades",
+      "aliases": ["tig welding"],
+      "labels": {"en": "Gas Tungsten Arc Welding"}
+    },
+    {
+      "id": "skill:design:figma",
+      "canonical": "Figma",
+      "category": "Design Tools",
+      "aliases": ["figma"],
+      "labels": {"en": "Figma"}
+    },
+    {
+      "id": "skill:design:ux",
+      "canonical": "User Experience Design",
+      "category": "Design",
+      "aliases": ["ux design", "user experience"],
+      "labels": {"en": "User Experience Design"}
     }
   ],
   "occupations": [
@@ -265,6 +305,12 @@
       "target": "Docker",
       "relation": "related_to",
       "weight": 0.85
+    },
+    {
+      "source": "Figma",
+      "target": "User Experience Design",
+      "relation": "tool_of",
+      "weight": 0.80
     }
   ]
 }

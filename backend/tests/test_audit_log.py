@@ -25,69 +25,22 @@ ACTOR_ALICE = "user_alice_101"
 ACTOR_BOB = "user_bob_202"
 
 
-class MockAsyncCursor:
-    def __init__(self, docs: List[Dict[str, Any]]):
-        self.docs = docs
-
-    def sort(self, *args, **kwargs):
-        return self
-
-    def skip(self, n: int):
-        self.docs = self.docs[n:]
-        return self
-
-    def limit(self, n: int):
-        self.docs = self.docs[:n]
-        return self
-
-    async def to_list(self, length: int = 100):
-        return self.docs[:length]
-
-
-class MockAuditCollection:
-    def __init__(self):
-        self.records: List[Dict[str, Any]] = []
-
-    async def insert_one(self, doc: Dict[str, Any]):
-        doc_copy = dict(doc)
-        if "_id" not in doc_copy:
-            doc_copy["_id"] = f"audit_{len(self.records) + 1}"
-        self.records.append(doc_copy)
-        return type("InsertResult", (), {"inserted_id": doc_copy["_id"]})()
-
-    async def count_documents(self, filter_query: Dict[str, Any]) -> int:
-        matched = self._filter(filter_query)
-        return len(matched)
-
-    def find(self, filter_query: Dict[str, Any]):
-        matched = self._filter(filter_query)
-        return MockAsyncCursor(matched)
-
-    def _filter(self, filter_query: Dict[str, Any]) -> List[Dict[str, Any]]:
-        results = []
-        for r in self.records:
-            match = True
-            for k, v in filter_query.items():
-                if k == "timestamp" and isinstance(v, dict):
-                    ts = r.get("timestamp")
-                    if "$gte" in v and ts < v["$gte"]:
-                        match = False
-                    if "$lte" in v and ts > v["$lte"]:
-                        match = False
-                elif r.get(k) != v:
-                    match = False
-            if match:
-                results.append(r)
-        return results
+from tests.conftest import MockAsyncSession
 
 
 @pytest.fixture
-def mock_audit_db():
-    db = MagicMock()
-    coll = MockAuditCollection()
-    db.audit_logs = coll
-    db.__getitem__.return_value = coll
-    return db
+def mock_audit_session():
+    return MockAsyncSession(items=[])
+
+
+@pytest.fixture
+def mock_audit_db(mock_audit_session):
+    class _MockAuditRepoAdapter:
+        def __init__(self, session):
+            self.session = session
+        def __call__(self):
+            return self.session
+    return _MockAuditRepoAdapter(mock_audit_session)
 
 
 @pytest.mark.asyncio
@@ -112,20 +65,11 @@ async def test_audit_log_append_only_and_immutability(mock_audit_db):
 
     # 2. Verify update operations are strictly blocked
     with pytest.raises(RuntimeError, match="immutable and cannot be modified"):
-        await repo.update({"_id": saved.id}, {"action": "tampered"})
-
-    with pytest.raises(RuntimeError, match="immutable and cannot be modified"):
-        await repo.update_one({"_id": saved.id}, {"action": "tampered"})
+        await repo.update({"id": saved.id}, {"action": "tampered"})
 
     # 3. Verify delete operations are strictly blocked
     with pytest.raises(RuntimeError, match="immutable and cannot be deleted"):
         await repo.delete(saved.id)
-
-    with pytest.raises(RuntimeError, match="immutable and cannot be deleted"):
-        await repo.delete_one({"_id": saved.id})
-
-    with pytest.raises(RuntimeError, match="immutable and cannot be deleted"):
-        await repo.delete_many({"tenant_id": TENANT_ALPHA})
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,10 @@
+from __future__ import annotations
+import uuid
+from sqlalchemy import select
+from config.db import get_pg_session_factory
+from models.tables import Job
 """JSearch RapidAPI integration for candidate-only external job listings with LinkedIn & Naukri priority."""
 
-from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
@@ -69,7 +73,7 @@ def resolve_best_apply_url(external_job: Dict[str, Any]) -> Tuple[str, str]:
     return fallback_link, fallback_pub
 
 
-async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dict[str, int]:
+async def scrape_external_jobs(db: Any = None, queries: List[str] | None = None) -> Dict[str, int]:
     """Fetch fresh JSearch results (LinkedIn & Naukri prioritized) and upsert them by provider job_id."""
     api_key = os.getenv("RAPIDAPI_KEY", "").strip()
     if not api_key:
@@ -80,13 +84,6 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
         "X-RapidAPI-Key": api_key,
         "X-RapidAPI-Host": JSEARCH_HOST,
     }
-
-    if hasattr(db, "_raw_db"):
-        jobs_coll = db._raw_db["jobs"]
-    elif hasattr(db, "get_collection") and not hasattr(db, "client"):
-        jobs_coll = db.get_collection("jobs")
-    else:
-        jobs_coll = db["jobs"]
 
     now = datetime.now(timezone.utc)
     total_fetched = 0
@@ -220,18 +217,25 @@ async def scrape_external_jobs(db: Any, queries: List[str] | None = None) -> Dic
                     "updated_at": now,
                 }
 
-                await jobs_coll.update_one(
-                    {"external_job_id": external_job_id},
-                    {
-                        "$set": job_doc,
-                        "$setOnInsert": {
-                            "tenant_id": "default",
-                            "applicant_count": 0,
-                            "created_at": now,
-                        },
-                    },
-                    upsert=True,
-                )
+                async with get_pg_session_factory()() as session:
+                    stmt = select(Job).where(Job.external_job_id == str(external_job_id))
+                    existing = (await session.execute(stmt)).scalar_one_or_none()
+                    if existing:
+                        for k, v in job_doc.items():
+                            if hasattr(existing, k):
+                                setattr(existing, k, v)
+                    else:
+                        valid_cols = {c.name for c in Job.__table__.columns}
+                        filtered = {k: v for k, v in job_doc.items() if k in valid_cols}
+                        new_job = Job(
+                            id=str(uuid.uuid4()),
+                            tenant_id="default",
+                            applicant_count=0,
+                            created_at=now,
+                            **filtered
+                        )
+                        session.add(new_job)
+                    await session.commit()
                 total_upserted += 1
 
     logger.info("External job scrape completed", fetched=total_fetched, upserted=total_upserted, skipped=total_skipped)
@@ -253,12 +257,12 @@ if __name__ == "__main__":
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from config.db import connect_db, disconnect_db, get_database
+    from config.db import connect_db, disconnect_db
 
     async def _run_manual_scrape() -> None:
         try:
             await connect_db()
-            result = await scrape_external_jobs(get_database())
+            result = await scrape_external_jobs()
             print(f"Job scrape completed successfully: {result}")
         except Exception as exc:
             print(f"Job scrape failed: {exc}")

@@ -2,7 +2,7 @@
 Token Lifecycle & Revocation Service — CareerShala Enterprise Security.
 
 Provides:
-1. Revocation denylist verification (TTL indexed MongoDB + in-memory fast path)
+1. Revocation denylist verification (Indexed PostgreSQL + in-memory fast path)
 2. Refresh Token Family Rotation & Reuse Detection (detects compromised tokens and revokes family)
 3. Session termination on logout, password change, and privilege escalation
 """
@@ -12,7 +12,10 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional, Tuple
 import structlog
-from config.db import get_database
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
+
+from config.db import get_pg_session_factory
 from core.config import settings
 from core.security import (
     create_access_token,
@@ -21,6 +24,7 @@ from core.security import (
     hash_token,
     verify_token_type,
 )
+from models import RefreshToken, RevokedToken, User, gen_uuid_str
 
 logger = structlog.get_logger(__name__)
 
@@ -30,14 +34,14 @@ _REVOKED_JTI_CACHE: set[str] = set()
 
 class TokenService:
     """
-    Manages cryptographic JWT lifecycle, token rotation, and denylist verification.
+    Manages cryptographic JWT lifecycle, token rotation, and denylist verification via PostgreSQL.
     """
 
     @staticmethod
     async def is_jti_revoked(jti: Optional[str]) -> bool:
         """
         Checks if a JTI has been added to the revocation denylist.
-        Time Complexity: O(1) in-memory check, falling back to indexed MongoDB read.
+        Time Complexity: O(1) in-memory check, falling back to indexed database read.
         """
         if not jti:
             return False
@@ -46,11 +50,13 @@ class TokenService:
             return True
 
         try:
-            db = get_database()
-            revoked_doc = await db["revoked_tokens"].find_one({"jti": jti})
-            if revoked_doc:
-                _REVOKED_JTI_CACHE.add(jti)
-                return True
+            session_factory = get_pg_session_factory()
+            async with session_factory() as session:
+                stmt = select(RevokedToken).where(RevokedToken.jti == str(jti))
+                res = await session.execute(stmt)
+                if res.scalar_one_or_none() is not None:
+                    _REVOKED_JTI_CACHE.add(jti)
+                    return True
         except Exception as e:
             logger.error("Failed to check JTI revocation status", jti=jti, error=str(e))
 
@@ -66,20 +72,31 @@ class TokenService:
 
         _REVOKED_JTI_CACHE.add(jti)
         try:
-            db = get_database()
-            exp = expires_at or (datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-            await db["revoked_tokens"].update_one(
-                {"jti": jti},
-                {
-                    "$set": {
-                        "jti": jti,
-                        "expires_at": exp,
-                        "revoked_at": datetime.now(timezone.utc),
-                        "reason": reason,
-                    }
-                },
-                upsert=True,
-            )
+            session_factory = get_pg_session_factory()
+            now = datetime.now(timezone.utc)
+            exp = expires_at or (now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+
+            async with session_factory() as session:
+                async with session.begin():
+                    stmt = (
+                        insert(RevokedToken)
+                        .values(
+                            id=gen_uuid_str(),
+                            jti=str(jti),
+                            expires_at=exp,
+                            revoked_at=now,
+                            reason=reason,
+                        )
+                        .on_conflict_do_update(
+                            index_elements=[RevokedToken.jti],
+                            set_={
+                                "expires_at": exp,
+                                "revoked_at": now,
+                                "reason": reason,
+                            },
+                        )
+                    )
+                    await session.execute(stmt)
             logger.info("JTI revoked successfully", jti=jti, reason=reason)
         except Exception as e:
             logger.error("Failed to persist JTI revocation", jti=jti, error=str(e))
@@ -93,11 +110,15 @@ class TokenService:
             return
 
         try:
-            db = get_database()
-            await db["refresh_tokens"].update_many(
-                {"family_id": family_id},
-                {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc), "revocation_reason": reason}},
-            )
+            session_factory = get_pg_session_factory()
+            async with session_factory() as session:
+                async with session.begin():
+                    stmt = (
+                        update(RefreshToken)
+                        .where(RefreshToken.family_id == str(family_id))
+                        .values(revoked=True)
+                    )
+                    await session.execute(stmt)
             logger.warning("Token family revoked", family_id=family_id, reason=reason)
         except Exception as e:
             logger.error("Failed to revoke token family", family_id=family_id, error=str(e))
@@ -108,11 +129,15 @@ class TokenService:
         Revokes all active refresh tokens for a user.
         """
         try:
-            db = get_database()
-            await db["refresh_tokens"].update_many(
-                {"user_id": str(user_id)},
-                {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc), "revocation_reason": reason}},
-            )
+            session_factory = get_pg_session_factory()
+            async with session_factory() as session:
+                async with session.begin():
+                    stmt = (
+                        update(RefreshToken)
+                        .where(RefreshToken.user_id == str(user_id))
+                        .values(revoked=True)
+                    )
+                    await session.execute(stmt)
             logger.info("All user tokens revoked", user_id=user_id, reason=reason)
         except Exception as e:
             logger.error("Failed to revoke user tokens", user_id=user_id, error=str(e))
@@ -129,20 +154,25 @@ class TokenService:
         Persists a newly issued refresh token in hashed form.
         """
         try:
-            db = get_database()
+            session_factory = get_pg_session_factory()
             hashed = hash_token(raw_token)
-            exp = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-            await db["refresh_tokens"].insert_one({
-                "token_hash": hashed,
-                "user_id": str(user_id),
-                "tenant_id": tenant_id,
-                "family_id": family_id,
-                "jti": jti,
-                "used": False,
-                "revoked": False,
-                "created_at": datetime.now(timezone.utc),
-                "expires_at": exp,
-            })
+            now = datetime.now(timezone.utc)
+            exp = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+            async with session_factory() as session:
+                async with session.begin():
+                    token_obj = RefreshToken(
+                        id=gen_uuid_str(),
+                        token_hash=hashed,
+                        user_id=str(user_id),
+                        family_id=str(family_id),
+                        jti=str(jti),
+                        used=False,
+                        revoked=False,
+                        created_at=now,
+                        expires_at=exp,
+                    )
+                    session.add(token_obj)
         except Exception as e:
             logger.error("Failed to store refresh token", user_id=user_id, error=str(e))
 
@@ -169,56 +199,51 @@ class TokenService:
             await TokenService.revoke_token_family(family_id, reason="revoked_jti_reuse")
             raise ValueError("Token has been revoked")
 
-        db = get_database()
+        session_factory = get_pg_session_factory()
         token_hash = hash_token(raw_refresh_token)
-        stored_record = await db["refresh_tokens"].find_one({"token_hash": token_hash})
 
-        if not stored_record:
-            # Token not found in db or already purged
-            raise ValueError("Refresh token record not recognized")
+        async with session_factory() as session:
+            stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+            res = await session.execute(stmt)
+            stored_record = res.scalar_one_or_none()
 
-        if stored_record.get("revoked") is True:
-            # Token is explicitly revoked
-            await TokenService.revoke_token_family(family_id, reason="compromised_token_reuse")
-            raise ValueError("Refresh token has been revoked")
+            if not stored_record:
+                raise ValueError("Refresh token record not recognized")
 
-        if stored_record.get("used") is True:
-            # REUSE DETECTED: Someone is presenting an old refresh token that was already swapped.
-            logger.error(
-                "security_alert_refresh_token_reuse_detected",
-                user_id=user_id,
-                family_id=family_id,
-                jti=jti,
-            )
-            await TokenService.revoke_token_family(family_id, reason="token_reuse_attack_detected")
-            await TokenService.revoke_jti(jti, reason="reuse_attack")
-            raise ValueError("Token reuse detected. All sessions in this family have been terminated.")
+            if stored_record.revoked is True:
+                await TokenService.revoke_token_family(family_id, reason="compromised_token_reuse")
+                raise ValueError("Refresh token has been revoked")
 
-        # Mark current token as used
-        await db["refresh_tokens"].update_one(
-            {"_id": stored_record["_id"]},
-            {"$set": {"used": True, "used_at": datetime.now(timezone.utc)}},
-        )
+            if stored_record.used is True:
+                logger.error(
+                    "security_alert_refresh_token_reuse_detected",
+                    user_id=user_id,
+                    family_id=family_id,
+                    jti=jti,
+                )
+                await TokenService.revoke_token_family(family_id, reason="token_reuse_attack_detected")
+                await TokenService.revoke_jti(jti, reason="reuse_attack")
+                raise ValueError("Token reuse detected. All sessions in this family have been terminated.")
 
-        # Retrieve user to get fresh roles and claims
-        user = await db["users"].find_one({"_id": stored_record["user_id"]})
-        if not user:
-            from bson import ObjectId
-            try:
-                user = await db["users"].find_one({"_id": ObjectId(stored_record["user_id"])})
-            except Exception:
-                pass
+            # Mark current token as used
+            stored_record.used = True
+            await session.commit()
 
-        role = user.get("role", "candidate") if user else payload.get("role", "candidate")
-        roles = user.get("roles", [role]) if user else payload.get("roles", [role])
-        tenant = user.get("tenant_id", tenant_id) if user else tenant_id
+            # Retrieve user to get fresh roles and claims
+            user_stmt = select(User).where(User.id == str(stored_record.user_id))
+            user_res = await session.execute(user_stmt)
+            user = user_res.scalar_one_or_none()
 
-        extra_claims = {
-            "email": payload.get("email") or (user.get("email") if user else ""),
-            "role": role,
-            "roles": roles,
-            "tenant_id": tenant,
-        }
+            role = getattr(user, "role", None) or payload.get("role", "candidate")
+            roles = getattr(user, "roles", None) or [role]
+            tenant = getattr(user, "tenant_id", None) or tenant_id
+
+            extra_claims = {
+                "email": payload.get("email") or getattr(user, "email", ""),
+                "role": role,
+                "roles": roles,
+                "tenant_id": tenant,
+            }
 
         # Issue new token pair
         new_access_token = create_access_token(subject=user_id, extra_claims=extra_claims)

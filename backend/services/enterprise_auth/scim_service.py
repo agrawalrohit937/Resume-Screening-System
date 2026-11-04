@@ -1,94 +1,112 @@
 """
-SCIM 2.0 Provisioning Service (RFC 7643 & RFC 7644).
-
-Phase 5, Task 5.2:
-Handles automated CRUD provisioning of enterprise members from IdP identity management
-systems (Okta, Azure AD, OneLogin, PingFederate).
+SCIM v2.0 Enterprise User Provisioning Service (Pure PostgreSQL SQLAlchemy 2.0).
+CareerShala ATS v2.0.0 — Enterprise Identity & Access Management.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-from bson import ObjectId
+from typing import Any, Dict, List, Optional
 import structlog
+from sqlalchemy import select, update, and_
 
-from models.enterprise_auth import SCIMEmail, SCIMName, SCIMUserPayload, SCIMUserResponse
+from config.db import get_pg_session_factory
+from models.tables import User
+from models.enterprise_auth import SCIMUserPayload, SCIMUserResponse
 from models.user_model import UserRole, UserStatus
 
 logger = structlog.get_logger(__name__)
 
 
 class SCIMService:
-    """
-    Implements RFC 7644 compliant SCIM operations partitioned by tenant_id.
-    """
+    def __init__(self, db: Any = None):
+        self.db = db
 
-    def _to_scim_response(self, doc: Dict[str, Any]) -> SCIMUserResponse:
-        email = doc.get("email", "")
-        uid = str(doc.get("_id") or doc.get("id"))
+    @staticmethod
+    def _to_scim_response(doc: Dict[str, Any]) -> SCIMUserResponse:
+        u_id = str(doc.get("id") or doc.get("_id", ""))
+        from models.enterprise_auth import SCIMName
+        fn = doc.get("full_name") or ""
+        parts = fn.split()
+        gn = parts[0] if parts else ""
+        fam = parts[-1] if len(parts) > 1 else ""
+        name_obj = SCIMName(formatted=fn, givenName=gn, familyName=fam)
         return SCIMUserResponse(
-            id=uid,
+            id=u_id,
             userName=doc.get("email", ""),
-            name=SCIMName(
-                formatted=doc.get("full_name"),
-                familyName=doc.get("full_name", "").split(" ")[-1] if " " in doc.get("full_name", "") else "",
-                givenName=doc.get("full_name", "").split(" ")[0] if doc.get("full_name") else "",
-            ),
-            emails=[SCIMEmail(value=email, type="work", primary=True)],
-            active=bool(doc.get("status") == UserStatus.ACTIVE.value),
-            roles=[doc.get("role", "recruiter")],
+            displayName=doc.get("full_name"),
+            name=name_obj,
+            active=doc.get("status") == UserStatus.ACTIVE.value,
+            emails=[{"value": doc.get("email", ""), "primary": True}],
+            roles=[doc.get("role", "candidate")],
             meta={
                 "resourceType": "User",
-                "created": doc.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(doc.get("created_at"), "isoformat") else str(doc.get("created_at")),
-                "location": f"/api/v1/scim/v2/Users/{uid}",
-            }
+                "created": doc.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(doc.get("created_at"), "isoformat") else str(doc.get("created_at", "")),
+                "lastModified": doc.get("updated_at", datetime.now(timezone.utc)).isoformat() if hasattr(doc.get("updated_at"), "isoformat") else str(doc.get("updated_at", "")),
+                "location": f"/scim/v2/Users/{u_id}",
+            },
         )
 
-    async def create_user(self, payload: SCIMUserPayload, tenant_id: str, db: Any) -> SCIMUserResponse:
-        email = payload.userName
-        if payload.emails and payload.emails[0].value:
-            email = payload.emails[0].value
+    async def provision_user(self, payload: SCIMUserPayload, tenant_id: str, db: Any = None) -> SCIMUserResponse:
+        email = payload.userName.lower().strip()
+        assigned_role = UserRole.RECRUITER.value
+        if payload.roles:
+            try:
+                assigned_role = UserRole(payload.roles[0].lower()).value
+            except Exception:
+                assigned_role = UserRole.RECRUITER.value
 
-        name = payload.displayName or (payload.name.formatted if payload.name else None) or email.split("@")[0]
-        role_str = payload.roles[0] if payload.roles else "recruiter"
-        try:
-            role_enum = UserRole(role_str.lower())
-        except Exception:
-            role_enum = UserRole.RECRUITER
-
-        doc = {
-            "_id": ObjectId(),
+        user_id = str(getattr(payload, "externalId", None) or getattr(payload, "external_id", None) or f"usr_{email}")
+        now = datetime.now(timezone.utc)
+        doc: Dict[str, Any] = {
+            "id": user_id,
             "email": email,
-            "full_name": name,
-            "role": role_enum.value,
+            "full_name": payload.displayName or email.split("@")[0].capitalize(),
+            "role": assigned_role,
+            "roles": [assigned_role],
             "status": UserStatus.ACTIVE.value if payload.active else UserStatus.INACTIVE.value,
             "tenant_id": tenant_id,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
+            "is_invited_staff": True,
+            "created_at": now,
+            "updated_at": now,
         }
 
-        if db is not None:
-            await db.users.insert_one(doc)
-
-        logger.info("SCIM user provisioned", user_id=str(doc["_id"]), email=email, tenant_id=tenant_id)
-        return self._to_scim_response(doc)
-
-    async def get_user(self, user_id: str, tenant_id: str, db: Any) -> Optional[SCIMUserResponse]:
-        if db is None:
-            return None
         try:
-            doc = await db.users.find_one({"_id": ObjectId(user_id), "tenant_id": tenant_id})
-        except Exception:
-            return None
-        if not doc:
-            return None
+            async with get_pg_session_factory()() as session:
+                stmt = select(User).where(and_(User.email == email, User.tenant_id == tenant_id))
+                res = await session.execute(stmt)
+                existing = res.scalar_one_or_none() if hasattr(res, "scalar_one_or_none") else None
+                if existing and hasattr(existing, "id"):
+                    existing.full_name = doc["full_name"]
+                    existing.status = doc["status"]
+                    existing.updated_at = now
+                    user_id = existing.id
+                else:
+                    session.add(User(**doc))
+                await session.commit()
+        except Exception as e:
+            logger.error("Failed SCIM user provisioning in DB", error=str(e))
+
+
+        doc["id"] = user_id
+        logger.info("SCIM user provisioned", user_id=user_id, email=email, tenant_id=tenant_id)
         return self._to_scim_response(doc)
 
-    async def update_user(self, user_id: str, payload: SCIMUserPayload, tenant_id: str, db: Any) -> Optional[SCIMUserResponse]:
-        if db is None:
+    async def get_user(self, user_id: str, tenant_id: str, db: Any = None) -> Optional[SCIMUserResponse]:
+
+        try:
+            async with get_pg_session_factory()() as session:
+                stmt = select(User).where(and_(User.id == str(user_id), User.tenant_id == tenant_id))
+                u_row = (await session.execute(stmt)).scalar_one_or_none()
+                if not u_row:
+                    return None
+                doc = {c.name: getattr(u_row, c.name) for c in User.__table__.columns}
+                return self._to_scim_response(doc)
+        except Exception as e:
+            logger.error("Failed SCIM get_user", user_id=user_id, error=str(e))
             return None
 
+    async def update_user(self, user_id: str, payload: SCIMUserPayload, tenant_id: str, db: Any = None) -> Optional[SCIMUserResponse]:
         update_fields: Dict[str, Any] = {
             "status": UserStatus.ACTIVE.value if payload.active else UserStatus.INACTIVE.value,
             "updated_at": datetime.now(timezone.utc),
@@ -102,46 +120,58 @@ class SCIMService:
                 pass
 
         try:
-            await db.users.update_one(
-                {"_id": ObjectId(user_id), "tenant_id": tenant_id},
-                {"$set": update_fields}
-            )
-            doc = await db.users.find_one({"_id": ObjectId(user_id), "tenant_id": tenant_id})
-            return self._to_scim_response(doc) if doc else None
+            async with get_pg_session_factory()() as session:
+                stmt = select(User).where(and_(User.id == str(user_id), User.tenant_id == tenant_id))
+                u_row = (await session.execute(stmt)).scalar_one_or_none()
+                if not u_row:
+                    return None
+                for k, v in update_fields.items():
+                    setattr(u_row, k, v)
+                await session.commit()
+                doc = {c.name: getattr(u_row, c.name) for c in User.__table__.columns}
+                return self._to_scim_response(doc)
         except Exception as e:
             logger.error("Failed SCIM user update", user_id=user_id, error=str(e))
             return None
 
-    async def deprovision_user(self, user_id: str, tenant_id: str, db: Any) -> bool:
-        if db is None:
-            return True
+    async def deprovision_user(self, user_id: str, tenant_id: str, db: Any = None) -> bool:
+
         try:
-            res = await db.users.update_one(
-                {"_id": ObjectId(user_id), "tenant_id": tenant_id},
-                {"$set": {"status": UserStatus.INACTIVE.value, "updated_at": datetime.now(timezone.utc)}}
-            )
-            return bool(getattr(res, "modified_count", 0) > 0 or getattr(res, "matched_count", 0) > 0)
+            async with get_pg_session_factory()() as session:
+                stmt = (
+                    update(User)
+                    .where(and_(User.id == str(user_id), User.tenant_id == tenant_id))
+                    .values(status=UserStatus.INACTIVE.value, updated_at=datetime.now(timezone.utc))
+                )
+                res = await session.execute(stmt)
+                await session.commit()
+                rc = getattr(res, "rowcount", None)
+                if isinstance(rc, int):
+                    return rc > 0
+                return True
         except Exception as e:
             logger.error("Failed SCIM user deprovisioning", user_id=user_id, error=str(e))
             return False
 
-    async def list_users(self, tenant_id: str, db: Any, start_index: int = 1, count: int = 50) -> Dict[str, Any]:
-        if db is None:
-            return {"schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"], "totalResults": 0, "Resources": []}
-
+    async def list_users(self, tenant_id: str, db: Any = None, start_index: int = 1, count: int = 50) -> Dict[str, Any]:
         skip_count = max(0, start_index - 1)
-        cursor = db.users.find({"tenant_id": tenant_id}).skip(skip_count).limit(count)
-        from utils.pagination import stream_cursor
-        docs = await stream_cursor(cursor)
-
-        resources = [self._to_scim_response(d).model_dump() for d in docs]
-        return {
-            "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-            "totalResults": len(resources),
-            "startIndex": start_index,
-            "itemsPerPage": count,
-            "Resources": resources,
-        }
+        try:
+            async with get_pg_session_factory()() as session:
+                stmt = select(User).where(User.tenant_id == tenant_id).offset(skip_count).limit(count)
+                rows = (await session.execute(stmt)).scalars().all()
+                docs = [{c.name: getattr(r, c.name) for c in User.__table__.columns} for r in rows]
+                resources = [self._to_scim_response(d) for d in docs]
+                return {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+                    "totalResults": len(resources),
+                    "startIndex": start_index,
+                    "itemsPerPage": count,
+                    "Resources": [r.dict(by_alias=True) for r in resources],
+                }
+        except Exception:
+            return {"schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"], "totalResults": 0, "Resources": []}
 
 
 scim_service = SCIMService()
+
+SCIMService.create_user = SCIMService.provision_user

@@ -719,7 +719,7 @@ export default function Interview() {
 
     // ── Active Quiz Cockpit ─────────────────────────────────────────
     return (
-        <div className="w-full max-w-5xl mx-auto">
+        <div className="w-full max-w-6xl mx-auto">
             <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-8 shadow-sm">
                 {/* Header status bar */}
                 <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-slate-100 text-xs">

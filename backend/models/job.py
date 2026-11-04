@@ -1,5 +1,5 @@
 """
-Job Marketplace Model & Schemas — MongoDB Entity & API Layer.
+Job Marketplace Model & Schemas — Database Entity & API Layer.
 
 Phase A: Jobs Foundation:
 - Pydantic models for job listings with 768-dim BGE local embedding vectors.
@@ -26,7 +26,7 @@ class JobStatus(str, Enum):
 
 
 class JobModel(BaseModel):
-    """MongoDB Document Model for the 'jobs' collection."""
+    """Domain Model for the 'jobs' collection."""
     id: Optional[str] = Field(default=None, alias="_id")
     company_name: str
     title: str

@@ -617,7 +617,7 @@ export default function HiringManagerDashboard() {
                 {loadingCalibration ? (
                   <div className="py-14 flex flex-col items-center justify-center space-y-3">
                     <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-                    <p className="text-xs text-slate-500 font-medium">Fetching interview scorecards & consensus report from MongoDB...</p>
+                    <p className="text-xs text-slate-500 font-medium">Fetching interview scorecards & consensus report from database...</p>
                   </div>
                 ) : (
                   <div className="space-y-6">

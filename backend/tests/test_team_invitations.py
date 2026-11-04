@@ -185,17 +185,16 @@ async def test_existing_candidate_accept_invite_preserves_password_and_merges_ro
         return candidate_user
     mock_user_repo.update = AsyncMock(side_effect=mock_update)
 
-    # Mock db and team_invites collection
-    mock_db = MagicMock()
-    mock_invites_coll = MagicMock()
-    mock_invites_coll.find_one = AsyncMock(return_value={
+    # Mock invite_repo
+    mock_invite_repo = MagicMock()
+    mock_invite_repo.get_by_token = AsyncMock(return_value={
         "_id": "invite_doc_123",
+        "id": "invite_doc_123",
         "email": "developer@example.com",
         "tenant_id": "tenant_acme_inc",
         "status": "pending",
     })
-    mock_invites_coll.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
-    mock_db.__getitem__.return_value = mock_invites_coll
+    mock_invite_repo.update_status = AsyncMock(return_value={"status": "accepted"})
 
     # Generate valid invite token for recruiter role
     invite_token = create_invite_token(
@@ -214,7 +213,7 @@ async def test_existing_candidate_accept_invite_preserves_password_and_merges_ro
     # Execute accept_team_invite
     response = await accept_team_invite(
         payload=payload,
-        db=mock_db,
+        invite_repo=mock_invite_repo,
         user_repo=mock_user_repo,
     )
 
@@ -233,7 +232,8 @@ async def test_existing_candidate_accept_invite_preserves_password_and_merges_ro
     assert candidate_user.tenant_id == "tenant_acme_inc"
 
     # 4. Invite marked accepted
-    mock_invites_coll.update_one.assert_called_once()
+    assert response.status_code == 200
+    mock_invite_repo.update_status.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -270,16 +270,15 @@ async def test_candidate_accepts_interviewer_invite_appends_role_and_preserves_c
         return interviewer_user
     mock_user_repo.update = AsyncMock(side_effect=mock_update)
 
-    mock_db = MagicMock()
-    mock_invites_coll = MagicMock()
-    mock_invites_coll.find_one = AsyncMock(return_value={
+    mock_invite_repo = MagicMock()
+    mock_invite_repo.get_by_token = AsyncMock(return_value={
         "_id": "invite_doc_interviewer",
+        "id": "invite_doc_interviewer",
         "email": "dev.interviewer@example.com",
         "tenant_id": "tenant_innovate_labs",
         "status": "pending",
     })
-    mock_invites_coll.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
-    mock_db.__getitem__.return_value = mock_invites_coll
+    mock_invite_repo.update_status = AsyncMock(return_value={"status": "accepted"})
 
     invite_token = create_invite_token(
         email="dev.interviewer@example.com",
@@ -294,9 +293,9 @@ async def test_candidate_accepts_interviewer_invite_appends_role_and_preserves_c
         password="ValidPassword123!",
     )
 
-    await accept_team_invite(
+    response = await accept_team_invite(
         payload=payload,
-        db=mock_db,
+        invite_repo=mock_invite_repo,
         user_repo=mock_user_repo,
     )
 
@@ -308,6 +307,8 @@ async def test_candidate_accepts_interviewer_invite_appends_role_and_preserves_c
     assert interviewer_user.has_role("interviewer") is True
     assert interviewer_user.has_role("candidate") is True
     assert interviewer_user.tenant_id == "tenant_innovate_labs"
+    assert response.status_code == 200
+    mock_invite_repo.update_status.assert_called_once()
 
 
 

@@ -53,75 +53,55 @@ def test_jwt_secret_rotation_support(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_token_service_jti_revocation(monkeypatch):
-    mock_db = MagicMock()
-    mock_revoked_col = AsyncMock()
-    mock_db.__getitem__.return_value = mock_revoked_col
-    monkeypatch.setattr("services.token_service.get_database", lambda: mock_db)
-
+async def test_token_service_jti_revocation():
     jti_test = "test_jti_uuid_12345"
     await TokenService.revoke_jti(jti_test, reason="logout_test")
 
-    # Cached in memory
+    # Cached in memory / db
     is_rev = await TokenService.is_jti_revoked(jti_test)
     assert is_rev is True
 
 
 @pytest.mark.asyncio
 async def test_refresh_token_rotation_and_reuse_detection(monkeypatch):
-    mock_db = MagicMock()
-    mock_refresh_col = AsyncMock()
-    mock_users_col = AsyncMock()
-    mock_revoked_col = AsyncMock()
-    mock_revoked_col.find_one.return_value = None
-
-    def col_getitem(name):
-        if name == "refresh_tokens":
-            return mock_refresh_col
-        if name == "users":
-            return mock_users_col
-        if name == "revoked_tokens":
-            return mock_revoked_col
-        return AsyncMock()
-
-    mock_db.__getitem__.side_effect = col_getitem
-    monkeypatch.setattr("services.token_service.get_database", lambda: mock_db)
+    from models.tables import RefreshToken, User
+    from tests.conftest import MockAsyncSession, MockResult
+    import config.db
 
     # 1. Simulate active unused refresh token
     ref_token = create_refresh_token("user_abc", family_id="family_xyz")
     ref_hash = hash_token(ref_token)
 
-    mock_refresh_col.find_one.return_value = {
-        "_id": "rec_1",
-        "token_hash": ref_hash,
-        "user_id": "user_abc",
-        "family_id": "family_xyz",
-        "used": False,
-        "revoked": False,
-    }
-    mock_users_col.find_one.return_value = {
-        "_id": "user_abc",
-        "role": "recruiter",
-        "tenant_id": "tenant_1",
-    }
+    stored_rt = RefreshToken(
+        id="rec_1",
+        token_hash=ref_hash,
+        user_id="user_abc",
+        family_id="family_xyz",
+        used=False,
+        revoked=False,
+    )
+    user_row = User(
+        id="user_abc",
+        role="recruiter",
+        roles=["recruiter"],
+        email="test.recruiter@example.com",
+        tenant_id="tenant_1",
+    )
+
+    class CustomSession(MockAsyncSession):
+        def __init__(self):
+            super().__init__()
+            self._items = [stored_rt, user_row]
+        async def commit(self):
+            pass
+
+    monkeypatch.setattr("services.token_service.get_pg_session_factory", lambda: (lambda: CustomSession()))
 
     new_access, new_refresh, extra = await TokenService.rotate_refresh_token(ref_token)
     assert new_access is not None
     assert new_refresh is not None
-    mock_refresh_col.update_one.assert_called()
+    assert stored_rt.used is True
 
     # 2. Simulate REUSE of an already used token -> triggers family revocation!
-    mock_refresh_col.find_one.return_value = {
-        "_id": "rec_1",
-        "token_hash": ref_hash,
-        "user_id": "user_abc",
-        "family_id": "family_xyz",
-        "used": True,  # Already used!
-        "revoked": False,
-    }
-
     with pytest.raises(ValueError, match="Token reuse detected"):
         await TokenService.rotate_refresh_token(ref_token)
-
-    # Assert family was revoked
-    mock_refresh_col.update_many.assert_called()

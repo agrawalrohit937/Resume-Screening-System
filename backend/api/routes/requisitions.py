@@ -1,13 +1,15 @@
-"""Requisition and Headcount Management API Routes.
+"""Requisition and Headcount Management API Routes (Pure PostgreSQL).
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select, and_, func
 
-from bson import ObjectId
-from api.deps import get_database, get_current_user
+from config.db import get_pg_session_factory
+from models.tables import Requisition as RequisitionTable, CandidateApplication, Job, Scorecard
+from api.deps import get_current_user
 from models.user_model import UserModel
 from models.requisition import RequisitionModel, ApprovalDecision, ApprovalStep
 from services.requisition_service import RequisitionService
@@ -42,15 +44,14 @@ class HirePayload(BaseModel):
 async def create_requisition_route(
     payload: CreateRequisitionPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Creates a new requisition in DRAFT status."""
-    service = RequisitionService(db)
+    service = RequisitionService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     return await service.create_requisition(
         title=payload.title,
         department=payload.department,
-        hiring_manager_id=current_user.id or "manager_user",
+        hiring_manager_id=current_user.id or "current_user",
         headcount=payload.headcount,
         budget_min=payload.budget_min,
         budget_max=payload.budget_max,
@@ -63,78 +64,53 @@ async def create_requisition_route(
 @router.get("", response_model=List[RequisitionModel])
 async def list_requisitions_route(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Lists all requisitions scoped to the user's active tenant."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    cursor = db.requisitions.find({"tenant_id": tenant_id})
-    docs = await cursor.to_list(length=100)
-    return [RequisitionModel(**d) for d in docs]
+    async with get_pg_session_factory()() as session:
+        stmt = select(RequisitionTable).where(RequisitionTable.tenant_id == tenant_id).limit(100)
+        rows = (await session.execute(stmt)).scalars().all()
+        results = []
+        for r in rows:
+            d = dict(r.data or {})
+            d["id"] = r.id
+            d["tenant_id"] = r.tenant_id
+            d["title"] = r.title
+            d["department"] = r.department
+            d["hiring_manager_id"] = r.hiring_manager_id
+            d["status"] = r.status
+            results.append(RequisitionModel(**d))
+        return results
 
 
 @router.get("/pipeline/candidates", response_model=List[Dict[str, Any]])
 async def get_pipeline_candidates_route(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Lists active candidates in the hiring pipeline for the active tenant with high-speed projections."""
-    import asyncio
     tenant_id = getattr(current_user, "tenant_id", "default")
-    
-    app_projection = {
-        "_id": 1,
-        "id": 1,
-        "job_id": 1,
-        "candidate_id": 1,
-        "user_id": 1,
-        "candidate_name": 1,
-        "full_name": 1,
-        "job_title": 1,
-        "stage": 1,
-        "quality_score": 1,
-        "match_score": 1,
-        "ats_score": 1,
-        "years_experience": 1,
-        "status": 1,
-        "created_at": 1,
-        "resume_url": 1,
-        "resume_snapshot.file_url": 1,
-    }
+    results = []
 
-    cursor = db.applications.find({"tenant_id": tenant_id}, app_projection).sort("created_at", -1)
-    apps = await cursor.to_list(length=100)
-    results: List[Dict[str, Any]] = []
+    async with get_pg_session_factory()() as session:
+        app_stmt = select(CandidateApplication).where(CandidateApplication.tenant_id == tenant_id).order_by(CandidateApplication.created_at.desc()).limit(100)
+        apps_rows = (await session.execute(app_stmt)).scalars().all()
+        apps = [{c.name: getattr(r, c.name) for c in CandidateApplication.__table__.columns} for r in apps_rows]
 
-    # Batch fetch jobs & scorecards
-    valid_job_ids = []
-    app_ids = []
-    for app in apps:
-        jid = app.get("job_id")
-        if jid and ObjectId.is_valid(jid):
-            valid_job_ids.append(ObjectId(jid))
-        aid = str(app.get("id") or app.get("_id"))
-        if aid:
-            app_ids.append(aid)
+        job_ids = list({a.get("job_id") for a in apps if a.get("job_id")})
+        jobs_map = {}
+        if job_ids:
+            j_stmt = select(Job).where(Job.id.in_(job_ids))
+            j_rows = (await session.execute(j_stmt)).scalars().all()
+            jobs_map = {j.id: {c.name: getattr(j, c.name) for c in Job.__table__.columns} for j in j_rows}
 
-    jobs_task = (
-        db.jobs.find(
-            {"_id": {"$in": valid_job_ids}},
-            {"_id": 1, "title": 1, "min_years": 1, "department": 1}
-        ).to_list(length=100)
-        if valid_job_ids else asyncio.sleep(0, result=[])
-    )
-
-    scorecard_task = (
-        db.scorecards.aggregate([
-            {"$match": {"application_id": {"$in": app_ids}, "tenant_id": tenant_id}},
-            {"$group": {"_id": "$application_id", "count": {"$sum": 1}}}
-        ]).to_list(length=100)
-        if app_ids else asyncio.sleep(0, result=[])
-    )
-
-    fetched_jobs, sc_groups = await asyncio.gather(jobs_task, scorecard_task)
-    jobs_map = {str(j["_id"]): j for j in (fetched_jobs or [])}
-    scorecard_counts_map = {str(g["_id"]): g.get("count", 0) for g in (sc_groups or [])}
+        app_ids = [str(a.get("id")) for a in apps if a.get("id")]
+        scorecard_counts_map = {}
+        if app_ids:
+            sc_stmt = select(Scorecard.application_id, func.count(Scorecard.id)).where(
+                and_(Scorecard.application_id.in_(app_ids), Scorecard.tenant_id == tenant_id)
+            ).group_by(Scorecard.application_id)
+            sc_res = await session.execute(sc_stmt)
+            scorecard_counts_map = {r[0]: r[1] for r in sc_res.all()}
 
     for app in apps:
         job_id = app.get("job_id")
@@ -184,24 +160,31 @@ async def get_pipeline_candidates_route(
 async def get_requisition_route(
     requisition_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Retrieves a requisition by ID."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    doc = await db.requisitions.find_one({"id": requisition_id, "tenant_id": tenant_id})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Requisition not found")
-    return RequisitionModel(**doc)
+    async with get_pg_session_factory()() as session:
+        stmt = select(RequisitionTable).where(and_(RequisitionTable.id == requisition_id, RequisitionTable.tenant_id == tenant_id))
+        r = (await session.execute(stmt)).scalar_one_or_none()
+        if not r:
+            raise HTTPException(status_code=404, detail="Requisition not found")
+        d = dict(r.data or {})
+        d["id"] = r.id
+        d["tenant_id"] = r.tenant_id
+        d["title"] = r.title
+        d["department"] = r.department
+        d["hiring_manager_id"] = r.hiring_manager_id
+        d["status"] = r.status
+        return RequisitionModel(**d)
 
 
 @router.post("/{requisition_id}/submit", response_model=RequisitionModel)
 async def submit_requisition_route(
     requisition_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Submits a draft requisition for sequential approval."""
-    service = RequisitionService(db)
+    service = RequisitionService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     req = await service.submit_for_approval(requisition_id, tenant_id=tenant_id)
     if not req:
@@ -214,10 +197,9 @@ async def record_decision_route(
     requisition_id: str,
     payload: DecisionPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Records an approval or rejection step in the requisition approval chain."""
-    service = RequisitionService(db)
+    service = RequisitionService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     req = await service.record_approval_decision(
         requisition_id=requisition_id,
@@ -236,10 +218,9 @@ async def link_job_route(
     requisition_id: str,
     payload: LinkJobPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Links an approved requisition to a job posting and marks it open."""
-    service = RequisitionService(db)
+    service = RequisitionService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     try:
         req = await service.link_to_job(requisition_id, job_id=payload.job_id, tenant_id=tenant_id)
@@ -255,10 +236,9 @@ async def record_hire_route(
     requisition_id: str,
     payload: HirePayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Increments the filled headcount count for a requisition."""
-    service = RequisitionService(db)
+    service = RequisitionService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     req = await service.record_hire(requisition_id, count=payload.count, tenant_id=tenant_id)
     if not req:

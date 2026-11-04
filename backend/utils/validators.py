@@ -3,21 +3,25 @@ Input Validators — reusable validation helpers
 """
 
 import re
-from bson import ObjectId
+from core.id import DocumentId
 
 
-def is_valid_object_id(value: str) -> bool:
-    try:
-        ObjectId(value)
-        return True
-    except Exception:
+def is_valid_document_id(value: str) -> bool:
+    if not value or not isinstance(value, str):
         return False
+    return DocumentId.is_valid(value)
 
 
-def validate_object_id(value: str, field_name: str = "ID") -> str:
-    if not is_valid_object_id(value):
-        raise ValueError(f"Invalid {field_name}: '{value}' is not a valid MongoDB ObjectId")
+is_valid_object_id = is_valid_document_id
+
+
+def validate_document_id(value: str, field_name: str = "ID") -> str:
+    if not is_valid_document_id(value):
+        raise ValueError(f"Invalid {field_name}: '{value}' is not a valid document ID")
     return value
+
+
+validate_object_id = validate_document_id
 
 
 def is_valid_github_username(username: str) -> bool:

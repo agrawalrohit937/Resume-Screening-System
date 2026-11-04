@@ -12,45 +12,9 @@ from models.job import JobModel, WorkMode
 from services.multi_tenancy.tenant_context import tenant_context
 
 
-class InMemoryCollection:
-    def __init__(self):
-        self.docs = []
-
-    async def insert_one(self, doc):
-        self.docs.append(dict(doc))
-        return type("InsertResult", (), {"inserted_id": doc.get("id")})()
-
-    def find(self, query):
-        results = []
-        for d in self.docs:
-            match = True
-            for k, v in query.items():
-                if d.get(k) != v:
-                    match = False
-                    break
-            if match:
-                results.append(dict(d))
-
-        class MockCursor:
-            def __init__(self, data):
-                self.data = data
-
-            async def to_list(self, length=100):
-                return self.data[:length]
-
-        return MockCursor(results)
-
-
-class MockDB:
-    def __init__(self):
-        self.webhook_subscriptions = InMemoryCollection()
-        self.webhook_deliveries = InMemoryCollection()
-
-
 @pytest.mark.asyncio
 async def test_webhook_lifecycle_and_hmac_verification():
-    db = MockDB()
-    webhook_service = WebhookService(db)
+    webhook_service = WebhookService()
 
     with tenant_context("tenant_acme"):
         # 1. Register subscription

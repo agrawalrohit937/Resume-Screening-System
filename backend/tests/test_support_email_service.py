@@ -15,7 +15,7 @@ class DummyTicketRepo:
 
     async def create(self, ticket_data: dict) -> SupportTicketModel:
         self.created_payload = ticket_data
-        return SupportTicketModel(id="mongo-ticket-id", **ticket_data)
+        return SupportTicketModel(id="doc-ticket-id", **ticket_data)
 
 
 class FakeEmailService:
@@ -209,4 +209,4 @@ async def test_support_ticket_routes_to_support_inbox_with_user_reply_to(monkeyp
     assert captured_call["to_email"] == "support@careershala.tech"
     assert captured_call["to_name"] == "CareerShala Support Team"
     assert captured_call["reply_to_email"] == "candidate@example.com"
-    assert captured_call["reply_to_name"] == "Bob Builder"
+    assert captured_call["reply_to_name"] == "Bob Builder"

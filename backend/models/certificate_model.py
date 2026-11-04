@@ -3,17 +3,14 @@ from datetime import datetime
 from typing import Optional
 import structlog
 
-from config.db import get_database
-
 logger = structlog.get_logger(__name__)
 
-COLLECTION = "certificates"
 SCHEMA_VERSION = 1
 
 
 @dataclass
 class CertificateRecord:
-    id: str  # cert_id, also used as Mongo _id
+    id: str  # cert_id, primary key
     certificate_type: str
     template_used: str
     user_id: str
@@ -29,32 +26,36 @@ class CertificateRecord:
     schema_version: int = field(default=SCHEMA_VERSION)
 
     async def persist(self) -> None:
-        db = get_database()
-        doc = asdict(self)
-        doc["_id"] = doc.pop("id")
-        if not doc.get("topic"):
-            doc["topic"] = (
-                self.snapshot.get("assessment_slug")
-                or self.snapshot.get("assessment_name")
-                or "general"
-            ).lower().strip()
+        from config.db import get_pg_session_factory
+        from models.tables import Certificate
+        t_val = self.topic or (
+            self.snapshot.get("assessment_slug")
+            or self.snapshot.get("assessment_name")
+            or "general"
+        ).lower().strip()
 
-        try:
-            await db[COLLECTION].insert_one(doc)
-        except Exception as e:
-            err_str = str(e)
-            if "certificate_user_topic_unique" in err_str or ("E11000" in err_str and "topic" in err_str):
-                logger.warning("Detected legacy certificate_user_topic_unique index collision, dropping index and retrying", error=err_str)
-                try:
-                    await db[COLLECTION].drop_index("certificate_user_topic_unique")
-                except Exception as drop_err:
-                    logger.warning("Could not drop legacy certificate_user_topic_unique index", error=str(drop_err))
-                await db[COLLECTION].insert_one(doc)
-            else:
-                raise
+        async with get_pg_session_factory()() as session:
+            cert_row = Certificate(
+                id=self.id,
+                certificate_type=self.certificate_type,
+                template_used=self.template_used,
+                user_id=str(self.user_id),
+                recipient_name=self.recipient_name,
+                snapshot=self.snapshot,
+                status=self.status,
+                issued_at=self.issued_at,
+                revoked_at=self.revoked_at,
+                public_url=self.public_url,
+                topic=t_val,
+                superseded_by=self.superseded_by,
+                superseded_at=self.superseded_at,
+                schema_version=self.schema_version,
+            )
+            session.add(cert_row)
+            await session.commit()
 
     @classmethod
-    def from_mongo(cls, doc: dict) -> "CertificateRecord":
+    def from_doc(cls, doc: dict) -> "CertificateRecord":
         d = dict(doc)
         d["id"] = d.pop("_id", d.get("id"))
         d.pop("schema_version", None)
@@ -64,18 +65,56 @@ class CertificateRecord:
 
     @staticmethod
     async def find_by_id(cert_id: str) -> Optional["CertificateRecord"]:
-        db = get_database()
-        doc = await db[COLLECTION].find_one({"_id": cert_id})
-        if doc is None:
-            return None
-        return CertificateRecord.from_mongo(doc)
+        from config.db import get_pg_session_factory
+        from models.tables import Certificate
+        from sqlalchemy import select
+        async with get_pg_session_factory()() as session:
+            stmt = select(Certificate).where(Certificate.id == str(cert_id))
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            if not row:
+                return None
+            return CertificateRecord(
+                id=row.id,
+                certificate_type=row.certificate_type,
+                template_used=row.template_used,
+                user_id=row.user_id,
+                recipient_name=row.recipient_name,
+                snapshot=row.snapshot or {},
+                status=row.status,
+                issued_at=row.issued_at,
+                revoked_at=row.revoked_at,
+                public_url=row.public_url or "",
+                topic=row.topic,
+                superseded_by=row.superseded_by,
+                superseded_at=row.superseded_at,
+                schema_version=row.schema_version or 1,
+            )
 
     @staticmethod
     async def find_by_user(user_id: str, page_size: int = 20) -> list["CertificateRecord"]:
-        db = get_database()
-        cursor = db[COLLECTION].find({"user_id": user_id}).sort("issued_at", -1).limit(page_size)
-        results = []
-        async for doc in cursor:
-            results.append(CertificateRecord.from_mongo(doc))
-        return results
+        from config.db import get_pg_session_factory
+        from models.tables import Certificate
+        from sqlalchemy import select, desc
+        async with get_pg_session_factory()() as session:
+            stmt = select(Certificate).where(Certificate.user_id == str(user_id)).order_by(desc(Certificate.issued_at)).limit(page_size)
+            rows = (await session.execute(stmt)).scalars().all()
+            return [
+                CertificateRecord(
+                    id=row.id,
+                    certificate_type=row.certificate_type,
+                    template_used=row.template_used,
+                    user_id=row.user_id,
+                    recipient_name=row.recipient_name,
+                    snapshot=row.snapshot or {},
+                    status=row.status,
+                    issued_at=row.issued_at,
+                    revoked_at=row.revoked_at,
+                    public_url=row.public_url or "",
+                    topic=row.topic,
+                    superseded_by=row.superseded_by,
+                    superseded_at=row.superseded_at,
+                    schema_version=row.schema_version or 1,
+                )
+                for row in rows
+            ]
 

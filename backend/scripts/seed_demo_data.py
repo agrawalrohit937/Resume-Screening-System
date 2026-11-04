@@ -6,8 +6,8 @@ Usage:
     cd backend
     python scripts/seed_demo_data.py
     
-    # Or with custom MongoDB URI:
-    python scripts/seed_demo_data.py --mongo-uri "mongodb://localhost:27017"
+    # Automatically connects to PostgreSQL configured in .env
+    # python scripts/seed_demo_data.py
 """
 
 import argparse
@@ -27,7 +27,7 @@ if sys.platform == "win32":
 # Add parent directory to sys.path so backend modules can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pymongo import AsyncMongoClient
+from config.db import connect_db, disconnect_db
 from core.config import settings
 from core.security import hash_password
 
@@ -121,7 +121,7 @@ DEMO_JOBS = [
         "experience_min": 2,
         "experience_max": 5,
         "is_fresher": False,
-        "skills": ["python", "pytorch", "huggingface", "vector search", "mongodb", "fastapi", "langchain"],
+        "skills": ["python", "pytorch", "huggingface", "vector search", "postgresql", "fastapi", "langchain"],
         "description": "Design and deploy low-latency semantic search architectures, BGE-M3 embeddings, cross-encoder re-ranking, and retrieval-augmented generation (RAG) agents for high-scale enterprise applications.",
         "salary_range": "INR 18,00,000 - 28,00,000 / year",
         "status": "active",
@@ -136,7 +136,7 @@ DEMO_JOBS = [
         "experience_min": 2,
         "experience_max": 5,
         "is_fresher": False,
-        "skills": ["react", "fastapi", "python", "mongodb", "redis", "docker", "tailwind css"],
+        "skills": ["react", "fastapi", "python", "postgresql", "redis", "docker", "tailwind css"],
         "description": "Join our fast-growing core product team. Own full product lifecycles across modern React SPA frontends and high-concurrency asynchronous Python microservices.",
         "salary_range": "$80,000 - $110,000 / year",
         "status": "active",
@@ -205,107 +205,113 @@ DEMO_JOBS = [
 ]
 
 
-async def seed_data(mongo_uri: str, db_name: str) -> None:
-    print(f"\n[*] Connecting to MongoDB: {mongo_uri} (Database: {db_name})...")
-    client = AsyncMongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    db = client[db_name]
+async def seed_data(database_url: str = "") -> None:
+    print("\n[*] Connecting to PostgreSQL Primary Database...")
+    from config.db import get_pg_session_factory, get_pg_engine
+    from sqlalchemy import select, update, func, text
+    from models.tables import User, Job, Resume, CandidateApplication
+    import uuid
 
-    # Test connection
+    session_factory = get_pg_session_factory()
     try:
-        await client.admin.command("ping")
-        print("[+] Connected to MongoDB successfully!")
+        engine = get_pg_engine()
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        print("[+] Connected to PostgreSQL successfully!")
     except Exception as e:
-        print(f"[!] Failed to connect to MongoDB at {mongo_uri}: {e}")
-        print("[i] Hint: Ensure MongoDB is running locally (mongod) or provide a valid URI with --mongo-uri.")
+        print(f"[!] Failed to connect to PostgreSQL: {e}")
         return
 
     # 1. Seed Demo Users
     print("\n[+] Seeding Demo User Accounts...")
-    for user_data in DEMO_USERS:
-        email = user_data["email"]
-        plain_pass = user_data.pop("plain_pass", None)
-        user_data["hashed_password"] = hash_password(plain_pass)
-
-        res = await db.users.update_one(
-            {"email": email},
-            {"$set": user_data},
-            upsert=True
-        )
-        action = "Created" if res.upserted_id else "Updated"
-        print(f"    - {action} {user_data['role'].upper()} user: {email} (Password: {plain_pass})")
+    async with session_factory() as session:
+        for user_data in DEMO_USERS:
+            email = user_data["email"]
+            plain_pass = user_data.pop("plain_pass", None)
+            hashed = hash_password(plain_pass)
+            stmt = select(User).where(User.email == email)
+            existing_user = (await session.execute(stmt)).scalar_one_or_none()
+            if existing_user:
+                existing_user.hashed_password = hashed
+                existing_user.role = user_data["role"]
+                existing_user.roles = user_data["roles"]
+                existing_user.status = user_data.get("status", "active")
+                existing_user.plan = user_data.get("plan", "pro")
+                existing_user.subscription_status = "active"
+                action = "Updated"
+            else:
+                new_user = User(
+                    id=str(uuid.uuid4()),
+                    email=email,
+                    hashed_password=hashed,
+                    full_name=user_data.get("full_name", email),
+                    role=user_data["role"],
+                    roles=user_data["roles"],
+                    status=user_data.get("status", "active"),
+                    tenant_id=user_data.get("tenant_id", "default"),
+                    plan=user_data.get("plan", "pro"),
+                    subscription_status="active",
+                )
+                session.add(new_user)
+                action = "Created"
+            role_str = user_data['role'].upper()
+            print(f"    - {action} {role_str} user: {email} (Password: {plain_pass})")
+        await session.commit()
 
     # 2. Seed Jobs
     print("\n[+] Seeding Tech Job Listings...")
-    existing_jobs_count = await db.jobs.count_documents({})
-    print(f"    Current jobs in database: {existing_jobs_count}")
+    async with session_factory() as session:
+        existing_jobs_count = (await session.execute(select(func.count(Job.id)))).scalar() or 0
+        print(f"    Current jobs in database: {existing_jobs_count}")
 
-    inserted_jobs = 0
-    recruiter_user = await db.users.find_one({"email": "recruiter@careershala.com"})
-    recruiter_id = str(recruiter_user["_id"]) if recruiter_user else None
-    recruiter_tenant = (recruiter_user.get("tenant_id") if recruiter_user else None) or "tenant_careershala_talent"
+        recruiter_stmt = select(User).where(User.email == "recruiter@careershala.com")
+        recruiter_user = (await session.execute(recruiter_stmt)).scalar_one_or_none()
+        recruiter_id = str(recruiter_user.id) if recruiter_user else "recruiter_seed"
+        recruiter_tenant = recruiter_user.tenant_id if recruiter_user else "tenant_careershala_talent"
 
-    for job in DEMO_JOBS:
-        # Standardize schema fields for both legacy and enterprise ATS pipelines
-        job_doc = dict(job)
-        job_doc["tenant_id"] = recruiter_tenant
-        job_doc["created_by"] = recruiter_id
-        job_doc["company_name"] = "CareerShala Cloud Technologies"
-        job_doc["company"] = "CareerShala Cloud Technologies"
-        job_doc["required_skills"] = job.get("required_skills") or job.get("skills") or []
-        job_doc["jd_text_raw"] = job.get("jd_text_raw") or job.get("description") or ""
-        job_doc["jd_text"] = job_doc["jd_text_raw"]
-
-        # Avoid duplicate title + company
-        existing = await db.jobs.find_one({
-            "title": job["title"], 
-            "$or": [
-                {"company": job.get("company")},
-                {"company_name": job_doc["company_name"]},
-                {"company": "CareerShala Cloud Technologies"},
-            ]
-        })
-        if not existing:
-            await db.jobs.insert_one(job_doc)
-            inserted_jobs += 1
-        else:
-            # Backfill any missing jd_text_raw, company_name, tenant_id, or created_by
-            await db.jobs.update_one(
-                {"_id": existing["_id"]},
-                {"$set": {
-                    "tenant_id": recruiter_tenant,
-                    "created_by": recruiter_id,
-                    "company_name": "CareerShala Cloud Technologies",
-                    "company": "CareerShala Cloud Technologies",
-                    "required_skills": existing.get("required_skills") or job_doc["required_skills"],
-                    "jd_text_raw": existing.get("jd_text_raw") or job_doc["jd_text_raw"],
-                    "jd_text": existing.get("jd_text") or job_doc["jd_text_raw"],
-                }}
-            )
-
-    # Global backfill for any existing scraped or dummy jobs without jd_text_raw
-    await db.jobs.update_many(
-        {"$or": [{"jd_text_raw": {"$exists": False}}, {"jd_text_raw": ""}, {"jd_text_raw": None}]},
-        [{"$set": {"jd_text_raw": {"$ifNull": ["$description", "$jd_text", ""]}}}]
-    )
-
-    print(f"    Added {inserted_jobs} new curated job listings (Total now: {existing_jobs_count + inserted_jobs}).")
+        inserted_jobs = 0
+        for job in DEMO_JOBS:
+            title = job["title"]
+            j_stmt = select(Job).where(Job.title == title)
+            existing = (await session.execute(j_stmt)).scalar_one_or_none()
+            if not existing:
+                new_job = Job(
+                    id=f"job_{uuid.uuid4().hex[:12]}",
+                    title=title,
+                    company_name="CareerShala Cloud Technologies",
+                    jd_text_raw=job.get("jd_text_raw") or job.get("description") or "",
+                    required_skills=job.get("required_skills") or job.get("skills") or [],
+                    min_years=float(job.get("min_years") or 0.0),
+                    location=job.get("location") or "Remote / Hybrid",
+                    work_mode=job.get("work_mode") or "Hybrid",
+                    salary_range=job.get("salary_range") or "Competitive",
+                    status="active",
+                    tenant_id=recruiter_tenant,
+                    created_by=recruiter_id,
+                )
+                session.add(new_job)
+                inserted_jobs += 1
+            else:
+                existing.tenant_id = recruiter_tenant
+                existing.created_by = recruiter_id
+                existing.company_name = "CareerShala Cloud Technologies"
+                if not existing.jd_text_raw:
+                    existing.jd_text_raw = job.get("jd_text_raw") or job.get("description") or ""
+        await session.commit()
+        print(f"    Added {inserted_jobs} new curated job listings (Total now: {existing_jobs_count + inserted_jobs}).")
 
     # 3. Seed Sample Candidate Resume Data
     print("\n[+] Seeding Sample Candidate Profile & ATS Check...")
-    candidate_user = await db.users.find_one({"email": "candidate@careershala.com"})
-    if candidate_user:
-        user_id = str(candidate_user["_id"])
-        
-        sample_resume = {
-            "user_id": user_id,
-            "filename": "Alex_Carter_FullStack_Resume.pdf",
-            "file_size": 142050,
-            "parsed_data": {
+    async with session_factory() as session:
+        cand_user = (await session.execute(select(User).where(User.email == "candidate@careershala.com"))).scalar_one_or_none()
+        if cand_user:
+            user_id = str(cand_user.id)
+            parsed_data = {
                 "name": "Alex Carter",
                 "email": "candidate@careershala.com",
                 "phone": "+1-555-0199",
                 "total_experience_years": 2.5,
-                "technical_skills": ["python", "react", "fastapi", "mongodb", "tailwind css", "docker", "git", "rest api"],
+                "technical_skills": ["python", "react", "fastapi", "postgresql", "tailwind css", "docker", "git", "rest api"],
                 "soft_skills": ["problem solving", "team collaboration", "communication"],
                 "education": [
                     {"degree": "Bachelor of Technology in Computer Science", "institution": "State University", "year": 2023}
@@ -313,166 +319,77 @@ async def seed_data(mongo_uri: str, db_name: str) -> None:
                 "work_experience": [
                     {"title": "Full Stack Developer", "company": "TechNova Solutions", "duration": "2023 - Present"}
                 ]
-            },
-            "status": "ready",
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc)
-        }
-        await db.resumes.update_one(
-            {"user_id": user_id},
-            {"$set": sample_resume},
-            upsert=True
-        )
-
-        # Activity timeline seed
-        sample_activity = {
-            "user_id": user_id,
-            "type": "job_application",
-            "title": "Application submitted for Full Stack Software Engineer",
-            "company": "CareerShala Cloud Technologies",
-            "created_at": datetime.now(timezone.utc)
-        }
-        await db.activities.update_one(
-            {"user_id": user_id, "title": sample_activity["title"]},
-            {"$set": sample_activity},
-            upsert=True
-        )
-        print("    Attached sample parsed resume and activity to candidate@careershala.com.")
-
-    # 4. Seed Multi-Stage Pipeline Candidates into db.applications
-    print("\n[+] Seeding Rich Applicant Kanban Pipeline...")
-    full_stack_job = await db.jobs.find_one({"title": "Full Stack Software Engineer (React + FastAPI)"})
-    ml_job = await db.jobs.find_one({"title": "AI / Machine Learning Engineer (BGE & RAG Pipelines)"})
-
-    pipeline_target_jobs = [j for j in [full_stack_job, ml_job] if j]
-    if not pipeline_target_jobs:
-        # Fallback to any job
-        first_job = await db.jobs.find_one({"created_by": recruiter_id}) or await db.jobs.find_one({})
-        if first_job:
-            pipeline_target_jobs = [first_job]
-
-    now = datetime.now(timezone.utc)
-    demo_applicants = [
-        {
-            "name": "Alex Carter",
-            "email": "candidate@careershala.com",
-            "stage": "Applied",
-            "match_score": 92.5,
-            "recruiter_score": 92.5,
-            "experience_years": 2.5,
-            "skills": ["react", "fastapi", "python", "mongodb", "docker", "tailwind css", "redis"],
-            "education": [{"degree": "B.Tech Computer Science", "institution": "State University", "year": 2023}],
-            "work_experience": [{"title": "Full Stack Developer", "company": "TechNova Solutions", "duration": "2023 - Present"}],
-            "phone": "+1-555-0199",
-            "github": "alexcarter-dev",
-            "linkedin": "https://linkedin.com/in/alexcarter-demo",
-        },
-        {
-            "name": "Priya Sharma",
-            "email": "priya.sharma@example.com",
-            "stage": "Under Review",
-            "match_score": 87.0,
-            "recruiter_score": 87.0,
-            "experience_years": 4.0,
-            "skills": ["python", "fastapi", "postgresql", "docker", "redis", "kubernetes", "aws"],
-            "education": [{"degree": "M.S. Software Systems", "institution": "National Institute", "year": 2021}],
-            "work_experience": [{"title": "Backend Infrastructure Engineer", "company": "CloudNative Systems", "duration": "2021 - Present"}],
-            "phone": "+91-98765-43210",
-            "github": "priyasharma-code",
-            "linkedin": "https://linkedin.com/in/priya-sharma-tech",
-        },
-        {
-            "name": "Devon Vance",
-            "email": "devon.vance@example.com",
-            "stage": "Shortlisted",
-            "match_score": 95.0,
-            "recruiter_score": 95.0,
-            "experience_years": 5.5,
-            "skills": ["react", "typescript", "fastapi", "graphql", "microservices", "docker", "tailwind css"],
-            "education": [{"degree": "B.S. Computer Engineering", "institution": "Tech Institute", "year": 2020}],
-            "work_experience": [{"title": "Senior Frontend / Fullstack", "company": "HyperScale Labs", "duration": "2020 - Present"}],
-            "phone": "+1-555-0842",
-            "github": "devonvance",
-            "linkedin": "https://linkedin.com/in/devon-vance",
-        },
-        {
-            "name": "Marcus Thorne",
-            "email": "marcus.thorne@example.com",
-            "stage": "Interview",
-            "match_score": 89.5,
-            "recruiter_score": 89.5,
-            "experience_years": 3.5,
-            "skills": ["python", "fastapi", "react", "next.js", "ci/cd", "mongodb", "docker"],
-            "education": [{"degree": "B.Tech Information Technology", "institution": "Metro University", "year": 2022}],
-            "work_experience": [{"title": "Full Stack Engineer", "company": "Vertex Digital", "duration": "2022 - Present"}],
-            "phone": "+44-20-7946-0912",
-            "github": "marcusthorne",
-            "linkedin": "https://linkedin.com/in/marcus-thorne",
-        },
-        {
-            "name": "Ananya Iyer",
-            "email": "ananya.iyer@example.com",
-            "stage": "Rejected",
-            "match_score": 46.0,
-            "recruiter_score": 46.0,
-            "experience_years": 1.0,
-            "skills": ["c++", "embedded systems", "matlab"],
-            "education": [{"degree": "B.E. Electronics", "institution": "City College", "year": 2024}],
-            "work_experience": [{"title": "Hardware Intern", "company": "ChipTech Labs", "duration": "2024"}],
-            "phone": "+91-98111-22334",
-            "github": "ananyaiyer",
-            "linkedin": "https://linkedin.com/in/ananya-iyer",
-        },
-    ]
-
-    total_apps_seeded = 0
-    for target_job in pipeline_target_jobs:
-        job_id_str = str(target_job["_id"])
-        job_title = target_job.get("title", "")
-        
-        for cand in demo_applicants:
-            app_filter = {"job_id": job_id_str, "candidate_email": cand["email"]}
-            app_doc = {
-                "job_id": job_id_str,
-                "candidate_name": cand["name"],
-                "candidate_email": cand["email"],
-                "stage": cand["stage"],
-                "match_score": cand["match_score"],
-                "recruiter_score": cand["recruiter_score"],
-                "tenant_id": recruiter_tenant,
-                "knockout_status": {"passed": cand["match_score"] >= 50.0, "reasons": []},
-                "resume_snapshot": {
-                    "filename": f"{cand['name'].replace(' ', '_')}_Resume.pdf",
-                    "parsed_data": {
-                        "name": cand["name"],
-                        "email": cand["email"],
-                        "skills": cand["skills"],
-                        "total_experience_years": cand["experience_years"],
-                        "education": cand["education"],
-                        "work_experience": cand["work_experience"],
-                        "contact_info": {
-                            "phone": cand["phone"],
-                            "github": cand["github"],
-                            "linkedin": cand["linkedin"],
-                            "email": cand["email"],
-                        },
-                    },
-                },
-                "created_at": now,
-                "updated_at": now,
             }
+            res_stmt = select(Resume).where(Resume.user_id == user_id)
+            existing_res = (await session.execute(res_stmt)).scalar_one_or_none()
+            if existing_res:
+                existing_res.filename = "Alex_Carter_FullStack_Resume.pdf"
+                existing_res.parsed_data = parsed_data
+                existing_res.status = "ready"
+                existing_res.updated_at = datetime.now(timezone.utc)
+            else:
+                session.add(Resume(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    filename="Alex_Carter_FullStack_Resume.pdf",
+                    file_size=142050,
+                    status="ready",
+                    parsed_data=parsed_data,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                ))
+            await session.commit()
+            print("    Attached sample parsed resume and activity to candidate@careershala.com.")
 
-            await db.applications.update_one(app_filter, {"$set": app_doc}, upsert=True)
-            total_apps_seeded += 1
+    # 4. Seed Multi-Stage Pipeline Candidates into CandidateApplication
+    print("\n[+] Seeding Rich Applicant Kanban Pipeline...")
+    async with session_factory() as session:
+        jobs_stmt = select(Job).limit(2)
+        pipeline_target_jobs = (await session.execute(jobs_stmt)).scalars().all()
+        now = datetime.now(timezone.utc)
+        demo_applicants = [
+            {"name": "Alex Carter", "email": "candidate@careershala.com", "stage": "Applied", "match_score": 92.5},
+            {"name": "Priya Sharma", "email": "priya.sharma@example.com", "stage": "Under Review", "match_score": 87.0},
+            {"name": "Devon Vance", "email": "devon.vance@example.com", "stage": "Shortlisted", "match_score": 95.0},
+            {"name": "Marcus Thorne", "email": "marcus.thorne@example.com", "stage": "Interview", "match_score": 89.5},
+            {"name": "Ananya Iyer", "email": "ananya.iyer@example.com", "stage": "Rejected", "match_score": 46.0},
+        ]
+        total_apps_seeded = 0
+        for target_job in pipeline_target_jobs:
+            job_id_str = str(target_job.id)
+            for cand in demo_applicants:
+                app_stmt = select(CandidateApplication).where(
+                    CandidateApplication.job_id == job_id_str,
+                    CandidateApplication.candidate_email == cand["email"]
+                )
+                existing_app = (await session.execute(app_stmt)).scalar_one_or_none()
+                if existing_app:
+                    existing_app.stage = cand["stage"]
+                    existing_app.match_score = cand["match_score"]
+                    existing_app.updated_at = now
+                else:
+                    session.add(CandidateApplication(
+                        id=f"app_{uuid.uuid4().hex[:12]}",
+                        job_id=job_id_str,
+                        candidate_name=cand["name"],
+                        candidate_email=cand["email"],
+                        stage=cand["stage"],
+                        match_score=cand["match_score"],
+                        quality_score=cand["match_score"],
+                        tenant_id=target_job.tenant_id or "default",
+                        created_at=now,
+                        updated_at=now,
+                    ))
+                total_apps_seeded += 1
+            await session.commit()
+            cnt_stmt = select(func.count(CandidateApplication.id)).where(CandidateApplication.job_id == job_id_str)
+            cnt = (await session.execute(cnt_stmt)).scalar() or 0
+            target_job.applicant_count = cnt
+            await session.commit()
+            print(f"    Seeded {len(demo_applicants)} applicants for role: '{target_job.title}' (Total on job: {cnt})")
 
-        # Synchronize live applicant count on job
-        actual_cnt = await db.applications.count_documents({"job_id": job_id_str})
-        await db.jobs.update_one({"_id": target_job["_id"]}, {"$set": {"applicant_count": actual_cnt}})
-        print(f"    Seeded {len(demo_applicants)} applicants for role: '{job_title}' (Total on job: {actual_cnt})")
+        print(f"    [OK] Successfully synchronized {total_apps_seeded} applicants across pipeline.")
 
-    print(f"    [OK] Successfully synchronized {total_apps_seeded} applicants across pipeline.")
-
-    await client.close()
     print("\n[OK] Demo data seeding complete! Ready for evaluation.")
     print("=" * 60)
     print("DEMO EVALUATION CREDENTIALS:")
@@ -484,11 +401,11 @@ async def seed_data(mongo_uri: str, db_name: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Seed CareerShala with sample demo accounts, jobs, and candidate data.")
-    parser.add_argument("--mongo-uri", type=str, default=settings.MONGO_URI, help="MongoDB connection URI")
-    parser.add_argument("--db-name", type=str, default=settings.MONGO_DB_NAME, help="MongoDB database name")
+    parser.add_argument("--database-url", type=str, default="", help="PostgreSQL connection string")
+
     args = parser.parse_args()
 
-    asyncio.run(seed_data(args.mongo_uri, args.db_name))
+    asyncio.run(seed_data())
 
 
 if __name__ == "__main__":

@@ -1,13 +1,19 @@
 """
-Notifications API Route — Dynamic real notification feed for users with MongoDB persistence.
+Notifications API Route — Dynamic real notification feed for users with PostgreSQL persistence.
 """
 
+import uuid
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.deps import get_current_user, get_db, get_gamification_repo
 from models.user_model import UserModel
-from api.deps import get_current_user, get_db
-from pymongo.asynchronous.database import AsyncDatabase
+from models.tables import UserNotificationState, Certificate
+from repositories.gamification_repo import GamificationRepository
 
 router = APIRouter()
 
@@ -32,10 +38,70 @@ def _parse_dt(val: Any) -> Optional[datetime]:
     return None
 
 
+async def _get_pg_notification_state(session: AsyncSession, user_id: str) -> Dict[str, Any]:
+    stmt = select(UserNotificationState).where(UserNotificationState.user_id == str(user_id))
+    res = await session.execute(stmt)
+    row = res.scalar_one_or_none()
+    if not row:
+        return {}
+    return {
+        "read_ids": row.read_ids or [],
+        "dismissed_ids": row.dismissed_ids or [],
+        "cleared_at": row.cleared_at,
+        "all_read_at": row.all_read_at,
+    }
+
+
+async def _update_pg_notification_state(
+    session: AsyncSession,
+    user_id: str,
+    *,
+    cleared_at: Optional[datetime] = None,
+    all_read_at: Optional[datetime] = None,
+    add_read_id: Optional[str] = None,
+    add_dismissed_id: Optional[str] = None,
+) -> None:
+    stmt = select(UserNotificationState).where(UserNotificationState.user_id == str(user_id))
+    res = await session.execute(stmt)
+    row = res.scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    if not row:
+        row = UserNotificationState(
+            id=str(uuid.uuid4()),
+            user_id=str(user_id),
+            read_ids=[add_read_id] if add_read_id else [],
+            dismissed_ids=[add_dismissed_id] if add_dismissed_id else [],
+            cleared_at=cleared_at,
+            all_read_at=all_read_at,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(row)
+    else:
+        if cleared_at is not None:
+            row.cleared_at = cleared_at
+            row.read_ids = []
+        if all_read_at is not None:
+            row.all_read_at = all_read_at
+        if add_read_id:
+            current_reads = list(row.read_ids or [])
+            if add_read_id not in current_reads:
+                current_reads.append(add_read_id)
+            row.read_ids = current_reads
+        if add_dismissed_id:
+            current_dismissed = list(row.dismissed_ids or [])
+            if add_dismissed_id not in current_dismissed:
+                current_dismissed.append(add_dismissed_id)
+            row.dismissed_ids = current_dismissed
+        row.updated_at = now
+    await session.commit()
+
+
 @router.get("/me")
 async def get_my_notifications(
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncDatabase = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
+    gamification_repo: GamificationRepository = Depends(get_gamification_repo),
 ) -> Dict[str, Any]:
     """Return real user notifications synthesized from certificates, point activities, and streaks,
     filtered by persistent user notification state (cleared_at, dismissed_ids, read_ids)."""
@@ -43,27 +109,32 @@ async def get_my_notifications(
     user_id = str(current_user.id)
 
     # 1. Fetch persistent notification state for this user
-    user_state = await db.user_notification_state.find_one({"user_id": user_id}) or {}
+    user_state = await _get_pg_notification_state(session, user_id)
     read_ids = set(user_state.get("read_ids") or [])
     dismissed_ids = set(user_state.get("dismissed_ids") or [])
     cleared_at = _parse_dt(user_state.get("cleared_at"))
     all_read_at = _parse_dt(user_state.get("all_read_at"))
 
     # 2. Fetch user certificates
-    cursor = db.certificates.find({"user_id": user_id}).sort("created_at", -1).limit(10)
-    certificates = await cursor.to_list(length=10)
+    stmt = (
+        select(Certificate)
+        .where(Certificate.user_id == user_id)
+        .order_by(Certificate.issued_at.desc())
+        .limit(10)
+    )
+    res = await session.execute(stmt)
+    certificates = res.scalars().all()
     for cert in certificates:
-        cert_id = str(cert.get("_id") or cert.get("certificate_id", ""))
+        cert_id = str(cert.id)
         notif_id = f"cert_{cert_id}"
         if notif_id in dismissed_ids:
             continue
 
-        issue_date = cert.get("issued_at") or cert.get("created_at") or datetime.now(timezone.utc)
-        issue_dt = _parse_dt(issue_date) or datetime.now(timezone.utc)
+        issue_dt = _parse_dt(cert.issued_at) or datetime.now(timezone.utc)
         if cleared_at and issue_dt <= cleared_at:
             continue
 
-        cert_type = (cert.get("certificate_type") or "Skill Assessment").replace("_", " ").title()
+        cert_type = (cert.certificate_type or "Skill Assessment").replace("_", " ").title()
         is_read = notif_id in read_ids or (all_read_at and issue_dt <= all_read_at)
 
         notifications.append({
@@ -77,9 +148,9 @@ async def get_my_notifications(
         })
 
     # 3. Fetch user gamification profile for XP/points and streaks
-    profile = await db.user_gamification.find_one({"user_id": user_id})
+    profile = await gamification_repo.get_by_user_id(user_id)
     if profile:
-        recent_points = profile.get("recent_points", [])
+        recent_points = profile.get("recent_points", []) or []
         for pt in reversed(recent_points[-15:]):
             ts_raw = pt.get("ts") or pt.get("created_at") or datetime.now(timezone.utc)
             pt_dt = _parse_dt(ts_raw) or datetime.now(timezone.utc)
@@ -146,43 +217,24 @@ async def get_my_notifications(
 @router.delete("/clear-all")
 async def clear_all_notifications(
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncDatabase = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Clear all current notifications for the user so they stay cleared even after reload."""
     user_id = str(current_user.id)
     now = datetime.now(timezone.utc)
-    await db.user_notification_state.update_one(
-        {"user_id": user_id},
-        {
-            "$set": {
-                "cleared_at": now,
-                "read_ids": [],
-                "updated_at": now,
-            }
-        },
-        upsert=True,
-    )
+    await _update_pg_notification_state(session, user_id, cleared_at=now)
     return {"status": "success", "cleared_at": now.isoformat()}
 
 
 @router.post("/read-all")
 async def mark_all_notifications_as_read(
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncDatabase = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Mark all current notifications as read."""
     user_id = str(current_user.id)
     now = datetime.now(timezone.utc)
-    await db.user_notification_state.update_one(
-        {"user_id": user_id},
-        {
-            "$set": {
-                "all_read_at": now,
-                "updated_at": now,
-            }
-        },
-        upsert=True,
-    )
+    await _update_pg_notification_state(session, user_id, all_read_at=now)
     return {"status": "success", "all_read_at": now.isoformat()}
 
 
@@ -190,18 +242,11 @@ async def mark_all_notifications_as_read(
 async def mark_notification_as_read(
     notification_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncDatabase = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Mark a single notification as read."""
     user_id = str(current_user.id)
-    await db.user_notification_state.update_one(
-        {"user_id": user_id},
-        {
-            "$addToSet": {"read_ids": notification_id},
-            "$set": {"updated_at": datetime.now(timezone.utc)},
-        },
-        upsert=True,
-    )
+    await _update_pg_notification_state(session, user_id, add_read_id=notification_id)
     return {"status": "success", "id": notification_id}
 
 
@@ -210,20 +255,12 @@ async def mark_notification_as_read(
 async def dismiss_notification(
     notification_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncDatabase = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Dismiss / delete a single notification."""
     if notification_id == "clear-all":
-        return await clear_all_notifications(current_user=current_user, db=db)
+        return await clear_all_notifications(current_user=current_user, session=session)
 
     user_id = str(current_user.id)
-    await db.user_notification_state.update_one(
-        {"user_id": user_id},
-        {
-            "$addToSet": {"dismissed_ids": notification_id},
-            "$set": {"updated_at": datetime.now(timezone.utc)},
-        },
-        upsert=True,
-    )
+    await _update_pg_notification_state(session, user_id, add_dismissed_id=notification_id)
     return {"status": "success", "id": notification_id}
-

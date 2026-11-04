@@ -4,7 +4,7 @@ Provides:
   - Idempotent task dispatching keyed on (resume_id, file_hash) or custom keys.
   - Exponential backoff retry execution.
   - Dead-Letter Queue (DLQ) tracking for unrecoverable failures into db.task_dlq.
-  - Automatic in-process async worker execution with MongoDB persistence.
+  - Automatic in-process async worker execution with database persistence.
 """
 
 from __future__ import annotations
@@ -54,20 +54,6 @@ class TaskManager:
         Returns: (is_duplicate: bool, current_status: Optional[str])
         """
         now = time.time()
-
-        # 1. Try MongoDB
-        if self.db is not None:
-            try:
-                coll = self.db[self._idempotency_collection_name]
-                record = await coll.find_one({"key": idempotency_key})
-                if record:
-                    expires_at = record.get("expires_at", 0)
-                    if expires_at > now:
-                        return True, record.get("status", "COMPLETED")
-            except Exception as e:
-                logger.debug("DB idempotency check failed", error=str(e))
-
-        # 2. In-memory fallback
         mem = _IN_MEMORY_IDEMPOTENCY.get(idempotency_key)
         if mem and mem.get("expires_at", 0) > now:
             return True, mem.get("status")
@@ -84,26 +70,6 @@ class TaskManager:
         """Updates task lifecycle state (QUEUED, PROCESSING, COMPLETED, FAILED)."""
         now = time.time()
         expires_at = now + ttl_seconds
-
-        # DB
-        if self.db is not None:
-            try:
-                coll = self.db[self._idempotency_collection_name]
-                op = coll.update_one(
-                    {"key": idempotency_key},
-                    {"$set": {
-                        "key": idempotency_key,
-                        "status": status,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                        "expires_at": expires_at,
-                        "metadata": result_metadata or {},
-                    }},
-                    upsert=True,
-                )
-                if hasattr(op, "__await__"):
-                    await op
-            except Exception:
-                pass
 
         # In-memory
         _IN_MEMORY_IDEMPOTENCY[idempotency_key] = {
@@ -132,16 +98,14 @@ class TaskManager:
             "failed_at_iso": datetime.now(timezone.utc).isoformat(),
         }
 
-        if self.db is not None:
-            try:
-                coll = self.db[self._dlq_collection_name]
-                op = coll.insert_one(dlq_entry)
-                if hasattr(op, "__await__"):
-                    await op
-            except Exception as e:
-                logger.error("Failed writing DLQ entry to MongoDB", error=str(e))
-
         _IN_MEMORY_DLQ.append(dlq_entry)
+        if hasattr(self, "db") and self.db:
+            try:
+                col = self.db["task_dlq"] if hasattr(self.db, "__getitem__") else getattr(self.db, "task_dlq", None)
+                if col and hasattr(col, "add"):
+                    await col.add(dlq_entry)
+            except Exception:
+                pass
         logger.error(
             "Task permanently failed, routed to DLQ",
             task_name=task_name,
@@ -223,18 +187,16 @@ class TaskManager:
         base_backoff_sec: float = 0.5,
     ) -> Any:
         """
-        Enqueues an asynchronous background job with persistent MongoDB tracking,
+        Enqueues an asynchronous background job with persistent database tracking,
         progress updates, and retry-with-backoff.
         """
         import uuid
-        from config.db import get_database
         from repositories.task_job_repo import TaskJobRepository
         from models.task_job_model import JobStatus, JobType
 
         j_id = job_id or uuid.uuid4().hex
         t_id = tenant_id or "default"
-        db = self.db or get_database()
-        repo = TaskJobRepository(db)
+        repo = TaskJobRepository(self.db)
 
         j_type = job_type if isinstance(job_type, JobType) else JobType(str(job_type))
         job_record = await repo.create_job(

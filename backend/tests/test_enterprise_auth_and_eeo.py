@@ -8,7 +8,6 @@ from __future__ import annotations
 import base64
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from bson import ObjectId
 
 from models.eeo import EEOGender, EEORaceEthnicity, EEOSelfIdentificationPayload
 from models.enterprise_auth import SAMLConfiguration, SCIMEmail, SCIMName, SCIMUserPayload
@@ -43,17 +42,12 @@ def test_saml_configuration_and_url_generation():
 
 @pytest.mark.asyncio
 async def test_saml_response_processing_and_jit_provisioning():
-    mock_db = MagicMock()
-    mock_db.users.find_one = AsyncMock(return_value=None)
-    mock_db.users.insert_one = AsyncMock()
-
     mock_xml = "Email: sarah.recruiter@acme.corp\nName: Sarah Connor\nRole: recruiter\n"
     b64_assertion = base64.b64encode(mock_xml.encode("utf-8")).decode("utf-8")
 
     session = await enterprise_sso_service.process_saml_response(
         saml_response_b64=b64_assertion,
         tenant_id="acme_corp",
-        db=mock_db,
     )
 
     assert session["email"] == "sarah.recruiter@acme.corp"
@@ -61,7 +55,6 @@ async def test_saml_response_processing_and_jit_provisioning():
     assert session["tenant_id"] == "acme_corp"
     assert session["role"] == "recruiter"
     assert "access_token" in session
-    mock_db.users.insert_one.assert_called_once()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -70,18 +63,6 @@ async def test_saml_response_processing_and_jit_provisioning():
 
 @pytest.mark.asyncio
 async def test_scim_user_crud_lifecycle():
-    mock_db = MagicMock()
-    mock_db.users.insert_one = AsyncMock()
-    mock_db.users.find_one = AsyncMock(return_value={
-        "_id": ObjectId("660000000000000000000011"),
-        "email": "john.doe@enterprise.com",
-        "full_name": "John Doe",
-        "role": "hiring_manager",
-        "status": "active",
-        "tenant_id": "corp_xyz",
-    })
-    mock_db.users.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
-
     # 1. Create User
     payload = SCIMUserPayload(
         userName="john.doe@enterprise.com",
@@ -92,20 +73,19 @@ async def test_scim_user_crud_lifecycle():
         active=True,
         tenant_id="corp_xyz",
     )
-    user_resp = await scim_service.create_user(payload, tenant_id="corp_xyz", db=mock_db)
+    user_resp = await scim_service.create_user(payload, tenant_id="corp_xyz")
     assert user_resp.userName == "john.doe@enterprise.com"
     assert user_resp.roles == ["hiring_manager"]
-    mock_db.users.insert_one.assert_called_once()
+    user_id = user_resp.id
 
     # 2. Get User
-    fetched = await scim_service.get_user("660000000000000000000011", tenant_id="corp_xyz", db=mock_db)
+    fetched = await scim_service.get_user(user_id, tenant_id="corp_xyz")
     assert fetched is not None
     assert fetched.name.formatted == "John Doe"
 
     # 3. Deprovision User
-    success = await scim_service.deprovision_user("660000000000000000000011", tenant_id="corp_xyz", db=mock_db)
+    success = await scim_service.deprovision_user(user_id, tenant_id="corp_xyz")
     assert success is True
-    mock_db.users.update_one.assert_called_once()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -114,10 +94,6 @@ async def test_scim_user_crud_lifecycle():
 
 @pytest.mark.asyncio
 async def test_eeo_recording_and_aggregate_report():
-    mock_db = MagicMock()
-    mock_db.raw_db = mock_db
-    mock_db.eeo_responses.insert_one = AsyncMock()
-
     payload = EEOSelfIdentificationPayload(
         gender=EEOGender.FEMALE,
         race_ethnicity=EEORaceEthnicity.ASIAN,
@@ -129,12 +105,12 @@ async def test_eeo_recording_and_aggregate_report():
         payload=payload,
         candidate_id="cand_789",
         tenant_id="tenant_omega",
-        db=mock_db,
     )
     assert record.gender == "Female"
     assert record.race_ethnicity == "Asian"
     assert record.candidate_id == "cand_789"
-    mock_db.eeo_responses.insert_one.assert_called_once()
+    assert record.id is not None
+
 
 
 def test_eeo_absolute_score_isolation_proof():

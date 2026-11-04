@@ -61,7 +61,7 @@ const JOB_LISTINGS = [
     location: 'Remote (Worldwide)',
     level: 'Senior / Lead',
     description: 'Architect distributed microservices, multi-tenant database isolation, job alert workers, and high-throughput ATS ingestion engines.',
-    skills: ['Python', 'FastAPI', 'PostgreSQL', 'MongoDB', 'AsyncIO', 'Docker'],
+    skills: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy', 'AsyncIO', 'Docker'],
   },
   {
     id: 'product-designer',

@@ -7,66 +7,10 @@ from models.talent_pool import VisibilityTier
 from services.talent_pool_service import TalentPoolService
 
 
-class InMemoryCollection:
-    def __init__(self):
-        self.docs = []
-
-    async def insert_one(self, doc):
-        self.docs.append(dict(doc))
-        return type("InsertResult", (), {"inserted_id": doc.get("id")})()
-
-    async def find_one(self, query):
-        for d in self.docs:
-            if all(d.get(k) == v for k, v in query.items()):
-                return dict(d)
-        return None
-
-    def find(self, query):
-        results = []
-        for d in self.docs:
-            match = True
-            for k, v in query.items():
-                if isinstance(v, dict):
-                    if "$ne" in v and d.get(k) == v["$ne"]:
-                        match = False
-                        break
-                    if "$gte" in v and (d.get(k) is None or d.get(k) < v["$gte"]):
-                        match = False
-                        break
-                elif d.get(k) != v:
-                    match = False
-                    break
-            if match:
-                results.append(dict(d))
-
-        class MockCursor:
-            def __init__(self, data):
-                self.data = data
-
-            async def to_list(self, length=100):
-                return self.data[:length]
-
-        return MockCursor(results)
-
-    async def update_one(self, query, update):
-        for d in self.docs:
-            if all(d.get(k) == v for k, v in query.items()):
-                if "$set" in update:
-                    d.update(update["$set"])
-                return type("UpdateResult", (), {"modified_count": 1})()
-        return type("UpdateResult", (), {"modified_count": 0})()
-
-
-class MockDB:
-    def __init__(self):
-        self.talent_pool_profiles = InMemoryCollection()
-        self.talent_pool_views = InMemoryCollection()
-
-
 @pytest.mark.asyncio
 async def test_consented_talent_pool_lifecycle():
-    db = MockDB()
-    service = TalentPoolService(db)
+    service = TalentPoolService()
+
 
     # 1. Profile created: Default is strictly OFF (opted_in=False, HIDDEN)
     profile = await service.create_or_update_profile(

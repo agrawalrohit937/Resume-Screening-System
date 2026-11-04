@@ -23,7 +23,6 @@ from schemas.application_schema import (
 )
 from services.apply_assistant_service import ApplyAssistantService
 from repositories.resume_repo import ResumeRepository
-from config.db import get_database
 
 router = APIRouter(prefix="/apply", tags=["Apply Assistant"])
 service = ApplyAssistantService()
@@ -103,18 +102,21 @@ async def extract_from_screenshot(
 
 
 def _to_draft_response(doc: dict) -> ApplyDraftResponse:
+    from datetime import datetime, timezone
     draft = doc.get("edited_draft") or doc.get("generated_draft") or {}
     ats_ref = doc.get("ats_result_ref") or {}
+    app_id = str(doc.get("_id") or doc.get("id") or "")
+    now = datetime.now(timezone.utc)
     return ApplyDraftResponse(
-        application_id=str(doc["_id"]),
-        status=doc["status"],
+        application_id=app_id,
+        status=doc.get("status", "draft"),
         email_subject=draft.get("email_subject"),
         email_body=draft.get("email_body"),
         cover_letter_text=draft.get("cover_letter_text"),
         ats_result=ATSResultSummary(**ats_ref) if ats_ref.get("result_id") else None,
         needs_manual_review=doc.get("needs_manual_review", False),
-        created_at=doc["created_at"],
-        updated_at=doc["updated_at"],
+        created_at=doc.get("created_at") or now,
+        updated_at=doc.get("updated_at") or now,
     )
 
 
@@ -129,8 +131,7 @@ async def check_ats_score(
     user_id = _user_id(current_user)
     
     # Resolve resume and get text
-    db = get_database()
-    resume_repo = ResumeRepository(db)
+    resume_repo = ResumeRepository()
     resume = await resume_repo.get_by_id_and_user(payload.resume_id, user_id)
     if not resume:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Resume not found")

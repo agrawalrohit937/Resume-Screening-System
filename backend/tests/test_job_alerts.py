@@ -13,8 +13,6 @@ Verifies:
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
-from bson import ObjectId
-
 from models.cron_run_model import DeliveryStatus
 from scheduler.job_alerts import (
     calculate_slot_id,
@@ -45,36 +43,30 @@ async def test_atomic_candidate_claim_and_duplicate_prevention(monkeypatch):
     fake_brevo = AsyncMock(return_value={"sent": True, "message_id": "msg-12345"})
     monkeypatch.setattr(EmailService, "_send_brevo_email", fake_brevo)
 
-    mock_db = MagicMock()
-    mock_db.jobs.count_documents = AsyncMock(return_value=5)
-    mock_db.jobs.delete_many = AsyncMock(return_value=MagicMock(deleted_count=0))
-    mock_db.cron_job_runs.create_index = AsyncMock()
-    mock_db.job_alert_deliveries.create_index = AsyncMock()
-    mock_db.cron_job_runs.find_one = AsyncMock(return_value=None)
-    mock_db.cron_job_runs.update_one = AsyncMock()
-    mock_db.users.update_one = AsyncMock()
-    mock_db.companies.find_one = AsyncMock(return_value=None)
-
-    candidate_id = str(ObjectId())
+    candidate_id = "cand_test_claim_123"
     candidate_doc = {
-        "_id": ObjectId(candidate_id),
+        "_id": candidate_id,
+        "id": candidate_id,
         "email": "cand@example.com",
         "full_name": "Test Candidate",
         "job_alerts_enabled": True,
         "last_alert_slot": None,
     }
 
-    mock_cursor = MagicMock()
-    mock_cursor.to_list = AsyncMock(return_value=[candidate_doc])
-    mock_db.users.find.return_value = mock_cursor
-
-    # Candidate has parsed resume
-    mock_db.resumes.find_one = AsyncMock(return_value={
-        "_id": ObjectId(),
+    mock_cron_repo = MagicMock()
+    mock_cron_repo.get_open_jobs_count = AsyncMock(return_value=5)
+    mock_cron_repo.get_cron_run = AsyncMock(return_value=None)
+    mock_cron_repo.upsert_cron_run = AsyncMock()
+    mock_cron_repo.get_active_candidates = AsyncMock(return_value=[candidate_doc])
+    mock_cron_repo.get_candidate_parsed_resume = AsyncMock(return_value={
+        "id": "resume_123",
         "user_id": candidate_id,
-        "status": "parsed",
         "parsed_data": {"skills": ["Python", "FastAPI"]},
     })
+    mock_cron_repo.get_candidate_delivery = AsyncMock(return_value=None)
+    mock_cron_repo.claim_candidate = AsyncMock(return_value=True)
+    mock_cron_repo.update_delivery = AsyncMock()
+    mock_cron_repo.update_user_alert_slot = AsyncMock()
 
     from contextlib import asynccontextmanager
 
@@ -99,32 +91,24 @@ async def test_atomic_candidate_claim_and_duplicate_prevention(monkeypatch):
             ]
         }
 
-        # First run: candidate not claimed yet (find_one returns None)
-        mock_db.job_alert_deliveries.find_one = AsyncMock(return_value=None)
-        mock_db.job_alert_deliveries.insert_one = AsyncMock()
-        mock_db.job_alert_deliveries.update_one = AsyncMock()
-
-        res = await run_nightly_job_alerts(db=mock_db, slot_id="2026-10-03_07:30")
+        # First run: candidate not claimed yet (get_candidate_delivery returns None)
+        res = await run_nightly_job_alerts(slot_id="2026-10-03_07:30", cron_repo=mock_cron_repo)
         assert res["status"] == "completed"
         assert res["emails_delivered"] == 1
 
-        # Verify insert_one was called to claim candidate
-        mock_db.job_alert_deliveries.insert_one.assert_called_once()
-        claim_call = mock_db.job_alert_deliveries.insert_one.call_args[0][0]
-        assert claim_call["candidate_id"] == candidate_id
-        assert claim_call["slot_id"] == "2026-10-03_07:30"
-        assert claim_call["status"] == DeliveryStatus.CLAIMED.value
+        # Verify claim_candidate was called to atomically claim candidate
+        mock_cron_repo.claim_candidate.assert_called_once_with(candidate_id, "2026-10-03_07:30", "cand@example.com")
 
         # Second run: candidate already marked DELIVERED
-        mock_db.job_alert_deliveries.find_one = AsyncMock(return_value={
+        mock_cron_repo.get_candidate_delivery = AsyncMock(return_value={
             "candidate_id": candidate_id,
             "slot_id": "2026-10-03_07:30",
             "status": DeliveryStatus.DELIVERED.value,
         })
-        mock_db.job_alert_deliveries.insert_one.reset_mock()
+        mock_cron_repo.claim_candidate.reset_mock()
         fake_brevo.reset_mock()
 
-        res2 = await run_nightly_job_alerts(db=mock_db, slot_id="2026-10-03_07:30", force_replay=True)
+        res2 = await run_nightly_job_alerts(slot_id="2026-10-03_07:30", force_replay=True, cron_repo=mock_cron_repo)
         assert res2["emails_delivered"] == 0
         fake_brevo.assert_not_called()
 
@@ -142,30 +126,24 @@ async def test_uncertain_outcome_quarantine(monkeypatch):
     })
     monkeypatch.setattr(EmailService, "_send_brevo_email", fake_brevo)
 
-    mock_db = MagicMock()
-    mock_db.jobs.count_documents = AsyncMock(return_value=5)
-    mock_db.jobs.delete_many = AsyncMock(return_value=MagicMock(deleted_count=0))
-    mock_db.cron_job_runs.create_index = AsyncMock()
-    mock_db.job_alert_deliveries.create_index = AsyncMock()
-    mock_db.cron_job_runs.find_one = AsyncMock(return_value=None)
-    mock_db.cron_job_runs.update_one = AsyncMock()
-    mock_db.job_alert_deliveries.find_one = AsyncMock(return_value=None)
-    mock_db.job_alert_deliveries.insert_one = AsyncMock()
-    mock_db.job_alert_deliveries.update_one = AsyncMock()
-    mock_db.users.update_one = AsyncMock()
-
-    candidate_id = str(ObjectId())
+    candidate_id = "cand_timeout_123"
     candidate_doc = {
-        "_id": ObjectId(candidate_id),
+        "_id": candidate_id,
+        "id": candidate_id,
         "email": "cand_timeout@example.com",
         "full_name": "Timeout Candidate",
         "job_alerts_enabled": True,
     }
 
-    mock_cursor = MagicMock()
-    mock_cursor.to_list = AsyncMock(return_value=[candidate_doc])
-    mock_db.users.find.return_value = mock_cursor
-    mock_db.resumes.find_one = AsyncMock(return_value={"status": "parsed", "parsed_data": {}})
+    mock_cron_repo = MagicMock()
+    mock_cron_repo.get_open_jobs_count = AsyncMock(return_value=5)
+    mock_cron_repo.get_cron_run = AsyncMock(return_value=None)
+    mock_cron_repo.upsert_cron_run = AsyncMock()
+    mock_cron_repo.get_active_candidates = AsyncMock(return_value=[candidate_doc])
+    mock_cron_repo.get_candidate_parsed_resume = AsyncMock(return_value={"parsed_data": {}})
+    mock_cron_repo.get_candidate_delivery = AsyncMock(return_value=None)
+    mock_cron_repo.claim_candidate = AsyncMock(return_value=True)
+    mock_cron_repo.update_delivery = AsyncMock()
 
     from contextlib import asynccontextmanager
 
@@ -179,15 +157,15 @@ async def test_uncertain_outcome_quarantine(monkeypatch):
             "recommended_jobs": [{"id": "job-1", "title": "Dev", "company_name": "Corp", "is_applied": False}]
         }
 
-        res = await run_nightly_job_alerts(db=mock_db, slot_id="2026-10-03_07:30")
+        res = await run_nightly_job_alerts(slot_id="2026-10-03_07:30", cron_repo=mock_cron_repo)
 
         assert res["emails_delivered"] == 0
         assert res["emails_uncertain"] == 1
 
         # Verify job_alert_deliveries was marked UNCERTAIN
-        update_calls = mock_db.job_alert_deliveries.update_one.call_args_list
+        update_calls = mock_cron_repo.update_delivery.call_args_list
         marked_uncertain = any(
-            c[0][1].get("$set", {}).get("status") == DeliveryStatus.UNCERTAIN.value
+            c.kwargs.get("status") == DeliveryStatus.UNCERTAIN.value
             for c in update_calls
         )
         assert marked_uncertain is True
@@ -202,26 +180,28 @@ async def test_sweep_stuck_pending_resumes():
     async def mock_acquired_lock(*args, **kwargs):
         yield True
 
-    sample_id = ObjectId()
-    mock_db = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.to_list = AsyncMock(return_value=[
-        {"_id": sample_id, "user_id": "u123", "status": "processing"}
-    ])
-    mock_db.resumes.find.return_value = mock_cursor
-    mock_db.resumes.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+    from tests.conftest import MockResult
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(return_value=MockResult(rowcount=1))
+    mock_session.commit = AsyncMock()
+    mock_session.rollback = AsyncMock()
+    
+    @asynccontextmanager
+    async def mock_begin():
+        yield
+
+    mock_session.begin = mock_begin
+
+    @asynccontextmanager
+    async def mock_session_ctx():
+        yield mock_session
 
     with patch("scheduler.job_alerts.distributed_lock", side_effect=mock_acquired_lock):
-        res = await sweep_stuck_pending_resumes(db=mock_db)
+        with patch("config.db.get_pg_session_factory", return_value=lambda: mock_session_ctx()):
+            res = await sweep_stuck_pending_resumes()
 
     assert res["swept"] == 1
-    mock_db.resumes.find.assert_called_once()
-    called_query = mock_db.resumes.find.call_args[0][0]
-    assert called_query["status"] == {"$in": ["pending", "processing"]}
-    mock_db.resumes.update_one.assert_called_once()
-    update_arg = mock_db.resumes.update_one.call_args[0]
-    assert update_arg[0] == {"_id": sample_id}
-    assert update_arg[1]["$set"]["status"] == "failed"
+    mock_session.execute.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -311,38 +291,32 @@ async def test_stale_claim_recovery_after_15_minutes(monkeypatch):
     async def mock_acquired_lock(*args, **kwargs):
         yield True
 
-    mock_db = MagicMock()
-    mock_db.jobs.count_documents = AsyncMock(return_value=5)
-    mock_db.jobs.delete_many = AsyncMock(return_value=MagicMock(deleted_count=0))
-    mock_db.cron_job_runs.create_index = AsyncMock()
-    mock_db.job_alert_deliveries.create_index = AsyncMock()
-    mock_db.cron_job_runs.find_one = AsyncMock(return_value=None)
-    mock_db.cron_job_runs.update_one = AsyncMock()
-    mock_db.users.update_one = AsyncMock()
-
-    candidate_id = str(ObjectId())
+    candidate_id = "cand_stale_123"
     candidate_doc = {
-        "_id": ObjectId(candidate_id),
+        "_id": candidate_id,
+        "id": candidate_id,
         "email": "cand_stale@example.com",
         "full_name": "Stale Candidate",
         "job_alerts_enabled": True,
     }
 
-    mock_cursor = MagicMock()
-    mock_cursor.to_list = AsyncMock(return_value=[candidate_doc])
-    mock_db.users.find.return_value = mock_cursor
-    mock_db.resumes.find_one = AsyncMock(return_value={"status": "parsed", "parsed_data": {}})
-
-    # Claim is 20 minutes old (stale)
     stale_time = datetime.now(timezone.utc) - timedelta(minutes=20)
-    mock_db.job_alert_deliveries.find_one = AsyncMock(return_value={
+    mock_cron_repo = MagicMock()
+    mock_cron_repo.get_open_jobs_count = AsyncMock(return_value=5)
+    mock_cron_repo.get_cron_run = AsyncMock(return_value=None)
+    mock_cron_repo.upsert_cron_run = AsyncMock()
+    mock_cron_repo.get_active_candidates = AsyncMock(return_value=[candidate_doc])
+    mock_cron_repo.get_candidate_parsed_resume = AsyncMock(return_value={"parsed_data": {}})
+    mock_cron_repo.get_candidate_delivery = AsyncMock(return_value={
         "candidate_id": candidate_id,
         "slot_id": "2026-10-03_07:30",
         "status": DeliveryStatus.CLAIMED.value,
         "claimed_at": stale_time,
         "attempt_count": 1,
     })
-    mock_db.job_alert_deliveries.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+    mock_cron_repo.reclaim_candidate = AsyncMock(return_value=True)
+    mock_cron_repo.update_delivery = AsyncMock()
+    mock_cron_repo.update_user_alert_slot = AsyncMock()
 
     with patch("scheduler.job_alerts.find_jobs_for_candidate", new_callable=AsyncMock) as mock_match, \
          patch("scheduler.job_alerts.distributed_lock", side_effect=mock_acquired_lock):
@@ -350,10 +324,11 @@ async def test_stale_claim_recovery_after_15_minutes(monkeypatch):
             "recommended_jobs": [{"id": "job-1", "title": "Dev", "company_name": "Corp", "is_applied": False}]
         }
 
-        res = await run_nightly_job_alerts(db=mock_db, slot_id="2026-10-03_07:30")
+        res = await run_nightly_job_alerts(slot_id="2026-10-03_07:30", cron_repo=mock_cron_repo)
 
         assert res["emails_delivered"] == 1
         fake_brevo.assert_called_once()
+        mock_cron_repo.reclaim_candidate.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -401,7 +376,7 @@ async def test_webhook_sweep_stuck_resumes_authentication():
 
     # 1. 401 when invalid
     with pytest.raises(HTTPException) as exc_info:
-        await sweep_stuck_resumes_webhook(x_cron_secret="wrong", db=mock_db)
+        await sweep_stuck_resumes_webhook(x_cron_secret="wrong")
     assert exc_info.value.status_code == 401
 
     # 2. 200 when valid
@@ -413,7 +388,6 @@ async def test_webhook_sweep_stuck_resumes_authentication():
 
         res = await sweep_stuck_resumes_webhook(
             x_cron_secret="CareerShala-Cron-Token-9988!@#",
-            db=mock_db,
         )
         assert res["status"] == "success"
         assert res["message"] == "Sweep completed"
@@ -427,11 +401,9 @@ async def test_webhook_expire_subscriptions_authentication():
     from api.routes.users import expire_subscriptions_webhook
     from fastapi import HTTPException
 
-    mock_db = MagicMock()
-
     # 1. 401 when invalid
     with pytest.raises(HTTPException) as exc_info:
-        await expire_subscriptions_webhook(x_cron_secret="wrong", db=mock_db)
+        await expire_subscriptions_webhook(x_cron_secret="wrong")
     assert exc_info.value.status_code == 401
 
     # 2. 200 when valid
@@ -443,7 +415,6 @@ async def test_webhook_expire_subscriptions_authentication():
 
         res = await expire_subscriptions_webhook(
             x_cron_secret="CareerShala-Cron-Token-9988!@#",
-            db=mock_db,
         )
         assert res["status"] == "success"
         assert res["message"] == "Subscription expiry sweep completed"

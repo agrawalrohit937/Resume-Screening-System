@@ -1,3 +1,9 @@
+from sqlalchemy import select, func, or_, and_, desc
+from config.db import get_pg_session_factory
+from models.tables import (
+    CandidateApplication, JobApplication, Job, Resume,
+    ATSResult, Certificate, InterviewSessionModel, User, EeoResponse
+)
 """
 Analytics Dashboard Routes — Platform-wide and user-level metrics
 """
@@ -8,146 +14,130 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import APIRouter, Depends, Query
 
-from api.deps import get_current_user, get_admin_user, get_result_repo, get_user_repo
-from config.db import get_database
+from sqlalchemy.ext.asyncio import AsyncSession
+from api.deps import get_current_user, get_admin_user, get_result_repo, get_user_repo, get_db
+from config.db import get_pg_session_factory
 from models.user_model import UserModel
 from repositories.result_repo import ResultRepository
 from repositories.user_repo import UserRepository
-
-from bson import ObjectId
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
-async def _build_user_activity_feed(user_id: str, db: Any) -> List[Dict[str, Any]]:
-    """Aggregates a diverse, distinct timeline of candidate platform events."""
+async def _build_user_activity_feed(user_id: str, db: Optional[Any] = None, session: Optional[AsyncSession] = None) -> List[Dict[str, Any]]:
+    """Aggregates a diverse timeline of candidate platform events via pure SQLAlchemy ORM."""
     activity: List[Dict[str, Any]] = []
     now = datetime.now(timezone.utc)
 
-    # 1. Job Applications
-    try:
-        apps_cursor = db.applications.find(
-            {"$or": [{"candidate_id": user_id}, {"user_id": user_id}]}
-        ).sort("_id", -1).limit(6)
-        apps = await apps_cursor.to_list(length=6)
-        for a in apps:
-            dt = a.get("created_at") or (a["_id"].generation_time if hasattr(a.get("_id"), "generation_time") else now)
-            job_title = a.get("job_title") or a.get("title")
-            company_name = a.get("company_name") or a.get("company")
-            if not job_title and a.get("job_id"):
-                try:
-                    j_doc = await db.jobs.find_one({"_id": ObjectId(str(a["job_id"]))})
-                    if j_doc:
-                        job_title = j_doc.get("title")
-                        company_name = j_doc.get("company_name")
-                except Exception:
-                    pass
+    async def _extract(sess: AsyncSession):
+        # 1. Job Applications (joined with Job to avoid N+1 queries)
+        try:
+            stmt = (
+                select(CandidateApplication, Job.title, Job.company_name)
+                .outerjoin(Job, CandidateApplication.job_id == Job.id)
+                .where(CandidateApplication.candidate_id == str(user_id))
+                .order_by(CandidateApplication.created_at.desc())
+                .limit(6)
+            )
+            rows = (await sess.execute(stmt)).all()
+            for row in rows:
+                a = row[0]
+                job_title = row[1] or "Software Engineer"
+                company_name = row[2] or "CareerShala Partner"
+                dt = a.created_at or now
 
-            job_title = job_title or "Software Engineer"
-            company_name = company_name or "CareerShala Partner"
-            activity.append({
-                "id": f"app_{a['_id']}",
-                "type": "job_application",
-                "title": f"Applied to {job_title}",
-                "detail": company_name,
-                "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
-                "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
-            })
-    except Exception as exc:
-        logger.warning("Error fetching applications for activity feed", error=str(exc))
+                activity.append({
+                    "id": f"app_{a.id}",
+                    "type": "job_application",
+                    "title": f"Applied to {job_title}",
+                    "detail": company_name,
+                    "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
+                    "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
+                })
+        except Exception as exc:
+            logger.warning("Error fetching applications for activity feed", error=str(exc))
 
-    # 2. Resumes Uploaded & Parsed
-    try:
-        res_cursor = db.resumes.find({"user_id": user_id}).sort("_id", -1).limit(4)
-        resumes = await res_cursor.to_list(length=4)
-        for r in resumes:
-            dt = r.get("created_at") or (r["_id"].generation_time if hasattr(r.get("_id"), "generation_time") else now)
-            fname = r.get("filename") or "Primary Resume.pdf"
-            clean_name = fname.split("_")[0] if ("_" in fname and len(fname.split("_")[0]) > 6) else fname
-            activity.append({
-                "id": f"res_{r['_id']}",
-                "type": "resume_upload",
-                "title": "Resume Uploaded & Parsed",
-                "detail": clean_name,
-                "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
-                "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
-            })
-    except Exception as exc:
-        logger.warning("Error fetching resumes for activity feed", error=str(exc))
+        # 2. Resumes Uploaded
+        try:
+            res_stmt = select(Resume).where(Resume.user_id == str(user_id)).order_by(Resume.created_at.desc()).limit(4)
+            resumes = (await sess.execute(res_stmt)).scalars().all()
+            for r in resumes:
+                dt = r.created_at or now
+                fname = r.filename or "Primary Resume.pdf"
+                clean_name = fname.split("_")[0] if ("_" in fname and len(fname.split("_")[0]) > 6) else fname
+                activity.append({
+                    "id": f"res_{r.id}",
+                    "type": "resume_upload",
+                    "title": "Resume Uploaded & Parsed",
+                    "detail": clean_name,
+                    "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
+                    "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
+                })
+        except Exception as exc:
+            logger.warning("Error fetching resumes for activity feed", error=str(exc))
 
-    # 3. ATS Scans (Consolidate same-day duplicate scans into grouped entries)
-    try:
-        scans_cursor = db.results.find({"user_id": user_id}).sort("_id", -1).limit(15)
-        scans = await scans_cursor.to_list(length=15)
-        scans_by_date: Dict[str, List[Any]] = {}
-        for sc in scans:
-            dt = sc.get("created_at") or (sc["_id"].generation_time if hasattr(sc.get("_id"), "generation_time") else now)
-            date_key = dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt)[:10]
-            if date_key not in scans_by_date:
-                scans_by_date[date_key] = []
-            scans_by_date[date_key].append((sc, dt))
+        # 3. ATS Scans
+        try:
+            scans_stmt = select(ATSResult).where(ATSResult.user_id == str(user_id)).order_by(ATSResult.created_at.desc()).limit(15)
+            scans = (await sess.execute(scans_stmt)).scalars().all()
+            for sc in scans:
+                dt = sc.created_at or now
+                raw_score = float(sc.final_score or 0.5)
+                pct_score = round(raw_score * 100 if raw_score <= 1.0 else raw_score)
+                rec = getattr(sc, "recommendation", None) or ("High Match" if pct_score >= 80 else "Good Match" if pct_score >= 60 else "Evaluated")
+                activity.append({
+                    "id": f"ats_{sc.id}",
+                    "type": "ats_scan",
+                    "title": "ATS Resume Scan",
+                    "detail": f"Match Score: {pct_score}% ({rec})",
+                    "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
+                    "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
+                })
+        except Exception as exc:
+            logger.warning("Error fetching ATS scans for activity feed", error=str(exc))
 
-        for date_key, group in scans_by_date.items():
-            latest_sc, latest_dt = group[0]
-            raw_score = float(latest_sc.get("final_score", 0.5))
-            pct_score = round(raw_score * 100 if raw_score <= 1.0 else raw_score)
-            rec = latest_sc.get("recommendation") or "ATS Evaluated"
-            count = len(group)
-            if count == 1:
-                title = "ATS Resume Scan"
-                detail = f"Match Score: {pct_score}% ({rec})"
-            else:
-                title = f"ATS Resume Analysis ({count} scans)"
-                detail = f"Latest Score: {pct_score}%"
+        # 4. Certificates
+        try:
+            certs_stmt = select(Certificate).where(Certificate.user_id == str(user_id)).order_by(Certificate.issued_at.desc()).limit(3)
+            certs = (await sess.execute(certs_stmt)).scalars().all()
+            for c in certs:
+                dt = getattr(c, "issued_at", None) or now
+                topic = c.topic or "Interview Excellence"
+                activity.append({
+                    "id": f"cert_{c.id}",
+                    "type": "certificate",
+                    "title": f"Certificate Unlocked: {topic}",
+                    "detail": f"Grade: {getattr(c, 'grade_label', 'A')} ({int(getattr(c, 'score', 100))}%)",
+                    "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
+                    "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
+                })
+        except Exception as exc:
+            logger.warning("Error fetching certificates for activity feed", error=str(exc))
 
-            activity.append({
-                "id": f"ats_{latest_sc['_id']}",
-                "type": "ats_scan",
-                "title": title,
-                "detail": detail,
-                "created_at": latest_dt.isoformat() if hasattr(latest_dt, "isoformat") else str(latest_dt),
-                "timestamp": latest_dt.timestamp() if hasattr(latest_dt, "timestamp") else 0,
-            })
-    except Exception as exc:
-        logger.warning("Error fetching ATS scans for activity feed", error=str(exc))
+        # 5. Mock Interview Sessions
+        try:
+            ints_stmt = select(InterviewSessionModel).where(InterviewSessionModel.user_id == str(user_id)).order_by(InterviewSessionModel.created_at.desc()).limit(3)
+            interviews = (await sess.execute(ints_stmt)).scalars().all()
+            for i_sess in interviews:
+                dt = i_sess.created_at or now
+                activity.append({
+                    "id": f"int_{i_sess.id}",
+                    "type": "interview",
+                    "title": "Mock Interview Completed",
+                    "detail": f"Score: {int(i_sess.score or 80)}%",
+                    "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
+                    "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
+                })
+        except Exception as exc:
+            logger.warning("Error fetching interview sessions for activity feed", error=str(exc))
 
-    # 4. Certificates & Achievements
-    try:
-        cert_cursor = db.certificates.find(
-            {"$or": [{"candidate_id": user_id}, {"user_id": user_id}]}
-        ).sort("_id", -1).limit(3)
-        certs = await cert_cursor.to_list(length=3)
-        for c in certs:
-            dt = c.get("created_at") or (c["_id"].generation_time if hasattr(c.get("_id"), "generation_time") else now)
-            topic = c.get("topic") or "Interview Excellence"
-            activity.append({
-                "id": f"cert_{c['_id']}",
-                "type": "certificate",
-                "title": f"Certificate Unlocked: {topic}",
-                "detail": f"Grade: {c.get('grade_label', 'A')} ({int(c.get('score', 100))}%)",
-                "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
-                "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
-            })
-    except Exception as exc:
-        logger.warning("Error fetching certificates for activity feed", error=str(exc))
-
-    # 5. Mock Interview Sessions
-    try:
-        int_cursor = db.interview_sessions.find({"user_id": user_id}).sort("_id", -1).limit(3)
-        interviews = await int_cursor.to_list(length=3)
-        for i_sess in interviews:
-            dt = i_sess.get("created_at") or (i_sess["_id"].generation_time if hasattr(i_sess.get("_id"), "generation_time") else now)
-            activity.append({
-                "id": f"int_{i_sess['_id']}",
-                "type": "interview",
-                "title": "Mock Interview Completed",
-                "detail": f"Score: {int(i_sess.get('score', 80))}%",
-                "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
-                "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
-            })
-    except Exception as exc:
-        logger.warning("Error fetching interview sessions for activity feed", error=str(exc))
+    active_sess = session if (session and hasattr(session, "execute")) else (db if (db and hasattr(db, "execute")) else None)
+    if active_sess:
+        await _extract(active_sess)
+    else:
+        async with get_pg_session_factory()() as sess:
+            await _extract(sess)
 
     # Sort all activity items descending by timestamp
     activity.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
@@ -159,7 +149,8 @@ async def get_my_analytics(
     days: int = Query(default=30, ge=1, le=365),
     current_user: UserModel = Depends(get_current_user),
     result_repo: ResultRepository = Depends(get_result_repo),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     uid = str(current_user.id)
     summary = await result_repo.get_analytics_summary(uid)
@@ -171,7 +162,7 @@ async def get_my_analytics(
     chrono_results = list(reversed(recent_results[:7]))
     score_trend = []
     for idx, r in enumerate(chrono_results):
-        r_dt = r.created_at or (ObjectId(str(r.id)).generation_time if hasattr(ObjectId(str(r.id)), "generation_time") else datetime.now(timezone.utc))
+        r_dt = r.created_at or datetime.now(timezone.utc)
         raw_sc = float(r.final_score or 0.5)
         pct_sc = round(raw_sc * 100 if raw_sc <= 1.0 else raw_sc)
         lbl = r_dt.strftime("%b %d") if hasattr(r_dt, "strftime") else f"Scan {idx+1}"
@@ -181,11 +172,11 @@ async def get_my_analytics(
             "label": lbl,
             "date": r_dt.isoformat() if hasattr(r_dt, "isoformat") else str(r_dt),
             "score": pct_sc,
-            "recommendation": r.recommendation or "ATS Scan",
+            "recommendation": getattr(r, "recommendation", None) or "ATS Scan",
         })
 
     # 3. Dynamic Activity Feed
-    activity_feed = await _build_user_activity_feed(uid, db)
+    activity_feed = await _build_user_activity_feed(uid, db=db, session=session)
 
     # 4. Strict Areas to Improve Filter Logic:
     # Strictly filter skills below 60% threshold or genuine missing keyword gaps.
@@ -241,10 +232,11 @@ async def get_my_analytics(
 @router.get("/activity")
 async def get_my_activity_feed(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """Dedicated endpoint returning candidate's chronological cross-platform activity timeline."""
-    activity_feed = await _build_user_activity_feed(str(current_user.id), db)
+    activity_feed = await _build_user_activity_feed(str(current_user.id), db=db, session=session)
     return {"success": True, "items": activity_feed, "count": len(activity_feed)}
 
 
@@ -253,36 +245,40 @@ async def get_platform_analytics(
     admin_user: UserModel = Depends(get_admin_user),
     result_repo: ResultRepository = Depends(get_result_repo),
     user_repo: UserRepository = Depends(get_user_repo),
-    db=Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     global_summary = await result_repo.get_analytics_summary()
     user_stats = await user_repo.get_platform_user_stats()
-    pipeline = [
-        {"$group": {
-            "_id": {"$switch": {
-                "branches": [
-                    {"case": {"$gte": ["$final_score", 0.8]}, "then": "80-100"},
-                    {"case": {"$gte": ["$final_score", 0.6]}, "then": "60-79"},
-                    {"case": {"$gte": ["$final_score", 0.4]}, "then": "40-59"},
-                ],
-                "default": "0-39"
-            }},
-            "count": {"$sum": 1},
-        }},
-    ]
-    cursor = db.results.aggregate(pipeline)
-    score_dist = {doc["_id"]: doc["count"] async for doc in cursor}
-    pipeline2 = [
-        {"$unwind": "$missing_skills"},
-        {"$group": {"_id": "$missing_skills", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 15},
-    ]
-    cursor2 = db.results.aggregate(pipeline2)
-    top_missing = [{"skill": doc["_id"], "count": doc["count"]} async for doc in cursor2]
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    recent_checks = await db.results.count_documents({"created_at": {"$gte": week_ago}})
-    new_users = await db.users.count_documents({"created_at": {"$gte": week_ago}})
+
+    async def _query_platform(sess: AsyncSession):
+        scores_res = await sess.execute(select(ATSResult.final_score))
+        scores = [r[0] for r in scores_res.all() if r[0] is not None]
+        score_dist = {"80-100": 0, "60-79": 0, "40-59": 0, "0-39": 0}
+        for sc in scores:
+            val = sc * 100 if sc <= 1.0 else sc
+            if val >= 80:
+                score_dist["80-100"] += 1
+            elif val >= 60:
+                score_dist["60-79"] += 1
+            elif val >= 40:
+                score_dist["40-59"] += 1
+            else:
+                score_dist["0-39"] += 1
+
+        top_missing = []
+        recent_checks = (await sess.execute(select(func.count(ATSResult.id)).where(ATSResult.created_at >= week_ago))).scalar() or 0
+        new_users = (await sess.execute(select(func.count(User.id)).where(User.created_at >= week_ago))).scalar() or 0
+        return score_dist, top_missing, recent_checks, new_users
+
+    active_sess = session if (session and hasattr(session, "execute")) else (db if (db and hasattr(db, "execute")) else None)
+    if active_sess:
+        score_dist, top_missing, recent_checks, new_users = await _query_platform(active_sess)
+    else:
+        async with get_pg_session_factory()() as sess:
+            score_dist, top_missing, recent_checks, new_users = await _query_platform(sess)
+
     return {
         "global_summary": {
             "total_ats_checks": global_summary.get("total_checks", 0),
@@ -299,7 +295,8 @@ async def get_platform_analytics(
 @router.get("/enterprise")
 async def get_enterprise_analytics(
     current_user: UserModel = Depends(get_current_user),
-    db=Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """Computes executive talent, headcount, hiring velocity, and anonymized diversity metrics with high-speed parallel execution."""
     import asyncio
@@ -309,116 +306,55 @@ async def get_enterprise_analytics(
     user_roles = getattr(current_user, "roles", [getattr(current_user, "role", "candidate")])
     is_admin_or_exec = any(r in {"admin", "platform_admin", "executive", "exec"} for r in user_roles)
 
-    # ── 1. Tenant jobs (open + closed) ───────────────────────────────────────
-    job_query: dict = {}
-    if is_admin_or_exec or tenant_id == "default":
-        job_query = {}
-    else:
-        job_query = {
-            "$or": [
-                {"tenant_id": tenant_id},
-                {"tenant_id": "default"},
-                {"tenant_id": {"$exists": False}},
-                {"tenant_id": None},
-                {"created_by": str(current_user.id)},
-            ]
-        }
 
-    jobs_cursor = db.jobs.find(job_query, {"_id": 1, "title": 1, "department": 1, "openings": 1, "status": 1})
-    jobs_list = await jobs_cursor.to_list(length=500)
-    job_ids = [str(j["_id"]) for j in jobs_list]
-    open_jobs = [j for j in jobs_list if str(j.get("status", "open")).lower() in ("open", "active")]
 
-    # Approved headcount = sum of openings from active (open) jobs; fallback 1 per job
-    approved_headcount = sum(int(j.get("openings", 1) or 1) for j in open_jobs) if open_jobs else 0
-    hire_stage_variants = ["Hired", "hired"]
+    async with get_pg_session_factory()() as session:
+        stmt = select(Job).order_by(Job.created_at.desc())
+        if not (is_admin_or_exec or tenant_id == "default"):
+            stmt = stmt.where(or_(Job.tenant_id == tenant_id, Job.tenant_id == "default", Job.tenant_id == None, Job.created_by == str(current_user.id)))
+        jobs_res = await session.execute(stmt)
+        raw_jobs = jobs_res.scalars().all()
+        jobs_list = [{"_id": str(j.id), "title": j.title, "department": j.department, "status": j.status, "openings": 1} for j in raw_jobs]
+        job_ids = [str(j["_id"]) for j in jobs_list]
+        open_jobs = [j for j in jobs_list if str(j.get("status", "open")).lower() in ("open", "active")]
 
-    # Setup time window for hiring velocity (last 6 months)
-    now = datetime.now(timezone.utc)
-    months_meta = []
-    for months_ago in range(5, -1, -1):
-        month_start = (now.replace(day=1) - timedelta(days=months_ago * 30)).replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0
-        )
-        month_end = (month_start + timedelta(days=32)).replace(day=1)
-        month_label = month_start.strftime("%b")
-        months_meta.append((month_start, month_end, month_label))
+        approved_headcount = len(open_jobs)
+        hire_stage_variants = ["Hired", "hired"]
 
-    earliest_start = months_meta[0][0] if months_meta else now
-    latest_end = months_meta[-1][1] if months_meta else now
+        now = datetime.now(timezone.utc)
+        months_meta = []
+        for months_ago in range(5, -1, -1):
+            month_start = (now.replace(day=1) - timedelta(days=months_ago * 30)).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            month_end = (month_start + timedelta(days=32)).replace(day=1)
+            month_label = month_start.strftime("%b")
+            months_meta.append((month_start, month_end, month_label))
 
-    # EEO query setup
-    eeo_filters = []
-    if tenant_id and tenant_id != "default":
-        eeo_filters.append({"tenant_id": tenant_id})
-    else:
-        eeo_filters.append({"tenant_id": {"$in": ["default", None, ""]}})
-    if job_ids:
-        eeo_filters.append({"job_id": {"$in": job_ids}})
-    eeo_query = {"$or": eeo_filters} if len(eeo_filters) > 1 else eeo_filters[0]
+        earliest_start = months_meta[0][0] if months_meta else now
+        latest_end = months_meta[-1][1] if months_meta else now
 
-    # ── Parallel Query Dispatch ──────────────────────────────────────────────
-    if job_ids:
-        hired_count_task = db.applications.count_documents({
-            "job_id": {"$in": job_ids},
-            "stage": {"$in": hire_stage_variants},
-        })
-        hired_apps_task = db.applications.find(
-            {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
-            {"job_id": 1},
-        ).to_list(length=2000)
-        total_offers_task = db.applications.count_documents({
-            "job_id": {"$in": job_ids},
-            "stage": {"$in": ["offer", "Offer", "hired", "Hired"]},
-        })
-        ttf_apps_task = db.applications.find(
-            {"job_id": {"$in": job_ids}, "stage": {"$in": hire_stage_variants}},
-            {"created_at": 1, "updated_at": 1},
-        ).to_list(length=500)
-        velocity_cursor = db.applications.aggregate([
-            {
-                "$match": {
-                    "job_id": {"$in": job_ids},
-                    "stage": {"$in": hire_stage_variants},
-                    "updated_at": {"$gte": earliest_start, "$lt": latest_end},
-                }
-            },
-            {"$project": {"updated_at": 1}}
-        ])
-        if hasattr(velocity_cursor, "__await__"):
-            velocity_cursor = await velocity_cursor
-        velocity_task = velocity_cursor.to_list(length=5000)
-    else:
-        hired_count_task = db.applications.count_documents({
-            "tenant_id": tenant_id,
-            "stage": {"$in": hire_stage_variants},
-        })
-        hired_apps_task = asyncio.sleep(0, result=[])
-        total_offers_task = db.applications.count_documents({
-            "tenant_id": tenant_id,
-            "stage": {"$in": ["offer", "Offer", "hired", "Hired"]}
-        })
-        ttf_apps_task = asyncio.sleep(0, result=[])
-        velocity_task = asyncio.sleep(0, result=[])
+        hired_apps = []
+        hired_count = 0
+        total_offers = 0
+        ttf_apps = []
+        matching_hires = []
+        if job_ids:
+            hired_res = await session.execute(
+                select(CandidateApplication).where(CandidateApplication.job_id.in_(job_ids), CandidateApplication.stage.in_(hire_stage_variants))
+            )
+            hired_app_rows = hired_res.scalars().all()
+            hired_count = len(hired_app_rows)
+            hired_apps = [{"job_id": str(r.job_id)} for r in hired_app_rows]
+            ttf_apps = [{"created_at": r.created_at, "updated_at": r.updated_at} for r in hired_app_rows]
+            matching_hires = [{"updated_at": r.updated_at} for r in hired_app_rows if r.updated_at and earliest_start <= r.updated_at < latest_end]
 
-    eeo_task = db.eeo_responses.find(eeo_query, {"race_ethnicity": 1, "gender": 1}).to_list(length=1000)
+            total_offers = (await session.execute(
+                select(func.count(CandidateApplication.id)).where(CandidateApplication.job_id.in_(job_ids), CandidateApplication.stage.in_(["offer", "Offer", "hired", "Hired"]))
+            )).scalar() or 0
 
-    # Concurrently execute all analytics sub-queries
-    (
-        hired_count,
-        hired_apps,
-        total_offers,
-        ttf_apps,
-        matching_hires,
-        eeo_responses
-    ) = await asyncio.gather(
-        hired_count_task,
-        hired_apps_task,
-        total_offers_task,
-        ttf_apps_task,
-        velocity_task,
-        eeo_task
-    )
+        eeo_res = await session.execute(select(EeoResponse).limit(1000))
+        eeo_responses = [{"race_ethnicity": r.race_ethnicity, "gender": r.gender} for r in eeo_res.scalars().all()]
 
     filled_hires = hired_count or 0
 

@@ -10,8 +10,8 @@ import re
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 
-from typing import Any
-from api.deps import get_user_repo, get_otp_service, get_otp_repo, get_database
+from typing import Any, Optional
+from api.deps import get_user_repo, get_otp_service, get_otp_repo
 from core.config import settings
 from core.security import (
     decode_token,
@@ -46,7 +46,6 @@ async def signup(
     payload: SignupRequest,
     user_repo: UserRepository = Depends(get_user_repo),
     otp_service: OTPService = Depends(get_otp_service),
-    db: Any = Depends(get_database),
 ):
     """
     Register a new account — DOES NOT activate it or issue tokens yet (FEATURE 1).
@@ -73,23 +72,35 @@ async def signup(
     # single roles like RECRUITER or INTERVIEWER to invited teammates].
 
     initial_role_input = payload.role.value if hasattr(payload.role, "value") else str(payload.role).lower()
+    requested_roles = [r.value if hasattr(r, "value") else str(r).lower() for r in payload.roles] if payload.roles else []
 
-    if payload.roles and isinstance(payload.roles, list):
-        roles_list = [r.value if hasattr(r, "value") else str(r).lower() for r in payload.roles]
+    # Strict Security Guard: Never allow administrative roles to be self-assigned via public signup
+    FORBIDDEN_SIGNUP_ROLES = {"admin", "platform_admin"}
+    if initial_role_input in FORBIDDEN_SIGNUP_ROLES or any(r in FORBIDDEN_SIGNUP_ROLES for r in requested_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative roles cannot be self-assigned via public signup.",
+        )
+
+    if requested_roles:
+        roles_list = [r for r in requested_roles if r not in FORBIDDEN_SIGNUP_ROLES]
     elif initial_role_input in ("employer", "recruiter", "executive", "exec"):
         # Tenant creator / owner signup is strictly assigned EXECUTIVE role.
         # Backend role inheritance automatically grants recruiter, hiring manager, and interviewer capabilities.
         roles_list = [UserRole.EXECUTIVE.value]
-    elif initial_role_input:
+    elif initial_role_input and initial_role_input not in FORBIDDEN_SIGNUP_ROLES:
         roles_list = [initial_role_input]
     else:
+        roles_list = [UserRole.CANDIDATE.value]
+
+    if not roles_list:
         roles_list = [UserRole.CANDIDATE.value]
 
     primary_role = roles_list[0]
 
     # Resolve tenant_id for enterprise accounts
     is_enterprise = any(
-        r in ("platform_admin", "admin", "executive", "exec", "employer", "recruiter", "hiring_manager", "interviewer")
+        r in ("executive", "exec", "employer", "recruiter", "hiring_manager", "interviewer")
         for r in roles_list
     )
 
@@ -104,8 +115,6 @@ async def signup(
         common_domains = {"gmail", "yahoo", "hotmail", "outlook", "icloud", "proton", "mail", "aol"}
         if domain not in common_domains:
             resolved_tenant = domain
-        elif "platform_admin" in roles_list or "admin" in roles_list:
-            resolved_tenant = "system"
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -165,28 +174,21 @@ async def signup(
         await purge_orphaned_tenant_if_needed(db, resolved_tenant, excluding_user_id=str(user.id))
 
         c_name = (payload.company_name or "").strip() or resolved_tenant.replace("-", " ").title()
-        await db.companies.update_one(
-            {"tenant_id": resolved_tenant},
-            {
-                "$setOnInsert": {
-                    "tenant_id": resolved_tenant,
-                    "company_name": c_name,
-                    "logo_url": None,
-                    "cover_url": None,
-                    "created_at": now,
-                    "created_by": str(user.id),
-                    "location": "Remote",
-                    "industry": "Technology",
-                    "team_size": "50-200 employees",
-                    "perks": ["Flexible Hours", "Health Insurance", "Remote Work"],
-                    "about": f"Welcome to {c_name}.",
-                },
-                "$set": {
-                    "updated_at": now,
-                }
-            },
-            upsert=True,
-        )
+        from repositories.company_repo import CompanyRepository
+        comp_repo = CompanyRepository()
+        existing_comp = await comp_repo.get_by_tenant_id(resolved_tenant)
+        if not existing_comp:
+            await comp_repo.upsert(resolved_tenant, {
+                "company_name": c_name,
+                "logo_url": None,
+                "cover_url": None,
+                "created_by": str(user.id),
+                "location": "Remote",
+                "industry": "Technology",
+                "team_size": "50-200 employees",
+                "website": "",
+                "description": f"Official organization profile for {c_name}.",
+            })
 
     await otp_service.issue(email, payload.full_name, OTPPurpose.SIGNUP_VERIFICATION)
 

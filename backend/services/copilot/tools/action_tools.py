@@ -167,7 +167,7 @@ class GenerateInterviewQuestionsTool(BaseTool):
             },
             {
                 "id": "q3",
-                "question": "How do you choose between MongoDB and PostgreSQL for a high-concurrency microservice?",
+                "question": "How do you design high-concurrency PostgreSQL connection pooling and JSONB indexing?",
                 "category": "Data Modeling",
                 "difficulty": args.difficulty.title(),
                 "eval_criteria": "ACID compliance vs flexible schema, index strategies, sharding vs replication.",

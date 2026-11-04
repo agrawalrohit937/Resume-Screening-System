@@ -1,3 +1,6 @@
+from config.db import get_pg_session_factory
+from sqlalchemy import select, update
+from models.tables import Company, User, UserGamification
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -158,34 +161,46 @@ async def activate_user_subscription(
     tenant_id = getattr(user, "tenant_id", None)
     if tenant_id and tenant_id != "default":
         try:
-            from config.db import get_database as _get_raw_db
-            raw_db = _get_raw_db()
-            await raw_db.companies.update_one(
-                {"tenant_id": tenant_id},
-                {"$set": {
-                    "plan": normalized_plan,
-                    "subscription_active": True,
-                    "subscription_status": "active",
-                    "subscription_start_date": start_date,
-                    "subscription_end_date": end_date,
-                    "subscribed_by": str(user.id),
-                    "updated_at": now,
-                }},
-                upsert=True,
-            )
-            # Instantly unlock premium for all recruiters, interviewers, and team members of this company!
-            await raw_db.users.update_many(
-                {"tenant_id": tenant_id},
-                {"$set": {
-                    "plan": normalized_plan,
-                    "subscription_active": True,
-                    "subscription_status": "active",
-                    "subscription_start_date": start_date,
-                    "subscription_end_date": end_date,
-                    "company_subscription": True,
-                    "plan_updated_at": now,
-                }}
-            )
+            async with get_pg_session_factory()() as session:
+                comp_stmt = select(Company).where(Company.tenant_id == tenant_id)
+                comp = (await session.execute(comp_stmt)).scalar_one_or_none()
+                if comp:
+                    comp.plan = normalized_plan
+                    comp.subscription_active = True
+                    comp.subscription_status = "active"
+                    comp.subscription_start_date = start_date
+                    comp.subscription_end_date = end_date
+                    comp.subscribed_by = str(user.id)
+                    comp.updated_at = now
+                else:
+                    new_comp = Company(
+                        id=str(uuid.uuid4()),
+                        tenant_id=tenant_id,
+                        company_name=tenant_id.replace("-", " ").title(),
+                        plan=normalized_plan,
+                        subscription_active=True,
+                        subscription_status="active",
+                        subscription_start_date=start_date,
+                        subscription_end_date=end_date,
+                        subscribed_by=str(user.id),
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    session.add(new_comp)
+
+                await session.execute(
+                    update(User)
+                    .where(User.tenant_id == tenant_id)
+                    .values(
+                        plan=normalized_plan,
+                        subscription_active=True,
+                        subscription_status="active",
+                        subscription_start_date=start_date,
+                        subscription_end_date=end_date,
+                        plan_updated_at=now,
+                    )
+                )
+                await session.commit()
         except Exception as e:
             logger.error("Failed to propagate company subscription to team members", error=str(e))
 
@@ -243,39 +258,39 @@ async def cancel_subscription(
     tenant_id = getattr(current_user, "tenant_id", None)
     if tenant_id and tenant_id != "default":
         try:
-            from config.db import get_database as _get_raw_db
-            raw_db = _get_raw_db()
             now_dt = datetime.now(timezone.utc)
-            await raw_db.companies.update_one(
-                {"tenant_id": tenant_id},
-                {"$set": {
-                    "plan": "free",
-                    "subscription_active": False,
-                    "subscription_status": "cancelled",
-                    "subscription_end_date": None,
-                    "updated_at": now_dt,
-                }}
-            )
-            await raw_db.users.update_many(
-                {"tenant_id": tenant_id},
-                {"$set": {
-                    "plan": "free",
-                    "subscription_active": False,
-                    "subscription_status": "cancelled",
-                    "subscription_end_date": None,
-                    "plan_updated_at": now_dt,
-                }}
-            )
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(Company)
+                    .where(Company.tenant_id == tenant_id)
+                    .values(
+                        plan="free",
+                        subscription_active=False,
+                        subscription_status="cancelled",
+                        subscription_end_date=None,
+                        updated_at=now_dt,
+                    )
+                )
+                await session.execute(
+                    update(User)
+                    .where(User.tenant_id == tenant_id)
+                    .values(
+                        plan="free",
+                        subscription_active=False,
+                        subscription_status="cancelled",
+                        subscription_end_date=None,
+                        plan_updated_at=now_dt,
+                    )
+                )
+                await session.commit()
         except Exception:
             pass
 
     # If user had an active recovery case, close it as churned
     try:
-        from config.db import get_database
         from repositories.revenue_recovery_repo import RevenueRecoveryRepository
         from models.revenue_recovery_model import RecoveryStatus, ActorType
-        db = get_database()
-        recovery_repo = RevenueRecoveryRepository(db)
+        recovery_repo = RevenueRecoveryRepository()
         active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
         if active_case:
             await recovery_repo.update_case(active_case.case_id, {
@@ -384,11 +399,9 @@ async def verify_payment(
 
     # If user had an active recovery case, close it as recovered
     try:
-        from config.db import get_database
         from repositories.revenue_recovery_repo import RevenueRecoveryRepository
         from models.revenue_recovery_model import RecoveryStatus, ActorType
-        db = get_database()
-        recovery_repo = RevenueRecoveryRepository(db)
+        recovery_repo = RevenueRecoveryRepository()
         active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
         if active_case:
             await recovery_repo.update_case(active_case.case_id, {
@@ -432,20 +445,20 @@ async def report_payment_failure(
     plan = _normalize(payload.plan)
     amount = 299.0 if plan == 'pro' else 499.0
 
-    from config.db import get_database
     from repositories.revenue_recovery_repo import RevenueRecoveryRepository
     from workflows.revenue_recovery_graph import revenue_recovery_pipeline
     from models.revenue_recovery_model import RecoveryStatus, ActorType
 
-    db = get_database()
-    recovery_repo = RevenueRecoveryRepository(db)
+    recovery_repo = RevenueRecoveryRepository()
 
     # Check for existing active recovery case
     existing_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
     attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
 
     # Fetch user gamification and profile
-    gamification_profile = await db.user_gamification.find_one({"user_id": str(current_user.id)}) or {}
+    async with get_pg_session_factory()() as session:
+        g_row = (await session.execute(select(UserGamification).where(UserGamification.user_id == str(current_user.id)))).scalar_one_or_none()
+        gamification_profile = {c.name: getattr(g_row, c.name) for c in UserGamification.__table__.columns} if g_row else {}
 
     # Run LangGraph pipeline
     init_state = {
@@ -548,15 +561,13 @@ async def razorpay_webhook(
     payload_obj = data.get("payload", {})
     payment_entity = payload_obj.get("payment", {}).get("entity", {})
 
-    from config.db import get_database
     from repositories.revenue_recovery_repo import RevenueRecoveryRepository
     from repositories.user_repo import UserRepository
     from workflows.revenue_recovery_graph import revenue_recovery_pipeline
     from models.revenue_recovery_model import RecoveryStatus, ActorType
 
-    db = get_database()
-    recovery_repo = RevenueRecoveryRepository(db)
-    user_repo = UserRepository(db)
+    recovery_repo = RevenueRecoveryRepository()
+    user_repo = UserRepository()
 
     # 1. Handle Payment Failure Events
     if event in ("payment.failed", "subscription.halted", "subscription.charge_failed"):
@@ -592,7 +603,9 @@ async def razorpay_webhook(
         existing_case = await recovery_repo.get_active_case_for_user(user_id) if user_doc else None
         attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
 
-        gamification_profile = (await db.user_gamification.find_one({"user_id": user_id})) or {}
+        async with get_pg_session_factory()() as session:
+            g_row = (await session.execute(select(UserGamification).where(UserGamification.user_id == str(user_id)))).scalar_one_or_none()
+            gamification_profile = {c.name: getattr(g_row, c.name) for c in UserGamification.__table__.columns} if g_row else {}
 
         init_state = {
             "case_id": existing_case.case_id if existing_case else "",

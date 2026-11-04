@@ -8,12 +8,13 @@ tenant executives, and platform administrators.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from api.deps import get_database, get_current_user, PaginationParams
+from sqlalchemy.ext.asyncio import AsyncSession
+from api.deps import get_current_user, PaginationParams, get_db, get_audit_repo
 from core.rbac import Permission, check_rbac_access
 from models.user_model import UserModel
 from models.audit_log_model import AuditLogModel
@@ -45,7 +46,9 @@ async def list_audit_logs(
     tenant_override: Optional[str] = Query(None, alias="tenant_id", description="Platform Admin only: filter by tenant ID"),
     pagination: PaginationParams = Depends(),
     current_user: UserModel = Depends(get_current_user),
-    db=Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    audit_repo: AuditLogRepository = Depends(get_audit_repo),
+    db: Optional[Any] = None,
 ):
     """
     Retrieves compliance audit logs with strict tenant isolation and filtering.
@@ -82,7 +85,12 @@ async def list_audit_logs(
     else:
         target_tenant = current_user.tenant_id or "default"
 
-    repo = AuditLogRepository(db)
+    if db is not None:
+        repo = AuditLogRepository(db)
+    elif hasattr(session, "execute"):
+        repo = AuditLogRepository(session)
+    else:
+        repo = audit_repo
     items, total = await repo.query_logs(
         tenant_id=target_tenant,
         actor_id=actor_id,

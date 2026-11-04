@@ -53,12 +53,11 @@ def compute_context_version(resume_data: Optional[Dict[str, Any]] = None, user_p
 
 class SemanticResponseCache:
     """
-    Thread-safe semantic response cache with dual in-memory + MongoDB persistence.
+    Thread-safe semantic response cache with dual in-memory + database persistence.
     """
 
     def __init__(self, db: Optional[Any] = None):
-        self.db = db
-        self.collection = getattr(db, "copilot_cache", None) if db else None
+        self.db = None
         # Local in-memory cache: (tenant_id, user_id) -> list of entries
         self._memory_cache: Dict[str, List[Dict[str, Any]]] = {}
 
@@ -103,31 +102,6 @@ class SemanticResponseCache:
                     "similarity": sim,
                     "cache_hit": True,
                 }
-
-        # 3. Check MongoDB copilot_cache
-        if self.collection is not None:
-            try:
-                cursor = self.collection.find({
-                    "tenant_id": tenant_id,
-                    "user_id": user_id,
-                    "context_version": context_version,
-                })
-                db_entries = await cursor.to_list(length=50)
-                for entry in db_entries:
-                    sim = _cosine_similarity(query_vec, entry.get("embedding", []))
-                    if sim >= CACHE_SIMILARITY_THRESHOLD:
-                        logger.info("Semantic cache DB HIT", similarity=sim, query=clean_query[:50])
-                        # Populate in-memory cache
-                        self._add_to_memory(user_key, entry)
-                        return {
-                            "text": entry["text"],
-                            "citations": entry.get("citations", []),
-                            "suggestions": entry.get("suggestions", []),
-                            "similarity": sim,
-                            "cache_hit": True,
-                        }
-            except Exception as e:
-                logger.warning("Semantic cache DB read error", error=str(e))
 
         return None
 
@@ -176,12 +150,6 @@ class SemanticResponseCache:
 
         user_key = f"{tenant_id}:{user_id}"
         self._add_to_memory(user_key, entry)
-
-        if self.collection is not None:
-            try:
-                await self.collection.insert_one(dict(entry))
-            except Exception as e:
-                logger.warning("Semantic cache DB write error", error=str(e))
 
     def _add_to_memory(self, user_key: str, entry: Dict[str, Any]) -> None:
         if user_key not in self._memory_cache:

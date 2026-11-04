@@ -193,8 +193,8 @@ def evaluate_skill_context(
     # Resolve location and base multiplier
     exp_list = section_index.get("experiences", [])
     total_duration = sum(float(e.get("duration_years", 0.0) or 0.0) for e in exp_list)
-    # Entry-level / student / fresher condition: no exp or <= 1.0 year of tenure
-    is_entry = not exp_list or total_duration <= 1.0
+    # Entry-level / student / fresher condition: no exp or 0.0 tenure
+    is_entry = not exp_list or total_duration == 0.0
 
     if in_work_metric:
         where = "work_experience_metric"
@@ -202,24 +202,24 @@ def evaluate_skill_context(
         recency_years = min_exp_years_ago if min_exp_years_ago < 90 else 0.0
     elif in_work:
         where = "work_experience"
-        base_mult = 1.00
+        base_mult = 0.95
         recency_years = min_exp_years_ago if min_exp_years_ago < 90 else 0.0
     elif in_project:
         where = "project"
-        base_mult = 0.95
+        base_mult = 0.85
         recency_years = min_proj_years_ago if min_proj_years_ago < 90 else 0.0
     elif in_cert:
         where = "certification"
-        base_mult = 0.90
+        base_mult = 0.75
         recency_years = 0.0
     elif in_skills_list:
         where = "skills_list"
-        base_mult = 1.00 if is_entry else 0.85
+        base_mult = 1.00 if is_entry else 0.60
         recency_years = 0.0
     else:
         # Appears in raw text only
         where = "skills_list"
-        base_mult = 1.00 if is_entry else 0.85
+        base_mult = 1.00 if is_entry else 0.60
         recency_years = 0.0
 
     # 5. Recency Decay (exponential half-life)
@@ -240,7 +240,7 @@ def evaluate_skill_context(
     if where == "skills_list" and (sk_low in section_index["stuffed_tokens"] or len(re.findall(sk_pattern, section_index["raw_lower"])) > 6):
         is_stuffed = True
 
-    stuffing_penalty = 0.60 if is_stuffed else 1.00
+    stuffing_penalty = 0.35 if is_stuffed else 1.00
 
     # 8. Composite Skill Credit in [0.10, 1.00]
     final_credit = min(1.00, max(0.10, base_mult * recency_decay * duration_factor * stuffing_penalty))

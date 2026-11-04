@@ -46,26 +46,20 @@ async def analyze_github(
 
     if payload.save_to_profile:
         from datetime import datetime, timezone
-        from config.db import get_database
-        db = get_database()
-        profile_data = result.get("profile") or {}
-        await db.github_profiles.delete_many({"user_id": str(current_user.id), "username": {"$ne": payload.username}})
-        await db.github_profiles.update_one(
-            {"username": payload.username},
-            {
-                "$set": {
-                    "user_id": str(current_user.id),
-                    "username": payload.username,
-                    "public_repos": profile_data.get("public_repos", 0),
-                    "followers": profile_data.get("followers", 0),
-                    "contribution_score": result.get("contribution_score", 0),
-                    "tech_stack": result.get("tech_stack", []),
-                    "raw_analysis": result,
-                    "updated_at": datetime.now(timezone.utc),
-                }
-            },
-            upsert=True,
-        )
+        from config.db import get_pg_session_factory
+        from sqlalchemy import update
+        from models.tables import User
+        async with get_pg_session_factory()() as session:
+            await session.execute(
+                update(User)
+                .where(User.id == str(current_user.id))
+                .values(
+                    github_username=payload.username,
+                    github_url=f"https://github.com/{payload.username}",
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+            await session.commit()
 
     return {"success": True, "data": result}
 

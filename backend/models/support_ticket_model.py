@@ -1,12 +1,12 @@
 """
-MongoDB Document Model — Support Tickets
+Domain Model — Support Tickets
 """
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-from bson import ObjectId
+import uuid
 
 
 class TicketAttachment(BaseModel):
@@ -19,7 +19,7 @@ class TicketAttachment(BaseModel):
 
 
 class TicketMessage(BaseModel):
-    id: str = Field(default_factory=lambda: str(ObjectId()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     role: str = "user"  # "user" | "support" | "system"
     body: str
     attachments: List[TicketAttachment] = Field(default_factory=list)

@@ -11,7 +11,7 @@ Covers:
 """
 
 import pytest
-from bson import ObjectId
+import uuid
 from services.copilot.guardrails import (
     sanitize_untrusted_text,
     wrap_user_data,
@@ -83,77 +83,26 @@ def test_calculate_cost_telemetry():
     assert calculate_cost_usd(0, 0) == 0.0
 
 
-# ─── In-Memory Mock Collection for Session Cost Verification ───────────────────
-
-class MockCollection:
-    def __init__(self):
-        self.docs = []
-
-    async def insert_one(self, doc):
-        d = dict(doc)
-        if "_id" not in d:
-            d["_id"] = ObjectId()
-        self.docs.append(d)
-        return type("Result", (), {"inserted_id": d["_id"]})()
-
-    async def find_one(self, query):
-        for doc in self.docs:
-            match = True
-            for k, v in query.items():
-                if doc.get(k) != v:
-                    match = False
-                    break
-            if match:
-                return dict(doc)
-        return None
-
-    async def update_one(self, query, update):
-        target = None
-        for doc in self.docs:
-            match = True
-            for k, v in query.items():
-                if doc.get(k) != v:
-                    match = False
-                    break
-            if match:
-                target = doc
-                break
-        if not target:
-            return type("Result", (), {"modified_count": 0})()
-
-        if "$inc" in update:
-            for k, v in update["$inc"].items():
-                target[k] = target.get(k, 0) + v
-        if "$set" in update:
-            for k, v in update["$set"].items():
-                target[k] = v
-        return type("Result", (), {"modified_count": 1})()
-
-
-class MockDatabase:
-    def __init__(self):
-        self.copilot_sessions = MockCollection()
-        self.copilot_messages = MockCollection()
-        self.copilot_memory = MockCollection()
+from tests.conftest import MockAsyncSession
 
 
 @pytest.mark.asyncio
 async def test_session_cost_telemetry_persistence():
     """Verify copilot_sessions accumulates total_tokens and total_cost_usd across turns."""
-    mock_db = MockDatabase()
-    repo = CopilotRepository(mock_db)
+    session = MockAsyncSession(items=[])
+    repo = CopilotRepository(session_factory=lambda: session)
     tenant_id = "test_guardrails_tenant"
     user_id = "user_guard_1"
 
-    session = await repo.create_session(tenant_id, user_id, title="Telemetry Test")
-    assert session.total_tokens == 0
-    assert session.total_cost_usd == 0.0
+    session_obj = await repo.create_session(tenant_id, user_id, title="Telemetry Test")
+    assert session_obj.total_tokens == 0
+    assert session_obj.total_cost_usd == 0.0
 
     # Turn 1: 500 prompt, 500 completion
     await repo.append_message(
         tenant_id=tenant_id,
         user_id=user_id,
-        session_id=str(session.id),
+        session_id=str(session_obj.id),
         role="assistant",
         content="Hello!",
         prompt_tokens=500,
@@ -164,14 +113,14 @@ async def test_session_cost_telemetry_persistence():
     await repo.append_message(
         tenant_id=tenant_id,
         user_id=user_id,
-        session_id=str(session.id),
+        session_id=str(session_obj.id),
         role="assistant",
         content="Second turn.",
         prompt_tokens=1000,
         completion_tokens=1000,
     )
 
-    updated_session = await repo.get_session(tenant_id, user_id, str(session.id))
+    updated_session = await repo.get_session(tenant_id, user_id, str(session_obj.id))
     assert updated_session.total_tokens == 3000
     assert updated_session.total_cost_usd > 0.0
     assert updated_session.message_count == 2

@@ -1,12 +1,12 @@
 """
-MongoDB Document Models — Revenue Recovery & Risk Management
+Domain Model — Revenue Recovery & Risk Management
 """
 
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from bson import ObjectId
+import uuid
 
 
 class RecoveryStatus(str, Enum):
@@ -56,7 +56,7 @@ class ActorType(str, Enum):
 
 
 class AuditLogEntry(BaseModel):
-    id: str = Field(default_factory=lambda: str(ObjectId()))
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     actor: ActorType = ActorType.AI_AGENT
     actor_name: Optional[str] = "AI Recovery Agent"

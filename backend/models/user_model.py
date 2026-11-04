@@ -1,5 +1,5 @@
 """
-MongoDB Document Models — User
+Domain Model — User
 """
 
 from datetime import datetime, timezone

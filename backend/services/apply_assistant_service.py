@@ -6,9 +6,8 @@ from datetime import datetime, timezone
 from typing import List, Tuple
 from fastapi import HTTPException, status as http_status
 
-from config.db import get_database
 from repositories.application_repo import ApplicationRepository
-from models.application_model import ApplicationStatus
+from models.apply_assistant_model import ApplicationStatus
 from workflows.apply_assistant_graph import apply_assistant_graph
 from services.scoring_engine import score_resume
 from repositories.resume_repo import ResumeRepository
@@ -130,8 +129,7 @@ class ApplyAssistantService:
     @property
     def resume_repo(self) -> ResumeRepository:
         if self._resume_repo is None:
-            db = self._db if self._db is not None else get_database()
-            self._resume_repo = ResumeRepository(db)
+            self._resume_repo = ResumeRepository(self._db)
         return self._resume_repo
 
     async def _get_resume(self, resume_id: str, user_id: str) -> dict:
@@ -256,8 +254,9 @@ class ApplyAssistantService:
             "missing_keywords": ats_result.get("missing_keywords", []),
         }
 
+        app_id = str(application.get("_id") or application.get("id") or "")
         saved = await self.repo.save_generated_draft(
-            str(application["_id"]),
+            app_id,
             user_id=user_id,
             jd_analysis=final_state.get("jd_analysis", {}),
             ats_result_ref=ats_result_ref,

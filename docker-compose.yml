@@ -1,28 +1,29 @@
 version: "3.8"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CareerShala — Local Development Services (MongoDB)
-# Run `docker compose up -d` to spin up MongoDB with zero local configuration.
+# CareerShala — Local Development Services (PostgreSQL)
+# Run `docker compose up -d` to spin up PostgreSQL with zero local configuration.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 services:
-  # ── MongoDB 7.0 ─────────────────────────────────────────────────────────────
-  mongo:
-    image: mongo:7.0
-    container_name: careershala_mongo
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: careershala_postgres
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "5432:5432"
     environment:
-      MONGO_INITDB_DATABASE: ai_career_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: careershala_db
     volumes:
-      - careershala_mongo_data:/data/db
+      - careershala_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD-SHELL", "pg_isready -U postgres -d careershala_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  careershala_mongo_data:
-
+  careershala_pg_data:

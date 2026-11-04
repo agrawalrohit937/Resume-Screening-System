@@ -1,3 +1,6 @@
+from config.db import get_pg_session_factory
+from sqlalchemy import select, update, desc, and_, or_, func
+from models.tables import Certificate
 """
 Certificate API Router
 ======================
@@ -27,7 +30,6 @@ from certificates.service import CertificateService
 from certificates.skill_icons import slugify, resolve_skill_icon_path
 from certificates.renderer import render_certificate_pdf
 from certificates.qr import build_verification_url, generate_qr_image
-from config.db import get_database
 from models.certificate_model import CertificateRecord
 from models.user_model import UserModel
 
@@ -74,20 +76,24 @@ async def _do_issue(
     final_slug = slugify(assessment_slug) if assessment_slug else slugify(assessment_name)
     if not final_slug:
         final_slug = "assessment"
-
-    raw_db = get_database()
-
     # Detect if user already received an active certificate for this assessment
-    existing_cert = await raw_db.certificates.find_one({
-        "user_id": str(current_user.id),
-        "$or": [
-            {"topic": final_slug},
-            {"snapshot.assessment_slug": final_slug},
-            {"snapshot.assessment_name": {"$regex": f"^{re.escape(assessment_name)}$", "$options": "i"}},
-            {"snapshot.assessment_slug_display": {"$regex": f"^{re.escape(assessment_name)}$", "$options": "i"}}
-        ],
-        "status": "active"
-    }, sort=[("issued_at", -1)])
+    async with get_pg_session_factory()() as session:
+        stmt = (
+            select(Certificate)
+            .where(
+                and_(
+                    Certificate.user_id == str(current_user.id),
+                    Certificate.status == "active",
+                    or_(
+                        Certificate.topic == final_slug,
+                        func.lower(Certificate.topic) == final_slug.lower(),
+                    )
+                )
+            )
+            .order_by(desc(Certificate.issued_at))
+            .limit(1)
+        )
+        existing_cert = (await session.execute(stmt)).scalar_one_or_none()
 
     is_update = bool(existing_cert)
     prev_score = existing_cert.get("snapshot", {}).get("score", 0) if existing_cert else None
@@ -118,16 +124,20 @@ async def _do_issue(
         )
 
     # Mark previously-issued certificate as superseded so the new credential is primary
-    if existing_cert and str(existing_cert.get("_id")) != record.id:
+    if existing_cert and str(getattr(existing_cert, "id", None) or existing_cert.get("_id")) != record.id:
         try:
-            await raw_db.certificates.update_one(
-                {"_id": existing_cert["_id"]},
-                {"$set": {
-                    "status": "superseded",
-                    "superseded_by": record.id,
-                    "superseded_at": datetime.now(timezone.utc),
-                }}
-            )
+            old_id = getattr(existing_cert, "id", None) or existing_cert.get("_id")
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(Certificate)
+                    .where(Certificate.id == str(old_id))
+                    .values(
+                        status="superseded",
+                        superseded_by=record.id,
+                        superseded_at=datetime.now(timezone.utc),
+                    )
+                )
+                await session.commit()
         except Exception as e:
             logger.warning("Could not mark previous certificate as superseded", error=str(e))
 
@@ -208,32 +218,39 @@ async def check_certificate_status(
     current_user: UserModel = Depends(get_current_user),
 ):
     """Checks whether the current candidate already holds an e-certificate for this topic."""
-    raw_db = get_database()
     slug = slugify(topic)
-    cert = await raw_db.certificates.find_one({
-        "user_id": str(current_user.id),
-        "$or": [
-            {"topic": slug},
-            {"snapshot.assessment_slug": slug},
-            {"snapshot.assessment_name": {"$regex": f"^{re.escape(topic)}$", "$options": "i"}},
-            {"snapshot.assessment_slug_display": {"$regex": f"^{re.escape(topic)}$", "$options": "i"}}
-        ],
-        "status": "active"
-    }, sort=[("issued_at", -1)])
+    async with get_pg_session_factory()() as session:
+        stmt = (
+            select(Certificate)
+            .where(
+                and_(
+                    Certificate.user_id == str(current_user.id),
+                    Certificate.status == "active",
+                    or_(
+                        Certificate.topic == slug,
+                        func.lower(Certificate.topic) == slug.lower(),
+                    )
+                )
+            )
+            .order_by(desc(Certificate.issued_at))
+            .limit(1)
+        )
+        cert = (await session.execute(stmt)).scalar_one_or_none()
 
     if not cert:
         return {"has_certificate": False, "certificate": None}
 
+    snap = cert.snapshot or {}
     return {
         "has_certificate": True,
         "certificate": {
-            "certificate_id": cert["_id"],
-            "topic": cert.get("snapshot", {}).get("assessment_name", topic),
-            "score": cert.get("snapshot", {}).get("score"),
-            "grade": cert.get("snapshot", {}).get("grade_label"),
-            "difficulty": cert.get("snapshot", {}).get("difficulty"),
-            "public_url": cert.get("public_url"),
-            "issued_at": cert["issued_at"].isoformat() if hasattr(cert["issued_at"], "isoformat") else str(cert["issued_at"]),
+            "certificate_id": cert.id,
+            "topic": snap.get("assessment_name", topic),
+            "score": snap.get("score"),
+            "grade": snap.get("grade_label"),
+            "difficulty": snap.get("difficulty"),
+            "public_url": cert.public_url,
+            "issued_at": cert.issued_at.isoformat() if hasattr(cert.issued_at, "isoformat") else str(cert.issued_at),
         }
     }
 
@@ -248,31 +265,30 @@ async def resend_certificate(
     Allows a candidate who already received an e-certificate to have it re-rendered with their
     latest profile information and dispatched directly to their email inbox.
     """
-    raw_db = get_database()
-    cert = await raw_db.certificates.find_one({
-        "_id": certificate_id,
-        "user_id": str(current_user.id),
-    })
+    async with get_pg_session_factory()() as session:
+        stmt = select(Certificate).where(and_(Certificate.id == certificate_id, Certificate.user_id == str(current_user.id)))
+        cert = (await session.execute(stmt)).scalar_one_or_none()
     if not cert:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Certificate not found or not owned by current user.",
         )
 
-    snapshot = dict(cert.get("snapshot") or {})
+    snapshot = dict(cert.snapshot or {})
     # Sync with current user profile name if updated
     if current_user.full_name and current_user.full_name.strip():
         snapshot["recipient_name"] = current_user.full_name.strip()
 
-    template_dir = cert.get("template_used", "assessment")
+    template_dir = cert.template_used or "assessment"
     verification_url = build_verification_url(certificate_id)
+    issued_dt = cert.issued_at
     render_context = {
         "recipient_name": snapshot.get("recipient_name", current_user.full_name),
         "assessment_name": (
             f"{snapshot.get('assessment_name', 'Skill Assessment')} Assessment "
             f"({snapshot.get('difficulty', 'Standard')} Level)"
         ),
-        "issued_date": cert["issued_at"].strftime("%d %B %Y") if hasattr(cert["issued_at"], "strftime") else datetime.now().strftime("%d %B %Y"),
+        "issued_date": issued_dt.strftime("%d %B %Y") if hasattr(issued_dt, "strftime") else datetime.now().strftime("%d %B %Y"),
         "cert_id": certificate_id,
         "skill_logo_image": resolve_skill_icon_path(snapshot.get("assessment_slug", "assessment")),
         "skill_name": str(snapshot.get("assessment_name", "SKILL")).upper(),
@@ -286,11 +302,14 @@ async def resend_certificate(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to render certificate PDF.")
 
     # Update recipient name in DB if it changed
-    if snapshot.get("recipient_name") != cert.get("recipient_name"):
-        await raw_db.certificates.update_one(
-            {"_id": certificate_id},
-            {"$set": {"recipient_name": snapshot["recipient_name"], "snapshot.recipient_name": snapshot["recipient_name"]}}
-        )
+    if snapshot.get("recipient_name") != cert.recipient_name:
+        async with get_pg_session_factory()() as session:
+            await session.execute(
+                update(Certificate)
+                .where(Certificate.id == certificate_id)
+                .values(recipient_name=snapshot["recipient_name"], snapshot=snapshot)
+            )
+            await session.commit()
 
     # Dispatch email in background with updated flag
     background_tasks.add_task(

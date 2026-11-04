@@ -1,85 +1,77 @@
 """
-Subscription Expiry Sweep — Automated Retention & Plan Management.
-
-Sweep to auto-downgrade expired paid plans to Free.
-Executed via authenticated webhook from Azure Logic App or manual admin trigger.
+Subscription Expiry Scheduler Job (Pure PostgreSQL SQLAlchemy 2.0).
+Sweeps active paid subscriptions periodically; downgrades expired users to Free.
 """
 
-from __future__ import annotations
-
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
-
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any
 import structlog
-from bson import ObjectId
+from sqlalchemy import select, update, and_, or_
 
-from config.db import get_database
+from config.db import get_pg_session_factory
+from models.tables import User
 
 logger = structlog.get_logger(__name__)
 
 
-async def expire_overdue_subscriptions(db: Optional[Any] = None) -> Dict[str, Any]:
+async def expire_stale_subscriptions(db: Any = None) -> Dict[str, Any]:
     """
-    Finds active subscriptions whose end date is past, and downgrades them to 'free'.
-    Accepts an optional database instance; falls back to get_database() if None.
+    Sweeps active paid subscriptions and downgrades users whose
+    subscription has passed its end date to Free.
     """
     now = datetime.now(timezone.utc)
     legacy_cutoff = now - timedelta(days=30)
-    if db is None:
-        try:
-            db = get_database()
-        except Exception as exc:
-            logger.error("Database connection unavailable for subscription sweep", error=str(exc))
-            return {"error": "Database not initialized", "expired_count": 0}
 
-    raw_db = getattr(db, "_raw_db", db)
 
-    filter_query = {
-        "subscription_active": True,
-        "$or": [
-            {"subscription_end_date": {"$lte": now, "$ne": None}},
-            {
-                "$or": [
-                    {"subscription_end_date": None},
-                    {"subscription_end_date": {"$exists": False}},
-                ],
-                "plan_updated_at": {"$lte": legacy_cutoff},
-            },
-        ],
-    }
 
     try:
-        expired_docs = await raw_db.users.find(
-            filter_query, {"_id": 1, "email": 1, "plan": 1}
-        ).to_list(length=2000)
+        session_factory = get_pg_session_factory()
+        async with session_factory() as session:
+            stmt = (
+                select(User)
+                .where(
+                    and_(
+                        User.subscription_active == True,
+                        User.plan != "free",
+                        or_(
+                            User.subscription_end_date <= now,
+                            and_(User.subscription_end_date.is_(None), User.plan_updated_at <= legacy_cutoff)
+                        )
+                    )
+                )
+            )
+            expired_users = (await session.execute(stmt)).scalars().all()
 
-        if not expired_docs:
-            logger.info("subscription_expiry_sweep: no expired subscriptions found")
-            return {"expired_count": 0}
+            if not expired_users:
+                logger.info("subscription_expiry_sweep: no expired subscriptions found")
+                return {"expired_count": 0}
 
-        object_ids = [ObjectId(str(d["_id"])) for d in expired_docs if d.get("_id")]
-        emails = [d.get("email", "?") for d in expired_docs]
+            expired_ids = [u.id for u in expired_users]
+            emails = [u.email for u in expired_users]
 
-        result = await raw_db.users.update_many(
-            {"_id": {"$in": object_ids}},
-            {
-                "$set": {
-                    "plan": "free",
-                    "subscription_active": False,
-                    "subscription_status": "expired",
-                    "subscription_end_date": None,
-                    "plan_updated_at": now,
-                }
-            },
-        )
+            up_stmt = (
+                update(User)
+                .where(User.id.in_(expired_ids))
+                .values(
+                    plan="free",
+                    subscription_active=False,
+                    subscription_status="expired",
+                    subscription_end_date=None,
+                    plan_updated_at=now,
+                )
+            )
+            res = await session.execute(up_stmt)
+            await session.commit()
 
-        logger.warning(
-            "subscription_expiry_sweep: auto-downgraded expired subscriptions",
-            expired_count=result.modified_count,
-            user_emails=emails,
-        )
-        return {"expired_count": result.modified_count}
+            logger.info(
+                "subscription_expiry_sweep: successfully downgraded expired users",
+                count=len(expired_ids),
+                emails=emails[:10],
+            )
+            return {"expired_count": len(expired_ids), "downgraded_ids": expired_ids}
 
     except Exception as exc:
-        logger.error("Failed to execute subscription expiry sweep", error=str(exc))
+        logger.exception("subscription_expiry_sweep failed", error=str(exc))
         return {"error": str(exc), "expired_count": 0}
+
+expire_overdue_subscriptions = expire_stale_subscriptions

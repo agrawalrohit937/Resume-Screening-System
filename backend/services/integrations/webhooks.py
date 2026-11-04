@@ -1,8 +1,11 @@
+from __future__ import annotations
+from config.db import get_pg_session_factory
+from sqlalchemy import select, and_
+from models.tables import WebhookSubscription as WebhookTable
 """Enterprise Outbound Webhooks with HMAC SHA-256 Signatures & Delivery Retries.
 CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
 
-from __future__ import annotations
 
 import asyncio
 import hashlib
@@ -87,16 +90,6 @@ class WebhookService:
         self._http_client = http_client
         self.max_retries = max_retries
 
-    def _get_coll(self, name: str) -> Any:
-        if self.db is None:
-            return None
-        if hasattr(self.db, name):
-            return getattr(self.db, name)
-        try:
-            return self.db[name]
-        except Exception:
-            return None
-
     async def register_subscription(
         self,
         target_url: str,
@@ -113,9 +106,21 @@ class WebhookService:
             events=events or ["*"],
             description=description,
         )
-        coll = self._get_coll("webhook_subscriptions")
-        if coll is not None:
-            await coll.insert_one(sub.dict())
+
+        try:
+            async with get_pg_session_factory()() as session:
+                new_sub = WebhookTable(
+                    id=str(sub.id),
+                    tenant_id=resolved_tenant,
+                    url=target_url,
+                    events=events or ["*"],
+                    secret=secret_key,
+                    status="active" if sub.is_active else "inactive",
+                )
+                session.add(new_sub)
+                await session.commit()
+        except Exception as e:
+            logger.warning("Failed to persist webhook subscription", error=str(e))
         logger.info("Webhook subscription registered", target_url=target_url, tenant_id=resolved_tenant)
         return sub
 
@@ -131,14 +136,26 @@ class WebhookService:
         retries_limit = max_retries if max_retries is not None else self.max_retries
         subscriptions: List[WebhookSubscription] = []
 
-        coll = self._get_coll("webhook_subscriptions")
-        if coll is not None:
-            cursor = coll.find({
-                "tenant_id": resolved_tenant,
-                "is_active": True
-            })
-            subs_data = await cursor.to_list(length=50)
-            subscriptions = [WebhookSubscription(**s) for s in subs_data]
+        try:
+            async with get_pg_session_factory()() as session:
+                stmt = select(WebhookTable).where(
+                    WebhookTable.tenant_id == resolved_tenant,
+                    WebhookTable.status == "active"
+                )
+                rows = (await session.execute(stmt)).scalars().all()
+                subscriptions = [
+                    WebhookSubscription(
+                        id=str(r.id),
+                        tenant_id=r.tenant_id,
+                        target_url=r.url,
+                        secret_key=r.secret,
+                        events=r.events or ["*"],
+                        is_active=(r.status == "active"),
+                    )
+                    for r in rows
+                ]
+        except Exception as e:
+            logger.warning("Failed to fetch webhook subscriptions", error=str(e))
 
         results: List[WebhookDeliveryResult] = []
         payload_obj = WebhookPayload(
@@ -200,10 +217,6 @@ class WebhookService:
                 error=last_error
             )
             results.append(delivery)
-
-            deliv_coll = self._get_coll("webhook_deliveries")
-            if deliv_coll is not None:
-                await deliv_coll.insert_one(delivery.dict())
 
         logger.info("Dispatched webhook event", event_type=event_type, dispatched_count=len(results))
         return results

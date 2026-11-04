@@ -8,7 +8,7 @@
 ## 🏗️ Architecture
 
 ```
-Routes → Services → Repositories → MongoDB
+Routes → Services → Repositories → PostgreSQL
          ↓
      NLP Engine (BERT + TF-IDF)
          ↓
@@ -21,8 +21,8 @@ Routes → Services → Repositories → MongoDB
 |-------|---------|
 | `api/routes/` | HTTP endpoints, request validation, response formatting |
 | `services/` | Business logic, AI/NLP processing |
-| `repositories/` | MongoDB async CRUD operations |
-| `models/` | MongoDB document schemas |
+| `repositories/` | PostgreSQL async CRUD operations |
+| `models/` | SQLAlchemy 2.0 & Pydantic entity schemas |
 | `schemas/` | Pydantic v2 request/response DTOs |
 | `utils/` | Reusable NLP, file, validation helpers |
 
@@ -38,7 +38,7 @@ backend/
 │   ├── security.py            # JWT + password hashing
 │   └── logging.py             # Structured logging (structlog)
 ├── config/
-│   └── db.py                  # Motor async MongoDB + index management
+│   └── db.py                  # PostgreSQL async engine & connection pool
 ├── api/
 │   ├── deps.py                # DI: auth guards, repo/service providers
 │   └── routes/
@@ -111,7 +111,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 # Edit .env — at minimum set:
-# MONGO_URI, SECRET_KEY, GITHUB_TOKEN (optional), ANTHROPIC_API_KEY (optional)
+# DATABASE_URL, SECRET_KEY, GITHUB_TOKEN (optional), ANTHROPIC_API_KEY (optional)
 ```
 
 ### 3. Run
@@ -142,7 +142,7 @@ cd docker/
 # Build and start all services
 docker compose up -d --build
 
-# Dev mode (includes Mongo Express UI at :8081)
+# Dev mode
 docker compose --profile dev up -d
 
 # Scale API workers
@@ -157,11 +157,11 @@ docker compose down
 
 **Services started:**
 - `api` → FastAPI at `:8000`
-- `mongo` → MongoDB at `:27017`
+- `postgres` → PostgreSQL at `:5432`
 - `redis` → Redis at `:6379`
 - `nginx` → Reverse proxy at `:80`
 - `celery_worker` → Background tasks
-- `mongo_express` → MongoDB UI at `:8081` (dev only)
+- `alembic` → Automated schema migrations
 
 ---
 
@@ -281,7 +281,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
     envVars:
-      - key: MONGO_URI
+      - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         generateValue: true
@@ -301,7 +301,7 @@ docker push <account>.dkr.ecr.us-east-1.amazonaws.com/ai-career-api:latest
 SECRET_KEY=$(openssl rand -hex 32)
 DEBUG=false
 ENVIRONMENT=production
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/
+DATABASE_URL=postgresql+asyncpg://user:pass@ep-host.aws.neon.tech/neondb
 SENTRY_DSN=https://...@sentry.io/...
 ```
 
@@ -311,11 +311,11 @@ SENTRY_DSN=https://...@sentry.io/...
 
 1. **BERT Model** — Loads once at startup via singleton. First request is slow (~2s). Subsequent: ~50ms.
 2. **Bulk Scoring** — Uses batched BERT embeddings for O(1) extra API calls regardless of resume count.
-3. **MongoDB Indexes** — All collections indexed on creation via `_ensure_indexes()`.
+3. **PostgreSQL Indexes** — Optimized B-tree and JSONB indexes for sub-millisecond query execution.
 4. **Async Everywhere** — No blocking I/O — all DB calls, HTTP calls, and file I/O are async.
 5. **Background Parsing** — Resume upload returns immediately; parsing runs in background.
 6. **GZip Middleware** — Responses >1KB compressed automatically.
-7. **Connection Pooling** — MongoDB pool: 10–100 connections.
+7. **Connection Pooling** — PostgreSQL async pool: 10–20 connections with asyncpg.
 8. **Redis Caching** — Add `aiocache` decorators to hot endpoints for 10x speedup.
 
 ---
@@ -325,7 +325,8 @@ SENTRY_DSN=https://...@sentry.io/...
 | Package | Version | Purpose |
 |---------|---------|---------|
 | fastapi | 0.111 | Async web framework |
-| motor | 3.4 | Async MongoDB driver |
+| asyncpg | 0.29 | Async PostgreSQL driver |
+| sqlalchemy | 2.0 | Async ORM & query builder |
 | pydantic | 2.7 | Data validation |
 | sentence-transformers | 2.7 | BERT embeddings |
 | scikit-learn | 1.4 | TF-IDF + cosine similarity |

@@ -33,11 +33,13 @@ export default function Dashboard() {
       const cached = sessionStorage.getItem(dashboardCacheKey)
       if (!cached) return
       const data = JSON.parse(cached)
-      setAnalytics(data.analytics || null)
-      setHistory(data.history || [])
-      setGami(data.gami || null)
-      setResumeCount(data.resumeCount || 0)
-      setScoreTrend(data.scoreTrend || [])
+      if (data && data.analytics) {
+        setAnalytics(data.analytics)
+        setHistory(data.history || [])
+        setGami(data.gami || null)
+        setResumeCount(data.resumeCount || 0)
+        setScoreTrend(data.scoreTrend || [])
+      }
     } catch {
       sessionStorage.removeItem(dashboardCacheKey)
     }
@@ -88,29 +90,45 @@ export default function Dashboard() {
     }
 
     Promise.all([
-      getMyAnalytics(undefined, { signal: controller.signal }).catch(() => ({ data: null })),
+      getMyAnalytics(undefined, { signal: controller.signal }).catch((err) => {
+        console.warn('Analytics fetch error:', err)
+        return { data: null }
+      }),
       getATSHistory({ page_size: 5 }, { signal: controller.signal }).catch(() => ({ data: { items: [] } })),
       getResumes({ page_size: 1 }, { signal: controller.signal }).catch(() => ({ data: { resumes: [] } })),
-      getGamificationProfile({ signal: controller.signal }).catch(() => ({ data: null })),
+      getGamificationProfile({ signal: controller.signal }).catch((err) => {
+        console.warn('Gamification fetch error:', err)
+        return { data: null }
+      }),
     ]).then(([a, h, r, g]) => {
       if (!mounted) return
-      const analyticsData = a.data || null
-      setAnalytics(analyticsData)
-      setHistory(h.data?.items || [])
-      setGami(g.data || null)
-      setResumeCount(r.data?.resumes?.length || 0)
-      setScoreTrend(analyticsData?.score_trend || [])
+      const analyticsData = a?.data || null
+      if (analyticsData) {
+        setAnalytics(analyticsData)
+        setScoreTrend(analyticsData.score_trend || [])
+      }
+      if (h?.data?.items) {
+        setHistory(h.data.items)
+      }
+      if (g?.data) {
+        setGami(g.data)
+      }
+      if (r?.data?.resumes) {
+        setResumeCount(r.data.resumes.length)
+      }
 
-      try {
-        sessionStorage.setItem(dashboardCacheKey, JSON.stringify({
-          analytics: analyticsData,
-          history: h.data?.items || [],
-          gami: g.data || null,
-          resumeCount: r.data?.resumes?.length || 0,
-          scoreTrend: analyticsData?.score_trend || [],
-        }))
-      } catch {
-        // Session storage is an optional performance cache.
+      if (analyticsData) {
+        try {
+          sessionStorage.setItem(dashboardCacheKey, JSON.stringify({
+            analytics: analyticsData,
+            history: h?.data?.items || [],
+            gami: g?.data || null,
+            resumeCount: r?.data?.resumes?.length || 0,
+            scoreTrend: analyticsData.score_trend || [],
+          }))
+        } catch {
+          // Session storage is an optional performance cache.
+        }
       }
       
       try {
@@ -118,12 +136,14 @@ export default function Dashboard() {
         const best = sum.best_score ?? 0
         const normBest = best > 1 ? Math.round(best) : Math.round(best * 100)
         const totalChecks = sum.total_ats_checks || 0
-        const streakVal = g.data?.current_streak || 0
-        localStorage.setItem('careershala_cached_stats', JSON.stringify({
-          score: totalChecks > 0 ? normBest : 0,
-          streak: streakVal,
-          totalChecks: totalChecks
-        }))
+        const streakVal = g?.data?.current_streak || 0
+        if (totalChecks > 0 || streakVal > 0) {
+          localStorage.setItem('careershala_cached_stats', JSON.stringify({
+            score: totalChecks > 0 ? normBest : 0,
+            streak: streakVal,
+            totalChecks: totalChecks
+          }))
+        }
       } catch {}
     }).finally(() => {
       if (mounted) setLoading(false)
@@ -133,7 +153,7 @@ export default function Dashboard() {
       mounted = false
       controller.abort()
     }
-  }, [user, dashboardCacheKey])
+  }, [user?.id, user?.email, dashboardCacheKey])
 
   if (loading && !analytics && !gami) {
     return (

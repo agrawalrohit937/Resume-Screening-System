@@ -847,25 +847,35 @@ def _evaluate_eligibility(
     # Recruiter Eligibility Checks (driven by job fields, supports dict or object)
     if job is not None:
         # 1. Location & Remote Policy
-        req_loc = str((job.get("location") or job.get("required_location")) if isinstance(job, dict) else (getattr(job, "location", None) or getattr(job, "required_location", "") or "")).strip()
-        remote_pol = str((job.get("remote_policy") if isinstance(job, dict) else getattr(job, "remote_policy", "")) or "").strip().lower()
+        _loc_raw = (job.get("location") or job.get("required_location")) if isinstance(job, dict) else (getattr(job, "location", None) or getattr(job, "required_location", None))
+        req_loc = str(_loc_raw).strip() if _loc_raw and str(_loc_raw).strip().lower() != "none" else ""
+        _rem_raw = (job.get("remote_policy") if isinstance(job, dict) else getattr(job, "remote_policy", None))
+        remote_pol = str(_rem_raw).strip().lower() if _rem_raw and str(_rem_raw).strip().lower() != "none" else ""
 
         if req_loc or remote_pol:
             cand_loc = str(extracted_data.get("location") or extracted_data.get("city") or (extracted_data.get("contact_info", {}) or {}).get("location") or "").strip()
+            is_hard_loc = bool(job.get("hard_location_requirement", False)) if isinstance(job, dict) else bool(getattr(job, "hard_location_requirement", False))
             if remote_pol in ("remote", "work_from_home", "fully_remote"):
                 loc_passed, loc_obs = True, f"Remote policy ({remote_pol}) accommodates candidate"
                 _record_check(checks, reasons, advisories, "location_policy", f"Location: {req_loc or remote_pol}", loc_passed, "soft", loc_obs, ["location"] if cand_loc else [], "job_location_spec")
             elif not cand_loc:
-                # Candidate location missing: do NOT mark unverified or hard rejection. Skip check and add to needs_input
                 needs_input.append("location")
+                _record_check(
+                    checks, reasons, advisories,
+                    "location_policy",
+                    f"Location: {req_loc or remote_pol}",
+                    "unverified",
+                    "hard",
+                    "Candidate location not specified in resume",
+                    [],
+                    "job_location_spec",
+                )
             else:
                 if req_loc.lower() in cand_loc.lower() or cand_loc.lower() in req_loc.lower():
                     loc_passed, loc_obs = True, cand_loc
                 else:
                     loc_passed, loc_obs = False, f"Candidate located in {cand_loc}, role requires {req_loc}"
 
-                # Location mismatch is soft unless job.hard_location_requirement is explicitly True
-                is_hard_loc = bool(job.get("hard_location_requirement", False)) if isinstance(job, dict) else bool(getattr(job, "hard_location_requirement", False))
                 _record_check(
                     checks, reasons, advisories,
                     "location_policy",
@@ -900,10 +910,22 @@ def _evaluate_eligibility(
         # 3. Work Authorization & Languages
         req_auth_flag = bool(job.get("require_work_auth", False)) if isinstance(job, dict) else bool(getattr(job, "require_work_auth", False))
         if req_auth_flag:
-            req_auth = str((job.get("work_authorization") if isinstance(job, dict) else getattr(job, "work_authorization", None)) or "Valid Work Authorization").strip()
+            _raw_auth = (job.get("work_authorization") if isinstance(job, dict) else getattr(job, "work_authorization", None))
+            req_auth = str(_raw_auth).strip() if _raw_auth and str(_raw_auth).strip().lower() != "none" else "Valid Work Authorization"
             cand_auth = extracted_data.get("work_authorization") or extracted_data.get("visa_status")
+            is_hard_auth = bool(job.get("hard_auth_requirement", False)) if isinstance(job, dict) else bool(getattr(job, "hard_auth_requirement", False))
             if not cand_auth:
                 needs_input.append("work_authorization")
+                _record_check(
+                    checks, reasons, advisories,
+                    "work_authorization",
+                    f"Work Authorization: {req_auth}",
+                    "unverified",
+                    "hard",
+                    "Work authorization not declared in resume",
+                    [],
+                    "job_auth_spec",
+                )
             else:
                 _record_check(checks, reasons, advisories, "work_authorization", f"Work Authorization: {req_auth}", True, "soft", str(cand_auth), ["work_authorization"], "job_auth_spec")
 
@@ -1179,7 +1201,7 @@ def build_smart_embedding_text(
 def _normalize_resume_data(resume: Union[Dict[str, Any], str, Any]) -> Tuple[Dict[str, Any], str]:
     """
     Standardizes resume input into a predictable dict contract regardless of whether
-    it came as a Pydantic model, MongoDB document, or raw dictionary.
+    it came as a Pydantic model, database document, or raw dictionary.
     Guarantees consistent keys: education (with field_of_study, degree, institution),
     work_experience (with title, company, start_date, end_date, technologies),
     skills, total_experience_years, and raw_text.
@@ -1340,6 +1362,10 @@ def _compute_shared_components(
     canon_fn = canonicalize_skills or (lambda seq: list(dict.fromkeys(str(s).strip() for s in seq if s and str(s).strip())))
     extract_fn = extract_skills_deterministic or (lambda t: [])
 
+    resolved_req_skills = required_skills
+    if resolved_req_skills is None and isinstance(jd, dict):
+        resolved_req_skills = jd.get("required_skills") or jd.get("skills")
+
     has_structured_skills = (
         must_have_skills is not None or
         nice_to_have_skills is not None or
@@ -1348,8 +1374,8 @@ def _compute_shared_components(
     if has_structured_skills:
         skill_universe = canon_fn((resolved_must_skills or []) + (resolved_nice_skills or []))
         explicit_reqs = skill_universe
-    elif required_skills:
-        explicit_reqs = canon_fn(required_skills)
+    elif resolved_req_skills:
+        explicit_reqs = canon_fn(resolved_req_skills)
         skill_universe = explicit_reqs
     else:
         skill_universe = canon_fn(extract_fn(jd_text))
@@ -1394,7 +1420,7 @@ def _compute_shared_components(
         cand_skills,
         skill_universe,
         jd_source=jd_index,
-        explicit_required=set(explicit_reqs),
+        explicit_required=set(resolved_req_skills) if resolved_req_skills else None,
         extracted_data=extracted_data,
         raw_text=raw_text,
         or_groups=final_or_groups,

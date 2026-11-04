@@ -1,7 +1,7 @@
 """
-CareerShala AI Copilot v2 Document Models & Typed Schemas
+CareerShala AI Copilot v2 Domain Models & Typed Schemas
 =========================================================
-MongoDB schemas and Pydantic validation models for:
+Database schema and Pydantic validation models for:
 - copilot_sessions: conversation threads with metadata and token accounting
 - copilot_messages: transcript items with role, cards, citations, and feedback
 - copilot_memory: durable user facts learned by the agent (max 40/user, LRU)

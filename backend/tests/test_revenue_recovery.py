@@ -94,8 +94,8 @@ def test_risk_scoring_high_risk():
 
 
 def test_risk_scoring_timezone_compatibility():
-    """Verify risk scoring handles both naive (MongoDB style) and aware datetimes seamlessly."""
-    # Case 1: Naive datetime (typical MongoDB BSON deserialization)
+    """Verify risk scoring handles both naive (ISO / naive style) and aware datetimes seamlessly."""
+    # Case 1: Naive datetime (typical ISO/datetime deserialization)
     naive_login = datetime.utcnow() - timedelta(days=5)
     naive_renewal = datetime.utcnow() + timedelta(days=2)
     assert naive_login.tzinfo is None

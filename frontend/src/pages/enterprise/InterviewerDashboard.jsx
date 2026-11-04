@@ -818,7 +818,7 @@ export default function InterviewerDashboard() {
                             </span>
                           </h3>
                           <p className="text-xs text-slate-600 mt-0.5">
-                            Scorecard already exists for this candidate. Your evaluation is stored in MongoDB and calibration consensus is locked.
+                            Scorecard already exists for this candidate. Your evaluation is stored in the database and calibration consensus is locked.
                           </p>
                         </div>
                       </div>

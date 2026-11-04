@@ -2,10 +2,10 @@
 Gmail Token Service — Silent token refresh for the Google Gmail API.
 
 This service is the heart of the "offline access" OAuth pattern:
-- Loads the user's stored Google OAuth refresh_token from MongoDB.
+- Loads the user's stored Google OAuth refresh_token from database.
 - Checks if the current access_token is expired (with a 5-minute safety buffer).
 - If expired, silently calls Google's token endpoint to get a new access_token.
-- Saves the refreshed token back to MongoDB.
+- Saves the refreshed token back to database.
 - Returns a fully-initialised google.oauth2.credentials.Credentials object
   ready for use with the Gmail API client — no user interaction required.
 

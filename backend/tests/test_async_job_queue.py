@@ -48,60 +48,25 @@ def auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+from tests.conftest import MockAsyncSession
+
+
 class MockJobDB:
     def __init__(self):
-        self.task_jobs_docs = {}
         self.dlq_docs = []
 
     def __getitem__(self, name):
-        if name == "task_jobs":
-            return self.make_job_collection()
         if name == "task_dlq":
             return self.make_dlq_collection()
         return MagicMock()
 
-    def make_job_collection(self):
-        coll = MagicMock()
-
-        async def _insert_one(doc):
-            d = dict(doc)
-            d["_id"] = "job_db_id_" + d["job_id"]
-            self.task_jobs_docs[d["job_id"]] = d
-            return MagicMock(inserted_id=d["_id"])
-
-        async def _find_one(query):
-            job_id = query.get("job_id")
-            doc = self.task_jobs_docs.get(job_id)
-            if not doc:
-                return None
-            if "tenant_id" in query and doc.get("tenant_id") != query["tenant_id"]:
-                return None
-            return dict(doc)
-
-        async def _find_one_and_update(query, update, return_document=True):
-            job_id = query.get("job_id")
-            doc = self.task_jobs_docs.get(job_id)
-            if not doc:
-                return None
-            if "tenant_id" in query and doc.get("tenant_id") != query["tenant_id"]:
-                return None
-            if "$set" in update:
-                doc.update(update["$set"])
-            return dict(doc)
-
-        coll.insert_one = AsyncMock(side_effect=_insert_one)
-        coll.find_one = AsyncMock(side_effect=_find_one)
-        coll.find_one_and_update = AsyncMock(side_effect=_find_one_and_update)
-        return coll
-
     def make_dlq_collection(self):
         coll = MagicMock()
-
-        async def _insert_one(doc):
+        async def _add(doc):
             self.dlq_docs.append(doc)
-            return MagicMock(inserted_id="dlq_1")
-
-        coll.insert_one = AsyncMock(side_effect=_insert_one)
+            return MagicMock(id="dlq_1")
+        coll.add = AsyncMock(side_effect=_add)
+        coll.insert_one = coll.add
         return coll
 
 
@@ -126,8 +91,8 @@ async def test_batch_match_enqueues_and_returns_202(client, user_a_token):
 @pytest.mark.asyncio
 async def test_job_repository_lifecycle():
     """Verify task job repository creates, updates progress, and marks completion."""
-    mock_db = MockJobDB()
-    repo = TaskJobRepository(mock_db)
+    session = MockAsyncSession(items=[])
+    repo = TaskJobRepository(session_factory=lambda: session)
 
     job = await repo.create_job(
         job_id="test_job_101",
@@ -154,8 +119,8 @@ async def test_job_repository_lifecycle():
 @pytest.mark.asyncio
 async def test_multi_tenant_job_isolation(user_a_token, user_b_token):
     """Ensure Tenant B cannot retrieve or observe Tenant A's background job."""
-    mock_db = MockJobDB()
-    repo = TaskJobRepository(mock_db)
+    session = MockAsyncSession(items=[])
+    repo = TaskJobRepository(session_factory=lambda: session)
 
     await repo.create_job(
         job_id="job_alpha_secret",
@@ -205,23 +170,20 @@ async def test_retry_with_backoff_and_dlq_routing():
 @pytest.mark.asyncio
 async def test_copilot_lru_eviction_worker():
     """Verify background LRU memory compaction worker trims excess records."""
-    mock_db = MagicMock()
-    mock_mem_coll = MagicMock()
+    from models.tables import CopilotMemory
+    import unittest.mock
 
-    # Seed 45 memory records
-    mock_records = [{"_id": f"mem_{i}", "last_accessed_at": i} for i in range(45)]
-    mock_cursor = MagicMock()
-    mock_cursor.sort.return_value = mock_cursor
-    mock_cursor.to_list = AsyncMock(return_value=mock_records)
-    mock_mem_coll.find.return_value = mock_cursor
-    mock_mem_coll.delete_many = AsyncMock(return_value=MagicMock(deleted_count=5))
-    mock_db.copilot_memory = mock_mem_coll
+    mock_records = [
+        CopilotMemory(id=f"mem_{i}", tenant_id="default", user_id="test_user", key=f"fact_{i}", value=f"val_{i}")
+        for i in range(45)
+    ]
+    test_session = MockAsyncSession(items=list(mock_records))
 
     res = await execute_copilot_lru_eviction(
         user_id="test_user",
         tenant_id="default",
         max_items=40,
-        db=mock_db,
+        db=test_session,
     )
     assert res["status"] == "success"
     assert res["evicted_count"] == 5

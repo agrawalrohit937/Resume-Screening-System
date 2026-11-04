@@ -12,18 +12,14 @@ Tests for Employer-Driven B2B Live AI Interview Engine:
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from bson import ObjectId
+import uuid
 
 from services.live_interview_service import LiveInterviewService
 
 
 @pytest.mark.asyncio
 async def test_prompt_incorporates_full_jd_and_custom_questions():
-    mock_db = MagicMock()
-    mock_col = MagicMock()
-    mock_db.live_interview_sessions = mock_col
-    mock_db.__getitem__.side_effect = lambda name: mock_col
-    service = LiveInterviewService(db=mock_db)
+    service = LiveInterviewService()
 
     full_jd = (
         "We are looking for a Senior Distributed Systems Engineer with deep expertise in "
@@ -56,11 +52,7 @@ async def test_prompt_incorporates_full_jd_and_custom_questions():
 
 @pytest.mark.asyncio
 async def test_generate_ai_questions_prepends_custom_questions():
-    mock_db = MagicMock()
-    mock_col = MagicMock()
-    mock_db.live_interview_sessions = mock_col
-    mock_db.__getitem__.side_effect = lambda name: mock_col
-    service = LiveInterviewService(db=mock_db)
+    service = LiveInterviewService()
 
     custom_questions = [
         "What is your strategy for live zero-downtime database migrations?",
@@ -83,87 +75,63 @@ async def test_generate_ai_questions_prepends_custom_questions():
 
 @pytest.mark.asyncio
 async def test_b2b_service_lifecycle():
-    # Setup mock MongoDB
     sessions_store = {}
     apps_store = {}
 
-    mock_db = MagicMock()
-    mock_sessions_col = MagicMock()
-    mock_apps_col = MagicMock()
+    mock_repo = MagicMock()
+    mock_app_repo = MagicMock()
 
-    async def mock_insert_one(doc):
-        doc_id = doc.get("_id") or str(ObjectId())
-        doc["_id"] = doc_id
-        sessions_store[str(doc_id)] = doc
-        res = MagicMock()
-        res.inserted_id = doc_id
-        return res
+    async def mock_create_session(data):
+        sid = str(data.get("id") or data.get("_id") or uuid.uuid4().hex)
+        d = dict(data)
+        d["id"] = sid
+        d["_id"] = sid
+        sessions_store[sid] = d
+        return dict(d)
 
-    async def mock_find_one(query):
-        if "magic_token" in query:
-            token = query["magic_token"]
-            for d in sessions_store.values():
-                if d.get("magic_token") == token:
-                    return dict(d)
-            return None
-        if "_id" in query:
-            sid = str(query["_id"])
-            return dict(sessions_store.get(sid)) if sid in sessions_store else None
+    async def mock_get_by_magic_token(token):
+        for s in sessions_store.values():
+            if s.get("magic_token") == token:
+                return dict(s)
         return None
 
-    async def mock_update_one(filter_q, update_q):
-        sid = None
-        if "_id" in filter_q:
-            sid = str(filter_q["_id"])
-        elif "magic_token" in filter_q:
-            tok = filter_q["magic_token"]
-            for k, v in sessions_store.items():
-                if v.get("magic_token") == tok:
-                    sid = k
-                    break
+    async def mock_get_by_id(sid):
+        return dict(sessions_store[str(sid)]) if str(sid) in sessions_store else None
 
-        if sid and sid in sessions_store:
-            target = sessions_store[sid]
-            if "$set" in update_q:
-                target.update(update_q["$set"])
-            if "$push" in update_q:
-                for pk, pv in update_q["$push"].items():
-                    target.setdefault(pk, []).append(pv)
-        res = MagicMock()
-        res.modified_count = 1
-        res.matched_count = 1
-        return res
+    async def mock_update_by_token(token, updates):
+        for sid, s in sessions_store.items():
+            if s.get("magic_token") == token:
+                if isinstance(updates, dict):
+                    for k, v in updates.items():
+                        if k in ("answers", "cheating_events"):
+                            if isinstance(v, list):
+                                s[k] = v
+                            else:
+                                s.setdefault(k, []).append(v)
+                        else:
+                            s[k] = v
+                return dict(s)
+        return None
 
-    mock_sessions_col.insert_one = AsyncMock(side_effect=mock_insert_one)
-    mock_sessions_col.find_one = AsyncMock(side_effect=mock_find_one)
-    mock_sessions_col.update_one = AsyncMock(side_effect=mock_update_one)
+    mock_repo.create_session = AsyncMock(side_effect=mock_create_session)
+    mock_repo.get_by_magic_token = AsyncMock(side_effect=mock_get_by_magic_token)
+    mock_repo.get_by_id = AsyncMock(side_effect=mock_get_by_id)
+    mock_repo.update_by_token = AsyncMock(side_effect=mock_update_by_token)
 
-    async def mock_app_update_one(filter_q, update_q):
-        aid = str(filter_q.get("_id"))
-        if "$set" in update_q:
-            apps_store.setdefault(aid, {}).update(update_q["$set"])
-        res = MagicMock()
-        res.modified_count = 1
-        res.matched_count = 1
-        return res
+    async def mock_app_update_fields(aid, fields):
+        apps_store.setdefault(str(aid), {}).update(fields)
+        return apps_store[str(aid)]
 
-    mock_apps_col.update_one = AsyncMock(side_effect=mock_app_update_one)
+    async def mock_app_find_by_id(aid):
+        return apps_store.get(str(aid))
 
-    def get_col(name):
-        if name in ("live_interview_sessions", "interview_sessions", "interviews"):
-            return mock_sessions_col
-        if name in ("applications", "job_applications"):
-            return mock_apps_col
-        return mock_sessions_col
+    mock_app_repo.update_fields = AsyncMock(side_effect=mock_app_update_fields)
+    mock_app_repo.find_by_id = AsyncMock(side_effect=mock_app_find_by_id)
 
-    mock_db.__getitem__.side_effect = get_col
-    mock_db.live_interview_sessions = mock_sessions_col
-    mock_db.applications = mock_apps_col
-
-    service = LiveInterviewService(db=mock_db)
+    service = LiveInterviewService(repo=mock_repo, app_repo=mock_app_repo)
 
     # 1. Schedule Employer Session
-    app_id = str(ObjectId())
+    app_id = str(uuid.uuid4().hex)
     full_jd = "Full JD text for Lead Backend Developer requiring Redis, Celery, and FastAPI."
     custom_qs = ["Explain Redis PubSub vs Kafka Streams."]
 
@@ -272,11 +240,8 @@ async def test_b2b_service_lifecycle():
 async def test_magic_token_expiry():
     # Test expired token detection
     expired_store = {}
-    mock_db = MagicMock()
-    mock_col = MagicMock()
-
     past_time = datetime.now(timezone.utc) - timedelta(hours=2)
-    doc_id = ObjectId()
+    doc_id = str(uuid.uuid4().hex)
     expired_doc = {
         "_id": doc_id,
         "magic_token": "expired_magic_tok_123",
@@ -287,18 +252,11 @@ async def test_magic_token_expiry():
         "job_title": "Frontend Engineer",
         "questions": [],
     }
-    expired_store["expired_magic_tok_123"] = expired_doc
 
-    async def mock_find(query):
-        tok = query.get("magic_token")
-        return expired_store.get(tok)
+    mock_repo = MagicMock()
+    mock_repo.get_by_magic_token = AsyncMock(return_value=expired_doc)
 
-    mock_col.find_one = AsyncMock(side_effect=mock_find)
-    mock_col.update_one = AsyncMock(return_value=MagicMock(modified_count=0, matched_count=0))
-    mock_db.live_interview_sessions = mock_col
-    mock_db.__getitem__.side_effect = lambda name: mock_col
-
-    service = LiveInterviewService(db=mock_db)
+    service = LiveInterviewService(repo=mock_repo)
 
     # get_session_by_magic_token should return is_expired=True
     res = await service.get_session_by_magic_token("expired_magic_tok_123")

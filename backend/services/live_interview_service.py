@@ -1,3 +1,6 @@
+from repositories.interview_session_repo import InterviewSessionRepository
+from repositories.application_repo import ApplicationRepository
+from repositories.resume_repo import ResumeRepository
 """
 Live Interview Service — session CRUD + AI question generation + cheating processing
 """
@@ -8,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Optional
 
 import structlog
-from pymongo.asynchronous.database import AsyncDatabase
+AsyncDatabase = Optional[object]
 
 from models.interview_session_model import (
     SessionStatus, CheatingEventType,
@@ -89,9 +92,17 @@ QUESTION_BANK = {
 
 class LiveInterviewService:
 
-    def __init__(self, db: AsyncDatabase):
+    def __init__(
+        self,
+        db: AsyncDatabase = None,
+        repo: Optional[InterviewSessionRepository] = None,
+        app_repo: Optional[ApplicationRepository] = None,
+        resume_repo: Optional[ResumeRepository] = None,
+    ):
         self.db = db
-        self.col = db.live_interview_sessions
+        self.repo = repo or InterviewSessionRepository(db=db)
+        self.app_repo = app_repo or ApplicationRepository(db=db)
+        self.resume_repo = resume_repo or ResumeRepository(db=db)
 
     # ── Create session (AI questions) ─────────────────────────────────────────
     async def create_session(
@@ -136,7 +147,7 @@ class LiveInterviewService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        await self.col.insert_one(doc)
+        await self.repo.create_session(doc)
         return {"session_id": session_id, "questions": questions, "total_questions": len(questions)}
 
     # ── AI Question Generation ────────────────────────────────────────────────
@@ -372,19 +383,14 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
 
         if application_id or candidate_email:
             try:
-                from bson import ObjectId
                 app_doc = None
-                if application_id and ObjectId.is_valid(application_id):
-                    app_doc = await self.db.applications.find_one({"_id": ObjectId(application_id)})
-                elif application_id:
-                    app_doc = await self.db.applications.find_one({"_id": application_id})
-                elif candidate_email and job_id:
-                    app_doc = await self.db.applications.find_one({"candidate_email": candidate_email, "job_id": job_id})
+                if application_id:
+                    app_doc = await self.app_repo.find_by_id(str(application_id))
                 
                 if app_doc:
                     raw_parsed = (app_doc.get("resume_snapshot") or {}).get("parsed_data") or {}
                     if not raw_parsed and app_doc.get("candidate_id"):
-                        res_doc = await self.db.resumes.find_one({"user_id": app_doc["candidate_id"]})
+                        res_doc = await self.resume_repo.find_by_user_id(str(app_doc["candidate_id"]))
                         raw_parsed = (res_doc or {}).get("parsed_data") or {}
                     
                     if raw_parsed:
@@ -463,7 +469,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
             "updated_at":            datetime.now(timezone.utc).isoformat(),
         }
 
-        await self.col.insert_one(doc)
+        await self.repo.create_session(doc)
         logger.info("B2B Employer Live Interview scheduled", session_id=session_id, company=company_name, job=job_title, token=magic_token)
 
         # Send invitation email if candidate email is provided
@@ -502,7 +508,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
     # ── Magic Token Session Lifecycle (Candidate Experience) ─────────────────
     async def get_session_by_magic_token(self, magic_token: str) -> Optional[Dict]:
         """Fetch and validate candidate assessment session using magic token."""
-        doc = await self.col.find_one({"magic_token": magic_token})
+        doc = await self.repo.get_by_magic_token(magic_token)
         if not doc:
             return None
 
@@ -556,31 +562,31 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
 
     async def start_magic_session(self, magic_token: str) -> bool:
         """Start candidate session via magic token."""
-        result = await self.col.update_one(
-            {"magic_token": magic_token, "status": {"$in": [SessionStatus.PENDING, SessionStatus.ACTIVE]}},
-            {"$set": {
+        res = await self.repo.update_by_token(
+            magic_token,
+            {
                 "status": SessionStatus.ACTIVE,
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
+            },
         )
-        return result.modified_count > 0 or result.matched_count > 0
+        return bool(res)
 
     async def save_magic_answer(self, magic_token: str, answer_data: Dict) -> bool:
         """Record answer for magic session."""
         now = datetime.now(timezone.utc).isoformat()
-        result = await self.col.update_one(
-            {"magic_token": magic_token},
+        res = await self.repo.update_by_token(
+            magic_token,
             {
-                "$push": {"answers": answer_data},
-                "$set":  {"updated_at": now},
+                "answers": answer_data,
+                "updated_at": now,
             },
         )
-        return result.modified_count > 0
+        return bool(res)
 
     async def record_magic_cheating_event(self, magic_token: str, event: Dict) -> Dict:
         """Record integrity event for magic session."""
-        session = await self.col.find_one({"magic_token": magic_token})
+        session = await self.repo.get_by_magic_token(magic_token)
         if not session:
             return {"error": "Session not found"}
 
@@ -590,19 +596,17 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         aborted  = warnings >= 5
 
         update = {
-            "$push": {"cheating_events": event},
-            "$set": {
-                "cheating_score":   score,
-                "warning_count":    warnings,
-                "session_aborted":  aborted,
-                "updated_at":       datetime.now(timezone.utc).isoformat(),
-            },
+            "cheating_events": event,
+            "cheating_score":   score,
+            "warning_count":    warnings,
+            "session_aborted":  aborted,
+            "updated_at":       datetime.now(timezone.utc).isoformat(),
         }
         if aborted:
-            update["$set"]["status"] = SessionStatus.ABORTED
-            update["$set"]["abort_reason"] = "Exceeded maximum cheating warnings"
+            update["status"] = SessionStatus.ABORTED
+            update["abort_reason"] = "Exceeded maximum cheating warnings"
 
-        await self.col.update_one({"magic_token": magic_token}, update)
+        await self.repo.update_by_token(magic_token, update)
 
         return {
             "cheating_score": score,
@@ -614,9 +618,9 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
     async def complete_magic_session(self, magic_token: str, overall_data: Dict) -> Dict:
         """Complete magic session and immediately sync scorecard to Recruiter's candidate profile."""
         now = datetime.now(timezone.utc).isoformat()
-        await self.col.update_one(
-            {"magic_token": magic_token},
-            {"$set": {
+        await self.repo.update_by_token(
+            magic_token,
+            {
                 "status":              SessionStatus.COMPLETED,
                 "overall_score":       overall_data.get("overall_score"),
                 "avg_confidence":      overall_data.get("avg_confidence"),
@@ -628,10 +632,10 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                 "session_summary":     overall_data.get("session_summary"),
                 "completed_at":        now,
                 "updated_at":          now,
-            }},
+            },
         )
 
-        session = await self.col.find_one({"magic_token": magic_token})
+        session = await self.repo.get_by_magic_token(magic_token)
         if not session:
             return {}
 
@@ -663,35 +667,19 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
 
         # Sync to applications collection if application_id or (job_id, candidate_email) is linked
         try:
-            app_query = None
             if session.get("application_id"):
-                from bson import ObjectId
-                try:
-                    app_query = {"_id": ObjectId(session["application_id"])}
-                except Exception:
-                    app_query = {"_id": session["application_id"]}
-            elif session.get("job_id") and session.get("candidate_email"):
-                app_query = {
-                    "job_id": session["job_id"],
-                    "candidate_email": {"$regex": f"^{re.escape(session['candidate_email'])}$", "$options": "i"},
-                }
-
-            if app_query:
-                await self.db.applications.update_one(
-                    app_query,
+                await self.app_repo.update_fields(
+                    str(session["application_id"]),
                     {
-                        "$set": {
-                            "live_interview_scorecard": scorecard,
-                            "live_interview_completed": True,
-                            "live_interview_score": overall_data.get("overall_score"),
-                            "live_interview_session_id": session_id,
-                            "updated_at": now,
-                        }
+                        "live_interview_scorecard": scorecard,
+                        "live_interview_completed": True,
+                        "live_interview_score": overall_data.get("overall_score"),
+                        "live_interview_session_id": session_id,
                     }
                 )
                 logger.info("Synchronized AI Live Interview scorecard to Recruiter Application", session_id=session_id)
         except Exception as sync_err:
-            logger.error("Failed to synchronize scorecard to applications collection", error=str(sync_err))
+            logger.error("Failed to synchronize scorecard to applications table", error=str(sync_err))
 
         session["id"] = session_id
         return session
@@ -780,7 +768,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                 "updated_at":            datetime.now(timezone.utc).isoformat(),
             }
 
-            await self.col.insert_one(doc)
+            await self.repo.create_session(doc)
 
             email_sent = False
             if c_email:
@@ -831,8 +819,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         if status_filter and status_filter != "all":
             query["status"] = status_filter
 
-        cursor = self.col.find(query).sort("created_at", -1).limit(limit)
-        docs = await cursor.to_list(length=limit)
+        docs = await self.repo.list_sessions(query, limit=limit)
 
         now_utc = datetime.now(timezone.utc)
         results = []
@@ -1024,22 +1011,22 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         query = {"_id": session_id}
         if employer_id:
             query["employer_id"] = employer_id
-        doc = await self.col.find_one(query)
+        doc = await self.repo.get_by_id(session_id)
         if doc:
             doc["id"] = doc.pop("_id")
         return doc
 
     # ── Start session ─────────────────────────────────────────────────────────
     async def start_session(self, session_id: str, user_id: str) -> bool:
-        result = await self.col.update_one(
-            {"_id": session_id, "user_id": user_id},
-            {"$set": {
+        res = await self.repo.update_by_id(
+            session_id,
+            {
                 "status": SessionStatus.ACTIVE,
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
+            },
         )
-        return result.modified_count > 0
+        return bool(res)
 
     # ── Save answer ───────────────────────────────────────────────────────────
     async def save_answer(
@@ -1049,14 +1036,14 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         answer_data: Dict,
     ) -> bool:
         now = datetime.now(timezone.utc).isoformat()
-        result = await self.col.update_one(
-            {"_id": session_id, "user_id": user_id},
+        res = await self.repo.update_by_id(
+            session_id,
             {
-                "$push": {"answers": answer_data},
-                "$set":  {"updated_at": now},
+                "answers": answer_data,
+                "updated_at": now,
             },
         )
-        return result.modified_count > 0
+        return bool(res)
 
     # ── Record cheating event ─────────────────────────────────────────────────
     async def record_cheating_event(
@@ -1065,7 +1052,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         user_id:    str,
         event:      Dict,
     ) -> Dict:
-        session = await self.col.find_one({"_id": session_id, "user_id": user_id})
+        session = await self.repo.get_by_id(session_id, user_id=user_id)
         if not session:
             return {"error": "Session not found"}
 
@@ -1075,19 +1062,17 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         aborted  = warnings >= 5
 
         update = {
-            "$push": {"cheating_events": event},
-            "$set": {
-                "cheating_score":   score,
-                "warning_count":    warnings,
-                "session_aborted":  aborted,
-                "updated_at":       datetime.now(timezone.utc).isoformat(),
-            },
+            "cheating_events": event,
+            "cheating_score":   score,
+            "warning_count":    warnings,
+            "session_aborted":  aborted,
+            "updated_at":       datetime.now(timezone.utc).isoformat(),
         }
         if aborted:
-            update["$set"]["status"] = SessionStatus.ABORTED
-            update["$set"]["abort_reason"] = "Exceeded maximum cheating warnings"
+            update["status"] = SessionStatus.ABORTED
+            update["abort_reason"] = "Exceeded maximum cheating warnings"
 
-        await self.col.update_one({"_id": session_id}, update)
+        await self.repo.update_by_id(session_id, update)
 
         return {
             "cheating_score": score,
@@ -1104,9 +1089,9 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         overall_data: Dict,
     ) -> Dict:
         now = datetime.now(timezone.utc).isoformat()
-        await self.col.update_one(
-            {"_id": session_id, "user_id": user_id},
-            {"$set": {
+        session = await self.repo.update_by_id(
+            session_id,
+            {
                 "status":              SessionStatus.COMPLETED,
                 "overall_score":       overall_data.get("overall_score"),
                 "avg_confidence":      overall_data.get("avg_confidence"),
@@ -1118,27 +1103,22 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                 "session_summary":     overall_data.get("session_summary"),
                 "completed_at":        now,
                 "updated_at":          now,
-            }},
+            },
         )
-        session = await self.col.find_one({"_id": session_id})
         if session:
             session["id"] = session.pop("_id")
         return session or {}
 
     # ── Get session ───────────────────────────────────────────────────────────
     async def get_session(self, session_id: str, user_id: str) -> Optional[Dict]:
-        doc = await self.col.find_one({"_id": session_id, "user_id": user_id})
+        doc = await self.repo.get_by_id(session_id, user_id=user_id)
         if doc:
             doc["id"] = doc.pop("_id")
         return doc
 
     # ── User history ──────────────────────────────────────────────────────────
     async def get_user_history(self, user_id: str, limit: int = 20) -> List[Dict]:
-        cursor = self.col.find(
-            {"user_id": user_id, "status": {"$in": [SessionStatus.COMPLETED, SessionStatus.ABORTED]}},
-            {"questions": 0, "cheating_events": 0},
-        ).sort("created_at", -1).limit(limit)
-        docs = await cursor.to_list(length=limit)
+        docs = await self.repo.list_sessions({"user_id": user_id}, limit=limit)
         for d in docs:
             d["id"] = d.pop("_id")
         return docs

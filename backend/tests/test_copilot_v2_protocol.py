@@ -15,8 +15,8 @@ Tests:
 
 from typing import Any, Dict, List
 import pytest
-from bson import ObjectId
-from pymongo import DESCENDING
+import uuid
+DESCENDING = -1
 
 from main import app
 from api.deps import get_copilot_repo
@@ -31,157 +31,14 @@ TENANT_ALPHA = "tenant_alpha"
 TENANT_BETA = "tenant_beta"
 
 
-# ─── Async In-Memory MongoDB Mock for Clean Verification ───────────────────────
-
-class AsyncMockCollection:
-    def __init__(self):
-        self.docs: List[Dict[str, Any]] = []
-
-    async def insert_one(self, doc):
-        d = dict(doc)
-        if "_id" not in d:
-            d["_id"] = ObjectId()
-        elif isinstance(d["_id"], str):
-            try:
-                d["_id"] = ObjectId(d["_id"])
-            except Exception:
-                pass
-        self.docs.append(d)
-        return type("Result", (), {"inserted_id": d["_id"]})()
-
-    async def insert_many(self, docs):
-        inserted_ids = []
-        for doc in docs:
-            res = await self.insert_one(doc)
-            inserted_ids.append(res.inserted_id)
-        return type("Result", (), {"inserted_ids": inserted_ids})()
-
-    def _matches(self, doc: Dict[str, Any], query: Dict[str, Any]) -> bool:
-        for k, v in query.items():
-            doc_val = doc.get(k)
-            if k == "_id":
-                if str(doc_val) != str(v):
-                    return False
-                continue
-            if isinstance(v, dict):
-                if "$ne" in v and doc_val == v["$ne"]:
-                    return False
-                if "$lt" in v:
-                    if doc_val is None or doc_val >= v["$lt"]:
-                        return False
-                if "$in" in v and doc_val not in v["$in"]:
-                    return False
-            elif doc_val != v:
-                return False
-        return True
-
-    async def find_one(self, query=None, sort=None):
-        query = query or {}
-        matching = [d for d in self.docs if self._matches(d, query)]
-        if not matching:
-            return None
-        if sort:
-            for key, direction in reversed(sort):
-                matching.sort(
-                    key=lambda d: (d.get(key) is not None, d.get(key)),
-                    reverse=(direction == -1 or direction == DESCENDING),
-                )
-        return dict(matching[0])
-
-    async def find_one_and_update(self, query, update, upsert=False, return_document=True):
-        for d in self.docs:
-            if self._matches(d, query):
-                if "$set" in update:
-                    d.update(update["$set"])
-                return dict(d)
-        if upsert:
-            new_doc = {}
-            for k, v in query.items():
-                if not isinstance(v, dict):
-                    new_doc[k] = v
-            if "$setOnInsert" in update:
-                new_doc.update(update["$setOnInsert"])
-            if "$set" in update:
-                new_doc.update(update["$set"])
-            await self.insert_one(new_doc)
-            return dict(new_doc)
-        return None
-
-    async def update_one(self, query, update):
-        for d in self.docs:
-            if self._matches(d, query):
-                if "$set" in update:
-                    d.update(update["$set"])
-                if "$inc" in update:
-                    for k, val in update["$inc"].items():
-                        d[k] = d.get(k, 0) + val
-                return type("Result", (), {"modified_count": 1})()
-        return type("Result", (), {"modified_count": 0})()
-
-    async def delete_one(self, query):
-        for i, d in enumerate(self.docs):
-            if self._matches(d, query):
-                self.docs.pop(i)
-                return type("Result", (), {"deleted_count": 1})()
-        return type("Result", (), {"deleted_count": 0})()
-
-    async def delete_many(self, query):
-        initial = len(self.docs)
-        self.docs = [d for d in self.docs if not self._matches(d, query)]
-        return type("Result", (), {"deleted_count": initial - len(self.docs)})()
-
-    async def count_documents(self, query=None):
-        query = query or {}
-        return sum(1 for d in self.docs if self._matches(d, query))
-
-    def find(self, query=None, projection=None):
-        query = query or {}
-        matching = [dict(d) for d in self.docs if self._matches(d, query)]
-
-        class MockCursor:
-            def __init__(self, data):
-                self.data = data
-
-            def sort(self, sort_spec, direction=None):
-                if isinstance(sort_spec, list):
-                    for key, dir_ in reversed(sort_spec):
-                        self.data.sort(
-                            key=lambda d: (d.get(key) is not None, d.get(key)),
-                            reverse=(dir_ == -1 or dir_ == DESCENDING),
-                        )
-                elif isinstance(sort_spec, str):
-                    dir_ = direction if direction is not None else 1
-                    self.data.sort(
-                        key=lambda d: (d.get(sort_spec) is not None, d.get(sort_spec)),
-                        reverse=(dir_ == -1 or dir_ == DESCENDING),
-                    )
-                return self
-
-            def limit(self, n):
-                self.data = self.data[:n]
-                return self
-
-            async def to_list(self, length=100):
-                return self.data[:length]
-
-        return MockCursor(matching)
-
-
-class MockCopilotDatabase:
-    def __init__(self):
-        self.copilot_sessions = AsyncMockCollection()
-        self.copilot_messages = AsyncMockCollection()
-        self.copilot_memory = AsyncMockCollection()
+# ─── Pure PostgreSQL / SQLAlchemy 2.0 In-Memory Verification Fixtures ────────
+from tests.conftest import MockAsyncSession
 
 
 @pytest.fixture
-def mock_copilot_db():
-    return MockCopilotDatabase()
-
-
-@pytest.fixture
-def copilot_repo(mock_copilot_db):
-    repo = CopilotRepository(mock_copilot_db)
+def copilot_repo():
+    session = MockAsyncSession(items=[])
+    repo = CopilotRepository(session_factory=lambda: session)
     app.dependency_overrides[get_copilot_repo] = lambda: repo
     yield repo
     app.dependency_overrides.pop(get_copilot_repo, None)

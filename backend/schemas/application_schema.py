@@ -3,15 +3,18 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from bson import ObjectId
+from core.id import DocumentId
 
-from models.application_model import ApplicationStatus
+from models.apply_assistant_model import ApplicationStatus
 
 
-def _validate_object_id(v: str) -> str:
-    if not ObjectId.is_valid(v):
-        raise ValueError(f"Invalid ObjectId: {v}")
+def _validate_document_id(v: str) -> str:
+    if not DocumentId.is_valid(v):
+        raise ValueError(f"Invalid ID: {v}")
     return v
+
+
+_validate_object_id = _validate_document_id
 
 
 # ---------- Requests ----------

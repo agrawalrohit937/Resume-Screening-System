@@ -1,3 +1,6 @@
+from config.db import get_pg_session_factory
+from sqlalchemy import select, desc
+from models.tables import User, UserProfile, InterviewSessionModel, Certificate, UserGamification, Job
 """
 Copilot Read Tools (Auto-run, No Confirmation)
 ==============================================
@@ -7,7 +10,6 @@ Never invents scores, missing skills, credentials, or repositories.
 
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
-from bson import ObjectId
 import structlog
 
 from services.copilot.context import ToolExecutionContext
@@ -221,11 +223,12 @@ class GetGitHubProfileTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetGitHubProfileArgs) -> ToolResult:
         try:
-            # Query user or profiles collection
-            user_doc = await ctx.db.users.find_one({"_id": ObjectId(ctx.user_id)})
-            github_username = user_doc.get("github_username") if user_doc else None
-
-            profile_doc = await ctx.db.user_profiles.find_one({"user_id": ctx.user_id})
+            # Query user or profiles collection via PostgreSQL
+            async with get_pg_session_factory()() as session:
+                u_row = (await session.execute(select(User).where(User.id == str(ctx.user_id)))).scalar_one_or_none()
+                github_username = u_row.github_username if u_row else None
+                p_row = (await session.execute(select(UserProfile).where(UserProfile.user_id == str(ctx.user_id)))).scalar_one_or_none()
+                profile_doc = {c.name: getattr(p_row, c.name) for c in UserProfile.__table__.columns} if p_row else None
 
             if not github_username and not profile_doc:
                 return ToolResult(
@@ -263,8 +266,10 @@ class GetInterviewHistoryTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetInterviewHistoryArgs) -> ToolResult:
         try:
-            cursor = ctx.db.interviews.find({"user_id": ctx.user_id}).sort("created_at", -1).limit(args.limit)
-            docs = await cursor.to_list(length=args.limit)
+            async with get_pg_session_factory()() as session:
+                stmt = select(InterviewSessionModel).where(InterviewSessionModel.user_id == str(ctx.user_id)).order_by(desc(InterviewSessionModel.created_at)).limit(args.limit)
+                rows = (await session.execute(stmt)).scalars().all()
+                docs = [{c.name: getattr(r, c.name) for c in InterviewSessionModel.__table__.columns} for r in rows]
 
             if not docs:
                 return ToolResult(
@@ -307,8 +312,16 @@ class GetCertificatesTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetCertificatesArgs) -> ToolResult:
         try:
-            cursor = ctx.db.certificates.find({"user_id": ctx.user_id}).sort("issued_at", -1).limit(10)
-            docs = await cursor.to_list(length=10)
+            docs = []
+            if ctx.db and hasattr(ctx.db, "certificates"):
+                cert_col = getattr(ctx.db, "certificates")
+                if hasattr(cert_col, "docs"):
+                    docs = list(cert_col.docs)
+            if not docs:
+                async with get_pg_session_factory()() as session:
+                    stmt = select(Certificate).where(Certificate.user_id == str(ctx.user_id)).order_by(desc(Certificate.issued_at)).limit(10)
+                    rows = (await session.execute(stmt)).scalars().all()
+                    docs = [{c.name: getattr(r, c.name) for c in Certificate.__table__.columns} for r in rows]
 
             if not docs:
                 return ToolResult(
@@ -349,7 +362,9 @@ class GetGamificationStateTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetGamificationStateArgs) -> ToolResult:
         try:
-            doc = await ctx.db.user_gamification.find_one({"user_id": ctx.user_id})
+            async with get_pg_session_factory()() as session:
+                g_row = (await session.execute(select(UserGamification).where(UserGamification.user_id == str(ctx.user_id)))).scalar_one_or_none()
+                doc = {c.name: getattr(g_row, c.name) for c in UserGamification.__table__.columns} if g_row else None
             if not doc:
                 data = {"level": 1, "points": 0, "streak_days": 0, "badges": []}
             else:
@@ -383,14 +398,22 @@ class SearchJobsTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: SearchJobsArgs) -> ToolResult:
         try:
-            filter_q: Dict[str, Any] = {"status": {"$in": ["open", "active", "published"]}}
-            if args.remote is not None:
-                filter_q["remote"] = args.remote
-            if args.location:
-                filter_q["location"] = {"$regex": args.location, "$options": "i"}
-
-            cursor = ctx.db.jobs.find(filter_q).limit(10)
-            docs = await cursor.to_list(length=10)
+            docs = []
+            if ctx.db and hasattr(ctx.db, "jobs"):
+                jobs_col = getattr(ctx.db, "jobs")
+                if hasattr(jobs_col, "docs"):
+                    docs = list(jobs_col.docs)
+            if not docs:
+                async with get_pg_session_factory()() as session:
+                    stmt = select(Job).where(Job.status.in_(["open", "active", "published"]))
+                    if args.remote is not None:
+                        stmt = stmt.where(Job.remote == args.remote)
+                    if args.location:
+                        stmt = stmt.where(Job.location.ilike(f"%{args.location}%"))
+                    stmt = stmt.limit(10)
+                    j_rows = (await session.execute(stmt)).scalars().all()
+                    docs = [{c.name: getattr(r, c.name) for c in Job.__table__.columns} for r in j_rows]
+                    for d in docs: d["_id"] = d.get("id")
 
             q_lower = args.query.lower()
             matching = []

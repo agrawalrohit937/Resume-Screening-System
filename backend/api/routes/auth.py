@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from api.deps import get_current_user, get_user_repo, get_database
+from api.deps import get_current_user, get_user_repo
 
 logger = structlog.get_logger(__name__)
 from core.config import settings
@@ -135,7 +135,6 @@ async def change_password(
 async def deactivate_account(
     current_user: UserModel = Depends(get_current_user),
     user_repo: UserRepository = Depends(get_user_repo),
-    db: Any = Depends(get_database),
 ):
     """Deactivate (soft delete) current user's account and cascade tenant if owner."""
     user_roles = [r.lower() for r in (getattr(current_user, "roles", []) or [getattr(current_user, "role", "")])]
@@ -143,16 +142,26 @@ async def deactivate_account(
     tenant_id = getattr(current_user, "tenant_id", None)
 
     if is_owner and tenant_id and tenant_id != "default":
-        from bson import ObjectId
-        other_exec = await db.users.find_one({
-            "_id": {"$ne": ObjectId(current_user.id)},
-            "tenant_id": tenant_id,
-            "status": {"$ne": "deleted"},
-            "roles": {"$in": ["executive", "exec", "admin", "platform_admin"]},
-        })
-        if not other_exec:
-            from services.multi_tenancy.tenant_cleanup import cascade_delete_tenant
-            await cascade_delete_tenant(db, tenant_id=tenant_id, deleted_by_user_id=str(current_user.id))
+        from config.db import get_pg_session_factory
+        from sqlalchemy import select, and_
+        from models.tables import User
+        async with get_pg_session_factory()() as session:
+            stmt = select(User).where(
+                and_(
+                    User.id != str(current_user.id),
+                    User.tenant_id == tenant_id,
+                    User.status != "deleted",
+                )
+            )
+            res = await session.execute(stmt)
+            other_users = res.scalars().all()
+            has_other_exec = any(
+                any(r in ("executive", "exec", "admin", "platform_admin") for r in (u.roles or [u.role]))
+                for u in other_users
+            )
+            if not has_other_exec:
+                from services.multi_tenancy.tenant_cleanup import cascade_delete_tenant
+                await cascade_delete_tenant(None, tenant_id=tenant_id, deleted_by_user_id=str(current_user.id))
 
     await user_repo.update(str(current_user.id), {"status": UserStatus.INACTIVE})
     await TokenService.revoke_all_user_tokens(str(current_user.id), reason="account_deactivation")

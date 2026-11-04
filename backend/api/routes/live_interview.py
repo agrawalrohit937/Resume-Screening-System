@@ -15,7 +15,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from pydantic import BaseModel, Field
 
-from api.deps import get_current_user, get_database, get_resume_repo
+from api.deps import get_current_user, get_resume_repo
 from models.user_model import UserModel, UserRole
 from services.live_interview_service import LiveInterviewService
 from services.evaluation_service import EvaluationService
@@ -28,12 +28,12 @@ router = APIRouter()
 _eval_svc = EvaluationService()
 
 
-def get_svc(db=Depends(get_database)) -> LiveInterviewService:
-    return LiveInterviewService(db)
+def get_svc() -> LiveInterviewService:
+    return LiveInterviewService()
 
 
-def get_gamification_service(db=Depends(get_database)) -> GamificationService:
-    return GamificationService(db)
+def get_gamification_service() -> GamificationService:
+    return GamificationService()
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ async def complete_magic_session(
     - Synchronizes full scorecard immediately to Recruiter Dashboard under candidate application.
     - Does NOT reveal score/feedback to candidate.
     """
-    raw_doc = await svc.col.find_one({"magic_token": token})
+    raw_doc = await svc.get_session_by_magic_token(token)
     if not raw_doc:
         raise HTTPException(status_code=404, detail="Session not found")
 

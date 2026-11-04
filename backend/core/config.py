@@ -47,11 +47,10 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     FRONTEND_URL: str = "http://localhost:5173"
 
-    # ── 2. Database (MongoDB) ──────────────────────────────────────────────────
-    MONGO_URI: str = "mongodb://localhost:27017"
-    MONGO_DB_NAME: str = "ai_career_platform"
-    MONGO_MAX_CONNECTIONS: int = 100
-    MONGO_MIN_CONNECTIONS: int = 10
+    # ── 2. Database (PostgreSQL Engine) ───────────────────────────────────────
+    DATABASE_URL: Optional[str] = None
+    POSTGRES_POOL_SIZE: int = 10
+    POSTGRES_MAX_OVERFLOW: int = 20
 
     # ── 3. Security & JWT ─────────────────────────────────────────────────────
     SECRET_KEY: str = Field(
@@ -206,6 +205,20 @@ class Settings(BaseSettings):
         return self
 
     # ── Helper Properties ─────────────────────────────────────────────────────
+    @property
+    def async_database_url(self) -> Optional[str]:
+        if not self.DATABASE_URL:
+            return None
+        url = self.DATABASE_URL.strip()
+        if url.startswith("postgres://"):
+            url = "postgresql+asyncpg://" + url[len("postgres://"):]
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        # Normalize asyncpg query params
+        url = url.replace("sslmode=require", "ssl=require")
+        url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
+        return url
+
     @property
     def max_file_bytes(self) -> int:
         return self.MAX_FILE_SIZE_MB * 1024 * 1024

@@ -326,10 +326,12 @@ async def link_or_create_user(
     picture = provider_data.get("picture")
 
     r_val = str(role).lower() if role else "candidate"
+    if r_val in ("admin", "platform_admin"):
+        r_val = "candidate"
     if r_val in ("employer", "recruiter", "executive", "exec"):
         roles_list = [UserRole.EXECUTIVE.value]
         primary_role = UserRole.EXECUTIVE.value
-    elif r_val:
+    elif r_val and r_val not in ("admin", "platform_admin"):
         roles_list = [r_val]
         primary_role = r_val
     else:

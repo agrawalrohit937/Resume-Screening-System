@@ -59,13 +59,13 @@
 - **Date**: 2026-09-18
 - **Status**: Accepted
 - **Context**:
-  Candidate job recommendations ("Jobs For You") previously executed full in-memory cosine scans over open jobs by querying MongoDB for all active postings, downloading 768-dim embeddings across the network, and computing dot products in Python. This scaled at $O(N_{\text{jobs}} \times D)$ in network traffic, database I/O, and CPU memory.
+  Candidate job recommendations ("Jobs For You") previously executed full in-memory cosine scans over open jobs by querying PostgreSQL for all active postings, downloading 768-dim embeddings across the network, and computing dot products in Python. This scaled at $O(N_{\text{jobs}} \times D)$ in network traffic, database I/O, and CPU memory.
 - **Decision**:
-  1. Added MongoDB Atlas `$vectorSearch` pipeline support in `services.job_matcher` utilizing HNSW graph approximate nearest neighbors on `jobs.jd_embedding_bge` with cosine similarity.
+  1. Added PostgreSQL Neon Cloud `$vectorSearch` pipeline support in `services.job_matcher` utilizing HNSW graph approximate nearest neighbors on `jobs.jd_embedding_bge` with cosine similarity.
   2. Complexity reduced from $O(N_{\text{jobs}} \times D)$ linear scan to $O(\log N_{\text{jobs}} \times D)$ logarithmic graph retrieval.
   3. Filtered candidate applied jobs to eliminate recommendation slot waste.
   4. Guarded under `FEATURE_ATLAS_VECTOR_SEARCH` feature flag (defaults to False in local dev/CI without Atlas Search; gracefully falls back to in-memory cosine scan when unsupported).
-  5. Created idempotent PyMongo migration script `backend/migrations/001_create_vector_indexes.py` with `--dry-run` capability.
+  5. Created idempotent SQLAlchemy / asyncpg migration script `backend/migrations/001_create_vector_indexes.py` with `--dry-run` capability.
 - **Consequences**:
   - Near-instantaneous candidate recommendation queries on large job catalogs with minimal server memory footprint.
   ## ADR 005: Multilingual Embeddings, Semantic Chunking, and Max-Sim Late Interaction
@@ -205,15 +205,15 @@
   CareerShala ATS v2.0.0 required enterprise-grade scalability, resilient asynchronous background task execution, distributed deduplication across multi-replica cloud environments, CPU-sparing embedding caching, cursor pagination to avoid memory bloat, structured observability, and parallel shadow scoring for safe model rollout.
 - **Decisions**:
   1. **Asynchronous Task Workers & Idempotency**:
-     - Built `backend/services/tasks/` architecture with `TaskManager` implementing deterministic idempotency keys (`parse:{resume_id}:{file_hash}`), exponential backoff retries with jitter, dead-letter queue routing (`db.task_dlq`), and in-process async worker execution with MongoDB persistence.
+     - Built `backend/services/tasks/` architecture with `TaskManager` implementing deterministic idempotency keys (`parse:{resume_id}:{file_hash}`), exponential backoff retries with jitter, dead-letter queue routing (`db.task_dlq`), and in-process async worker execution with PostgreSQL persistence.
   2. **Distributed Scheduling & Deduplication**:
-     - Built `backend/services/locking/distributed_lock.py` providing atomic MongoDB `find_one_and_update` document locking with TTL expiration and safe token comparison release.
+     - Built `backend/services/locking/distributed_lock.py` providing atomic PostgreSQL `find_one_and_update` document locking with TTL expiration and safe token comparison release.
      - Protected critical batch jobs (nightly job alerts, stuck resume sweepers) from duplicate concurrent executions across replicas.
   3. **Dedicated Embedding Cache & Int8 Quantization**:
      - Built `backend/services/embedding_cache.py` keyed deterministically on `sha256(text) + model_version` with a 30-day TTL.
      - Implemented dynamic batching (`batch_size=32`) and scalar Int8 quantization with per-vector scale factors preserving > 0.999 cosine similarity fidelity while saving 75% memory.
   4. **Cursor-Based Pagination & Large Dataset Streaming**:
-     - Built `backend/utils/pagination.py` providing `stream_cursor` and `paginate_by_cursor` using MongoDB `_id` index boundaries ($O(1)$ index seek instead of $O(N)$ deep offset skip).
+     - Built `backend/utils/pagination.py` providing `stream_cursor` and `paginate_by_cursor` using PostgreSQL `_id` index boundaries ($O(1)$ index seek instead of $O(N)$ deep offset skip).
      - Eliminated silent truncations (`.to_list(100/200/500)`) across job feeds, application pipelines, and compliance endpoints.
   5. **Observability, Metrics & Drift Detection**:
      - Wired distributed trace ID propagation (`trace_context`, `set_trace_id`, `TraceIDMiddleware`) across parse $\to$ embed $\to$ score $\to$ rank with automatic structlog injection.
@@ -238,7 +238,7 @@
   6. Ecosystem integrations: Outbound webhooks signed with HMAC-SHA256 (`X-CareerShala-Signature`), ATS adapters for Greenhouse Harvest API, Lever Postings/Opportunities, and Workday RaaS, plus automated job syndication (Indeed XML feeds and Google for Jobs schema.org JSON-LD).
   7. Consented Talent Pools: Privacy-preserving talent marketplace where candidates opt-in per visibility tier (`anonymized`, `full`, default `hidden`), maintain employer exclusion blocklists, and receive full transparency audit logs of recruiter profile views.
 - **Decisions**:
-  1. **Multi-Tenancy**: Built `backend/services/multi_tenancy/tenant_context.py` using Python `contextvars` to propagate `tenant_id` seamlessly across async tasks. Built `TenantScopedRepository` wrapping PyMongo/Motor collections and automatically enforcing `{"tenant_id": current_tenant_id}` across all queries, mutations, and counts. Added `tenant_id` to `JobModel`, `ApplicationModel`, `ResumeModel`, `ATSResultModel`, and `ShadowScoreRecord`.
+  1. **Multi-Tenancy**: Built `backend/services/multi_tenancy/tenant_context.py` using Python `contextvars` to propagate `tenant_id` seamlessly across async tasks. Built `TenantScopedRepository` wrapping SQLAlchemy / asyncpg/asyncpg collections and automatically enforcing `{"tenant_id": current_tenant_id}` across all queries, mutations, and counts. Added `tenant_id` to `JobModel`, `ApplicationModel`, `ResumeModel`, `ATSResultModel`, and `ShadowScoreRecord`.
   2. **Granular RBAC**: Built `backend/core/rbac.py` defining fine-grained permissions (`Permission` enum) and role matrix. Provided `has_permission` and `check_rbac_access` with declarative permission guards.
   3. **Enterprise SSO & SCIM**: Built `backend/services/enterprise_auth/sso_service.py` for SAML 2.0 AuthN requests and assertion consumption with JIT user provisioning. Built `SCIMService` in `backend/services/enterprise_auth/scim_service.py` implementing SCIM 2.0 User resource lifecycles.
   4. **EEO Isolation**: Built `backend/models/eeo.py` and `backend/services/eeo_service.py`. Voluntary demographic responses are stored in a dedicated `db.eeo_responses` collection. Recruiter and candidate scoring models never query or access this vault, mathematically preventing disparate impact.
