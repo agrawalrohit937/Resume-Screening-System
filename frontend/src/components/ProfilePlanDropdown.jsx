@@ -30,12 +30,12 @@ function DropdownAvatar({ user }) {
   return (
     <div className="relative shrink-0 select-none">
       <AvatarRing user={user} ringSize={44} shape="circle">
-        <div className="w-11 h-11 rounded-full overflow-hidden border border-slate-200/80 shadow-2xs flex items-center justify-center text-white font-extrabold text-sm bg-gradient-to-br from-indigo-500 to-blue-600">
+        <div className="w-full h-full rounded-full overflow-hidden border border-slate-200/80 shadow-2xs flex items-center justify-center text-white font-extrabold text-sm bg-gradient-to-br from-indigo-500 to-blue-600">
           {imgUrl ? (
             <img
               src={imgUrl}
               alt={user?.full_name || 'User'}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-top"
             />
           ) : (
             <span>{initials}</span>
@@ -436,6 +436,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
           onClick={() => {
             onClose?.()
             logout?.()
+            navigate('/login', { replace: true })
           }}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer select-none"
         >

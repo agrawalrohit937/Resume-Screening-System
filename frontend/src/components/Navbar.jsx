@@ -67,7 +67,7 @@ function UserAvatar({ user, size = 'sm' }) {
         src={avatarUrl}
         alt={user?.full_name || 'avatar'}
         referrerPolicy="no-referrer"
-        className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-2xs`}
+        className={`${sizeClass} rounded-full object-cover object-top border-2 border-white shadow-2xs`}
         onError={() => setImgError(true)}
       />
     )

@@ -1,8 +1,5 @@
 /**
- * Centralized profile avatar resolution & Cloudinary optimization helper for CareerShala.
- *
- * Injects `q_auto,f_auto,w_100,c_fill` parameters on Cloudinary URLs to reduce image sizes
- * from ~167 KB to ~5-10 KB on mobile and desktop viewports.
+ * Centralized profile avatar resolution & Cloudinary helper for CareerShala.
  */
 
 export function optimizeCloudinaryUrl(url, width = 100) {
@@ -14,11 +11,7 @@ export function optimizeCloudinaryUrl(url, width = 100) {
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('/')) {
     return null
   }
-  if (trimmed.includes('res.cloudinary.com')) {
-    if (!trimmed.includes('q_auto')) {
-      return trimmed.replace('/upload/', `/upload/q_auto,f_auto,w_${width},c_fill/`)
-    }
-  }
+  // Return clean verified URL as-is to avoid Cloudinary strict transformation 404 errors
   return trimmed
 }
 
@@ -85,5 +78,3 @@ export function resolveCompanyLogo(companyOrName) {
 
   return null
 }
-
-

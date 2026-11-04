@@ -69,6 +69,7 @@ export default function Results() {
 
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState(() => saved?.result || null)
+  const [pastResult, setPastResult] = useState(null)
   const [enhancing, setEnhancing] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [showSuperchargeScanner, setShowSuperchargeScanner] = useState(false)
@@ -145,7 +146,12 @@ export default function Results() {
       try {
         const { data: latestScan } = await getLatestATSResult()
         if (latestScan?.has_result && isMounted) {
-          setResult(latestScan.result)
+          setPastResult(latestScan.result)
+          // If session storage had an active scan, restore it; otherwise let user see the scanner form
+          const cached = getSavedSession()
+          if (cached?.result) {
+            setResult(cached.result)
+          }
           if (latestScan.job_description) setJdText(latestScan.job_description)
           if (latestScan.job_title) setJobTitle(latestScan.job_title)
           if (latestScan.required_skills?.length > 0) setRequiredSkills(latestScan.required_skills.join(', '))
@@ -510,6 +516,23 @@ export default function Results() {
                   Evaluate your profile against target roles using semantic AI and strict enterprise boolean filters.
                 </p>
               </div>
+
+              {pastResult && (
+                <div className="flex flex-wrap items-center justify-between gap-3 max-w-3xl mx-auto mb-5 p-3.5 bg-gradient-to-r from-sky-50 via-indigo-50/50 to-white border border-sky-200/80 rounded-2xl shadow-2xs">
+                  <div className="flex items-center gap-2.5 text-xs text-slate-700">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Previous scan available: <strong>{Math.round(pastResult.score || pastResult.overall_score || 75)}% ATS Match</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setResult(pastResult)}
+                    className="px-3.5 py-1.5 rounded-xl bg-white border border-sky-300 text-[#1d6fa5] hover:bg-sky-50 text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>View Last Result</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              )}
 
               {/* Dual Workstation Cards (Balanced Heights) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-stretch min-h-0 lg:min-h-[480px]">

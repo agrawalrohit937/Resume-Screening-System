@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import AvatarRing, { getUserPlan } from '../components/AvatarRing'
 import { uploadResume } from '../services/api'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
+import ImageCropModal from '../components/ImageCropModal'
 
 // --- Components ---
 const Crown = ({ size = 28, gradId, variant = 'gold' }) => {
@@ -164,6 +165,9 @@ export default function Profile() {
 
   // Avatar error state
   const [imgError, setImgError] = useState(false)
+  const [cropModalOpen, setCropModalOpen] = useState(false)
+  const [cropImageSrc, setCropImageSrc] = useState(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   // Resume Upload State
   const [resumeFile, setResumeFile] = useState(null)
@@ -171,7 +175,7 @@ export default function Profile() {
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadDone, setUploadDone] = useState(false)
 
-  const savedAvatarUrl = resolveAvatarUrl(user)
+  const savedAvatarUrl = resolveAvatarUrl(user, 240)
   useEffect(() => { setImgError(false) }, [savedAvatarUrl])
   const displayedAvatarUrl = imgError ? null : savedAvatarUrl
 
@@ -254,7 +258,7 @@ export default function Profile() {
 
   const initials = getInitials(user.full_name)
 
-  const handlePhotoSelect = async (e) => {
+  const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
@@ -264,21 +268,31 @@ export default function Profile() {
       toast.error('Only JPG, PNG, or WEBP allowed')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB')
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be under 10MB')
       return
     }
 
-    setLoading(true)
+    const reader = new FileReader()
+    reader.onload = () => {
+      setCropImageSrc(reader.result)
+      setCropModalOpen(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleCropComplete = async (croppedFile) => {
+    setUploadingPhoto(true)
     try {
-      await uploadProfilePhoto(file)
-      await refreshUser()
+      await uploadProfilePhoto(croppedFile)
       setImgError(false)
+      setCropModalOpen(false)
+      setCropImageSrc(null)
       toast.success('Profile photo updated ✨')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Upload failed')
     } finally {
-      setLoading(false)
+      setUploadingPhoto(false)
     }
   }
 
@@ -291,7 +305,6 @@ export default function Profile() {
       } else {
         await updateProfile({ profile_picture: null, avatar_url: null })
       }
-      await refreshUser()
       setImgError(false)
       toast.success('Profile photo removed')
     } catch (err) {
@@ -304,14 +317,37 @@ export default function Profile() {
   const handleSave = async () => {
     setLoading(true)
     try {
-      const payload = { ...form, graduation_year: form.graduation_year ? Number(form.graduation_year) : null }
-      await toast.promise(updateProfile(payload), {
+      // Clean payload: send trimmed strings or null to avoid 422 validation issues
+      const payload = {}
+      for (const [key, val] of Object.entries(form)) {
+        if (key === 'graduation_year') {
+          payload[key] = val ? Number(val) : null
+        } else if (typeof val === 'string') {
+          payload[key] = val.trim() || null
+        } else {
+          payload[key] = val
+        }
+      }
+
+      const savePromise = updateProfile(payload)
+      await toast.promise(savePromise, {
         loading: 'Saving your profile...',
         success: 'Profile beautifully updated! 🎉',
-        error: 'Save failed',
+        error: (err) => {
+          const detail = err?.response?.data?.detail
+          if (typeof detail === 'string') return detail
+          if (Array.isArray(detail)) {
+            return detail.map(d => d.msg || d.message).join(', ')
+          }
+          if (detail && typeof detail === 'object') {
+            return detail.msg || detail.message || 'Validation error'
+          }
+          return err?.message || 'Save failed. Please check the fields.'
+        },
       })
-      await refreshUser()
       setEditing(false)
+    } catch (err) {
+      console.error('Profile save error:', err)
     } finally {
       setLoading(false)
     }
@@ -347,7 +383,7 @@ export default function Profile() {
               )}
 
               <AvatarRing user={user} ringSize={112} shape="circle">
-                <div className={`relative z-10 w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] rounded-full overflow-hidden flex items-center justify-center text-white text-3xl sm:text-4xl font-black select-none border-4 shadow-md transition-transform duration-300 ${isPremium
+                <div className={`relative z-10 w-full h-full rounded-full overflow-hidden flex items-center justify-center text-white text-3xl sm:text-4xl font-black select-none border-4 shadow-md transition-transform duration-300 ${isPremium
                     ? 'border-[#F3C24B] bg-gradient-to-br from-[#F3C24B] to-[#B9812A] shadow-[#F3C24B]/30'
                     : 'border-white bg-gradient-to-br from-indigo-500 to-purple-600'
                   }`}>
@@ -356,7 +392,7 @@ export default function Profile() {
                       src={displayedAvatarUrl}
                       alt={user.full_name || 'Profile'}
                       referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover object-top"
                       onError={() => setImgError(true)}
                     />
                   ) : (
@@ -909,6 +945,19 @@ export default function Profile() {
 
       </div>
 
+      {/* Interactive Avatar Crop Modal */}
+      {cropModalOpen && cropImageSrc && (
+        <ImageCropModal
+          isOpen={cropModalOpen}
+          imageSrc={cropImageSrc}
+          onClose={() => {
+            setCropModalOpen(false)
+            setCropImageSrc(null)
+          }}
+          onCropComplete={handleCropComplete}
+          isUploading={uploadingPhoto}
+        />
+      )}
     </div>
   )
 }

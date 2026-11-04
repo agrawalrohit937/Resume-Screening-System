@@ -125,7 +125,7 @@ async def _build_user_activity_feed(user_id: str, db: Optional[Any] = None, sess
                     "id": f"int_{i_sess.id}",
                     "type": "interview",
                     "title": "Mock Interview Completed",
-                    "detail": f"Score: {int(i_sess.score or 80)}%",
+                    "detail": f"Score: {int(getattr(i_sess, 'overall_score', 80) or getattr(i_sess, 'score', 80) or 80)}%",
                     "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
                     "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
                 })

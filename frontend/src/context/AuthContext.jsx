@@ -12,6 +12,7 @@ export function clearAllUserStorage() {
     localStorage.removeItem("careershala_view_context")
     localStorage.removeItem("careerpilot_view_context")
     localStorage.removeItem("admin_view_mode")
+    localStorage.removeItem("careershala_user")
 
     // 2. User & Recruiter Preferences / Caches
     localStorage.removeItem("recruiter_preferences")
@@ -49,16 +50,35 @@ export function clearAllUserStorage() {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(() => {
+    try {
+      const u = localStorage.getItem("careershala_user")
+      return u ? JSON.parse(u) : null
+    } catch (_) {
+      return null
+    }
+  })
   const [loading, setLoading] = useState(true)
 
   // 🔐 LOGOUT — Strict Session Isolation: wipes local storage, resets global state, fires background backend notify
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const currentToken = localStorage.getItem("access_token")
+
+    try {
+      sessionStorage.setItem("careershala_explicit_logout", "true")
+    } catch (_) {}
+
     // 1. Wipe all local auth & session state synchronously
     clearAllUserStorage()
     delete api.defaults.headers.common["Authorization"]
     delete api.defaults.headers.common["x-tenant-id"]
     setUser(null)
+
+    // Clear client-accessible cookies
+    try {
+      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+      document.cookie = "refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+    } catch (_) {}
 
     // 2. Broadcast global logout event so active providers & views immediately reset
     if (typeof window !== 'undefined') {
@@ -66,14 +86,19 @@ export function AuthProvider({ children }) {
       window.dispatchEvent(new CustomEvent('careershala:auth-change', { detail: { user: null } }))
     }
 
-    // 3. Notify backend in the background — network errors silently swallowed
-    api.post('/auth/logout').catch(() => {})
+    // 3. Notify backend with the active token so JTI is blacklisted and cookies cleared
+    try {
+      await api.post('/auth/logout', {}, {
+        headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {}
+      })
+    } catch (_) {}
   }, [])
 
   const refreshUser = useCallback(async () => {
     try {
       const { data } = await api.get('/auth/me')
       setUser(data)
+      try { localStorage.setItem("careershala_user", JSON.stringify(data)) } catch (_) {}
       return data
     } catch (err) {
       return null
@@ -84,20 +109,40 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true
 
+    const isExplicitlyLoggedOut = (() => {
+      try {
+        return sessionStorage.getItem("careershala_explicit_logout") === "true"
+      } catch (_) {
+        return false
+      }
+    })()
+
     const token = localStorage.getItem("access_token")
 
-    // ✅ If we have a localStorage token, attach it.
-    // Otherwise, rely on cookie-based auth (backend sets httponly cookies).
-    if (token) {
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`
-    } else {
+    // If user explicitly logged out or no token is stored in localStorage, don't auto-resurrect session
+    if (isExplicitlyLoggedOut || !token) {
+      if (isExplicitlyLoggedOut && token) {
+        clearAllUserStorage()
+      }
       delete api.defaults.headers.common["Authorization"]
+      delete api.defaults.headers.common["x-tenant-id"]
+      if (isMounted) {
+        setUser(null)
+        setLoading(false)
+      }
+      return () => {
+        isMounted = false
+      }
     }
+
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`
 
     api.get('/auth/me')
       .then(res => {
         if (isMounted) {
+          try { sessionStorage.removeItem("careershala_explicit_logout") } catch (_) {}
           setUser(res.data)
+          try { localStorage.setItem("careershala_user", JSON.stringify(res.data)) } catch (_) {}
           if (res.data?.tenant_id && res.data.tenant_id !== 'default') {
             localStorage.setItem("tenant_id", res.data.tenant_id)
             api.defaults.headers.common["x-tenant-id"] = res.data.tenant_id
@@ -110,9 +155,8 @@ export function AuthProvider({ children }) {
       .catch(() => {
         if (isMounted) {
           setUser(null)
-          localStorage.removeItem("access_token")
-          localStorage.removeItem("refresh_token")
-          localStorage.removeItem("tenant_id")
+          clearAllUserStorage()
+          delete api.defaults.headers.common["Authorization"]
           delete api.defaults.headers.common["x-tenant-id"]
         }
       })
@@ -126,6 +170,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const _persistSession = (data) => {
+    try { sessionStorage.removeItem("careershala_explicit_logout") } catch (_) {}
     localStorage.setItem("access_token", data.access_token)
     localStorage.setItem("refresh_token", data.refresh_token)
     if (data?.user?.tenant_id && data.user.tenant_id !== 'default') {
@@ -239,27 +284,27 @@ export function AuthProvider({ children }) {
   const updateProfile = async (payload) => {
     const { data } = await api.put('/auth/me', payload)
     setUser(data)
+    try { localStorage.setItem('careershala_user', JSON.stringify(data)) } catch (_) {}
     return data
   }
 
-  // In AuthContext.jsx, update your uploadProfilePhoto like this:
   const uploadProfilePhoto = async (file) => {
     const formData = new FormData()
     formData.append('file', file)
 
-    // Backend now returns the UPDATED user object with the new FTP profile_picture URL
     const { data } = await api.post('/users/profile-photo', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
 
-    // Update global user state immediately — display_picture is resolved server-side
     setUser(data)
+    try { localStorage.setItem('careershala_user', JSON.stringify(data)) } catch (_) {}
     return data
   }
 
   const removeProfilePhoto = async () => {
     const { data } = await api.delete('/users/profile-photo')
     setUser(data)
+    try { localStorage.setItem('careershala_user', JSON.stringify(data)) } catch (_) {}
     return data
   }
 

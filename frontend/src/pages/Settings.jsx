@@ -213,7 +213,7 @@ export default function Settings() {
             <AvatarRing user={user} ringSize={72} shape="circle">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden border-2 border-white shadow-md">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover object-top" />
                 ) : (
                   <span>{initials}</span>
                 )}
