@@ -1,12 +1,11 @@
-"""Enterprise SSO (SAML 2.0 / OIDC) and SCIM 2.0 API Routes.
+"""Enterprise SSO (SAML 2.0 / OIDC) and SCIM 2.0 API Routes (Pure PostgreSQL).
 CareerShala ATS v2.0.0 - Enterprise Authentication.
 """
 
 from typing import Any, Dict
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
+from fastapi import APIRouter, Form, HTTPException, Query, status
 from pydantic import BaseModel
 
-from api.deps import get_database
 from models.enterprise_auth import (
     SCIMUserPayload,
     SCIMUserResponse,
@@ -46,12 +45,11 @@ async def initiate_saml_login_route(
 @router.post("/saml/acs", response_model=SAMLACSResponse)
 async def saml_acs_route(
     SAMLResponse: str = Form(..., description="Base64-encoded SAML Response"),
-    db: Any = Depends(get_database),
 ):
     """Assertion Consumer Service (ACS) endpoint parsing SAML assertion with JIT provisioning."""
     service = EnterpriseSSOService()
     try:
-        return await service.process_saml_response(SAMLResponse, db=db)
+        return await service.process_saml_response(SAMLResponse)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -61,10 +59,9 @@ async def scim_list_users_route(
     startIndex: int = Query(1, ge=1),
     count: int = Query(100, ge=1, le=1000),
     tenant_id: str = Query("default"),
-    db: Any = Depends(get_database),
 ):
     """SCIM 2.0 endpoint for listing provisioned enterprise users."""
-    service = SCIMService(db)
+    service = SCIMService()
     return await service.list_users(tenant_id=tenant_id, start_index=startIndex, count=count)
 
 
@@ -72,10 +69,9 @@ async def scim_list_users_route(
 async def scim_create_user_route(
     payload: SCIMUserPayload,
     tenant_id: str = Query("default"),
-    db: Any = Depends(get_database),
 ):
     """SCIM 2.0 endpoint for provisioning an enterprise user."""
-    service = SCIMService(db)
+    service = SCIMService()
     try:
         return await service.create_user(payload, tenant_id=tenant_id)
     except ValueError as e:
@@ -86,10 +82,9 @@ async def scim_create_user_route(
 async def scim_get_user_route(
     user_id: str,
     tenant_id: str = Query("default"),
-    db: Any = Depends(get_database),
 ):
     """SCIM 2.0 endpoint for retrieving a user by ID."""
-    service = SCIMService(db)
+    service = SCIMService()
     user = await service.get_user(user_id, tenant_id=tenant_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -101,10 +96,9 @@ async def scim_update_user_route(
     user_id: str,
     payload: SCIMUserPayload,
     tenant_id: str = Query("default"),
-    db: Any = Depends(get_database),
 ):
     """SCIM 2.0 endpoint for updating an enterprise user."""
-    service = SCIMService(db)
+    service = SCIMService()
     user = await service.update_user(user_id, payload, tenant_id=tenant_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

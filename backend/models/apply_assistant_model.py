@@ -2,7 +2,6 @@
 
 from datetime import datetime, timezone
 from enum import Enum
-from bson import ObjectId
 
 
 class ApplicationStatus(str, Enum):
@@ -13,7 +12,6 @@ class ApplicationStatus(str, Enum):
     FAILED = "failed"
 
 
-APPLICATION_COLLECTION = "job_applications"
 
 
 def new_application_document(
@@ -26,14 +24,14 @@ def new_application_document(
     job_description: str,
 ) -> dict:
     """
-    Builds the initial Mongo document for a new draft. Called only from
+    Builds the initial document for a new draft. Called only from
     application_repo.create() - the service layer never constructs this
     dict directly, so a future field-shape change stays contained here.
     """
     now = datetime.now(timezone.utc)
     return {
-        "user_id": ObjectId(user_id),
-        "resume_id": ObjectId(resume_id),          # reference only - full resume lives in resume_repo's collection
+        "user_id": str(user_id),
+        "resume_id": str(resume_id),          # reference only - full resume lives in resume_repo's table
         "company_name": company_name,
         "job_title": job_title,
         "hr_email": hr_email,

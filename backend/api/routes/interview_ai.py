@@ -5,14 +5,15 @@ Extends existing /interview routes WITHOUT breaking them
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
-from api.deps import get_current_user, get_resume_repo
-from config.db import get_database
+from sqlalchemy.ext.asyncio import AsyncSession
+from api.deps import get_current_user, get_resume_repo, get_db
+
 from models.resume_model import ResumeStatus
 from models.user_model import UserModel
 from repositories.resume_repo import ResumeRepository
@@ -28,8 +29,8 @@ _ai_interview_svc = AIInterviewService()
 _cheating_svc = CheatingDetectionService()
 
 
-def get_gamification_service(db=Depends(get_database)) -> GamificationService:
-    return GamificationService(db)
+def get_gamification_service() -> GamificationService:
+    return GamificationService()
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
@@ -133,18 +134,37 @@ async def evaluate_answer(
 async def submit_cheating_report(
     payload: CheatingReportRequest,
     current_user: UserModel = Depends(get_current_user),
-    db=Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """Submit cheating events and receive a risk assessment."""
     report = _cheating_svc.analyze_session(payload.session_id, payload.events)
 
-    # Persist report
-    await db.cheating_reports.insert_one({
-        "user_id": str(current_user.id),
-        "session_id": payload.session_id,
-        "report": report.model_dump(),
-        "created_at": datetime.now(timezone.utc),
-    })
+    # Persist report directly to interview session in PostgreSQL
+    from sqlalchemy import update
+    from models.tables import InterviewSessionModel
+    from config.db import get_pg_session_factory
+    events_dump = [e.model_dump() if hasattr(e, "model_dump") else e for e in payload.events]
+    c_score = getattr(report, "cheating_score", 0)
+
+    async def _update_sess(sess):
+        stmt = (
+            update(InterviewSessionModel)
+            .where(InterviewSessionModel.id == str(payload.session_id))
+            .values(
+                cheating_events=events_dump,
+                cheating_score=c_score,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        await sess.execute(stmt)
+        await sess.commit()
+
+    if hasattr(session, "execute"):
+        await _update_sess(session)
+    else:
+        async with get_pg_session_factory()() as sess:
+            await _update_sess(sess)
 
     return report.model_dump()
 

@@ -12,7 +12,6 @@ from enum import Enum
 from typing import Any, Dict, Optional
 from uuid import uuid4
 from pydantic import BaseModel, Field
-from bson import ObjectId
 
 
 class AuditAction(str, Enum):
@@ -81,4 +80,3 @@ class AuditLogModel(BaseModel):
 
     class Config:
         populate_by_name = True
-        json_encoders = {ObjectId: str}

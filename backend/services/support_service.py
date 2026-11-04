@@ -293,7 +293,7 @@ class SupportService:
     async def get_ticket(self, ticket_id: str, user: UserModel) -> Optional[Dict[str, Any]]:
         # Try looking up by human-readable ticket_id first (e.g. CS-2026-001245)
         ticket = await self.ticket_repo.get_by_ticket_id(ticket_id)
-        # Fallback: try MongoDB _id (used by internal admin operations)
+        # Fallback: try database document _id (used by internal admin operations)
         if not ticket:
             ticket = await self.ticket_repo.get_by_id(ticket_id)
         if not ticket:
@@ -304,7 +304,7 @@ class SupportService:
         return ticket.model_dump()
 
     async def _resolve_ticket_id(self, ticket_id: str) -> Optional[SupportTicketModel]:
-        """Resolve a ticket_id that may be human-readable or MongoDB _id."""
+        """Resolve a ticket_id that may be human-readable or document _id."""
         ticket = await self.ticket_repo.get_by_ticket_id(ticket_id)
         if not ticket:
             try:
@@ -314,7 +314,7 @@ class SupportService:
         return ticket
 
     async def _resolve_ticket_doc_id(self, ticket_id: str) -> Optional[str]:
-        """Return the MongoDB _id (as string) for a given ticket identifier."""
+        """Return the document _id (as string) for a given ticket identifier."""
         ticket = await self._resolve_ticket_id(ticket_id)
         if not ticket:
             return None

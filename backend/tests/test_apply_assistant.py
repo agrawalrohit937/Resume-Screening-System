@@ -116,7 +116,7 @@ def test_quality_validator_flags_placeholder_text():
 
 
 def test_status_transition_guard():
-    from backend.models.application_model import is_valid_transition
+    from backend.models.apply_assistant_model import is_valid_transition
 
     assert is_valid_transition("ready_for_review", "sending") is True
     assert is_valid_transition("draft", "sent") is False

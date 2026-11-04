@@ -5,7 +5,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB.svg?style=flat-square&logo=react)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.3.3-646CFF.svg?style=flat-square&logo=vite)](https://vitejs.dev/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%207.0-47A248.svg?style=flat-square&logo=mongodb)](https://www.mongodb.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20Neon-336791.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4.6-38B2AC.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/Tests-397%20Passed-brightgreen.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
@@ -115,7 +115,7 @@ graph TD
     end
 
     subgraph CloudServices ["Databases & Cloud Services"]
-        MongoDB[("MongoDB Database")]
+        Postgres[("PostgreSQL Database (Neon)")]
         Cloudinary["Image & Profile Photo CDN"]
         Brevo["Email Notifications Service"]
         GmailOAuth["Send Email via Gmail"]
@@ -141,7 +141,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 | **PDF Resume Reading** | Cloud OCR (Azure Document Intelligence) | Local `pdfplumber` layout-aware text extractor | Clean raw text extraction |
 | **Resume Matching Score** | Local BGE-M3 Neural Embedding model | Google Gemini Cloud Vector Embeddings | Deterministic skill & keyword overlap calculation |
 | **AI Output Parsing** | Standard `json.loads` | Auto-repairing `json-repair` tool (fixes markdown blocks) | Safe default response bank |
-| **Task Synchronization** | MongoDB atomic document lock (`find_one_and_update`) | In-memory atomic lock | Aborts duplicate overlapping jobs safely |
+| **Task Synchronization** | Database atomic row lock (`SELECT ... FOR UPDATE`) | In-memory atomic lock | Aborts duplicate overlapping jobs safely |
 | **Background Scheduling** | Azure Cloud Timer Triggers | Admin Webhook endpoints (`/admin/trigger-*`) | Built-in fallback task sweep |
 | **Payment Activation** | Instant checkout verification | Background Razorpay webhook listener | Auto-checks status when user next logs in |
 
@@ -257,7 +257,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 | **Data Charts** | **Recharts** | Interactive skill radar charts, score gauges, and hiring metrics |
 | **Browser Vision** | **MediaPipe** + **COCO-SSD** | In-browser face tracking, eye gaze estimation, and phone detection |
 | **Backend API** | **FastAPI** (Python 3.10+) | High-performance asynchronous API with interactive Swagger documentation |
-| **Database** | **MongoDB Atlas** + **Motor** | Scalable, non-blocking document database |
+| **Database** | **PostgreSQL 16** + **SQLAlchemy 2.0 Async** | Scalable relational & document-entity database engine on Neon Cloud |
 | **AI / LLMs** | **Groq**, **Google Gemini 2.5 Flash** | Multi-provider AI key rotation for resume analysis and chat |
 | **Vector Embeddings** | **BAAI BGE-M3** & **BGE-Reranker** | State-of-the-art semantic matching between resumes and job requirements |
 | **PDF Extraction** | **Azure Document Intelligence** & **pdfplumber** | 2-tier document parser for PDF and Word resumes |
@@ -274,7 +274,7 @@ Resume-Screening-System/
 ├── README.md                          # Complete project documentation
 ├── run_dev.bat                        # Windows 1-click startup launcher
 ├── run_dev.sh                         # Linux/Mac 1-click startup launcher
-├── docker-compose.yml                 # Local Docker setup (MongoDB)
+├── docker-compose.yml                 # Local Docker setup (PostgreSQL)
 │
 ├── backend/                           # FastAPI Python Backend
 │   ├── main.py                        # Entry point, middleware, CORS, and route registrations
@@ -304,7 +304,7 @@ Resume-Screening-System/
 │   │   ├── security.py                # Password hashing (Argon2/Bcrypt) & JWT creation
 │   │   └── logging.py                 # Structured application logging
 │   │
-│   ├── models/                        # MongoDB document schemas (User, Resume, Job, etc.)
+│   ├── models/                        # Database models & entity schemas (User, Resume, Job, etc.)
 │   ├── repositories/                  # Clean architecture database access layer
 │   │
 │   ├── services/                      # Business logic and AI engines
@@ -351,7 +351,7 @@ Resume-Screening-System/
 ### System Requirements
 - **Node.js** (v18.0 or newer)
 - **Python** (v3.10 or newer)
-- **MongoDB** (Local instance on `mongodb://localhost:27017` or a free cloud database on [MongoDB Atlas](https://www.mongodb.com/atlas))
+- **PostgreSQL** (PostgreSQL 16 on Neon Cloud or local instance on `localhost:5432`)
 
 ---
 
@@ -400,7 +400,7 @@ Resume-Screening-System/
    ```bash
    cp .env.example .env
    ```
-   *(Only `MONGO_URI` is required to start. You can use `mongodb://localhost:27017` or your free MongoDB Atlas link).*
+   *(Ensure your `DATABASE_URL` is set to your PostgreSQL connection string).*
 
 5. (Recommended) Seed demo accounts and sample jobs:
    ```bash
@@ -450,9 +450,8 @@ FRONTEND_URL=http://localhost:5173
 ALLOWED_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173"]
 
 # ── Database (Required) ──
-# Use your local MongoDB connection or your cloud MongoDB Atlas connection string
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB_NAME=ai_career_platform
+# PostgreSQL connection string (Neon Cloud or Local PostgreSQL)
+DATABASE_URL=postgresql+asyncpg://neondb_owner:npg_8cghU6CqyvTa@ep-mute-glade-a1s9p4l0-pooler.ap-southeast-1.aws.neon.tech/neondb
 
 # ── Security & Passwords ──
 # Any random secret string at least 32 characters long used to sign login tokens

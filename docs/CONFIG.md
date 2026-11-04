@@ -42,5 +42,5 @@ This document serves as the reference guide for environment variables, feature f
 | Component | Behavior |
 | :--- | :--- |
 | `TenantMiddleware` | Extracts `tenant_id` exclusively from verified JWT access claims. Rejects `X-Tenant-ID` spoofing with HTTP 403. |
-| `TenantScopedDatabase` | Injects active `tenant_id` filter across all tenant-scoped MongoDB collections. |
+| `TenantScopedDatabase` | Injects active `tenant_id` filter across all tenant-scoped PostgreSQL tables and document collections. |
 | `platform_admin` | The only root administrative role permitted cross-tenant query bypass. |

@@ -1,5 +1,5 @@
 """
-MongoDB Document Model — Career Page Applications
+Domain Model — Career Page Applications
 
 Stores submissions from the public /careers page (not the AI Apply Assistant).
 """
@@ -19,7 +19,6 @@ class CareerApplicationStatus(str, Enum):
     HIRED = "hired"
 
 
-CAREER_APPLICATION_COLLECTION = "career_applications"
 
 
 class CareerApplicationModel(BaseModel):

@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
-from bson import ObjectId
 
 
 class JobStatus(str, Enum):
@@ -47,4 +46,3 @@ class TaskJobModel(BaseModel):
 
     class Config:
         populate_by_name = True
-        json_encoders = {ObjectId: str}

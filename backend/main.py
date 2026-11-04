@@ -26,7 +26,7 @@ from slowapi.util import get_remote_address
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-from config.db import connect_db, disconnect_db
+from config.db import connect_db, disconnect_db, init_pg_db, close_pg_db
 from core.config import settings
 from core.logging import setup_logging, trace_context
 from core.metrics import (
@@ -115,10 +115,10 @@ if not FAVICON_PATH.is_file():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting AI Career Platform", version=settings.APP_VERSION)
+    logger.info("Starting AI Career Platform (Pure PostgreSQL Engine)", version=settings.APP_VERSION)
     try:
         init_telemetry()
-        await asyncio.wait_for(connect_db(), timeout=45.0)
+        await connect_db()
         FastAPICache.init(InMemoryBackend(), prefix="careershaala-cache")
         logger.info("FastAPICache initialized")
 

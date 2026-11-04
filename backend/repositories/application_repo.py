@@ -1,31 +1,31 @@
-"""MongoDB persistence for AI Apply Assistant applications."""
+"""
+Application Repository — Pure PostgreSQL (SQLAlchemy 2.0 Async ORM).
+Persistence for AI Apply Assistant applications.
+"""
 
 from datetime import datetime, timezone
-from typing import Optional, Tuple, List
-from bson import ObjectId
+from typing import Any, Dict, List, Optional, Tuple, Union
+from sqlalchemy import select, update, delete, func
 
-from config.db import get_database
-from models.application_model import (
-    APPLICATION_COLLECTION,
+from config.db import get_pg_session_factory
+from models import JobApplication, gen_uuid_str
+from models.apply_assistant_model import (
     ApplicationStatus,
-    new_application_document,
     is_valid_transition,
 )
 
 
+def _app_to_dict(row: JobApplication) -> Optional[dict]:
+    if not row:
+        return None
+    d = {c.name: getattr(row, c.name) for c in JobApplication.__table__.columns}
+    d["_id"] = d.get("id")
+    return d
+
+
 class ApplicationRepository:
-    def __init__(self, db=None):
-        self._db = db
-
-    @property
-    def db(self):
-        if self._db is not None:
-            return self._db
-        return get_database()
-
-    @property
-    def collection(self):
-        return self.db[APPLICATION_COLLECTION]
+    def __init__(self, db=None, session_factory=None):
+        self.session_factory = session_factory or get_pg_session_factory()
 
     async def create(
         self,
@@ -37,37 +37,78 @@ class ApplicationRepository:
         hr_email: str,
         job_description: str,
     ) -> dict:
-        doc = new_application_document(
-            user_id=user_id,
-            resume_id=resume_id,
+        now = datetime.now(timezone.utc)
+        new_id = gen_uuid_str()
+        inst = JobApplication(
+            id=new_id,
+            user_id=str(user_id),
+            resume_id=str(resume_id),
             company_name=company_name,
             job_title=job_title,
             hr_email=hr_email,
             job_description=job_description,
+            status=ApplicationStatus.DRAFT.value,
+            needs_manual_review=False,
+            send_metadata={
+                "sent_at": None,
+                "provider_message_id": None,
+                "attempts": 0,
+                "last_error": None,
+            },
+            created_at=now,
+            updated_at=now,
         )
-        result = await self.collection.insert_one(doc)
-        doc["_id"] = result.inserted_id
-        return doc
+        async with self.session_factory() as session:
+            session.add(inst)
+            await session.commit()
+            await session.refresh(inst)
+            return _app_to_dict(inst)
 
     async def get_by_id(self, application_id: str, user_id: str) -> Optional[dict]:
-        if not ObjectId.is_valid(application_id):
+        if not application_id:
             return None
-        return await self.collection.find_one({
-            "_id": ObjectId(application_id),
-            "user_id": ObjectId(user_id),
-        })
+
+        async with self.session_factory() as session:
+            stmt = select(JobApplication).where(
+                JobApplication.id == str(application_id),
+                JobApplication.user_id == str(user_id),
+            )
+            res = await session.execute(stmt)
+            row = res.scalar_one_or_none()
+            return _app_to_dict(row)
+
+    async def get_by_id_only(self, application_id: str) -> Optional[dict]:
+        if not application_id:
+            return None
+        async with self.session_factory() as session:
+            stmt = select(JobApplication).where(JobApplication.id == str(application_id))
+            res = await session.execute(stmt)
+            row = res.scalar_one_or_none()
+            return _app_to_dict(row)
 
     async def list_by_user(self, user_id: str, page: int = 1, page_size: int = 20) -> Tuple[List[dict], int]:
-        query = {"user_id": ObjectId(user_id)}
-        total = await self.collection.count_documents(query)
-        cursor = (
-            self.collection.find(query)
-            .sort("created_at", -1)
-            .skip((page - 1) * page_size)
-            .limit(page_size)
-        )
-        items = await cursor.to_list(length=page_size)
-        return items, total
+        if not user_id:
+            return [], 0
+
+        async with self.session_factory() as session:
+            count_stmt = (
+                select(func.count())
+                .select_from(JobApplication)
+                .where(JobApplication.user_id == str(user_id))
+            )
+            count_res = await session.execute(count_stmt)
+            total = count_res.scalar() or 0
+
+            stmt = (
+                select(JobApplication)
+                .where(JobApplication.user_id == str(user_id))
+                .order_by(JobApplication.created_at.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+            res = await session.execute(stmt)
+            items = [_app_to_dict(r) for r in res.scalars().all()]
+            return items, total
 
     async def save_generated_draft(
         self,
@@ -79,44 +120,58 @@ class ApplicationRepository:
         generated_draft: dict,
         needs_manual_review: bool,
     ) -> Optional[dict]:
-        """Called once by the service after the LangGraph run completes."""
-        update = {
+        now = datetime.now(timezone.utc)
+        vals = {
             "jd_analysis": jd_analysis,
             "ats_result_ref": ats_result_ref,
             "generated_draft": generated_draft,
             "needs_manual_review": needs_manual_review,
             "status": ApplicationStatus.READY_FOR_REVIEW.value,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": now,
         }
-        if not ObjectId.is_valid(application_id):
-            return None
-        result = await self.collection.update_one(
-            {"_id": ObjectId(application_id), "user_id": ObjectId(user_id)},
-            {"$set": update},
-        )
-        matched_count = getattr(result, "matched_count", None)
-        if isinstance(matched_count, int) and matched_count != 1:
-            return None
-        return await self.collection.find_one(
-            {"_id": ObjectId(application_id), "user_id": ObjectId(user_id)}
-        )
+
+        async with self.session_factory() as session:
+            stmt = (
+                update(JobApplication)
+                .where(
+                    JobApplication.id == str(application_id),
+                    JobApplication.user_id == str(user_id),
+                )
+                .values(**vals)
+                .returning(JobApplication)
+            )
+            res = await session.execute(stmt)
+            await session.commit()
+            row = res.scalar_one_or_none()
+            return _app_to_dict(row)
 
     async def save_edited_draft(self, application_id: str, user_id: str, edits: dict) -> Optional[dict]:
-        if not ObjectId.is_valid(application_id):
+        if not application_id:
             return None
+
         edits = {k: v for k, v in edits.items() if v is not None}
+        now = datetime.now(timezone.utc)
+
         if not edits:
             return await self.get_by_id(application_id, user_id)
 
-        update = {
-            "edited_draft": {**edits, "edited_at": datetime.now(timezone.utc)},
-            "updated_at": datetime.now(timezone.utc),
-        }
-        await self.collection.update_one(
-            {"_id": ObjectId(application_id), "user_id": ObjectId(user_id)},
-            {"$set": update},
-        )
-        return await self.get_by_id(application_id, user_id)
+        async with self.session_factory() as session:
+            stmt = (
+                update(JobApplication)
+                .where(
+                    JobApplication.id == str(application_id),
+                    JobApplication.user_id == str(user_id),
+                )
+                .values(
+                    edited_draft={**edits, "edited_at": now.isoformat()},
+                    updated_at=now,
+                )
+                .returning(JobApplication)
+            )
+            res = await session.execute(stmt)
+            await session.commit()
+            row = res.scalar_one_or_none()
+            return _app_to_dict(row)
 
     async def update_status(
         self,
@@ -125,24 +180,63 @@ class ApplicationRepository:
         target_status: str,
         **extra_fields,
     ) -> bool:
-        """
-        Enforces the status state machine from application_model.py.
-        Returns False (writes nothing) if the transition is invalid - the
-        service layer should turn that into a 409, never proceed anyway.
-        """
-        if not ObjectId.is_valid(application_id) or not is_valid_transition(current_status, target_status):
+        if not is_valid_transition(current_status, target_status):
             return False
 
-        update = {"status": target_status, "updated_at": datetime.now(timezone.utc), **extra_fields}
-        result = await self.collection.update_one(
-            {"_id": ObjectId(application_id), "status": current_status},
-            {"$set": update},
-        )
-        return result.modified_count == 1
+        now = datetime.now(timezone.utc)
+        vals = {"status": target_status, "updated_at": now, **extra_fields}
+        async with self.session_factory() as session:
+            stmt = (
+                update(JobApplication)
+                .where(
+                    JobApplication.id == str(application_id),
+                    JobApplication.status == current_status,
+                )
+                .values(**vals)
+            )
+            res = await session.execute(stmt)
+            await session.commit()
+            return res.rowcount == 1
+
+    async def update_stage(self, application_id: str, stage: str) -> bool:
+        if not application_id:
+            return False
+        now = datetime.now(timezone.utc)
+        async with self.session_factory() as session:
+            async with session.begin():
+                stmt = (
+                    update(JobApplication)
+                    .where(JobApplication.id == str(application_id))
+                    .values(stage=stage, updated_at=now)
+                )
+                res = await session.execute(stmt)
+                return bool(res.rowcount and res.rowcount > 0)
+
+    async def find_by_id(self, application_id: str) -> Optional[dict]:
+        return await self.get_by_id_only(application_id)
+
+    async def update_fields(self, application_id: str, fields: dict) -> Optional[dict]:
+        if not application_id:
+            return None
+        now = datetime.now(timezone.utc)
+        valid_cols = {col.name for col in JobApplication.__table__.columns}
+        vals = {k: v for k, v in fields.items() if k in valid_cols and k != 'id'}
+        vals['updated_at'] = now
+        async with self.session_factory() as session:
+            async with session.begin():
+                stmt = update(JobApplication).where(JobApplication.id == str(application_id)).values(**vals).returning(JobApplication)
+                res = await session.execute(stmt)
+                return _app_to_dict(res.scalar_one_or_none())
 
     async def delete(self, application_id: str, user_id: str) -> bool:
-        result = await self.collection.delete_one({
-            "_id": ObjectId(application_id),
-            "user_id": ObjectId(user_id),
-        })
-        return result.deleted_count == 1
+        if not application_id:
+            return False
+
+        async with self.session_factory() as session:
+            stmt = delete(JobApplication).where(
+                JobApplication.id == str(application_id),
+                JobApplication.user_id == str(user_id),
+            )
+            res = await session.execute(stmt)
+            await session.commit()
+            return res.rowcount == 1

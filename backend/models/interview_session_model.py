@@ -1,5 +1,5 @@
 """
-Interview Session Model — MongoDB schema for full live interview sessions
+Interview Session Model — Database schema for full live interview sessions
 """
 from datetime import datetime, timezone
 from typing import List, Optional, Dict

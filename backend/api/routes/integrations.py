@@ -1,3 +1,5 @@
+from repositories.job_repo import JobRepository
+from models.job import JobModel
 """Enterprise ATS Ecosystem Integrations & Syndication API Routes.
 CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
@@ -6,7 +8,6 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from api.deps import get_database
 from models.job import JobModel
 from services.integrations.adapters import GreenhouseAdapter, LeverAdapter, WorkdayAdapter
 from services.integrations.syndication import generate_indeed_xml_feed, generate_google_job_posting_ld_json
@@ -55,14 +56,15 @@ async def sync_workday_jobs_route():
     return await adapter.sync_jobs()
 
 
+from api.deps import get_job_repo
+
+
 @router.get("/syndication/indeed.xml", response_class=Response)
 async def get_indeed_feed_route(
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
 ):
     """Generates an Indeed-compliant XML feed of active jobs."""
-    cursor = db.jobs.find({"status": "open"})
-    docs = await cursor.to_list(length=100)
-    jobs = [JobModel(**d) for d in docs]
+    jobs = await job_repo.list_jobs(status="open", limit=100)
     xml_content = generate_indeed_xml_feed(jobs)
     return Response(content=xml_content, media_type="application/xml")
 
@@ -70,11 +72,10 @@ async def get_indeed_feed_route(
 @router.get("/syndication/google-jobs/{job_id}", response_model=Dict[str, Any])
 async def get_google_jobs_schema_route(
     job_id: str,
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
 ):
     """Generates Google for Jobs schema.org/JobPosting JSON-LD structured data."""
-    doc = await db.jobs.find_one({"id": job_id}) or await db.jobs.find_one({"_id": job_id})
-    if not doc:
+    job = await job_repo.get_by_id(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = JobModel(**doc)
     return generate_google_job_posting_ld_json(job)

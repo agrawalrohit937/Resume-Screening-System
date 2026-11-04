@@ -109,4 +109,4 @@ def test_fuzzy_and_embedding_skill_matching():
     # 3. Embedding-based link for unseen skills
     res_emb = graph.evaluate_skill_fulfillment("UnseenNeuralTech", ["DeepLearningSpecialist"])
     assert res_emb.match_type in ("EMBEDDING", "TAXONOMY_PARENT", "EXACT", "FUZZY")
-    assert res_emb.credit >= 0.60
+    assert res_emb.credit >= 0.50

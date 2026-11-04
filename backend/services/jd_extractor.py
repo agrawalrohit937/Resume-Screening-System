@@ -1,13 +1,16 @@
+from __future__ import annotations
+from config.db import get_pg_session_factory
+from sqlalchemy import update
+from models.tables import Job
 """
 External Job Description Extraction and Embedding Service.
 
 Enables ATS scoring for external job postings by:
 1. Scraping and extracting clean job description text from external URLs using BeautifulSoup / trafilatura.
-2. Persisting the extracted JD text to MongoDB (jd_text_raw & jd_text).
+2. Persisting the extracted JD text to database (jd_text_raw & jd_text).
 3. Computing dense 768-dim embeddings via local BAAI/bge-base-en-v1.5 and storing them.
 """
 
-from __future__ import annotations
 
 import re
 from typing import Any, Dict, Optional
@@ -131,7 +134,7 @@ async def ensure_external_job_jd(job_doc: Dict[str, Any], db: Any = None) -> str
     """
     Ensures that an external job document has full JD text and dense embeddings.
     If jd_text_raw is missing or sparse, automatically scrapes the external URL,
-    persists the text and vector embedding to MongoDB, and updates job_doc in-place.
+    persists the text and vector embedding to database, and updates job_doc in-place.
     """
     jd_raw = (job_doc.get("jd_text_raw") or job_doc.get("jd_text") or "").strip()
 
@@ -167,30 +170,28 @@ async def ensure_external_job_jd(job_doc: Dict[str, Any], db: Any = None) -> str
     job_doc["jd_text_raw"] = extracted_jd
     job_doc["jd_text"] = extracted_jd
 
-    # Update MongoDB and compute embedding
-    if db is not None:
-        raw_db = getattr(db, "raw_db", getattr(db, "_raw_db", db))
-        job_id = job_doc.get("_id")
-        if job_id:
-            try:
-                from bson import ObjectId
-                doc_id = ObjectId(str(job_id)) if ObjectId.is_valid(str(job_id)) else str(job_id)
-                op = raw_db.jobs.update_one(
-                    {"_id": doc_id},
-                    {"$set": {"jd_text_raw": extracted_jd, "jd_text": extracted_jd}},
+    # Update database and compute embedding
+    job_id = job_doc.get("id") or job_doc.get("_id")
+    if job_id:
+        try:
+            from config.db import get_pg_session_factory
+            from sqlalchemy import update
+            from models.tables import Job
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(Job).where(Job.id == str(job_id)).values(jd_text_raw=extracted_jd)
                 )
-                if hasattr(op, "__await__"):
-                    await op
-            except Exception as update_err:
-                logger.warning("Failed to persist scraped JD text to MongoDB", error=str(update_err))
+                await session.commit()
+        except Exception as update_err:
+            logger.warning("Failed to persist scraped JD text to database", error=str(update_err))
 
-        await _generate_and_save_job_embedding(job_doc, extracted_jd, db)
+    await _generate_and_save_job_embedding(job_doc, extracted_jd, db)
 
     return extracted_jd
 
 
 async def _generate_and_save_job_embedding(job_doc: Dict[str, Any], jd_text: str, db: Any = None) -> None:
-    """Generates 768-dim normalized embedding for the JD and saves it to MongoDB."""
+    """Generates 768-dim normalized embedding for the JD and saves it to database."""
     try:
         title = job_doc.get("title", "")
         req_skills = ", ".join(job_doc.get("required_skills") or [])
@@ -202,17 +203,15 @@ async def _generate_and_save_job_embedding(job_doc: Dict[str, Any], jd_text: str
             job_doc["jd_embedding_bge"] = emb
             job_doc["jd_embedding"] = emb
 
-            if db is not None:
-                raw_db = getattr(db, "raw_db", getattr(db, "_raw_db", db))
-                job_id = job_doc.get("_id")
-                if job_id:
-                    from bson import ObjectId
-                    doc_id = ObjectId(str(job_id)) if ObjectId.is_valid(str(job_id)) else str(job_id)
-                    op = raw_db.jobs.update_one(
-                        {"_id": doc_id},
-                        {"$set": {"jd_embedding_bge": emb, "jd_embedding": emb}},
+            job_id = job_doc.get("id") or job_doc.get("_id")
+            if job_id:
+                from config.db import get_pg_session_factory
+                from sqlalchemy import update
+                from models.tables import Job
+                async with get_pg_session_factory()() as session:
+                    await session.execute(
+                        update(Job).where(Job.id == str(job_id)).values(jd_embedding=emb)
                     )
-                    if hasattr(op, "__await__"):
-                        await op
+                    await session.commit()
     except Exception as emb_err:
         logger.warning("Failed to generate JD embedding", error=str(emb_err))

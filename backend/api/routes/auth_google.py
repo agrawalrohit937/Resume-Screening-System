@@ -31,6 +31,8 @@ async def google_auth(
     """
     google_token = payload.get("token")
     selected_role = payload.get("role", "candidate")
+    if str(selected_role).lower() in ("admin", "platform_admin"):
+        selected_role = "candidate"
 
     if not google_token:
         raise HTTPException(status_code=400, detail="Google token is missing")

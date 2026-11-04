@@ -61,7 +61,7 @@ async def test_parse_jd_with_groq_structure(monkeypatch):
 
     monkeypatch.setattr(groq_key_pool, "execute_async_with_fallback", mock_execute)
 
-    result = await parse_jd_with_groq("Sample JD text with company profile and requirements")
+    result = await parse_jd_with_groq("Sample JD text with Python, SQL, and Data Structures & Algorithms requirements")
     assert result["role"] == "Software Development Engineer"
     assert result["candidate_min_experience_years"] == 0
     assert result["is_fresher_eligible"] is True

@@ -31,6 +31,8 @@ async def linkedin_auth(
     """
     code = payload.get("code")
     selected_role = payload.get("state") or payload.get("role") or "candidate"
+    if str(selected_role).lower() in ("admin", "platform_admin"):
+        selected_role = "candidate"
     redirect_uri = payload.get("redirect_uri") or settings.LINKEDIN_REDIRECT_URI
 
     if not code:

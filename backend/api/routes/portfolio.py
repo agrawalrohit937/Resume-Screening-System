@@ -1,3 +1,6 @@
+from config.db import get_pg_session_factory
+from sqlalchemy import select
+from models.tables import User, Resume
 """
 Portfolio API Routes — Resume auto-parsing, AI enhancer, portfolio CRUD, analytics, and contact relay
 """
@@ -8,13 +11,15 @@ import html
 import re
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, Request, Query, status
-from pymongo.asynchronous.database import AsyncDatabase
+AsyncDatabase = Optional[object]
 from pydantic import BaseModel
 import structlog
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from api.deps import get_db, security, get_current_user, require_plan
+from api.deps import get_db, security, get_current_user, require_plan, get_portfolio_repo, get_user_repo
+from repositories.portfolio_repo import PortfolioRepository
+from repositories.user_repo import UserRepository
 from core.config import settings
 from core.security import decode_token
 from core.llm_client import groq_key_pool
@@ -129,11 +134,13 @@ async def parse_resume_for_portfolio(
 async def upload_portfolio_photo(
     file: UploadFile = File(...),
     current_user=Depends(get_current_user),
+    user_repo: UserRepository = Depends(get_user_repo),
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
     db: AsyncDatabase = Depends(get_db)
 ):
     """
     Accepts multipart image upload, streams bytes directly to Cloudinary,
-    and stores the HTTPS secure_url in MongoDB user_profiles and users collections.
+    and stores the HTTPS secure_url in user_profiles and users collections.
     """
     ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
     MAX_SIZE = 5 * 1024 * 1024  # 5MB
@@ -166,24 +173,15 @@ async def upload_portfolio_photo(
             detail=f"Cloudinary upload failed: {str(upload_err)}"
         )
 
-    # Synchronize with main user account and user_profiles collection
+    # Synchronize with main user account and user_profiles via pure repository
     if user_id:
-        from bson import ObjectId
-        query = {"_id": ObjectId(user_id)} if ObjectId.is_valid(user_id) else {"_id": user_id}
-        await db.users.update_one(
-            query,
-            {"$set": {
-                "profile_picture": secure_url,
-                "profile_picture_public_id": public_id,
-                "avatar_url": secure_url,
-                "profile_photo_url": secure_url
-            }}
-        )
-        await db.user_profiles.update_one(
-            {"user_id": str(user_id)},
-            {"$set": {"avatar_url": secure_url}},
-            upsert=True
-        )
+        user_updates = {
+            "profile_picture": secure_url,
+            "profile_picture_public_id": public_id,
+            "avatar_url": secure_url,
+        }
+        await user_repo.update(user_id, user_updates)
+        await portfolio_repo.upsert_profile(user_id, {"avatar_url": secure_url})
 
     return {
         "status": "success",
@@ -271,6 +269,8 @@ async def enhance_portfolio_content(req: EnhanceRequest):
 async def check_slug_availability(
     slug: str = Query(..., description="The slug or username to check"),
     user_id: Optional[str] = Depends(get_optional_user),
+    user_repo: UserRepository = Depends(get_user_repo),
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
     db: AsyncDatabase = Depends(get_db)
 ):
     clean_slug = slug.strip().lower().replace(" ", "-")
@@ -293,12 +293,7 @@ async def check_slug_availability(
         }
 
     # Query user_profiles
-    existing_profile = await db.user_profiles.find_one({
-        "$or": [
-            {"username": clean_slug},
-            {"username": {"$regex": f"^{re.escape(clean_slug)}$", "$options": "i"}}
-        ]
-    })
+    existing_profile = await portfolio_repo.get_by_username(clean_slug)
 
     if existing_profile:
         profile_uid = str(existing_profile.get("user_id", ""))
@@ -315,12 +310,7 @@ async def check_slug_availability(
         }
 
     # Query users collection
-    existing_user = await db.users.find_one({
-        "$or": [
-            {"username": clean_slug},
-            {"username": {"$regex": f"^{re.escape(clean_slug)}$", "$options": "i"}}
-        ]
-    })
+    existing_user = await user_repo.get_by_portfolio_slug(clean_slug)
 
     if existing_user:
         user_uid = str(existing_user.get("_id", ""))
@@ -362,12 +352,7 @@ async def save_portfolio(
     uid = _authenticated_user_id(current_user)
 
     # Check if this slug is claimed by a DIFFERENT user
-    existing_by_slug = await db.user_profiles.find_one({
-        "$or": [
-            {"username": clean_username},
-            {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}}
-        ]
-    })
+    existing_by_slug = await portfolio_repo.get_by_username(clean_username)
     if existing_by_slug:
         owner_uid = str(existing_by_slug.get("user_id", ""))
         if uid and owner_uid and owner_uid != uid:
@@ -389,34 +374,19 @@ async def save_portfolio(
     # Preserve and sanitize dynamic domain-agnostic skills dictionary
     profile_dict["skills"] = sanitize_portfolio_skills(profile.skills)
 
-    # Upsert by user_id if available, otherwise by username
-    if uid:
-        await db.user_profiles.update_one(
-            {"user_id": uid},
-            {"$set": profile_dict},
-            upsert=True
-        )
-    else:
-        await db.user_profiles.update_one(
-            {"username": clean_username},
-            {"$set": profile_dict},
-            upsert=True
-        )
+    # Upsert by user_id if available, otherwise by username via portfolio_repo
+    await portfolio_repo.upsert_profile(uid or clean_username, profile_dict)
 
     # Sync portfolio link, photo, headline, and social links to main user account
     if uid:
-        from bson import ObjectId
-        query = {"_id": ObjectId(uid)} if ObjectId.is_valid(str(uid)) else {"_id": str(uid)}
         user_updates = {
             "portfolio_slug": clean_username,
             "portfolio_url": f"/portfolio/{clean_username}",
             "is_portfolio_published": True,
-            "updated_at": datetime.utcnow()
         }
         if profile.avatar_url:
             user_updates["profile_picture"] = profile.avatar_url
             user_updates["avatar_url"] = profile.avatar_url
-            user_updates["profile_photo_url"] = profile.avatar_url
         if profile.headline:
             user_updates["headline"] = profile.headline
         if profile.bio:
@@ -429,21 +399,10 @@ async def save_portfolio(
             if profile.social_links.get("linkedin"):
                 user_updates["linkedin_url"] = profile.social_links["linkedin"]
 
-        await db.users.update_one(query, {"$set": user_updates})
+        await user_repo.update(uid, user_updates)
 
-    # Initialize analytics document if missing
-    await db.portfolio_analytics.update_one(
-        {"username": clean_username},
-        {"$setOnInsert": {
-            "username": clean_username,
-            "total_views": 0,
-            "resume_downloads": 0,
-            "contact_clicks": 0,
-            "messages_received": 0,
-            "last_visited": datetime.utcnow()
-        }},
-        upsert=True
-    )
+    # Initialize analytics document via portfolio_repo
+    await portfolio_repo.record_view(clean_username)
 
     return {
         "status": "success",
@@ -456,18 +415,14 @@ async def save_portfolio(
 @router.post("/unpublish", summary="Make the current user's portfolio private")
 async def unpublish_portfolio(
     current_user=Depends(get_current_user),
+    user_repo: UserRepository = Depends(get_user_repo),
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
     db: AsyncDatabase = Depends(get_db),
 ):
     uid = _authenticated_user_id(current_user)
-    result = await db.user_profiles.update_one(
-        {"user_id": uid},
-        {"$set": {"is_published": False, "updated_at": datetime.utcnow()}},
-    )
-    await db.users.update_one(
-        {"_id": uid},
-        {"$set": {"is_portfolio_published": False, "updated_at": datetime.utcnow()}},
-    )
-    if result.matched_count == 0:
+    updated = await portfolio_repo.upsert_profile(uid, {"is_published": False})
+    await user_repo.update(uid, {"is_portfolio_published": False})
+    if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portfolio not found.")
     return {"status": "success", "message": "Portfolio unpublished."}
 
@@ -482,29 +437,22 @@ async def get_my_portfolio(
     if not user_id:
         return {"status": "empty", "data": None}
     
-    from bson import ObjectId
     user_doc = None
-    if ObjectId.is_valid(user_id):
-        user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
-    if not user_doc:
-        user_doc = await db.users.find_one({"_id": user_id})
+    resume_doc = None
+    async with get_pg_session_factory()() as session:
+        u_res = await session.execute(select(User).where(User.id == str(user_id)))
+        u_row = u_res.scalar_one_or_none()
+        if u_row:
+            user_doc = {c.name: getattr(u_row, c.name) for c in User.__table__.columns}
+            user_doc["_id"] = u_row.id
 
-    # Robust multi-field resume query
-    query_filters = [
-        {"user_id": str(user_id)},
-        {"user_id": user_id}
-    ]
-    if user_doc:
-        if user_doc.get("email"):
-            query_filters.append({"user_id": user_doc.get("email")})
-            query_filters.append({"email": user_doc.get("email")})
-        if user_doc.get("_id"):
-            query_filters.append({"user_id": str(user_doc.get("_id"))})
-
-    resume_doc = await db.resumes.find_one(
-        {"$or": query_filters},
-        sort=[("created_at", -1)]
-    )
+        r_res = await session.execute(
+            select(Resume).where(Resume.user_id == str(user_id)).order_by(Resume.created_at.desc()).limit(1)
+        )
+        r_row = r_res.scalar_one_or_none()
+        if r_row:
+            resume_doc = {c.name: getattr(r_row, c.name) for c in Resume.__table__.columns}
+            resume_doc["_id"] = r_row.id
 
     # Auto-resolve resume file download URL from database
     stored_resume_url = ""
@@ -513,9 +461,7 @@ async def get_my_portfolio(
     if not stored_resume_url and resume_doc:
         stored_resume_url = resume_doc.get("file_url") or ""
 
-    doc = await db.user_profiles.find_one({"user_id": str(user_id)})
-    if not doc:
-        doc = await db.user_profiles.find_one({"user_id": user_id})
+    doc = await portfolio_repo.get_by_user_id(str(user_id))
 
     # Only filter TRUE static placeholder dummies from early development, NEVER candidate projects
     LEGACY_DUMMIES = [
@@ -827,47 +773,28 @@ async def get_my_portfolio(
 
     auto_data["is_published"] = bool(doc.get("is_published", False)) if doc else False
 
-    # Automatically save clean profile in MongoDB
+    # Automatically save clean profile in database
     if not doc or has_corrupt_projects or sync_from_resume:
-        await db.user_profiles.update_one(
-            {"user_id": str(user_id)},
-            {"$set": auto_data},
-            upsert=True
-        )
+        await portfolio_repo.upsert_profile(str(user_id), auto_data)
 
     return {"status": "success", "data": auto_data}
 
 
 # ─── 5. Public Portfolio View ─────────────────────────────────────────────────
 @router.get("/public/{username}", summary="Public portfolio viewer data")
-async def get_public_portfolio(username: str, db: AsyncDatabase = Depends(get_db)):
+async def get_public_portfolio(username: str, portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo), user_repo: UserRepository = Depends(get_user_repo), db: AsyncDatabase = Depends(get_db)):
     clean_username = username.strip().lower()
     norm_query = re.sub(r'[\s\-_]', '', clean_username)
     
     # Only explicitly published profiles are public.
-    doc = await db.user_profiles.find_one({
-        "$or": [
-            {"username": clean_username, "is_published": True},
-            {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}, "is_published": True},
-            {"username": clean_username.replace("-", "_"), "is_published": True},
-            {"username": clean_username.replace("_", "-"), "is_published": True},
-            {"username": norm_query, "is_published": True},
-        ]
-    })
+    doc = await portfolio_repo.get_by_username(clean_username, published_only=True)
 
     # Resolve a saved published profile through the user's indexed slug.
     if not doc:
-        matched_user_doc = await db.users.find_one({
-            "$or": [
-                {"portfolio_slug": clean_username, "is_portfolio_published": True},
-                {"portfolio_slug": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}, "is_portfolio_published": True},
-                {"username": clean_username, "is_portfolio_published": True},
-                {"username": {"$regex": f"^{re.escape(clean_username)}$", "$options": "i"}, "is_portfolio_published": True},
-            ]
-        })
+        matched_user_doc = await user_repo.get_by_portfolio_slug(clean_username)
         if matched_user_doc:
-            uid = str(matched_user_doc["_id"])
-            doc = await db.user_profiles.find_one({"user_id": uid, "is_published": True})
+            uid = str(matched_user_doc.id)
+            doc = await portfolio_repo.get_by_user_id(uid)
 
     if not doc:
         raise HTTPException(
@@ -891,6 +818,7 @@ async def track_portfolio_event(
     request: Request,
     username: str,
     event_type: str,
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
     db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
@@ -903,31 +831,14 @@ async def track_portfolio_event(
     if not field_name:
         raise HTTPException(status_code=400, detail="Invalid event type")
 
-    await db.portfolio_analytics.update_one(
-        {"username": clean_username},
-        {
-            "$inc": {field_name: 1},
-            "$set": {"last_visited": datetime.utcnow()}
-        },
-        upsert=True
-    )
+    await portfolio_repo.increment_counter(clean_username, field_name)
     return {"status": "tracked", "event": event_type}
 
 
 @router.get("/analytics/{username}", summary="Get portfolio metrics")
-async def get_portfolio_analytics(username: str, db: AsyncDatabase = Depends(get_db)):
+async def get_portfolio_analytics(username: str, portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo), db: AsyncDatabase = Depends(get_db)):
     clean_username = username.strip().lower()
-    stats = await db.portfolio_analytics.find_one({"username": clean_username})
-    if not stats:
-        return {
-            "username": clean_username,
-            "total_views": 0,
-            "resume_downloads": 0,
-            "contact_clicks": 0,
-            "messages_received": 0
-        }
-    stats["_id"] = str(stats["_id"])
-    return stats
+    return await portfolio_repo.get_analytics(clean_username)
 
 
 # ─── 7. Dynamic Contact Form Email Forwarder ──────────────────────────────────
@@ -936,10 +847,11 @@ async def send_contact_message(
     username: str,
     msg: ContactMessageSchema,
     bg_tasks: BackgroundTasks,
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
     db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
-    profile = await db.user_profiles.find_one({"username": clean_username, "is_published": True})
+    profile = await portfolio_repo.get_by_username(clean_username, published_only=True)
     if not profile or "email" not in profile:
         raise HTTPException(status_code=404, detail="Candidate not found.")
 
@@ -951,11 +863,8 @@ async def send_contact_message(
     safe_message = html.escape(msg.message)
     safe_company = html.escape(msg.company) if msg.company else ""
 
-    # Increment messages received in analytics
-    await db.portfolio_analytics.update_one(
-        {"username": clean_username},
-        {"$inc": {"messages_received": 1}}
-    )
+    # Increment contact clicks / messages in analytics
+    await portfolio_repo.increment_counter(clean_username, "contact_clicks")
 
     # Dispatch email in background task
     async def _send_mail():

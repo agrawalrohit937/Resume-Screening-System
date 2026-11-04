@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
-from api.deps import get_database, get_current_user
+from api.deps import get_current_user
 from models.user_model import UserModel
 from services.integrations.webhooks import WebhookService, WebhookSubscription, WebhookDeliveryResult
 
@@ -28,10 +28,9 @@ class DispatchTestPayload(BaseModel):
 async def register_webhook_subscription_route(
     payload: RegisterSubscriptionPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Registers an enterprise outbound webhook endpoint with HMAC secret key."""
-    service = WebhookService(db)
+    service = WebhookService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     return await service.register_subscription(
         target_url=payload.target_url,
@@ -44,23 +43,36 @@ async def register_webhook_subscription_route(
 @router.get("/subscriptions", response_model=List[WebhookSubscription])
 async def list_webhook_subscriptions_route(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Lists registered outbound webhook subscriptions for the active tenant."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    cursor = db.webhook_subscriptions.find({"tenant_id": tenant_id})
-    docs = await cursor.to_list(length=50)
-    return [WebhookSubscription(**d) for d in docs]
+    from config.db import get_pg_session_factory
+    from sqlalchemy import select
+    from models.tables import WebhookSubscription as WebhookTable
+    async with get_pg_session_factory()() as session:
+        stmt = select(WebhookTable).where(WebhookTable.tenant_id == tenant_id).limit(50)
+        rows = (await session.execute(stmt)).scalars().all()
+        return [
+            WebhookSubscription(
+                id=r.id,
+                tenant_id=r.tenant_id,
+                target_url=getattr(r, "url", getattr(r, "target_url", "")),
+                events=r.events or [],
+                secret_key=getattr(r, "secret", getattr(r, "secret_key", "")),
+                is_active=getattr(r, "status", "active") == "active",
+                created_at=r.created_at,
+            )
+            for r in rows
+        ]
 
 
 @router.post("/dispatch-test", response_model=List[WebhookDeliveryResult])
 async def dispatch_test_webhook_route(
     payload: DispatchTestPayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """Dispatches a test webhook event signed with HMAC-SHA256."""
-    service = WebhookService(db)
+    service = WebhookService()
     tenant_id = getattr(current_user, "tenant_id", "default")
     return await service.dispatch_event(
         event_type=payload.event_type,

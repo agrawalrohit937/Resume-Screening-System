@@ -1,13 +1,18 @@
-"""Talent CRM Fundamentals - Silver Medalists & Candidate Re-engagement.
+from __future__ import annotations
+
+"""Talent CRM Fundamentals - Silver Medalists & Candidate Re-engagement (Pure PostgreSQL).
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timezone
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 import uuid
 import structlog
+from sqlalchemy import select, and_
 
+from config.db import get_pg_session_factory
+from models.tables import CandidateApplication
 from services.multi_tenancy.tenant_context import get_current_tenant_id
 
 logger = structlog.get_logger(__name__)
@@ -28,7 +33,7 @@ class SilverMedalistCandidate(BaseModel):
     tags: List[str] = Field(default_factory=lambda: ["silver_medalist"])
     status: str = "available"  # available, re_engaged, hired, opted_out
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_contacted_at: Optional[datetime] = None
 
 
@@ -41,14 +46,18 @@ class ReEngagementAlert(BaseModel):
     target_job_id: str
     target_job_title: str
     match_score: float
-    overlapping_skills: List[str] = Field(default_factory=list)
+    overlapping_skills: List[str]
     recommended_action: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class TalentCRMService:
-    def __init__(self, db):
+    def __init__(self, db: Any = None, session_factory: Any = None):
         self.db = db
+        self.session_factory = session_factory or get_pg_session_factory()
+
+    def _get_session(self):
+        return self.session_factory()
 
     async def register_silver_medalist(
         self,
@@ -65,40 +74,47 @@ class TalentCRMService:
         tenant_id: Optional[str] = None
     ) -> SilverMedalistCandidate:
         resolved_tenant = tenant_id or get_current_tenant_id()
-        
-        # Check if already exists in CRM
-        existing = await self.db.talent_crm.find_one({
+        cand_dict = {
+            "tenant_id": resolved_tenant,
             "candidate_id": candidate_id,
-            "tenant_id": resolved_tenant
-        })
-        if existing:
-            await self.db.talent_crm.update_one(
-                {"id": existing["id"], "tenant_id": resolved_tenant},
-                {"$addToSet": {"tags": "silver_medalist"}, "$set": {"ats_score": ats_score, "skills": skills}}
-            )
-            existing["tags"] = list(set(existing.get("tags", []) + ["silver_medalist"]))
-            return SilverMedalistCandidate(**existing)
+            "candidate_name": candidate_name,
+            "candidate_email": candidate_email,
+            "original_application_id": original_application_id,
+            "original_job_id": original_job_id,
+            "original_job_title": original_job_title,
+            "final_stage_reached": final_stage_reached,
+            "ats_score": ats_score,
+            "skills": skills,
+            "notes": notes,
+            "tags": ["silver_medalist"],
+            "status": "available",
+        }
+        candidate = SilverMedalistCandidate(**cand_dict)
 
-        candidate = SilverMedalistCandidate(
-            tenant_id=resolved_tenant,
-            candidate_id=candidate_id,
-            candidate_name=candidate_name,
-            candidate_email=candidate_email,
-            original_application_id=original_application_id,
-            original_job_id=original_job_id,
-            original_job_title=original_job_title,
-            final_stage_reached=final_stage_reached,
-            ats_score=ats_score,
-            skills=[s.strip() for s in skills if s.strip()],
-            notes=notes
-        )
-        await self.db.talent_crm.insert_one(candidate.dict())
-        logger.info(
-            "Candidate tagged as Silver Medalist in CRM",
-            candidate_id=candidate_id,
-            job_title=original_job_title,
-            tenant_id=resolved_tenant
-        )
+        async with self._get_session() as session:
+            stmt = select(CandidateApplication).where(
+                and_(CandidateApplication.candidate_id == str(candidate_id), CandidateApplication.tenant_id == str(resolved_tenant))
+            )
+            res = await session.execute(stmt)
+            existing = res.scalar_one_or_none() if hasattr(res, "scalar_one_or_none") else None
+            if existing:
+                existing.stage = "silver_medalist"
+                existing.details = cand_dict
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                session.add(CandidateApplication(
+                    id=f"app_{uuid.uuid4().hex[:12]}",
+                    job_id=str(original_job_id),
+                    candidate_id=str(candidate_id),
+                    tenant_id=str(resolved_tenant),
+                    candidate_name=candidate_name,
+                    candidate_email=candidate_email,
+                    stage="silver_medalist",
+                    match_score=float(ats_score),
+                    notes=notes,
+                    details=cand_dict,
+                ))
+            await session.commit()
         return candidate
 
     async def find_reengagement_matches(
@@ -110,13 +126,17 @@ class TalentCRMService:
         tenant_id: Optional[str] = None
     ) -> List[ReEngagementAlert]:
         resolved_tenant = tenant_id or get_current_tenant_id()
-        cursor = self.db.talent_crm.find({
-            "tenant_id": resolved_tenant,
-            "tags": "silver_medalist",
-            "status": "available"
-        })
-        candidates_data = await cursor.to_list(length=100)
-        
+        async with self._get_session() as session:
+            stmt = select(CandidateApplication).where(
+                and_(
+                    CandidateApplication.tenant_id == str(resolved_tenant),
+                    CandidateApplication.stage == "silver_medalist"
+                )
+            )
+            res = await session.execute(stmt)
+            rows = res.scalars().all() if hasattr(res, "scalars") else []
+            candidates_data = [r.details for r in rows if getattr(r, "details", None)]
+
         alerts: List[ReEngagementAlert] = []
         target_skills_set = {s.lower().strip() for s in required_skills}
 

@@ -9,7 +9,6 @@ import structlog
 from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from config.db import get_database as _get_raw_database
 from core.config import settings
 from core.security import decode_token, verify_token_type
 from models.user_model import UserModel, UserRole
@@ -18,6 +17,14 @@ from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
 from repositories.otp_repo import OTPRepository
 from repositories.copilot_repo import CopilotRepository
+from repositories.job_repo import JobRepository
+from repositories.application_repo import ApplicationRepository
+from repositories.company_repo import CompanyRepository
+from repositories.portfolio_repo import PortfolioRepository
+from repositories.gamification_repo import GamificationRepository
+from repositories.interview_kit_repo import InterviewKitRepository
+from repositories.team_invite_repo import TeamInviteRepository
+from repositories.audit_log_repo import AuditLogRepository
 from services.parser_service import ParserService
 from services.ai_interview_service import AIInterviewService
 from services.github_service import GitHubService
@@ -37,13 +44,11 @@ security = HTTPBearer(auto_error=False)
 
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-def get_database():
-    raw = _get_raw_database()
-    return TenantScopedDatabase(raw)
+from config.db import get_pg_db
 
-
-def get_db():
-    return get_database()
+async def get_db():
+    async for session in get_pg_db():
+        yield session
 
 
 def get_current_tenant() -> str:
@@ -51,24 +56,56 @@ def get_current_tenant() -> str:
 
 
 # ─── Repositories ─────────────────────────────────────────────────────────────
-def get_user_repo(db=Depends(get_db)) -> UserRepository:
-    return UserRepository(db)
+def get_user_repo() -> UserRepository:
+    return UserRepository()
 
 
-def get_resume_repo(db=Depends(get_db)) -> ResumeRepository:
-    return ResumeRepository(db)
+def get_resume_repo() -> ResumeRepository:
+    return ResumeRepository()
 
 
-def get_result_repo(db=Depends(get_db)) -> ResultRepository:
-    return ResultRepository(db)
+def get_result_repo() -> ResultRepository:
+    return ResultRepository()
 
 
-def get_otp_repo(db=Depends(get_db)) -> OTPRepository:
-    return OTPRepository(db)
+def get_otp_repo() -> OTPRepository:
+    return OTPRepository()
 
 
-def get_copilot_repo(db=Depends(get_db)) -> CopilotRepository:
-    return CopilotRepository(db)
+def get_copilot_repo() -> CopilotRepository:
+    return CopilotRepository()
+
+
+def get_job_repo() -> JobRepository:
+    return JobRepository()
+
+
+def get_app_repo() -> ApplicationRepository:
+    return ApplicationRepository()
+
+
+def get_company_repo() -> CompanyRepository:
+    return CompanyRepository()
+
+
+def get_portfolio_repo() -> PortfolioRepository:
+    return PortfolioRepository()
+
+
+def get_gamification_repo() -> GamificationRepository:
+    return GamificationRepository()
+
+
+def get_interview_kit_repo() -> InterviewKitRepository:
+    return InterviewKitRepository()
+
+
+def get_team_invite_repo() -> TeamInviteRepository:
+    return TeamInviteRepository()
+
+
+def get_audit_repo() -> AuditLogRepository:
+    return AuditLogRepository()
 
 
 # ─── Services ─────────────────────────────────────────────────────────────────
@@ -102,7 +139,7 @@ def get_otp_service(
 async def _check_and_apply_lazy_expiration(user: UserModel, user_repo: UserRepository) -> UserModel:
     """
     Lazy downgrade check: if a user's subscription has expired past its end date,
-    immediately downgrade their document in MongoDB and update the in-memory UserModel.
+    immediately downgrade their record in PostgreSQL and update the in-memory UserModel.
     """
     if user.subscription_active and user.subscription_end_date:
         end_date = user.subscription_end_date
@@ -204,28 +241,15 @@ async def get_current_user(
     # inherit the company's active subscription if the company executive upgraded the tenant!
     if user.tenant_id and user.tenant_id != "default" and not user.subscription_active:
         try:
-            raw_db = _get_raw_database()
-            company_doc = await raw_db.companies.find_one({"tenant_id": user.tenant_id})
-            if company_doc and company_doc.get("subscription_active"):
-                c_end = company_doc.get("subscription_end_date")
-                now = datetime.now(timezone.utc)
-                if isinstance(c_end, str):
-                    try:
-                        c_end = datetime.fromisoformat(c_end.replace("Z", "+00:00"))
-                    except Exception:
-                        c_end = None
-                if isinstance(c_end, datetime):
-                    if c_end.tzinfo is None:
-                        c_end = c_end.replace(tzinfo=timezone.utc)
-                    else:
-                        c_end = c_end.astimezone(timezone.utc)
-
-                if c_end and c_end > now:
-                    user.plan = company_doc.get("plan", "recruiter_pro")
+            from config.db import get_pg_session_factory
+            from sqlalchemy import select
+            from models.tables import Company
+            async with get_pg_session_factory()() as session:
+                company_row = (await session.execute(select(Company).where(Company.tenant_id == user.tenant_id))).scalar_one_or_none()
+                if company_row:
+                    user.plan = "recruiter_pro"
                     user.subscription_active = True
                     user.subscription_status = "active"
-                    user.subscription_start_date = company_doc.get("subscription_start_date")
-                    user.subscription_end_date = company_doc.get("subscription_end_date")
         except Exception:
             pass
 
@@ -290,26 +314,6 @@ async def get_optional_current_user(
 
 
 # ─── Role Guards ──────────────────────────────────────────────────────────────
-def require_role(*roles: UserRole):
-    async def _check(current_user: UserModel = Depends(get_current_user)) -> UserModel:
-        user_roles = {r.value if hasattr(r, "value") else str(r).lower() for r in (current_user.roles or [current_user.role])}
-        # PLATFORM_ADMIN root bypasses all role checks
-        if "platform_admin" in user_roles or "admin" in user_roles:
-            return current_user
-
-        # EXECUTIVE inherits full company tenant permissions
-        if "executive" in user_roles or "exec" in user_roles:
-            return current_user
-
-        required_values = {r.value if hasattr(r, "value") else str(r).lower() for r in roles}
-        if not user_roles.intersection(required_values):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required role(s): {[r.value if hasattr(r, 'value') else str(r) for r in roles]}",
-            )
-        return current_user
-    return _check
-
 
 def get_admin_user(current_user: UserModel = Depends(get_current_user)) -> UserModel:
     user_roles = {r.value if hasattr(r, "value") else str(r).lower() for r in (current_user.roles or [current_user.role])}

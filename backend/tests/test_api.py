@@ -9,8 +9,8 @@ from httpx import AsyncClient, ASGITransport
 
 # ─── Override settings BEFORE importing app ───────────────────────────────────
 import os
-os.environ["MONGO_URI"] = "mongodb://localhost:27017"
-os.environ["MONGO_DB_NAME"] = "ai_career_test"
+os.environ["DATABASE_URL"] = ""
+os.environ["APP_ENV"] = "test"
 os.environ["SECRET_KEY"] = "test-secret-key-do-not-use-in-production-12345"
 os.environ["DEBUG"] = "true"
 
@@ -44,11 +44,7 @@ Strong knowledge of REST APIs, async programming, and cloud infrastructure is re
 """
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# event_loop managed by pytest-asyncio
 
 
 @pytest.fixture

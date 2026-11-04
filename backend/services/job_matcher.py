@@ -1,10 +1,14 @@
+from __future__ import annotations
+from config.db import get_pg_session_factory
+from sqlalchemy import select, func, and_, or_, desc
+from models.tables import Job, Resume, CandidateApplication
 """
 Job Matcher Service — Skill & Role Recommendation Engine.
 
 Fast & Resilient Matching Pipeline:
 1. Stage 1 (Fast Role & Keyword Pre-Filter):
    - Extracts primary role, domain signals, and top technical skills from candidate resume.
-   - Performs a lightweight MongoDB query/regex pre-filter to narrow the open job pool
+   - Performs a lightweight database query/regex pre-filter to narrow the open job pool
      down to a relevant subset (~50-100 jobs), with graceful fallback to fresh jobs.
 2. Stage 2 (Skill Overlap & Role Bonus Match):
    - Computes deterministic skill overlap ratio and domain role relevance bonus.
@@ -13,14 +17,12 @@ Fast & Resilient Matching Pipeline:
    - Automatically recommends Top Trending & Fresh open marketplace jobs.
 """
 
-from __future__ import annotations
 
 import re
 import time
 from typing import Any, Dict, List, Set
 
 import structlog
-from bson import ObjectId
 
 from utils.pagination import stream_cursor
 
@@ -61,7 +63,7 @@ def _calibrate_match_score(similarity: float) -> float:
 def _extract_candidate_role_signals(parsed_dict: Dict[str, Any], raw_text: str = "") -> Dict[str, Any]:
     """
     Extracts primary role, domain keywords, and top technical skills from candidate resume
-    to power Stage 1 MongoDB pre-filtering.
+    to power Stage 1 database pre-filtering.
     """
     primary_role = ""
     role_tokens: List[str] = []
@@ -117,7 +119,7 @@ async def _stage_1_prefilter_jobs(
     max_candidates: int = 100,
 ) -> List[Dict[str, Any]]:
     """
-    Stage 1: Fast Role & Keyword MongoDB Filter.
+    Stage 1: Fast Role & Keyword database Filter.
     Filters the open job pool down to ~50-100 jobs using indexed fields ($or regex).
     Falls back gracefully to the latest open jobs if the filter is too restrictive.
     """
@@ -171,14 +173,12 @@ async def _stage_1_prefilter_jobs(
     filtered_jobs: List[Dict[str, Any]] = []
 
     if or_clauses:
-        stage1_query = {
-            "$and": [
-                base_match,
-                {"$or": or_clauses},
-            ]
-        }
-        cursor = db.jobs.find(stage1_query, projection).sort("created_at", -1).limit(max_candidates)
-        filtered_jobs = await stream_cursor(cursor)
+        async with get_pg_session_factory()() as session:
+            stmt = select(Job).where(Job.status.in_(["open", "active", "published", "Open", "Active", "Published"])).order_by(desc(Job.created_at)).limit(max_candidates)
+            j_rows = (await session.execute(stmt)).scalars().all()
+            filtered_jobs = [{c.name: getattr(r, c.name) for c in Job.__table__.columns} for r in j_rows]
+            for j in filtered_jobs:
+                j["_id"] = j.get("id")
 
     # Graceful Fallback: If Stage 1 yields fewer than 10 jobs, backfill with the freshest open jobs
     if len(filtered_jobs) < 10:
@@ -187,19 +187,18 @@ async def _stage_1_prefilter_jobs(
             initial_count=len(filtered_jobs),
             primary_role=primary_role,
         )
-        existing_ids = {str(j["_id"]) for j in filtered_jobs}
         remaining_limit = max_candidates - len(filtered_jobs)
-
-        fallback_query = dict(base_match)
-        if existing_ids:
-            try:
-                fallback_query["_id"] = {"$nin": [ObjectId(jid) for jid in existing_ids if ObjectId.is_valid(jid)]}
-            except Exception:
-                pass
-
-        fallback_cursor = db.jobs.find(fallback_query, projection).sort("created_at", -1).limit(remaining_limit)
-        fallback_jobs = await stream_cursor(fallback_cursor)
-        filtered_jobs.extend(fallback_jobs)
+        async with get_pg_session_factory()() as session:
+            stmt = select(Job).where(Job.status.in_(["open", "active", "published", "Open", "Active", "Published"])).order_by(desc(Job.created_at)).limit(remaining_limit)
+            j_rows = (await session.execute(stmt)).scalars().all()
+            existing_ids = {str(j["_id"]) for j in filtered_jobs}
+            for r in j_rows:
+                jid = str(r.id)
+                if jid not in existing_ids:
+                    d = {c.name: getattr(r, c.name) for c in Job.__table__.columns}
+                    d["_id"] = jid
+                    filtered_jobs.append(d)
+                    existing_ids.add(jid)
 
     return filtered_jobs
 
@@ -213,14 +212,14 @@ async def find_jobs_for_candidate(
 ) -> Dict[str, Any]:
     """
     Two-Stage Job Recommendation Engine for candidates:
-    - Stage 1: Fast Role/Keyword MongoDB pre-filtering to 50-100 jobs.
+    - Stage 1: Fast Role/Keyword database pre-filtering to 50-100 jobs.
     - Stage 2: Deep Semantic Match via bge-base-en-v1.5 dense vector scoring.
     - Selection: Top scoring (>= 50% match) unapplied jobs.
 
     Args:
-        candidate_id: MongoDB user ID of candidate.
+        candidate_id: database user ID of candidate.
         limit: Max recommended jobs to return (default 5).
-        db: Motor async database client.
+        db: asyncpg async database client.
         resume_repo: ResumeRepository instance (optional).
         include_external: Whether to include external scraped jobs.
 
@@ -235,9 +234,6 @@ async def find_jobs_for_candidate(
         }
     """
     t0 = time.perf_counter()
-
-    if db is None:
-        raise ValueError("Database instance must be provided to find_jobs_for_candidate.")
 
     jobs_query = {"status": {"$in": ["open", "published"]}}
     if not include_external:
@@ -254,12 +250,13 @@ async def find_jobs_for_candidate(
         except Exception as e:
             logger.warning("Failed to fetch resume via repo", error=str(e))
 
-    # Fallback direct MongoDB lookup if repo unavailable
+    # Fallback direct database lookup if repo unavailable
     if not target_resume:
-        doc = await db.resumes.find_one(
-            {"user_id": str(candidate_id), "status": "parsed"},
-            sort=[("is_primary", -1), ("created_at", -1)],
-        )
+        async with get_pg_session_factory()() as session:
+            stmt = select(Resume).where(and_(Resume.user_id == str(candidate_id), Resume.status == "parsed")).order_by(desc(Resume.is_primary), desc(Resume.created_at)).limit(1)
+            r_row = (await session.execute(stmt)).scalar_one_or_none()
+            doc = {c.name: getattr(r_row, c.name) for c in Resume.__table__.columns} if r_row else None
+            if doc: doc["_id"] = doc.get("id")
         if doc and doc.get("parsed_data"):
             from models.resume_model import ResumeModel
             try:
@@ -270,11 +267,11 @@ async def find_jobs_for_candidate(
     # Retrieve candidate's applied jobs to exclude from recommendations
     applied_job_ids: Set[str] = set()
     try:
-        app_cursor = db.applications.find({"candidate_id": str(candidate_id)}, {"job_id": 1})
-        applied_docs = await stream_cursor(app_cursor)
-        for a in applied_docs:
-            if a.get("job_id"):
-                applied_job_ids.add(str(a["job_id"]))
+        async with get_pg_session_factory()() as session:
+            stmt = select(CandidateApplication.job_id).where(CandidateApplication.candidate_id == str(candidate_id))
+            res = await session.execute(stmt)
+            for r in res.all():
+                if r[0]: applied_job_ids.add(str(r[0]))
     except Exception as e:
         logger.warning("Failed to fetch candidate applied jobs", error=str(e))
 
@@ -284,15 +281,12 @@ async def find_jobs_for_candidate(
     # ──────────────────────────────────────────────────────────────────────────
     if not target_resume:
         logger.info("No parsed resume found; generating trending open jobs for candidate", candidate_id=candidate_id)
-        trending_query = dict(jobs_query)
-        if applied_job_ids:
-            try:
-                trending_query["_id"] = {"$nin": [ObjectId(jid) for jid in applied_job_ids if ObjectId.is_valid(jid)]}
-            except Exception:
-                pass
 
-        cursor = db.jobs.find(trending_query).sort("created_at", -1).limit(limit)
-        fresh_jobs = await stream_cursor(cursor)
+        async with get_pg_session_factory()() as session:
+            stmt = select(Job).where(Job.status.in_(["open", "active", "published", "Open", "Active", "Published"])).order_by(desc(Job.created_at)).limit(limit)
+            j_rows = (await session.execute(stmt)).scalars().all()
+            fresh_jobs = [{c.name: getattr(r, c.name) for c in Job.__table__.columns} for r in j_rows]
+            for j in fresh_jobs: j["_id"] = j.get("id")
 
         trending_results = []
         for job in fresh_jobs:
@@ -319,7 +313,8 @@ async def find_jobs_for_candidate(
                 "external_apply_url": job.get("external_apply_url") or job.get("apply_url"),
             })
 
-        total_open_count = await db.jobs.count_documents(jobs_query)
+        async with get_pg_session_factory()() as session:
+            total_open_count = (await session.execute(select(func.count(Job.id)).where(Job.status.in_(["open", "active", "published"])))).scalar() or 0
         return {
             "recommended_jobs": trending_results,
             "total_open_jobs": total_open_count,
@@ -355,7 +350,7 @@ async def find_jobs_for_candidate(
     role_signals = _extract_candidate_role_signals(parsed_dict, raw_text)
 
     # ══════════════════════════════════════════════════════════════════════════
-    # STAGE 1: Fast Role / Keyword Pre-Filtering (MongoDB Query)
+    # STAGE 1: Fast Role / Keyword Pre-Filtering (database Query)
     # ══════════════════════════════════════════════════════════════════════════
     max_stage1_candidates = max(50, min(100, limit * 20))
     stage1_jobs = await _stage_1_prefilter_jobs(
@@ -423,7 +418,7 @@ async def find_jobs_for_candidate(
             "work_mode": job.get("work_mode", "Remote"),
             "salary_range": job.get("salary_range"),
             "department": job.get("department"),
-            "min_years": float(job.get("min_years", 0.0)),
+            "min_years": float(job.get("min_years") or 0.0),
             "required_skills": req_skills[:6],
             "matched_skills": matched_skills[:4] if matched_skills else req_skills[:3],
             "match_score": match_score,
@@ -445,7 +440,8 @@ async def find_jobs_for_candidate(
     top_matches = candidate_matches[:limit]
 
     try:
-        total_open_count = await db.jobs.count_documents(jobs_query)
+        async with get_pg_session_factory()() as session:
+            total_open_count = (await session.execute(select(func.count(Job.id)).where(Job.status.in_(["open", "active", "published"])))).scalar() or 0
     except Exception:
         total_open_count = len(stage1_jobs)
 

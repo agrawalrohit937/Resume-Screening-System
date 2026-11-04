@@ -6,16 +6,17 @@ Enterprise Phase 5.1:
 - PUT /api/v1/company: Alias for PATCH.
 """
 
-import re
 from datetime import datetime, timezone
 from typing import Any, Dict
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.deps import get_current_user, get_database
+from api.deps import get_current_user, get_company_repo, get_job_repo
 from models.job import CompanyProfilePayload
 from models.user_model import UserModel, UserRole
+from repositories.company_repo import CompanyRepository
+from repositories.job_repo import JobRepository
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -56,7 +57,7 @@ def _is_exec_or_admin(user: UserModel) -> bool:
 @router.get("")
 async def get_company_profile(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    company_repo: CompanyRepository = Depends(get_company_repo),
 ):
     """
     Retrieves the CompanyProfile for the authenticated user's organization tenant.
@@ -76,14 +77,12 @@ async def get_company_profile(
     if tenant_id and tenant_id != "default":
         from services.multi_tenancy.tenant_cleanup import purge_orphaned_tenant_if_needed
         await purge_orphaned_tenant_if_needed(db, tenant_id, excluding_user_id=str(current_user.id))
-        company_doc = await db.companies.find_one({"tenant_id": tenant_id})
+        company_doc = await company_repo.get_by_tenant_id(tenant_id)
 
     # 2. Secondary lookup by company_name if tenant_id match not found
     if not company_doc and getattr(current_user, "company_name", None):
         company_name_clean = current_user.company_name.strip()
-        company_doc = await db.companies.find_one(
-            {"company_name": {"$regex": f"^{re.escape(company_name_clean)}$", "$options": "i"}}
-        )
+        company_doc = await company_repo.get_by_name(company_name_clean)
 
     # 3. Fallback placeholder if no profile created yet
     if not company_doc:
@@ -107,11 +106,6 @@ async def get_company_profile(
             "twitter": None,
         }
 
-    # Format MongoDB ObjectId
-    if "_id" in company_doc:
-        company_doc["id"] = str(company_doc["_id"])
-        del company_doc["_id"]
-
     is_read_only = not _is_exec_or_admin(current_user)
 
     return {
@@ -127,7 +121,8 @@ async def get_company_profile(
 async def update_company_profile(
     payload: CompanyProfilePayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    company_repo: CompanyRepository = Depends(get_company_repo),
+    job_repo: JobRepository = Depends(get_job_repo),
 ):
     """
     Updates or creates the global organization CompanyProfile.
@@ -150,11 +145,7 @@ async def update_company_profile(
     tenant_id = current_user.tenant_id or "default"
     now = datetime.now(timezone.utc)
 
-    # Check for existing profile to clean up old logos if changed
-    query = {"tenant_id": tenant_id} if tenant_id != "default" else {
-        "company_name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}
-    }
-    existing_doc = await db.companies.find_one(query)
+    existing_doc = await company_repo.get_by_tenant_id(tenant_id)
     new_logo = payload.logo_url.strip() if payload.logo_url else None
     if new_logo and new_logo.startswith("data:image/"):
         from services.cloudinary_service import upload_base64_company_logo
@@ -183,21 +174,10 @@ async def update_company_profile(
         "linkedin": payload.linkedin.strip() if payload.linkedin else None,
         "github": payload.github.strip() if payload.github else None,
         "twitter": payload.twitter.strip() if payload.twitter else None,
-        "updated_by": str(current_user.id),
         "updated_at": now,
     }
 
-    await db.companies.update_one(
-        query,
-        {
-            "$set": profile_dict,
-            "$setOnInsert": {
-                "created_at": now,
-                "created_by": str(current_user.id),
-            },
-        },
-        upsert=True,
-    )
+    saved = await company_repo.upsert(tenant_id, profile_dict)
 
     # Synchronize logo, website, and about across open jobs for this tenant / company
     update_job_fields: Dict[str, Any] = {}
@@ -209,10 +189,14 @@ async def update_company_profile(
         update_job_fields["company_about"] = profile_dict["about"]
 
     if update_job_fields:
-        job_filter = {"tenant_id": tenant_id} if tenant_id != "default" else {
-            "company_name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}
-        }
-        await db.jobs.update_many(job_filter, {"$set": update_job_fields})
+        from sqlalchemy import update
+        from models import Job
+        from config.db import get_pg_session_factory
+        session_factory = get_pg_session_factory()
+        async with session_factory() as session:
+            stmt = update(Job).where(Job.tenant_id == tenant_id).values(**update_job_fields)
+            await session.execute(stmt)
+            await session.commit()
 
     logger.info(
         "Company profile updated successfully",
@@ -224,7 +208,7 @@ async def update_company_profile(
     return {
         "success": True,
         "message": "Company profile updated successfully.",
-        "profile": profile_dict,
+        "profile": saved,
         "is_read_only": False,
     }
 
@@ -232,7 +216,6 @@ async def update_company_profile(
 @router.delete("")
 async def delete_company_profile(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """
     Deletes the organization CompanyProfile and cleans up all associated branding/logo assets.

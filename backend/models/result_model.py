@@ -1,5 +1,5 @@
 """
-MongoDB Document Models — ATS Result, Job Description
+Domain Model — ATS Result, Job Description
 """
 
 from datetime import datetime, timezone

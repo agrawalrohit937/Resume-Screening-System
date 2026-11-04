@@ -1,3 +1,7 @@
+import uuid
+from config.db import get_pg_session_factory
+from sqlalchemy import select, update, and_
+from models.tables import TeamInvite, User
 """
 Team Management & Invitation Routes for Multi-Tenant SaaS.
 Enterprise Phase 5:
@@ -10,11 +14,16 @@ Enterprise Phase 5:
 
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
-from bson import ObjectId
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
-from api.deps import get_database, get_current_user, get_user_repo, get_email_service
+from api.deps import (
+    get_current_user,
+    get_user_repo,
+    get_email_service,
+    get_team_invite_repo,
+    get_company_repo,
+)
 from services.email_service import EmailService
 from core.config import settings
 from core.security import (
@@ -25,6 +34,8 @@ from core.security import (
 )
 from models.user_model import UserModel, UserRole, UserStatus
 from repositories.user_repo import UserRepository
+from repositories.team_invite_repo import TeamInviteRepository
+from repositories.company_repo import CompanyRepository
 from schemas.team_schema import (
     TeamInviteRequest,
     TeamInviteResponse,
@@ -62,7 +73,6 @@ async def invite_team_member(
     payload: TeamInviteRequest,
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
     email_service: EmailService = Depends(get_email_service),
 ):
     """
@@ -88,15 +98,12 @@ async def invite_team_member(
         )
 
     # Check if a user with this email is already a member of this tenant
-    users_coll = db["users"]
-    existing_member = await users_coll.find_one({"email": invitee_email, "tenant_id": tenant_id})
-    if existing_member:
+    existing_member = await user_repo.get_by_email(invitee_email)
+    if existing_member and existing_member.tenant_id == tenant_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"User '{invitee_email}' is already an active member of this organization.",
         )
-
-    invites_coll = db["team_invites"]
 
     # Generate token
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
@@ -128,17 +135,34 @@ async def invite_team_member(
         "expires_at": expires_at,
     }
 
-    # Upsert pending invite for this email + tenant
-    res = await invites_coll.update_one(
-        {"email": invitee_email, "tenant_id": tenant_id, "status": "pending"},
-        {"$set": invite_doc},
-        upsert=True,
-    )
-
-    invite_id = str(res.upserted_id) if res.upserted_id else ""
-    if not invite_id:
-        existing = await invites_coll.find_one({"email": invitee_email, "tenant_id": tenant_id, "status": "pending"})
-        invite_id = str(existing["_id"]) if existing else "invite_saved"
+        # Upsert pending invite for this email + tenant via PostgreSQL
+    async with get_pg_session_factory()() as session:
+        stmt = select(TeamInvite).where(
+            and_(TeamInvite.email == invitee_email, TeamInvite.tenant_id == tenant_id, TeamInvite.status == "pending")
+        )
+        existing_invite = (await session.execute(stmt)).scalar_one_or_none()
+        if existing_invite:
+            existing_invite.token = token
+            existing_invite.role = role_str
+            existing_invite.invited_by = str(current_user.id)
+            existing_invite.expires_at = expires_at
+            invite_id = existing_invite.id
+        else:
+            new_id = f"inv_{uuid.uuid4().hex[:12]}"
+            new_inv = TeamInvite(
+                id=new_id,
+                tenant_id=tenant_id,
+                email=invitee_email,
+                role=role_str,
+                invited_by=str(current_user.id),
+                token=token,
+                status="pending",
+                created_at=datetime.now(timezone.utc),
+                expires_at=expires_at,
+            )
+            session.add(new_inv)
+            invite_id = new_id
+        await session.commit()
 
     org_name = getattr(current_user, "company_name", None) or tenant_id
     role_str = assigned_role.value if hasattr(assigned_role, "value") else str(assigned_role)
@@ -178,7 +202,6 @@ async def invite_team_member(
 @router.get("/verify-invite", response_model=VerifyInviteResponse)
 async def verify_invite(
     token: str = Query(..., description="The team invite JWT token"),
-    db: Any = Depends(get_database),
 ):
     """
     Decodes and validates an invite token for preview on the frontend Accept Invite screen.
@@ -201,11 +224,9 @@ async def verify_invite(
     tenant_id = payload.get("tenant_id")
     role = payload.get("role")
 
-    invites_coll = db["team_invites"]
-    invite_record = await invites_coll.find_one({"email": email, "tenant_id": tenant_id, "status": "pending"})
-    if not invite_record:
-        # Check if already accepted
-        accepted = await invites_coll.find_one({"email": email, "tenant_id": tenant_id, "status": "accepted"})
+    invite_record = await invite_repo.get_by_token(token)
+    if not invite_record or invite_record.get("status") != "pending":
+        accepted = invite_record and invite_record.get("status") == "accepted" 
         if accepted:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -230,7 +251,8 @@ async def verify_invite(
 @router.post("/accept-invite")
 async def accept_team_invite(
     payload: AcceptInviteRequest,
-    db: Any = Depends(get_database),
+    invite_repo: TeamInviteRepository = Depends(get_team_invite_repo),
+    company_repo: CompanyRepository = Depends(get_company_repo),
     user_repo: UserRepository = Depends(get_user_repo),
 ):
     """
@@ -261,10 +283,16 @@ async def accept_team_invite(
             detail="Malformed invitation claims.",
         )
 
-    invites_coll = db["team_invites"]
-    invite_doc = await invites_coll.find_one({"email": email, "tenant_id": tenant_id, "status": "pending"})
-    if not invite_doc:
-        accepted = await invites_coll.find_one({"email": email, "tenant_id": tenant_id, "status": "accepted"})
+    if not hasattr(invite_repo, "get_by_token"):
+        invite_repo = get_team_invite_repo()
+    if not hasattr(company_repo, "get_by_name"):
+        company_repo = get_company_repo()
+    if not hasattr(user_repo, "get_by_email"):
+        user_repo = get_user_repo()
+
+    invite_doc = await invite_repo.get_by_token(payload.token)
+    if not invite_doc or invite_doc.get("status") != "pending":
+        accepted = invite_doc and invite_doc.get("status") == "accepted" 
         if accepted:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -281,7 +309,7 @@ async def accept_team_invite(
         assigned_role_enum = UserRole.RECRUITER
 
     # Fetch tenant's established company profile if available
-    company_doc = await db["companies"].find_one({"tenant_id": tenant_id})
+    company_doc = await company_repo.get_by_tenant_id(tenant_id)
     company_name = company_doc.get("company_name") if company_doc else None
 
     # Check if user already exists
@@ -384,17 +412,11 @@ async def accept_team_invite(
         }
         user = await user_repo.create(new_user_data)
 
-    # Mark invite accepted
-    await invites_coll.update_one(
-        {"_id": invite_doc["_id"]},
-        {
-            "$set": {
-                "status": "accepted",
-                "accepted_at": datetime.now(timezone.utc),
-                "accepted_by_user_id": str(user.id),
-            }
-        },
-    )
+    # Mark invite accepted via TeamInviteRepository
+    try:
+        await invite_repo.update_status(payload.token, "accepted")
+    except Exception as exc:
+        logger.warning("Could not mark invite as accepted in repository", error=str(exc))
 
     logger.info(
         "Team invitation accepted successfully",
@@ -411,54 +433,31 @@ async def accept_team_invite(
 @router.get("/members", response_model=TeamListResponse)
 async def list_team_members(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    user_repo: UserRepository = Depends(get_user_repo),
+    invite_repo: TeamInviteRepository = Depends(get_team_invite_repo),
 ):
     """
     Lists active team members and pending invitations for the current user's tenant with ultra-fast parallel queries.
     """
-    import asyncio
     tenant_id = current_user.tenant_id or "default"
-    users_coll = db["users"]
-    invites_coll = db["team_invites"]
-
-    user_projection = {
-        "_id": 1,
-        "email": 1,
-        "full_name": 1,
-        "role": 1,
-        "roles": 1,
-        "tenant_id": 1,
-        "status": 1,
-        "created_at": 1,
-        "last_login": 1,
-        "profile_picture": 1,
-    }
-
-    invite_projection = {
-        "_id": 1,
-        "email": 1,
-        "role": 1,
-        "tenant_id": 1,
-        "status": 1,
-        "created_at": 1,
-        "expires_at": 1,
-        "invited_by_name": 1,
-        "invited_by_email": 1,
-        "token": 1,
-    }
-
-    # Parallel query execution for instantaneous loading
-    users_task = users_coll.find(
-        {"tenant_id": tenant_id, "status": {"$ne": "deleted"}},
-        user_projection,
-    ).sort("created_at", -1).to_list(length=100)
-
-    invites_task = invites_coll.find(
-        {"tenant_id": tenant_id, "status": "pending"},
-        invite_projection,
-    ).sort("created_at", -1).to_list(length=100)
-
-    raw_members, raw_invites = await asyncio.gather(users_task, invites_task)
+    users_list_models, _ = await user_repo.list_users(skip=0, limit=100)
+    raw_members = [
+        {
+            "_id": u.id,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "roles": u.roles,
+            "tenant_id": u.tenant_id,
+            "status": u.status,
+            "created_at": u.created_at,
+            "last_login": u.last_login,
+            "profile_picture": u.profile_picture,
+        }
+        for u in users_list_models
+        if getattr(u, "tenant_id", None) == tenant_id and getattr(u, "status", None) != "deleted"
+    ]
+    raw_invites = await invite_repo.list_by_tenant(tenant_id)
 
     members: List[TeamMemberItem] = []
     for m in raw_members:
@@ -510,23 +509,15 @@ async def list_team_members(
 async def revoke_team_invite(
     invite_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    invite_repo: TeamInviteRepository = Depends(get_team_invite_repo),
 ):
     """
     Revoke a pending team invite so the token can no longer be used.
     """
     _ensure_can_manage_team(current_user)
     tenant_id = current_user.tenant_id or "default"
-    invites_coll = db["team_invites"]
-
-    try:
-        oid = ObjectId(invite_id)
-        query = {"_id": oid, "tenant_id": tenant_id}
-    except Exception:
-        query = {"id": invite_id, "tenant_id": tenant_id}
-
-    res = await invites_coll.update_one(query, {"$set": {"status": "revoked", "revoked_at": datetime.now(timezone.utc)}})
-    if res.matched_count == 0:
+    success = await invite_repo.revoke_invite(invite_id, tenant_id)
+    if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pending invite not found or already processed.",
@@ -539,7 +530,7 @@ async def revoke_team_invite(
 async def remove_team_member(
     user_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    user_repo: UserRepository = Depends(get_user_repo),
 ):
     """
     Remove an existing team member from the organization (tenant isolation revocation).
@@ -556,15 +547,7 @@ async def remove_team_member(
         )
 
     tenant_id = current_user.tenant_id or "default"
-    users_coll = db["users"]
-
-    try:
-        target_oid = ObjectId(user_id)
-        user_query = {"_id": target_oid}
-    except Exception:
-        user_query = {"_id": user_id}
-
-    target_user = await users_coll.find_one(user_query)
+    target_user = await user_repo.get_by_id(user_id)
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -572,7 +555,7 @@ async def remove_team_member(
         )
 
     # Verify target belongs to the same tenant (unless platform admin)
-    if target_user.get("tenant_id") != tenant_id and not current_user.has_role(UserRole.PLATFORM_ADMIN, UserRole.ADMIN):
+    if getattr(target_user, "tenant_id", None) != tenant_id and not current_user.has_role(UserRole.PLATFORM_ADMIN, UserRole.ADMIN):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Team member does not belong to your organization.",
@@ -589,7 +572,7 @@ async def remove_team_member(
         "updated_at": datetime.now(timezone.utc),
     }
 
-    await users_coll.update_one(user_query, {"$set": updates})
+    await user_repo.update(str(user_id), updates)
 
     logger.info(
         "Team member removed from organization",

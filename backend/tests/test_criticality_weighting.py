@@ -49,7 +49,8 @@ def test_infer_criticality_standalone():
     assert infer_criticality("AWS", jd) == 2.0  # Not in text or neutral
 
 
-def test_criticality_weighted_scoring_impact():
+def test_criticality_weighted_scoring_impact(monkeypatch):
+    monkeypatch.setattr("core.feature_flags.FEATURE_CONTEXTUAL_SKILLS", False)
     """
     A candidate missing a critical (weight 3.0) skill receives a lower skills score
     than a candidate missing a soft (weight 1.0) skill when both candidates match 2 out of 3 skills.

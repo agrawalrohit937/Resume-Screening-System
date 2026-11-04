@@ -6,7 +6,7 @@ Validates stream_cursor and paginate_by_cursor across various cursor interfaces.
 from __future__ import annotations
 
 import pytest
-from bson import ObjectId
+from core.id import DocumentId
 from utils.pagination import stream_cursor, paginate_by_cursor
 
 
@@ -27,7 +27,7 @@ class MockAsyncCursor:
         return item
 
 
-class MockMotorCursor:
+class MockDocumentCursor:
     def __init__(self, items: list):
         self.items = items
         self.skip_val = 0
@@ -76,12 +76,12 @@ class MockCollection:
                     match = False
             if match:
                 matching.append(doc)
-        return MockMotorCursor(matching)
+        return MockDocumentCursor(matching)
 
 
 @pytest.mark.asyncio
 async def test_stream_cursor_async_iterator():
-    items = [{"_id": ObjectId(), "name": f"item_{i}"} for i in range(15)]
+    items = [{"_id": DocumentId(), "name": f"item_{i}"} for i in range(15)]
     cursor = MockAsyncCursor(items)
     results = await stream_cursor(cursor)
     assert len(results) == 15
@@ -90,9 +90,9 @@ async def test_stream_cursor_async_iterator():
 
 
 @pytest.mark.asyncio
-async def test_stream_cursor_motor_cursor():
-    items = [{"_id": ObjectId(), "name": f"item_{i}"} for i in range(25)]
-    cursor = MockMotorCursor(items)
+async def test_stream_cursor_doc_cursor():
+    items = [{"_id": DocumentId(), "name": f"item_{i}"} for i in range(25)]
+    cursor = MockDocumentCursor(items)
     results = await stream_cursor(cursor, batch_size=10)
     assert len(results) == 25
 
@@ -106,7 +106,7 @@ async def test_stream_cursor_plain_iterable():
 
 @pytest.mark.asyncio
 async def test_paginate_by_cursor():
-    sample_ids = [ObjectId() for _ in range(50)]
+    sample_ids = [DocumentId() for _ in range(50)]
     # Ensure sorted descending
     sample_ids = sorted(sample_ids, reverse=True)
     docs = [{"_id": oid, "val": i} for i, oid in enumerate(sample_ids)]
@@ -123,7 +123,7 @@ async def test_paginate_by_cursor():
     cursor_id = page1["next_cursor"]
     page2 = await paginate_by_cursor(coll, filter_query={}, limit=10, cursor=cursor_id)
     assert len(page2["items"]) == 10
-    assert page2["items"][0]["_id"] < ObjectId(cursor_id)
+    assert page2["items"][0]["_id"] < DocumentId(cursor_id)
     assert page2["has_more"] is True
 
     # Traverse all pages until has_more is False

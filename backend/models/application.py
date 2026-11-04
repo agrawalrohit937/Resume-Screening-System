@@ -23,7 +23,7 @@ class ApplicationStage(str, Enum):
 
 
 class ApplicationModel(BaseModel):
-    """MongoDB document model for candidate job applications."""
+    """Domain Model for candidate job applications."""
     id: Optional[str] = Field(default=None, alias="_id")
     job_id: str
     candidate_id: str

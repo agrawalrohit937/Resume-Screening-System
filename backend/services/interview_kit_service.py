@@ -1,10 +1,15 @@
-"""Structured Interview Kit, Scorecard & Calibration Service.
+"""Structured Interview Kit, Scorecard & Calibration Service (Pure PostgreSQL).
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
-from typing import List, Optional, Dict
-import structlog
+from __future__ import annotations
 
+from typing import Any, Dict, List, Optional
+import structlog
+from sqlalchemy import update
+
+from config.db import get_pg_session_factory
+from models.tables import CandidateApplication
 from models.interview_kit import (
     InterviewKitModel,
     ScorecardModel,
@@ -14,13 +19,17 @@ from models.interview_kit import (
     Competency,
 )
 from services.multi_tenancy.tenant_context import get_current_tenant_id
+from repositories.interview_kit_repo import InterviewKitRepository
+from repositories.application_repo import ApplicationRepository
 
 logger = structlog.get_logger(__name__)
 
 
 class InterviewKitService:
-    def __init__(self, db):
+    def __init__(self, db: Any = None, kit_repo: Optional[InterviewKitRepository] = None, app_repo: Optional[ApplicationRepository] = None):
         self.db = db
+        self.kit_repo = kit_repo or InterviewKitRepository()
+        self.app_repo = app_repo or ApplicationRepository()
 
     async def create_interview_kit(
         self,
@@ -38,8 +47,10 @@ class InterviewKitService:
             competencies=competencies,
             standard_questions=standard_questions or [],
         )
-        await self.db.interview_kits.insert_one(kit.dict())
-        logger.info("Interview kit created", kit_id=kit.id, job_id=job_id, stage=stage_name)
+        saved = await self.kit_repo.create_kit(kit.dict())
+        if saved and saved.get("id"):
+            kit.id = saved["id"]
+        logger.info("Interview kit created via PostgreSQL", kit_id=kit.id, job_id=job_id, stage=stage_name)
         return kit
 
     async def submit_scorecard(
@@ -74,61 +85,21 @@ class InterviewKitService:
             notes=notes
         )
 
-        # Enforce unique constraint per (candidate_id, interviewer_id, stage) or (application_id, interviewer_id, stage)
-        existing = None
-        if cand_id_str:
-            existing = await self.db.scorecards.find_one({
-                "candidate_id": cand_id_str,
-                "interviewer_id": interviewer_id_str,
-                "stage_name": stage_name,
-            })
-        if not existing and app_id_str:
-            existing = await self.db.scorecards.find_one({
-                "application_id": app_id_str,
-                "interviewer_id": interviewer_id_str,
-                "stage_name": stage_name,
-            })
+        saved = await self.kit_repo.submit_scorecard(scorecard.dict())
+        if saved and saved.get("id"):
+            scorecard.id = saved["id"]
+        logger.info("Scorecard saved via repository", application_id=app_id_str, candidate_id=cand_id_str, stage=stage_name)
 
-        if existing:
-            # Preserve existing ID and update in place (atomic upsert)
-            existing_id = existing.get("id") or (str(existing.get("_id")) if existing.get("_id") else None)
-            if existing_id:
-                scorecard.id = str(existing.get("id") or existing_id)
-            scorecard_dict = scorecard.dict()
-
-            if "id" in existing:
-                up_q = {"id": existing["id"]}
-            elif "_id" in existing:
-                up_q = {"_id": existing["_id"]}
-            elif cand_id_str:
-                up_q = {"candidate_id": cand_id_str, "interviewer_id": interviewer_id_str, "stage_name": stage_name}
-            else:
-                up_q = {"application_id": app_id_str, "interviewer_id": interviewer_id_str, "stage_name": stage_name}
-
-            await self.db.scorecards.update_one(
-                up_q,
-                {"$set": scorecard_dict}
-            )
-            logger.info("Existing scorecard updated (upsert)", application_id=app_id_str, candidate_id=cand_id_str, interviewer_id=interviewer_id_str, stage=stage_name)
-        else:
-            await self.db.scorecards.insert_one(scorecard.dict())
-            logger.info("New scorecard inserted", application_id=app_id_str, candidate_id=cand_id_str, interviewer_id=interviewer_id_str, stage=stage_name)
-
-        if hasattr(self.db, "applications"):
-            try:
-                from bson import ObjectId
-                app_oid = ObjectId(application_id) if ObjectId.is_valid(application_id) else None
-                app_query = {"_id": app_oid} if app_oid else {"_id": application_id}
-                await self.db.applications.update_one(
-                    app_query,
-                    {"$set": {
-                        f"scorecard_{interviewer_id}": scorecard.dict(),
-                        "has_scorecard": True,
-                        "last_scorecard_submitted_at": scorecard.submitted_at,
-                    }}
+        try:
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(CandidateApplication)
+                    .where(CandidateApplication.id == str(application_id))
+                    .values(updated_at=scorecard.submitted_at)
                 )
-            except Exception as e:
-                logger.debug("Application scorecard metadata sync skipped", error=str(e))
+                await session.commit()
+        except Exception as e:
+            logger.debug("Application scorecard metadata sync skipped", error=str(e))
 
         logger.info("Scorecard submitted", application_id=application_id, interviewer_id=interviewer_id, rec=recommendation.value)
         return scorecard
@@ -139,21 +110,7 @@ class InterviewKitService:
         stage_name: str,
         tenant_id: Optional[str] = None
     ) -> CalibrationReport:
-        resolved_tenant = tenant_id or get_current_tenant_id()
-        cursor = self.db.scorecards.find({
-            "application_id": application_id,
-            "stage_name": stage_name,
-            "tenant_id": resolved_tenant
-        })
-        scorecards_data = await cursor.to_list(length=100)
-
-        # Resilient fallback: If no scorecards match the exact stage_name, fetch all scorecards for this application
-        if not scorecards_data:
-            cursor_all = self.db.scorecards.find({
-                "application_id": application_id,
-                "tenant_id": resolved_tenant
-            })
-            scorecards_data = await cursor_all.to_list(length=100)
+        scorecards_data = await self.kit_repo.get_scorecards_by_application(str(application_id))
         scorecards = [ScorecardModel(**doc) for doc in scorecards_data]
 
         if not scorecards:

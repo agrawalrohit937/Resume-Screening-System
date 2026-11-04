@@ -11,7 +11,7 @@ Two endpoints implement the industry-standard "offline access" pattern:
   POST /auth/gmail/callback
     → Called by the frontend's /gmail-callback page after Google redirects back
       with an authorization code. Exchanges the code for access + refresh tokens,
-      then saves both to MongoDB against the authenticated user.
+      then saves both to the database against the authenticated user.
 
 After this flow completes, every Gmail send is fully automatic:
 the GmailTokenService silently refreshes the access token as needed.
@@ -186,7 +186,7 @@ async def handle_gmail_callback(
             ),
         )
 
-    # Persist both tokens securely in MongoDB
+    # Persist both tokens securely in database
     await user_repo.save_gmail_tokens(
         user_id=str(current_user.id),
         access_token=access_token,

@@ -14,7 +14,6 @@ Tests:
 import asyncio
 from datetime import datetime, timezone
 import pytest
-from bson import ObjectId
 
 from services.copilot.context import ToolExecutionContext
 from services.copilot.registry import tool_registry, BaseTool, ToolResult
@@ -45,39 +44,26 @@ from services.copilot.tools.action_tools import (
 from services.copilot.router import CopilotRouter
 
 
-class MockAsyncCollection:
+class MockTableStore:
     def __init__(self, initial_docs=None):
         self.docs = list(initial_docs or [])
 
-    async def find_one(self, query=None, *args, **kwargs):
+    async def get(self, query=None, *args, **kwargs):
         query = query or {}
         for d in self.docs:
             if all(d.get(k) == v for k, v in query.items() if not isinstance(v, dict)):
                 return dict(d)
         return None
 
-    def find(self, query=None, *args, **kwargs):
+    def filter(self, query=None, *args, **kwargs):
         query = query or {}
-        matching = [
+        return [
             dict(d) for d in self.docs
             if all(d.get(k) == v for k, v in query.items() if not isinstance(v, dict))
         ]
 
-        class MockCursor:
-            def __init__(self, data):
-                self.data = data
 
-            def sort(self, *args, **kwargs):
-                return self
-
-            def limit(self, n):
-                self.data = self.data[:n]
-                return self
-
-            async def to_list(self, length=100):
-                return self.data[:length]
-
-        return MockCursor(matching)
+MockAsyncCollection = MockTableStore
 
 
 class MockResumeRepo:
@@ -135,7 +121,7 @@ def mock_context():
 
     class MockDB:
         def __init__(self):
-            self.users = MockAsyncCollection([{"_id": ObjectId("665f1a2b3c4d5e6f7a8b9c0d"), "github_username": "johndoe"}])
+            self.users = MockAsyncCollection([{"_id": "665f1a2b3c4d5e6f7a8b9c0d", "github_username": "johndoe"}])
             self.user_profiles = MockAsyncCollection([{"user_id": "user_123", "github_username": "johndoe", "languages": ["Python", "Go"], "contribution_score": 92}])
             self.interviews = MockAsyncCollection([{"user_id": "user_123", "role_title": "Senior Backend Engineer", "overall_score": 85, "weak_areas": ["System Design"]}])
             self.certificates = MockAsyncCollection([{"user_id": "user_123", "certificate_title": "FastAPI Certified Professional", "certificate_type": "backend", "grade": 94}])

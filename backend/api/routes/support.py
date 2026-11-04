@@ -13,24 +13,18 @@ from api.deps import (
     get_email_service,
     get_user_repo,
 )
-from config.db import get_database
 from core.config import settings
 from models.user_model import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
 from services.support_service import SupportService
 
-logger = structlog.get_logger(__name__)
-
 router = APIRouter(prefix="/support", tags=["Support"])
-
-
 def get_support_service(
-    db=Depends(get_database),
     user_repo: UserRepository = Depends(get_user_repo),
     email_service = Depends(get_email_service),
 ) -> SupportService:
-    ticket_repo = SupportTicketRepository(db)
+    ticket_repo = SupportTicketRepository()
     return SupportService(ticket_repo, user_repo, email_service)
 
 

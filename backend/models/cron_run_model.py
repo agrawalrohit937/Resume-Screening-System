@@ -33,7 +33,7 @@ class DeliveryStatus(str, Enum):
 
 
 class CronJobRunModel(BaseModel):
-    """MongoDB document model for scheduled cron job batch tracking."""
+    """Domain Model for scheduled cron job batch tracking."""
     id: Optional[str] = Field(default=None, alias="_id")
     job_name: str = Field(default="job_alerts", description="Identifier of the cron task")
     slot_id: str = Field(..., description="Deterministic slot string e.g. 2026-10-03_07:30")
@@ -54,7 +54,7 @@ class CronJobRunModel(BaseModel):
 
 
 class JobAlertDeliveryModel(BaseModel):
-    """MongoDB document model for atomic per-candidate per-slot email claims."""
+    """Domain Model for atomic per-candidate per-slot email claims."""
     id: Optional[str] = Field(default=None, alias="_id")
     candidate_id: str
     slot_id: str
@@ -68,19 +68,6 @@ class JobAlertDeliveryModel(BaseModel):
     error: Optional[str] = None
 
 
-async def ensure_cron_indexes(db: Any) -> None:
-    """Ensures required unique and query indexes exist on cron audit collections."""
-    try:
-        if db is None:
-            return
-        # Unique slot index for batch-level anti-replay
-        await db.cron_job_runs.create_index([("slot_id", 1), ("job_name", 1)], unique=True)
-        await db.cron_job_runs.create_index([("started_at", -1)])
-
-        # Unique compound index for per-candidate per-slot atomic claim
-        await db.job_alert_deliveries.create_index([("candidate_id", 1), ("slot_id", 1)], unique=True)
-        await db.job_alert_deliveries.create_index([("slot_id", 1), ("status", 1)])
-        await db.job_alert_deliveries.create_index([("claimed_at", 1)])
-    except Exception:
-        # Gracefully tolerate index creation conflicts if already initialized
-        pass
+async def ensure_cron_indexes(db: Any = None) -> None:
+    """Indexes are managed natively in PostgreSQL via Alembic."""
+    pass

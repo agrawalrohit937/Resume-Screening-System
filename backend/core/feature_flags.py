@@ -23,6 +23,7 @@ FEATURE_CONTEXTUAL_SKILLS: bool = _bool_flag("FEATURE_CONTEXTUAL_SKILLS", defaul
 FEATURE_HYBRID_RETRIEVAL: bool = _bool_flag("FEATURE_HYBRID_RETRIEVAL", default=True)
 FEATURE_CALIBRATION: bool = _bool_flag("FEATURE_CALIBRATION", default=True)
 FEATURE_CROSS_ENCODER_RERANK: bool = _bool_flag("FEATURE_CROSS_ENCODER_RERANK", default=False)
+FEATURE_DEP_NEGATION: bool = _bool_flag("FEATURE_DEP_NEGATION", default=True)
 
 # Ontology & Domain Adapters
 FEATURE_OCCUPATION_GRAPH: bool = _bool_flag("FEATURE_OCCUPATION_GRAPH", default=True)

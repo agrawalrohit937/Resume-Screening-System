@@ -4,7 +4,7 @@ Profile Image Utils — Cloudinary storage
 Validates, compresses/resizes the uploaded image (using Pillow), then
 uploads the bytes to Cloudinary via cloudinary_service.py.
 
-The stored value in MongoDB is the Cloudinary secure_url, and
+The stored value in database is the Cloudinary secure_url, and
 profile_picture_public_id holds the Cloudinary public_id for deletion.
 """
 
@@ -101,7 +101,7 @@ async def delete_profile_image(old_public_id: str) -> None:
     Deletes a previously-uploaded custom image from Cloudinary.
     Silently no-ops for None/empty values.
 
-    `old_public_id` is the Cloudinary public_id stored in MongoDB.
+    `old_public_id` is the Cloudinary public_id stored in database.
     Legacy HTTP URLs are skipped gracefully.
     """
     if not old_public_id:

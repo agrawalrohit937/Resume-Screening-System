@@ -20,22 +20,35 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from bson import ObjectId
+from core.id import DocumentId
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, BackgroundTasks, status
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
-from pymongo.errors import DuplicateKeyError
+from sqlalchemy.exc import IntegrityError as DuplicateKeyError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from core.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import (
     get_current_user,
-    get_database,
     get_optional_current_user,
     get_recruiter_or_admin,
     get_resume_repo,
+    get_job_repo,
+    get_app_repo,
+    get_company_repo,
+    get_db,
 )
+from repositories.company_repo import CompanyRepository
+from repositories.job_repo import JobRepository
+from repositories.application_repo import ApplicationRepository
+from repositories.resume_repo import ResumeRepository
+from repositories.user_repo import UserRepository
+from models.tables import Job, JobApplication, CandidateApplication, Resume, User, Company, AuditLog
+from config.db import get_pg_session_factory
+from sqlalchemy import select, update, delete, func, or_, and_, desc
+from repositories.application_repo import ApplicationRepository
 from models.application import ApplicationResponse, ApplicationStage
 from models.job import (
     CompanyProfilePayload,
@@ -60,6 +73,12 @@ from services.jd_parser_service import (
 logger = structlog.get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
+
+job_repo = JobRepository()
+app_repo = ApplicationRepository()
+resume_repo = ResumeRepository()
+company_repo = CompanyRepository()
+user_repo = UserRepository()
 
 
 class JobApplyPayload(BaseModel):
@@ -197,7 +216,6 @@ def extract_or_synthesize_jd(d: Dict[str, Any]) -> str:
 @router.post("/", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 async def create_job(
     payload: JobCreateRequest,
-    db: Any = Depends(get_database),
     current_user: UserModel = Depends(get_current_user),
 ):
     """
@@ -218,10 +236,8 @@ async def create_job(
     raw_text = payload.jd_text_raw.strip()
     company_clean = payload.company_name.strip()
 
-    # Fast company profile lookup (deterministic matching engine eliminates need for synchronous JD vector embeddings)
-    company_profile_doc = await db.companies.find_one(
-        {"company_name": {"$regex": f"^{re.escape(company_clean)}$", "$options": "i"}}
-    )
+    # Fast company profile lookup
+    company_profile_doc = await company_repo.get_by_name(company_clean)
     jd_embedding: List[float] = []
     company_profile = company_profile_doc or {}
 
@@ -292,8 +308,8 @@ async def create_job(
         "updated_at": now,
     }
 
-    result = await db.jobs.insert_one(job_doc)
-    job_id = str(result.inserted_id)
+    created = await job_repo.create(job_doc)
+    job_id = str(created.get("id") or created.get("_id"))
 
     logger.info("Job posted successfully", job_id=job_id, company=job_doc["company_name"], occupation_code=occ_code)
 
@@ -344,132 +360,24 @@ async def list_jobs(
     limit: int = Query(default=30, ge=1, le=100),
     skip: int = Query(default=0, ge=0),
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
 ):
-    """
-    Fetches open/published jobs for the candidate and recruiter marketplace feed (Explore Jobs).
-    Merges both internal employer postings and external scraped jobs:
-    - Internal jobs: Active platform postings where status != 'closed' (open, published, active).
-    - External jobs: Scraped jobs (is_external: true) where status != 'closed'.
-    - Sorting: Prioritizes internal platform jobs slightly higher, followed by external jobs, sorted by latest created_at.
-    - Application status: Strictly injects has_applied boolean calculated by querying db.applications.
-    """
-    query: Dict[str, Any] = {
-        "status": {"$in": ["open", "published", "active", "Open", "Published", "Active"]},
-        "$and": [],
-    }
-
-    # Search filter (title, company, description, skills)
-    if search and search.strip():
-        term = re.escape(search.strip())
-        query["$and"].append({
-            "$or": [
-                {"title": {"$regex": term, "$options": "i"}},
-                {"company_name": {"$regex": term, "$options": "i"}},
-                {"jd_text_raw": {"$regex": term, "$options": "i"}},
-                {"jd_text": {"$regex": term, "$options": "i"}},
-                {"required_skills": {"$regex": term, "$options": "i"}},
-            ]
-        })
-
-    # Work mode filter
-    if work_mode and work_mode.lower() != "all":
-        query["work_mode"] = {"$regex": f"^{re.escape(work_mode)}$", "$options": "i"}
-
-    # Location filter
-    if location and location.strip() and location.lower() != "all":
-        query["location"] = {"$regex": re.escape(location.strip()), "$options": "i"}
-
-    # Experience filter
-    if min_years is not None:
-        query["min_years"] = {"$lte": min_years}
-
-    # Skill filter (lenient across required_skills, title, and jd_text_raw)
-    if skill and skill.strip():
-        skill_term = re.escape(skill.strip())
-        query["$and"].append({
-            "$or": [
-                {"required_skills": {"$regex": skill_term, "$options": "i"}},
-                {"title": {"$regex": skill_term, "$options": "i"}},
-                {"jd_text_raw": {"$regex": skill_term, "$options": "i"}},
-                {"jd_text": {"$regex": skill_term, "$options": "i"}},
-            ]
-        })
-
-    if not query["$and"]:
-        del query["$and"]
-
-    raw_db = getattr(db, "raw_db", db)
-    total = await raw_db.jobs.count_documents(query)
-
-    # Sort: Newest jobs first (created_at: -1)
-    cursor = (
-        raw_db.jobs.find(query, {"jd_embedding": 0, "jd_embedding_bge": 0})
-        .sort("created_at", -1)
-        .skip(skip)
-        .limit(limit)
+    if not hasattr(job_repo, "list_jobs"):
+        job_repo = get_job_repo()
+    # Pure SQLAlchemy ORM job listing & user applied check
+    docs, total = await job_repo.list_jobs(
+        search=search,
+        work_mode=work_mode,
+        location=location,
+        min_years=min_years,
+        skill=skill,
+        skip=skip,
+        limit=limit,
     )
-    docs = await stream_cursor(cursor)
 
-    # Fallback if query returns nothing but jobs exist and no user search was applied
-    has_user_filters = bool(
-        (search and search.strip()) or
-        (location and location.strip() and location.lower() != "all") or
-        (skill and skill.strip()) or
-        (min_years is not None) or
-        (work_mode and work_mode.strip() and work_mode.lower() != "all")
-    )
-    if not docs and not has_user_filters:
-        raw_count = await raw_db.jobs.count_documents({})
-        if raw_count > 0:
-            fallback_cursor = (
-                raw_db.jobs.find({"status": {"$ne": "closed"}}, {"jd_embedding": 0, "jd_embedding_bge": 0})
-                .sort("created_at", -1)
-                .skip(skip)
-                .limit(limit)
-            )
-            docs = await stream_cursor(fallback_cursor)
-            total = len(docs)
-        else:
-            try:
-                from scheduler.job_alerts import run_external_job_scrape
-                asyncio.create_task(run_external_job_scrape())
-            except Exception as e:
-                logger.warning("Could not auto-trigger background job scrape", error=str(e))
-
-    # Strictly calculate has_applied by querying db.applications
     applied_job_ids = set()
-    if current_user and docs:
-        candidate_id_str = str(current_user.id)
-        candidate_ids = [candidate_id_str]
-        try:
-            candidate_ids.append(ObjectId(candidate_id_str))
-        except Exception:
-            pass
-
-        job_id_candidates = []
-        for d in docs:
-            job_id_candidates.append(str(d["_id"]))
-            if isinstance(d["_id"], ObjectId):
-                job_id_candidates.append(d["_id"])
-            else:
-                try:
-                    job_id_candidates.append(ObjectId(d["_id"]))
-                except Exception:
-                    pass
-
-        app_cursor = raw_db.applications.find(
-            {
-                "candidate_id": {"$in": candidate_ids},
-                "job_id": {"$in": job_id_candidates},
-            },
-            {"job_id": 1, "candidate_id": 1}
-        )
-        applied_docs = await stream_cursor(app_cursor)
-        for app in applied_docs:
-            jid = app.get("job_id")
-            if jid:
-                applied_job_ids.add(str(jid))
+    if current_user:
+        applied_job_ids = await job_repo.get_user_applied_job_ids(str(current_user.id))
 
     jobs = []
     for d in docs:
@@ -538,47 +446,37 @@ async def list_jobs(
 @router.get("/applications/my")
 async def get_my_applications(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """
     Fetches all jobs applied for by the current candidate from the `applications` collection.
     Joins job details (title, company, work mode, salary) and current pipeline stage.
     """
-    raw_db = getattr(db, "raw_db", db)
-    cursor = raw_db.applications.find({"candidate_id": str(current_user.id)}).sort("created_at", -1)
-    app_docs = await stream_cursor(cursor)
+    # Pure PostgreSQL query: candidate applications
+    app_docs = await job_repo.list_applications_by_candidate(str(current_user.id))
 
-    # Batch fetch jobs to eliminate N+1 round trips
-    job_ids_set = set()
-    for app in app_docs:
-        jid = app.get("job_id")
-        if jid and ObjectId.is_valid(jid):
-            job_ids_set.add(ObjectId(jid))
-
+    job_ids_set = {str(app.get("job_id")) for app in app_docs if app.get("job_id")}
     jobs_map = {}
     if job_ids_set:
-        job_cursor = raw_db.jobs.find(
-            {"_id": {"$in": list(job_ids_set)}},
-            {"jd_embedding": 0}
-        )
-        fetched_jobs = await stream_cursor(job_cursor)
-        jobs_map = {str(j["_id"]): j for j in fetched_jobs}
+        async with get_pg_session_factory()() as session:
+            stmt = select(Job).where(Job.id.in_(list(job_ids_set)))
+            res = await session.execute(stmt)
+            for j in res.scalars().all():
+                d = {c.name: getattr(j, c.name) for c in Job.__table__.columns}
+                d["_id"] = d.get("id")
+                jobs_map[str(j.id)] = d
 
-    # Batch fetch missing company logos
-    company_names = set()
-    for j in jobs_map.values():
-        cname = (j.get("company_name") or "").strip()
-        if cname and cname != "Unknown Company" and not j.get("company_logo"):
-            company_names.add(cname)
-
+    # Batch fetch company profiles for logos
     company_map = {}
+    company_names = {j.get("company_name", "").strip() for j in jobs_map.values() if j.get("company_name")}
     if company_names:
-        comp_regex_list = [re.compile(f"^{re.escape(c)}$", re.IGNORECASE) for c in company_names]
-        comp_cursor = db.companies.find({"company_name": {"$in": comp_regex_list}})
-        fetched_comps = await stream_cursor(comp_cursor)
-        for c in fetched_comps:
-            cname = (c.get("company_name") or "").strip().lower()
-            company_map[cname] = c
+        async with get_pg_session_factory()() as session:
+            stmt = select(Company).where(Company.company_name.in_(list(company_names)))
+            res = await session.execute(stmt)
+            for c in res.scalars().all():
+                company_map[c.company_name.strip().lower()] = {
+                    "logo_url": c.logo_url,
+                    "website": c.website,
+                }
 
     results = []
     for app in app_docs:
@@ -642,8 +540,8 @@ async def get_my_applications(
 async def get_recommended_jobs(
     limit: int = Query(default=5, ge=1, le=20),
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
     resume_repo = Depends(get_resume_repo),
+    job_repo: JobRepository = Depends(get_job_repo),
 ):
     """
     On-demand bidirectional AI recommendation engine.
@@ -683,7 +581,7 @@ async def get_recommended_jobs(
 @router.get("/my-jobs")
 async def get_my_posted_jobs(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Fetches all jobs created by the authenticated recruiter / interviewer / admin.
@@ -710,34 +608,37 @@ async def get_my_posted_jobs(
     # Multi-tenant visibility: Anyone within the same tenant organization can view all jobs
     # posted under that tenant, regardless of who created them.
     # Platform Admins at root level can view across all tenants if tenant_id is "default".
-    if is_platform_admin_user or current_tenant == "default":
-        query = {}
+    # Pure SQLAlchemy ORM recruiter jobs query
+    async def _fetch_jobs(sess: AsyncSession):
+        stmt = select(Job).where(Job.is_external == False).order_by(Job.created_at.desc())
+        if not (is_platform_admin_user or current_tenant == "default"):
+            stmt = stmt.where(or_(Job.tenant_id == current_tenant, Job.tenant_id == "default", Job.tenant_id == None))
+        res = await sess.execute(stmt)
+        docs = []
+        for j in res.scalars().all():
+            d = {c.name: getattr(j, c.name) for c in Job.__table__.columns}
+            d["_id"] = d.get("id")
+            docs.append(d)
+
+        job_ids = [str(d["_id"]) for d in docs]
+        app_counts = {}
+        if job_ids:
+            counts_stmt = (
+                select(CandidateApplication.job_id, func.count(CandidateApplication.id))
+                .where(CandidateApplication.job_id.in_(job_ids))
+                .group_by(CandidateApplication.job_id)
+            )
+            counts_res = await sess.execute(counts_stmt)
+            for row in counts_res.all():
+                app_counts[str(row[0])] = int(row[1])
+        return docs, app_counts
+
+    active_sess = session if hasattr(session, "execute") else None
+    if active_sess:
+        docs, app_counts = await _fetch_jobs(active_sess)
     else:
-        query = {"$or": [{"tenant_id": current_tenant}, {"tenant_id": "default"}, {"tenant_id": {"$exists": False}}, {"tenant_id": None}]}
-    query["is_external"] = {"$ne": True}
-
-    cursor = db.jobs.find(query, {"jd_embedding": 0}).sort("created_at", -1)
-    docs = await stream_cursor(cursor)
-
-    # Calculate real-time accurate applicant counts per job
-    job_ids = [str(d["_id"]) for d in docs]
-    app_counts = {}
-    if job_ids:
-        try:
-            pipeline = [
-                {"$match": {"job_id": {"$in": job_ids}}},
-                {"$group": {"_id": "$job_id", "count": {"$sum": 1}}},
-            ]
-            cursor_or_coro = db.applications.aggregate(pipeline)
-            if hasattr(cursor_or_coro, "__await__"):
-                cursor = await cursor_or_coro
-            else:
-                cursor = cursor_or_coro
-            agg_res = await cursor.to_list(len(job_ids))
-            for item in agg_res:
-                app_counts[str(item["_id"])] = int(item.get("count", 0))
-        except Exception:
-            pass
+        async with get_pg_session_factory()() as sess:
+            docs, app_counts = await _fetch_jobs(sess)
 
     jobs = [
         {
@@ -752,6 +653,7 @@ async def get_my_posted_jobs(
             "salary_range": d.get("salary_range"),
             "status": d.get("status", "open"),
             "department": d.get("department"),
+            "tenant_id": d.get("tenant_id"),
             "applicant_count": app_counts.get(str(d["_id"]), int(d.get("applicant_count", 0))),
             "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at", "")),
         }
@@ -764,7 +666,8 @@ async def get_my_posted_jobs(
 @router.get("/recruiter/stats")
 async def get_recruiter_pipeline_stats(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Returns live pipeline statistics for the authenticated recruiter.
@@ -779,47 +682,52 @@ async def get_recruiter_pipeline_stats(
             detail="Recruiter or Administrator access required.",
         )
 
-    # 1. Fetch organization jobs under active tenant
-    raw_db = getattr(db, "raw_db", db)
+    # 1. Fetch organization jobs under active tenant via pure SQLAlchemy
     current_tenant = getattr(current_user, "tenant_id", "default") or "default"
     is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN} for r in user_roles)
-    if is_platform_admin_user or current_tenant == "default":
-        job_query = {}
-    else:
-        job_query = {
-            "$or": [
-                {"tenant_id": current_tenant},
-                {"tenant_id": "default"},
-                {"tenant_id": {"$exists": False}},
-                {"tenant_id": None},
-                {"created_by": str(current_user.id)},
-            ]
-        }
-    job_query["is_external"] = {"$ne": True}
-    jobs_cursor = raw_db.jobs.find(job_query, {"_id": 1, "status": 1})
-    jobs_list = await stream_cursor(jobs_cursor)
-    job_ids = [str(j["_id"]) for j in jobs_list]
+    
+    async with get_pg_session_factory()() as session:
+        stmt = select(Job.id, Job.status).where(Job.is_external == False)
+        if not (is_platform_admin_user or current_tenant == "default"):
+            stmt = stmt.where(
+                or_(
+                    Job.tenant_id == current_tenant,
+                    Job.tenant_id == "default",
+                    Job.tenant_id == None,
+                    Job.created_by == str(current_user.id),
+                )
+            )
+        jobs_res = await session.execute(stmt)
+        jobs_rows = jobs_res.all()
+        job_ids = [str(r[0]) for r in jobs_rows]
+        active_openings = sum(1 for r in jobs_rows if str(r[1] or "").lower() in ("open", "active"))
 
-    active_openings = sum(1 for j in jobs_list if str(j.get("status", "")).lower() in ("open", "active"))
-
-    if not job_ids:
-        return {
-            "active_openings": 0,
-            "total_candidates": 0,
-            "action_required": 0,
-            "time_to_screen": None,
-            "funnel": {
-                "applied": 0,
-                "under_review": 0,
-                "shortlisted": 0,
-                "interview": 0,
-                "rejected": 0,
+        if not job_ids:
+            return {
+                "active_openings": 0,
+                "total_candidates": 0,
+                "action_required": 0,
+                "time_to_screen": None,
+                "funnel": {
+                    "applied": 0,
+                    "under_review": 0,
+                    "shortlisted": 0,
+                    "interview": 0,
+                    "rejected": 0,
+                }
             }
-        }
 
-    # 2. Fetch all applications for these jobs
-    apps_cursor = raw_db.applications.find({"job_id": {"$in": job_ids}})
-    apps_list = await stream_cursor(apps_cursor)
+        # 2. Fetch all applications for these jobs
+        apps_res = await session.execute(
+            select(CandidateApplication).where(CandidateApplication.job_id.in_(job_ids))
+        )
+        apps_list = []
+        for app_row in apps_res.scalars().all():
+            ad = {c.name: getattr(app_row, c.name) for c in CandidateApplication.__table__.columns}
+            if app_row.details:
+                ad.update(app_row.details)
+            ad["_id"] = ad.get("id")
+            apps_list.append(ad)
 
     total_candidates = len(apps_list)
 
@@ -862,7 +770,9 @@ async def get_job_applications(
     job_id: str,
     stage: Optional[str] = Query(default=None, description="Filter by stage: Applied, Under Review, Shortlisted, Interview, Rejected"),
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Returns all applicants for a specific job, enriched with their parsed resume data.
@@ -877,17 +787,11 @@ async def get_job_applications(
             detail="Recruiter, Interviewer, or Administrator access required.",
         )
 
-    raw_db = getattr(db, "raw_db", db)
-
-    try:
-        oid = ObjectId(job_id)
-    except Exception:
+    
+    if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
-    job_doc = await raw_db.jobs.find_one({"_id": oid}, {"jd_embedding": 0})
-    if not job_doc:
-        # Fallback search by string _id or custom job_id
-        job_doc = await raw_db.jobs.find_one({"$or": [{"_id": str(job_id)}, {"job_id": str(job_id)}]}, {"jd_embedding": 0})
+    job_doc = await job_repo.get_by_id(job_id)
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
@@ -908,37 +812,14 @@ async def get_job_applications(
                 detail="You can only view applicants for your organization's job postings.",
             )
 
-    query: Dict[str, Any] = {"job_id": job_id}
-    if stage and stage.strip() and stage.strip().lower() != "all":
-        query["stage"] = {"$regex": f"^{re.escape(stage.strip())}$", "$options": "i"}
+    # Pure repository call for candidate applications
+    app_docs = await job_repo.list_candidate_applications(job_id, stage=stage if stage and stage.lower() != "all" else None)
 
-    cursor = raw_db.applications.find(query).sort([("recruiter_score", -1), ("match_score", -1)])
-    app_docs = await stream_cursor(cursor)
-
-    # Pre-fetch fallback resumes for any legacy applications without snapshot
-    missing_resume_ids = set()
-    for app in app_docs:
-        resume_snapshot = app.get("resume_snapshot") or {}
-        has_snapshot = resume_snapshot and isinstance(resume_snapshot, dict) and (resume_snapshot.get("parsed_data") or resume_snapshot.get("file_url"))
-        if not has_snapshot:
-            rid = app.get("resume_id")
-            if rid:
-                missing_resume_ids.add(str(rid))
-
+    # Pre-fetch fallback resumes
+    missing_resume_ids = {str(app.get("resume_id")) for app in app_docs if app.get("resume_id")}
     fallback_resumes_map = {}
     if missing_resume_ids:
-        query_ids = []
-        for rid in missing_resume_ids:
-            query_ids.append(rid)
-            if ObjectId.is_valid(rid):
-                query_ids.append(ObjectId(rid))
-        res_cursor = raw_db.resumes.find(
-            {"_id": {"$in": query_ids}},
-            {"raw_text": 0, "embedding": 0}
-        )
-        fetched_resumes = await stream_cursor(res_cursor)
-        for r in fetched_resumes:
-            fallback_resumes_map[str(r["_id"])] = r
+        fallback_resumes_map = await resume_repo.get_multiple_by_ids(list(missing_resume_ids))
 
     enriched_applications = []
     for app in app_docs:
@@ -1082,7 +963,8 @@ async def download_applicant_resume(
     resume_id: str,
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Secure applicant resume download.
@@ -1094,27 +976,11 @@ async def download_applicant_resume(
     user_id_str = str(current_user.id)
     is_admin = current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
 
-    # 1. Lookup resume in db.resumes
-    doc = None
-    try:
-        if ObjectId.is_valid(resume_id):
-            doc = await resume_repo.collection.find_one({"_id": ObjectId(resume_id)})
-        if not doc:
-            doc = await resume_repo.collection.find_one({"_id": str(resume_id)})
-    except Exception:
-        doc = None
+    # 1. Lookup resume in resumes table via repository
+    doc = await resume_repo.get_by_id(str(resume_id))
 
-    # 2. Lookup application document
-    app_query: Dict[str, Any] = {
-        "$or": [
-            {"resume_id": str(resume_id)},
-            {"resume_id": resume_id},
-        ]
-    }
-    if ObjectId.is_valid(resume_id):
-        app_query["$or"].append({"_id": ObjectId(resume_id)})
-
-    app_doc = await db.applications.find_one(app_query, sort=[("created_at", -1)])
+    # 2. Lookup application document via repository
+    app_doc = await job_repo.get_candidate_application(job_id, str(resume_id))
 
     # 3. Ownership verification
     is_candidate_owner = (doc and str(doc.get("user_id")) == user_id_str) or (
@@ -1126,8 +992,7 @@ async def download_applicant_resume(
         is_job_owner = True
     elif app_doc:
         try:
-            job_oid = ObjectId(app_doc["job_id"])
-            job_doc = await db.jobs.find_one({"_id": job_oid})
+            job_doc = await job_repo.get_by_id(job_id)
             if job_doc and str(job_doc.get("created_by")) == user_id_str:
                 is_job_owner = True
         except Exception:
@@ -1184,7 +1049,10 @@ async def update_application_stage(
     payload: ApplicationStageUpdatePayload,
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    app_repo: ApplicationRepository = Depends(get_app_repo),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Updates the hiring pipeline stage for an applicant.
@@ -1197,14 +1065,7 @@ async def update_application_stage(
             detail="Recruiter or Administrator access required.",
         )
 
-    raw_db = getattr(db, "raw_db", db)
-
-    try:
-        app_oid = ObjectId(app_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid application ID format.")
-
-    app_doc = await raw_db.applications.find_one({"_id": app_oid})
+    app_doc = await app_repo.get_by_id_only(app_id)
     if not app_doc:
         raise HTTPException(status_code=404, detail="Application record not found.")
 
@@ -1222,8 +1083,7 @@ async def update_application_stage(
     # Verify job ownership or organization tenant if recruiter
     if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
         try:
-            job_oid = ObjectId(app_doc["job_id"])
-            job_doc = await raw_db.jobs.find_one({"_id": job_oid})
+            job_doc = await job_repo.get_by_id(str(app_doc.get("job_id", "")))
             if job_doc:
                 job_tenant = job_doc.get("tenant_id", "default") or "default"
                 user_tenant = getattr(current_user, "tenant_id", "default") or "default"
@@ -1243,11 +1103,7 @@ async def update_application_stage(
         except Exception:
             pass
 
-    now = datetime.now(timezone.utc)
-    await raw_db.applications.update_one(
-        {"_id": app_oid},
-        {"$set": {"stage": target_stage, "updated_at": now}},
-    )
+    await app_repo.update_stage(app_id, target_stage)
 
     logger.info(
         "Application stage successfully updated",
@@ -1270,7 +1126,14 @@ async def update_application_stage(
             "new_stage": target_stage,
             "timestamp": now,
         }
-        await db.audit_events.insert_one(audit_event)
+        async with get_pg_session_factory()() as session:
+            session.add(AuditLog(
+                action=audit_event["event_type"],
+                actor_id=audit_event["actor_id"],
+                target_id=audit_event["application_id"],
+                payload=audit_event,
+            ))
+            await session.commit()
         if target_stage == "Hired":
             logger.info(
                 "Telemetry: hired event logged",
@@ -1288,7 +1151,6 @@ async def update_application_stage(
             """Background task: send a professional offer notification to the hired candidate."""
             try:
                 from services.email_service import EmailService
-                from bson import ObjectId as _ObjId
 
                 candidate_id = app_doc_snap.get("candidate_id")
                 if not candidate_id:
@@ -1296,14 +1158,8 @@ async def update_application_stage(
                     return
 
                 # ── 1. Resolve candidate ──────────────────────────────────────
-                try:
-                    cand_doc = await db_ref.users.find_one(
-                        {"_id": _ObjId(candidate_id)}, {"email": 1, "full_name": 1}
-                    )
-                except Exception:
-                    cand_doc = await db_ref.users.find_one(
-                        {"_id": candidate_id}, {"email": 1, "full_name": 1}
-                    )
+                user_repository = UserRepository()
+                cand_doc = await user_repository.get_by_id(str(candidate_id))
 
                 if not cand_doc or not cand_doc.get("email"):
                     logger.warning(
@@ -1320,10 +1176,7 @@ async def update_application_stage(
                 company_name = "the hiring team"
                 recruiter_email: Optional[str] = None
                 try:
-                    job_doc = await db_ref.jobs.find_one(
-                        {"_id": _ObjId(app_doc_snap.get("job_id", ""))},
-                        {"title": 1, "company_name": 1, "company": 1, "contact_email": 1, "created_by": 1},
-                    )
+                    job_doc = await job_repo.get_by_id(str(app_doc_snap.get("job_id", "")))
                     if job_doc:
                         job_title = job_doc.get("title", job_title)
                         company_name = (
@@ -1332,17 +1185,10 @@ async def update_application_stage(
                             or company_name
                         )
                         recruiter_email = job_doc.get("contact_email")
-                        # Fallback: resolve recruiter email from the job creator's user record
                         if not recruiter_email and job_doc.get("created_by"):
-                            try:
-                                rec_doc = await db_ref.users.find_one(
-                                    {"_id": _ObjId(str(job_doc["created_by"]))},
-                                    {"email": 1},
-                                )
-                                if rec_doc:
-                                    recruiter_email = rec_doc.get("email")
-                            except Exception:
-                                pass
+                            rec_doc = await user_repository.get_by_id(str(job_doc["created_by"]))
+                            if rec_doc:
+                                recruiter_email = rec_doc.get("email")
                 except Exception:
                     pass
 
@@ -1471,26 +1317,18 @@ async def toggle_job_status(
     job_id: str,
     payload: Dict[str, Any],
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """Toggles job status between 'open' and 'closed'."""
     if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
         raise HTTPException(status_code=403, detail="Recruiter access required.")
 
-    try:
-        oid = ObjectId(job_id)
-    except Exception:
+    if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
-    query = {"_id": oid}
-    if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
-        user_tenant = getattr(current_user, "tenant_id", "default") or "default"
-        if user_tenant != "default":
-            query["tenant_id"] = user_tenant
-        else:
-            query["created_by"] = str(current_user.id)
-
-    job_doc = await db.jobs.find_one(query)
+    job_doc = await job_repo.get_by_id(job_id)
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found or unauthorized.")
 
@@ -1499,7 +1337,7 @@ async def toggle_job_status(
         raise HTTPException(status_code=400, detail="Invalid status. Must be 'open', 'closed', or 'draft'.")
 
     now = datetime.now(timezone.utc)
-    await db.jobs.update_one({"_id": oid}, {"$set": {"status": new_status, "updated_at": now}})
+    await job_repo.update(job_id, {"status": new_status, "updated_at": now})
     return {"success": True, "job_id": job_id, "status": new_status}
 
 
@@ -1509,7 +1347,9 @@ async def update_job(
     job_id: str,
     payload: JobUpdateRequest,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Update a job posting.
@@ -1519,28 +1359,19 @@ async def update_job(
     if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
         raise HTTPException(status_code=403, detail="Recruiter access required.")
 
-    try:
-        oid = ObjectId(job_id)
-    except Exception:
+    if not hasattr(job_repo, "get_by_id"):
+        job_repo = get_job_repo()
+
+    if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
-    query = {"_id": oid}
-    if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
-        user_tenant = getattr(current_user, "tenant_id", "default") or "default"
-        if user_tenant != "default":
-            query["tenant_id"] = user_tenant
-        else:
-            query["created_by"] = str(current_user.id)
-
-    job_doc = await db.jobs.find_one(query)
+    job_doc = await job_repo.get_by_id(job_id)
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found or unauthorized.")
 
-    # Check applicant count
-    applicant_count = job_doc.get("applicant_count", 0)
-    if not applicant_count or applicant_count == 0:
-        live_count = await db.applications.count_documents({"job_id": job_id})
-        applicant_count = live_count
+    applicant_count = await job_repo.count_candidate_applications(job_id)
+    if not applicant_count and job_doc.get("applicant_count"):
+        applicant_count = int(job_doc.get("applicant_count"))
 
     update_dict = payload.model_dump(exclude_unset=True)
     rescore_requested = update_dict.pop("rescore_applicants", False)
@@ -1583,14 +1414,14 @@ async def update_job(
             )
 
         # Recruiter explicitly opted into re-scoring
-        await db.job_edit_history.insert_one({
-            "job_id": job_id,
-            "edited_by": str(current_user.id),
-            "changed_fields": changed_core_fields,
-            "old_values": old_vals,
-            "new_values": new_vals,
-            "timestamp": now,
-        })
+        async with get_pg_session_factory()() as session:
+            session.add(AuditLog(
+                action="job_edit_rescore",
+                actor_id=str(current_user.id),
+                target_id=str(job_id),
+                payload={"changed_fields": changed_core_fields, "old_values": old_vals, "new_values": new_vals},
+            ))
+            await session.commit()
 
     # If jd_text_raw changed, preserve raw text (deterministic engine scores on-the-fly)
     if "jd_text_raw" in update_dict and (update_dict["jd_text_raw"] or "").strip() != (job_doc.get("jd_text_raw") or "").strip():
@@ -1601,8 +1432,7 @@ async def update_job(
 
     update_dict["updated_at"] = now
 
-    await db.jobs.update_one({"_id": oid}, {"$set": update_dict})
-    updated_doc = await db.jobs.find_one({"_id": oid})
+    updated_doc = await job_repo.update(job_id, update_dict) or job_doc
 
     # If rescoring was requested and core fields changed with applicants, re-score all applications
     rescored_count = 0
@@ -1611,17 +1441,13 @@ async def update_job(
         final_skills = updated_doc.get("required_skills", [])
         final_years = updated_doc.get("min_years")
 
-        apps_cursor = db.applications.find({"job_id": job_id})
-        async for app in apps_cursor:
+        all_apps = await job_repo.list_candidate_applications(job_id)
+        for app in all_apps:
             resume_payload = (app.get("resume_snapshot") or {}).get("parsed_data") or {}
             if not resume_payload or not resume_payload.get("raw_text"):
-                res_oid = None
-                try:
-                    res_oid = ObjectId(app.get("resume_id"))
-                except Exception:
-                    pass
-                if res_oid:
-                    res_doc = await db.resumes.find_one({"_id": res_oid})
+                rid = str(app.get("resume_id") or "")
+                if rid:
+                    res_doc = await resume_repo.get_by_id(rid)
                     if res_doc and res_doc.get("parsed_data"):
                         resume_payload = res_doc["parsed_data"]
 
@@ -1642,20 +1468,16 @@ async def update_job(
                 elig_rank = int(dual_scored.get("eligibility_rank", 0))
                 features_data = dual_scored.get("features") or dual_scored.get("recruiter_result", {}).get("features")
 
-                await db.applications.update_one(
-                    {"_id": app["_id"]},
-                    {"$set": {
-                        "match_score": m_score,
-                        "quality_score": q_score,
-                        "eligibility": elig_info,
-                        "eligibility_rank": elig_rank,
-                        "recruiter_score": r_score,
-                        "knockout_status": k_status,
-                        "features": features_data,
-                        "scoring_version": s_version,
-                        "updated_at": now,
-                    }}
-                )
+                await job_repo.update_candidate_application(job_id, str(app["_id"]), {
+                    "match_score": m_score,
+                    "quality_score": q_score,
+                    "eligibility": elig_info,
+                    "eligibility_rank": elig_rank,
+                    "recruiter_score": r_score,
+                    "knockout_status": k_status,
+                    "scoring_version": s_version,
+                    "features": features_data,
+                })
                 rescored_count += 1
             except Exception as re_err:
                 logger.warning("Failed to re-score application during job update", app_id=str(app.get("_id")), error=str(re_err))
@@ -1694,7 +1516,8 @@ async def trigger_job_alerts_manually(
     cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Manual & Automated Webhook trigger for Twice-Daily AI Job Alerts retention loop.
@@ -1722,7 +1545,7 @@ async def trigger_job_alerts_manually(
     from scheduler.job_alerts import run_nightly_job_alerts
     triggered_by = "manual_admin_api" if is_admin else "webhook_cron"
     result = await run_nightly_job_alerts(
-        db=db,
+        db=session or db,
         target_email=target_email,
         slot_id=slot_id,
         triggered_by=triggered_by,
@@ -1736,7 +1559,8 @@ async def trigger_job_scrape_manually(
     cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    db: Any = Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Manual & Automated Webhook trigger for External JSearch Job Scraper.
@@ -1775,7 +1599,8 @@ async def trigger_job_scrape_manually(
 async def get_jobs_by_company(
     company_name: str,
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    db: Any = Depends(get_database),
+    company_repo: CompanyRepository = Depends(get_company_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Public employer branding route: returns rich company profile and all open jobs.
@@ -1785,25 +1610,32 @@ async def get_jobs_by_company(
     if not cleaned_name:
         raise HTTPException(status_code=400, detail="Company name cannot be empty.")
 
-    pattern = f"^{re.escape(cleaned_name)}$"
-
     # 1. Fetch company profile if saved
-    company_doc = await db.companies.find_one(
-        {"company_name": {"$regex": pattern, "$options": "i"}}
-    )
+    company_doc = await company_repo.get_by_name(cleaned_name)
 
-    company_jobs_query: Dict[str, Any] = {
-        "company_name": {"$regex": pattern, "$options": "i"},
-        "status": {"$regex": "^(open|published)$", "$options": "i"},
-    }
+    async def _fetch_company_jobs(sess: AsyncSession):
+        stmt = (
+            select(Job)
+            .where(
+                func.lower(Job.company_name) == cleaned_name.lower(),
+                Job.status.in_(["open", "published", "active"]),
+            )
+            .order_by(Job.created_at.desc())
+        )
+        res = await sess.execute(stmt)
+        res_docs = []
+        for j in res.scalars().all():
+            d = {c.name: getattr(j, c.name) for c in Job.__table__.columns}
+            d["_id"] = d.get("id")
+            res_docs.append(d)
+        return res_docs
 
-    # 2. Fetch all open or published jobs for this company
-    cursor = db.jobs.find(
-        company_jobs_query,
-        {"jd_embedding": 0}
-    ).sort("created_at", -1)
-
-    docs = await stream_cursor(cursor)
+    active_sess = session if hasattr(session, "execute") else None
+    if active_sess:
+        docs = await _fetch_company_jobs(active_sess)
+    else:
+        async with get_pg_session_factory()() as sess:
+            docs = await _fetch_company_jobs(sess)
 
     canonical_name = (
         company_doc.get("company_name")
@@ -1891,7 +1723,8 @@ async def get_jobs_by_company(
 async def save_company_profile(
     payload: CompanyProfilePayload,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    company_repo: CompanyRepository = Depends(get_company_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Recruiters / Admins save their employer branding profile.
@@ -1935,30 +1768,34 @@ async def save_company_profile(
         "updated_at": now,
     }
 
-    # Upsert company profile by tenant_id or company_name
-    query = {"tenant_id": tenant_id} if tenant_id != "default" else {
-        "company_name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}
-    }
-    await db.companies.update_one(
-        query,
-        {"$set": profile_dict, "$setOnInsert": {"created_at": now, "created_by": str(current_user.id)}},
-        upsert=True,
-    )
+    # Upsert company profile by tenant_id or company_name via repository
+    await company_repo.upsert(clean_name, profile_dict)
 
-    # Sync logo & website to existing jobs of this company
+    # Sync logo & website to existing jobs of this company via native SQLAlchemy
     update_fields = {}
-    if profile_dict["logo_url"]:
+    if profile_dict.get("logo_url"):
         update_fields["company_logo"] = profile_dict["logo_url"]
-    if profile_dict["website"]:
+    if profile_dict.get("website"):
         update_fields["company_website"] = profile_dict["website"]
-    if profile_dict["about"]:
+    if profile_dict.get("about"):
         update_fields["company_about"] = profile_dict["about"]
 
     if update_fields:
-        await db.jobs.update_many(
-            {"company_name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}},
-            {"$set": update_fields},
-        )
+        async def _upd_jobs(sess: AsyncSession):
+            upd_stmt = (
+                update(Job)
+                .where(func.lower(Job.company_name) == clean_name.lower())
+                .values(**update_fields)
+            )
+            await sess.execute(upd_stmt)
+            await sess.commit()
+
+        active_sess = session if hasattr(session, "execute") else None
+        if active_sess:
+            await _upd_jobs(active_sess)
+        else:
+            async with get_pg_session_factory()() as sess:
+                await _upd_jobs(sess)
 
     logger.info("Company profile updated", company=clean_name, user_id=str(current_user.id))
     return {"success": True, "message": "Company profile saved successfully.", "profile": profile_dict}
@@ -1972,29 +1809,33 @@ async def save_company_profile(
 async def get_job_detail(
     job_id: str,
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
+    company_repo: CompanyRepository = Depends(get_company_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """Returns full job details for candidates or recruiters, enriched with company profile and has_applied state."""
-    try:
-        oid = ObjectId(job_id)
-    except Exception:
+    if not hasattr(job_repo, "get_by_id"):
+        from api.routes import jobs as jobs_mod
+        job_repo = getattr(jobs_mod, "job_repo", None) or get_job_repo()
+    if not hasattr(company_repo, "get_by_name"):
+        from api.routes import jobs as jobs_mod
+        company_repo = getattr(jobs_mod, "company_repo", None) or get_company_repo()
+
+    if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
-    raw_db = getattr(db, "raw_db", db)
-    doc = await raw_db.jobs.find_one({"_id": oid}, {"jd_embedding": 0})
+    doc = await job_repo.get_by_id(job_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
     user_role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
-    # External scraped jobs are globally accessible; internal jobs are accessible to all authenticated or public viewers of the posting
     company_name = doc.get("company_name", "")
 
     # Look up company profile if company fields missing on the job doc
     company_profile = None
     if company_name:
-        company_profile = await db.companies.find_one(
-            {"company_name": {"$regex": f"^{re.escape(company_name.strip())}$", "$options": "i"}}
-        )
+        company_profile = await company_repo.get_by_name(company_name)
 
     company_logo = doc.get("company_logo") or (company_profile.get("logo_url") if company_profile else None)
     company_website = doc.get("company_website") or (company_profile.get("website") if company_profile else None)
@@ -2004,22 +1845,8 @@ async def get_job_detail(
 
     has_applied = False
     if current_user:
-        candidate_id_str = str(current_user.id)
-        target_ids = [str(oid)]
-        if isinstance(oid, ObjectId):
-            target_ids.append(oid)
-        candidate_ids = [candidate_id_str]
-        try:
-            candidate_ids.append(ObjectId(candidate_id_str))
-        except Exception:
-            pass
-
-        existing_app = await raw_db.applications.find_one({
-            "candidate_id": {"$in": candidate_ids},
-            "job_id": {"$in": target_ids},
-        })
-        if existing_app:
-            has_applied = True
+        applied_ids = await job_repo.get_user_applied_job_ids(str(current_user.id))
+        has_applied = str(job_id) in applied_ids
 
     raw_skills = doc.get("required_skills")
     if isinstance(raw_skills, list):
@@ -2070,31 +1897,28 @@ async def match_job_ats(
     job_id: str,
     resume_id: Optional[str] = Query(default=None),
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
     resume_repo = Depends(get_resume_repo),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Calculates instant ATS match percentage between candidate resume and job.
     Uses candidate Fresher-Friendly profile (Skills 70%, Exp 15%, Edu 15%).
     Rate limited to 10 requests/minute/user.
     """
-    raw_db = getattr(db, "raw_db", db)
+    if not hasattr(job_repo, "get_by_id"):
+        job_repo = get_job_repo()
+    if not hasattr(resume_repo, "get_primary_by_user"):
+        resume_repo = get_resume_repo()
 
-    # 1. Resolve job document across tenant boundaries (candidates matching any open job)
-    job_doc = None
-    if ObjectId.is_valid(job_id):
-        job_doc = await raw_db.jobs.find_one({"_id": ObjectId(job_id)})
-    if not job_doc:
-        job_doc = await raw_db.jobs.find_one({"_id": str(job_id)})
-    if not job_doc:
-        job_doc = await raw_db.jobs.find_one({"job_id": str(job_id)})
-
+    job_doc = await job_repo.get_by_id(str(job_id))
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
     if bool(job_doc.get("is_external", False)):
         from services.jd_extractor import ensure_external_job_jd
-        await ensure_external_job_jd(job_doc, raw_db)
+        await ensure_external_job_jd(job_doc)
 
     # Ensure the job status is open, published, or active
     job_status = str(job_doc.get("status", "open")).lower()
@@ -2113,23 +1937,6 @@ async def match_job_ats(
         if not target_resume:
             resumes, _ = await resume_repo.get_by_user(str(current_user.id), limit=1)
             target_resume = resumes[0] if resumes else None
-
-    if not target_resume:
-        doc = await raw_db.resumes.find_one(
-            {"user_id": str(current_user.id), "status": "parsed"},
-            sort=[("is_primary", -1), ("created_at", -1)],
-        )
-        if not doc:
-            doc = await raw_db.resumes.find_one(
-                {"user_id": str(current_user.id)},
-                sort=[("is_primary", -1), ("created_at", -1)],
-            )
-        if doc and doc.get("parsed_data"):
-            try:
-                from models.resume_model import ResumeModel
-                target_resume = ResumeModel(**resume_repo._serialize(doc))
-            except Exception:
-                target_resume = doc
 
     raw_parsed = getattr(target_resume, "parsed_data", None)
     if not raw_parsed and isinstance(target_resume, dict):
@@ -2157,7 +1964,7 @@ async def match_job_ats(
     jd_content = (job_doc.get("jd_text_raw") or job_doc.get("jd_text") or "").strip()
     if not jd_content:
         from services.jd_extractor import ensure_external_job_jd
-        jd_content = await ensure_external_job_jd(job_doc, raw_db)
+        jd_content = await ensure_external_job_jd(job_doc)
 
     scored = score_resume(
         resume=resume_payload,
@@ -2209,8 +2016,10 @@ async def apply_to_job(
     payload: Optional[JobApplyPayload] = None,
     resume_id: Optional[str] = Query(default=None),
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
     resume_repo = Depends(get_resume_repo),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Submits a candidate application to a job.
@@ -2219,13 +2028,10 @@ async def apply_to_job(
     - Saves record to the 'applications' collection using ApplicationModel (stage: 'Applied').
     - Prevents duplicate applications from the same user for the same job.
     """
-    try:
-        oid = ObjectId(job_id)
-    except Exception:
+    if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
-    raw_db = getattr(db, "raw_db", db)
-    job_doc = await raw_db.jobs.find_one({"_id": oid})
+    job_doc = await job_repo.get_by_id(job_id)
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
@@ -2234,12 +2040,9 @@ async def apply_to_job(
 
     target_tenant_id = job_doc.get("tenant_id", "default") or "default"
 
-    # 1. Prevent duplicate applications in 'applications' collection
-    existing = await raw_db.applications.find_one({
-        "job_id": job_id,
-        "candidate_id": str(current_user.id),
-    })
-    if existing:
+    # 1. Prevent duplicate applications via JobRepository
+    applied_ids = await job_repo.get_user_applied_job_ids(str(current_user.id))
+    if str(job_id) in applied_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You have already applied to this job.",
@@ -2262,18 +2065,8 @@ async def apply_to_job(
             target_resume = resumes[0] if resumes else None
 
     if not target_resume:
-        doc = await db.resumes.find_one(
-            {"user_id": str(current_user.id), "status": "parsed"},
-            sort=[("is_primary", -1), ("created_at", -1)],
-        )
-        if not doc:
-            doc = await db.resumes.find_one(
-                {"user_id": str(current_user.id)},
-                sort=[("is_primary", -1), ("created_at", -1)],
-            )
-        if doc and doc.get("parsed_data"):
-            from models.resume_model import ResumeModel
-            target_resume = ResumeModel(**resume_repo._serialize(doc))
+        resumes, _ = await resume_repo.get_by_user(str(current_user.id), limit=1)
+        target_resume = resumes[0] if resumes else None
 
     raw_parsed = getattr(target_resume, "parsed_data", None)
     if not raw_parsed and isinstance(target_resume, dict):
@@ -2386,17 +2179,9 @@ async def apply_to_job(
         "updated_at": now,
     }
 
-    try:
-        res = await raw_db.applications.insert_one(app_doc)
-    except DuplicateKeyError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You have already applied to this job.",
-        )
-
-    # Update job applicant_count accurately
-    real_app_cnt = await raw_db.applications.count_documents({"job_id": str(oid)})
-    await raw_db.jobs.update_one({"_id": oid}, {"$set": {"applicant_count": real_app_cnt}})
+    # Create candidate application via pure JobRepository
+    created_app = await job_repo.create_candidate_application(app_doc)
+    await job_repo.increment_applicant_count(job_id, 1)
 
     # Telemetry logging (Phase 1.6 - privacy safe)
     try:
@@ -2459,12 +2244,14 @@ async def override_application_eligibility(
     app_id: str,
     payload: EligibilityOverridePayload,
     current_user: UserModel = Depends(get_recruiter_or_admin),
-    db: Any = Depends(get_database),
+    job_repo: JobRepository = Depends(get_job_repo),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """
     Recruiter/Admin discretion endpoint to override an automated eligibility determination.
     Updates application eligibility status, recalculates eligibility_rank, and logs
-    an immutable audit trail record to db.audit_logs.
+    an immutable audit trail record.
     """
     if payload.new_status not in ("eligible", "ineligible", "unverified"):
         raise HTTPException(
@@ -2472,12 +2259,7 @@ async def override_application_eligibility(
             detail="Invalid status. Must be 'eligible', 'ineligible', or 'unverified'."
         )
 
-    try:
-        app_oid = ObjectId(app_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid application ID format.")
-
-    app = await db.applications.find_one({"_id": app_oid, "job_id": job_id})
+    app = await job_repo.get_candidate_application(job_id, app_id)
     if not app:
         raise HTTPException(status_code=404, detail="Application not found for this job.")
 
@@ -2489,28 +2271,24 @@ async def override_application_eligibility(
         "by": str(current_user.id),
         "by_email": getattr(current_user, "email", None),
         "at": now,
-        "previous_status": app.get("eligibility", {}).get("status", "unverified"),
+        "previous_status": (app.get("details") or {}).get("eligibility", {}).get("status", "unverified") if isinstance(app.get("details"), dict) else "unverified",
         "new_status": payload.new_status,
         "reason_code": payload.reason_code,
         "note": payload.note,
     }
 
-    await db.applications.update_one(
-        {"_id": app_oid},
-        {
-            "$set": {
-                "eligibility.status": payload.new_status,
-                "eligibility_rank": new_rank,
-                "eligibility_override": override_entry,
-                "updated_at": now,
-            }
-        }
-    )
+    update_payload = {
+        "eligibility": {"status": payload.new_status},
+        "eligibility_rank": new_rank,
+        "eligibility_override": override_entry,
+        "updated_at": now,
+    }
+    await job_repo.update_candidate_application(job_id, app_id, update_payload)
 
     # Immutable audit logging
     audit_entry = {
         "action": "eligibility_override",
-        "application_id": str(app_oid),
+        "application_id": str(app_id),
         "job_id": job_id,
         "actor_id": str(current_user.id),
         "actor_email": getattr(current_user, "email", None),
@@ -2518,7 +2296,16 @@ async def override_application_eligibility(
         "timestamp": now,
         "details": override_entry,
     }
-    await db.audit_logs.insert_one(audit_entry)
+    try:
+        from repositories.audit_log_repo import AuditLogRepository
+        await AuditLogRepository().log_event(
+            action=audit_entry["action"],
+            actor_id=audit_entry["actor_id"],
+            target_id=audit_entry["application_id"],
+            payload=audit_entry["details"],
+        )
+    except Exception:
+        pass
 
     # Telemetry logging (Phase 1.6)
     try:
@@ -2533,7 +2320,7 @@ async def override_application_eligibility(
     except Exception as log_err:
         logger.warning("Failed to log eligibility_override match event", error=str(log_err))
 
-    updated_app = await db.applications.find_one({"_id": app_oid})
+    updated_app = await job_repo.get_candidate_application(job_id, app_id) or app
     return ApplicationResponse(
         id=str(updated_app["_id"]),
         job_id=updated_app["job_id"],

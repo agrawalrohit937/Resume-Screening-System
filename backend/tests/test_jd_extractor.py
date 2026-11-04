@@ -4,7 +4,6 @@ Unit tests for external job JD extraction and embedding service (jd_extractor.py
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from bson import ObjectId
 
 from services.jd_extractor import (
     _clean_extracted_text,
@@ -55,8 +54,23 @@ async def test_extract_jd_from_url_with_html():
 
 @pytest.mark.asyncio
 async def test_ensure_external_job_jd_generates_and_saves():
+    from tests.conftest import MockAsyncSession
+    from models.tables import Job as JobT
+
+    job_id = "660000000000000000000012"
+    job_row = JobT(
+        id=job_id,
+        title="Data Engineer",
+        company_name="Acme Analytics",
+        required_skills=["Python", "Spark", "Kafka"],
+        min_years=2.0,
+        is_external=True,
+        external_apply_url="https://careers.example.com/data-eng",
+        jd_text_raw="",
+    )
     job_doc = {
-        "_id": ObjectId("660000000000000000000012"),
+        "_id": job_id,
+        "id": job_id,
         "title": "Data Engineer",
         "company_name": "Acme Analytics",
         "required_skills": ["Python", "Spark", "Kafka"],
@@ -66,15 +80,12 @@ async def test_ensure_external_job_jd_generates_and_saves():
         "jd_text_raw": "",
     }
 
-    mock_db = MagicMock()
-    mock_raw_db = MagicMock()
-    mock_db.raw_db = mock_raw_db
-    mock_raw_db.jobs.update_one = AsyncMock(return_value=None)
-
-    with patch("services.jd_extractor.extract_jd_from_url") as mock_extract:
+    with patch("services.jd_extractor.extract_jd_from_url") as mock_extract, \
+         patch("services.jd_extractor.get_pg_session_factory") as mock_pg:
+        mock_pg.return_value = lambda: MockAsyncSession(items=[job_row])
         mock_extract.return_value = "Join Acme as Data Engineer building real-time pipelines with Spark and Kafka."
 
-        result_text = await ensure_external_job_jd(job_doc, mock_db)
+        result_text = await ensure_external_job_jd(job_doc)
         assert "Join Acme as Data Engineer" in result_text
         assert job_doc["jd_text_raw"] == result_text
         assert "jd_embedding_bge" in job_doc

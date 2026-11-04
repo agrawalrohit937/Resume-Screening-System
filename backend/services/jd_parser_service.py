@@ -60,56 +60,17 @@ def is_skill_grounded(skill_name: str, jd_text_clean: str) -> bool:
 
 
 async def _get_persistent_cache(cache_key: str, db: Optional[Any] = None) -> Optional[Dict[str, Any]]:
-    """Retrieves cached JD specs from RAM or MongoDB."""
+    """Retrieves cached JD specs from RAM or database."""
     if cache_key in _JD_CACHE:
         return _JD_CACHE[cache_key]
-
-    if db is None:
-        try:
-            from config.db import get_database
-            db = get_database()
-        except Exception:
-            db = None
-
-    if db is not None:
-        try:
-            cached_doc = await db["jd_specs_cache"].find_one({"cache_key": cache_key})
-            if cached_doc and "specs" in cached_doc:
-                _JD_CACHE[cache_key] = cached_doc["specs"]
-                return cached_doc["specs"]
-        except Exception as e:
-            logger.debug("MongoDB cache read error", error=str(e))
-
     return None
 
 
 async def _set_persistent_cache(cache_key: str, specs: Dict[str, Any], db: Optional[Any] = None) -> None:
-    """Persists parsed JD specs to RAM and MongoDB."""
+    """Persists parsed JD specs to high-speed RAM cache."""
     if len(_JD_CACHE) >= _MAX_CACHE_SIZE:
         _JD_CACHE.clear()
     _JD_CACHE[cache_key] = specs
-
-    if db is None:
-        try:
-            from config.db import get_database
-            db = get_database()
-        except Exception:
-            db = None
-
-    if db is not None:
-        try:
-            from datetime import datetime, timezone
-            await db["jd_specs_cache"].update_one(
-                {"cache_key": cache_key},
-                {"$set": {
-                    "cache_key": cache_key,
-                    "specs": specs,
-                    "updated_at": datetime.now(timezone.utc),
-                }},
-                upsert=True,
-            )
-        except Exception as e:
-            logger.debug("MongoDB cache write error", error=str(e))
 
 
 def map_job_title_to_occupation(title: str) -> Optional[str]:
@@ -292,7 +253,7 @@ async def parse_jd_with_groq(jd_text: str, db: Optional[Any] = None) -> Dict[str
     try:
         raw_result = await groq_key_pool.execute_async_with_fallback(_make_request)
         if isinstance(raw_result, dict) and raw_result:
-            raw_must = [str(s).strip() for s in (raw_result.get("must_have_skills") or []) if str(s).strip()]
+            raw_must = [str(s).strip() for s in (raw_result.get("must_have_skills") or raw_result.get("required_skills") or []) if str(s).strip()]
             raw_nice = [str(s).strip() for s in (raw_result.get("nice_to_have_skills") or []) if str(s).strip()]
             soft_skills = [str(s).strip() for s in (raw_result.get("soft_competencies") or []) if str(s).strip()]
 
@@ -350,7 +311,7 @@ async def parse_jd_with_groq(jd_text: str, db: Optional[Any] = None) -> Dict[str
                 "is_fresher_eligible": bool(min_years_val is None or min_years_val <= 1.0),
             }
 
-            # Persist to RAM and MongoDB
+            # Persist to RAM and database
             await _set_persistent_cache(cache_key, normalized_result, db=db)
 
             logger.info(

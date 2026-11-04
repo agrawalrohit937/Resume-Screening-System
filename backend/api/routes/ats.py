@@ -6,10 +6,11 @@ import tempfile
 from pathlib import Path
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
-from typing import Optional
+from typing import Optional, Any
+from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
-    get_user_repo, PaginationParams, get_database
+    get_user_repo, PaginationParams, get_db
 )
 from models.result_model import ATSResultModel
 from models.resume_model import ResumeStatus
@@ -669,11 +670,12 @@ async def queue_batch_match(
 async def get_task_status(
     task_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db=Depends(get_database),
+    session: Optional[AsyncSession] = Depends(get_db),
+    db: Optional[Any] = None,
 ):
     """Polls live execution status, progress percentage, and results for a background job."""
     tenant_id = getattr(current_user, "tenant_id", None) or "default"
-    repo = TaskJobRepository(db)
+    repo = TaskJobRepository(db or session)
     job = await repo.get_by_job_id(task_id, tenant_id=tenant_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task job not found.")

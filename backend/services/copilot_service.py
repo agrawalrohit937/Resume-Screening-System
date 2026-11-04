@@ -54,7 +54,7 @@ class CopilotService:
     ) -> None:
         """
         Background worker executed via FastAPI BackgroundTasks:
-        - Persists assistant message to MongoDB copilot_messages
+        - Persists assistant message to copilot_messages
         - Non-blocking: failures are logged and do not impact user response latency
         """
         try:
@@ -363,7 +363,7 @@ CORE BEHAVIOR & EMPTY-STATE COACHING:
             })
             yield sse_format({"type": "done"})
 
-            # Move MongoDB telemetry tracking (token calculation, cost update, history saving, semantic cache)
+            # Move database telemetry tracking (token calculation, cost update, history saving, semantic cache)
             # into FastAPI BackgroundTasks so API returns immediately without waiting for DB writes
             if background_tasks:
                 background_tasks.add_task(

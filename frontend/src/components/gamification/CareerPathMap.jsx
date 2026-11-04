@@ -4,7 +4,7 @@ import {
   Sprout, CircleDot, TrendingUp, Star, Flame, Zap, Gem, Trophy, Crown,
   Lock, Gift, Award, X, Check
 } from 'lucide-react'
-import { deriveCurrentLevelIndex } from './mockConfig'
+import { deriveCurrentLevelIndex } from './gamificationConfig'
 
 const RANK_STYLES = [
   { icon: Sprout, gradient: 'from-slate-500 to-slate-600', shadow: 'shadow-sm', border: 'border-slate-300', text: 'text-slate-700' },

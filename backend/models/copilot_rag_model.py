@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 class CopilotChunkModel(BaseModel):
     """
-    Stored document chunk in MongoDB `copilot_chunks`.
+    Stored document chunk in Database `copilot_chunks`.
     Scoped strictly by `tenant_id` and `user_id`.
     """
     id: Optional[str] = Field(default=None, alias="_id")

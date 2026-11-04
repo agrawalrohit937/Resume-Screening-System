@@ -1,6 +1,6 @@
 """
 Vector Calibration Script (Phase 1.3).
-Samples N (>=100) resume-JD pairs from MongoDB (or deterministic smoke test samples),
+Samples N (>=100) resume-JD pairs from Database (or deterministic smoke test samples),
 computes raw BGE cosine for both single-vector and multi-vector Max-Sim paths,
 computes p5/p50/p95 percentiles, and outputs recommended calibration parameters to JSON.
 
@@ -30,7 +30,7 @@ logger = structlog.get_logger(__name__)
 SAMPLE_SYNTHETIC_RESUMES = [
     "Senior Python Developer with 6 years experience in FastAPI, PostgreSQL, Redis, Docker, and Kubernetes.",
     "Frontend React Engineer proficient in TypeScript, Next.js, Redux Toolkit, TailwindCSS, and Jest testing.",
-    "Fullstack Engineer with Node.js, Express, React, MongoDB, GraphQL, and AWS Lambda serverless experience.",
+    "Fullstack Engineer with Node.js, Express, React, Database, GraphQL, and AWS Lambda serverless experience.",
     "DevOps and Cloud Infrastructure Engineer with Terraform, AWS, GCP, CI/CD pipelines, Prometheus, and Grafana.",
     "Data Scientist and ML Engineer with PyTorch, Scikit-Learn, Pandas, NLP transformers, and MLflow.",
     "Java Backend Developer with Spring Boot, Microservices, Kafka, MySQL, and Docker containerization.",
@@ -51,27 +51,25 @@ SAMPLE_SYNTHETIC_JDS = [
 
 
 async def fetch_sample_pairs_from_db(n_samples: int = 100) -> List[Tuple[Dict[str, Any], Dict[str, Any]]]:
-    """Fetches real resume and job pairs from MongoDB, or falls back to synthetic combinations."""
+    """Fetches real resume and job pairs from Database, or falls back to synthetic combinations."""
     pairs: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
     try:
-        from config.db import connect_db, get_database, disconnect_db
-        await connect_db()
-        db = get_database()
-
-        resumes_cursor = db.resumes.aggregate([{"$sample": {"size": min(n_samples, 200)}}])
-        resumes = await resumes_cursor.to_list(length=n_samples)
-
-        jobs_cursor = db.jobs.aggregate([{"$sample": {"size": min(n_samples, 200)}}])
-        jobs = await jobs_cursor.to_list(length=n_samples)
+        from config.db import get_pg_session_factory
+        from sqlalchemy import select, func
+        from models.tables import Resume, Job
+        async with get_pg_session_factory()() as session:
+            r_rows = (await session.execute(select(Resume).order_by(func.random()).limit(min(n_samples, 200)))).scalars().all()
+            resumes = [{c.name: getattr(r, c.name) for c in Resume.__table__.columns} for r in r_rows]
+            j_rows = (await session.execute(select(Job).order_by(func.random()).limit(min(n_samples, 200)))).scalars().all()
+            jobs = [{c.name: getattr(j, c.name) for c in Job.__table__.columns} for j in j_rows]
 
         if resumes and jobs:
             for i in range(n_samples):
                 r = resumes[i % len(resumes)]
                 j = jobs[i % len(jobs)]
                 pairs.append((r, j))
-        await disconnect_db()
     except Exception as e:
-        logger.info("Could not fetch from MongoDB, using synthetic candidate-job pool for calibration", error=str(e))
+        logger.info("Could not fetch from Database, using synthetic candidate-job pool for calibration", error=str(e))
 
     # Fill remaining with combinations of sample data if DB has insufficient records
     idx = 0

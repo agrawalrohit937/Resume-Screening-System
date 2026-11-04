@@ -35,21 +35,23 @@ async def main():
 
     print(f"[*] Starting semantic calibration (max_samples={args.max_samples})...")
 
-    # 1. Fetch resumes from MongoDB or fallback
+    # 1. Fetch resumes from database or fallback
     texts: List[str] = []
     try:
-        from core.config import settings
-        from motor.motor_asyncio import AsyncIOMotorClient
-        client = AsyncIOMotorClient(settings.MONGO_URI, serverSelectionTimeoutMS=2000)
-        db = client[settings.MONGO_DB_NAME]
-        cursor = db["resumes"].find({"status": "parsed"}, {"parsed_data.raw_text": 1}).limit(args.max_samples)
-        async for doc in cursor:
-            raw = (doc.get("parsed_data") or {}).get("raw_text")
-            if raw and len(raw.strip()) > 100:
-                texts.append(raw.strip()[:2000])
-        print(f"[+] Loaded {len(texts)} resumes from MongoDB.")
+        from config.db import get_pg_session_factory
+        from models.tables import Resume
+        from sqlalchemy import select
+        session_factory = get_pg_session_factory()
+        async with session_factory() as session:
+            stmt = select(Resume).where(Resume.status == "parsed").limit(args.max_samples)
+            res = await session.execute(stmt)
+            for r in res.scalars().all():
+                raw = (r.parsed_data or {}).get("raw_text") or r.raw_text
+                if raw and len(raw.strip()) > 100:
+                    texts.append(raw.strip()[:2000])
+        print(f"[+] Loaded {len(texts)} resumes from Database.")
     except Exception as e:
-        print(f"[-] MongoDB access unavailable or empty: {e}")
+        print(f"[-] Database access unavailable or empty: {e}")
 
     # Fallback to local test samples if database is empty
     if len(texts) < 10:
@@ -57,7 +59,7 @@ async def main():
         baseline_samples = [
             "Senior Backend Engineer with Python, FastAPI, Docker, Kubernetes, PostgreSQL microservices.",
             "Frontend Developer skilled in React, Next.js, TypeScript, Tailwind CSS, Redux.",
-            "Full Stack Engineer with Node.js, Express, React, MongoDB, AWS cloud deployment.",
+            "Full Stack Engineer with Node.js, Express, React, Database, AWS cloud deployment.",
             "Data Scientist specializing in Machine Learning, PyTorch, Scikit-learn, Pandas, NLP.",
             "DevOps Engineer with Terraform, Ansible, CI/CD pipelines, Docker, Kubernetes on GCP.",
             "Healthcare Registered Nurse with critical care ICU experience and BLS certification.",

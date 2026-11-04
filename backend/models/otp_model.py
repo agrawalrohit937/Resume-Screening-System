@@ -1,5 +1,5 @@
 """
-MongoDB Document Model — OTP (collection: "otps")
+Domain Model — OTP (collection: "otps")
 Never stores the raw OTP — only its hash.
 """
 

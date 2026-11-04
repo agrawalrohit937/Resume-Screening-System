@@ -71,7 +71,7 @@ def test_platform_admin_has_all_permissions_and_bypasses_tenant():
     # Test bypass flag in context
     set_platform_admin(True)
     try:
-        mock_coll = FakeMongoCollection()
+        mock_coll = FakeCollection()
         scoped = TenantScopedCollection(mock_coll)
         # Without tenant_override, platform admin query is not constrained by tenant_id
         q = scoped._scope_query({"title": "Senior Engineer"})
@@ -97,66 +97,69 @@ def test_executive_inherits_all_permissions_for_tenant():
     assert Permission.TALENT_CRM_ACCESS.value in combined
 
 
-class FakeMongoCollection:
-    """In-memory mock MongoDB collection for testing TenantScopedCollection."""
+class InMemoryTableStore:
+    """In-memory table store for testing TenantScopedRepository and relational isolation."""
     def __init__(self):
         self.docs = []
 
-    async def find_one(self, query=None, *args, **kwargs):
+    async def get(self, query=None, *args, **kwargs):
         query = query or {}
         for d in self.docs:
             if all(d.get(k) == v for k, v in query.items()):
                 return dict(d)
         return None
 
-    async def insert_one(self, doc, *args, **kwargs):
+    async def add(self, doc, *args, **kwargs):
         inserted = dict(doc)
-        if "_id" not in inserted:
-            inserted["_id"] = str(len(self.docs) + 1)
+        if "id" not in inserted and "_id" not in inserted:
+            inserted["id"] = str(len(self.docs) + 1)
         self.docs.append(inserted)
         class Res:
-            inserted_id = inserted["_id"]
+            inserted_id = inserted.get("id") or inserted.get("_id")
         return Res()
 
-    async def count_documents(self, query=None, *args, **kwargs):
+    async def count(self, query=None, *args, **kwargs):
         query = query or {}
         return sum(1 for d in self.docs if all(d.get(k) == v for k, v in query.items()))
+
+
+FakeCollection = InMemoryTableStore
 
 
 @pytest.mark.asyncio
 async def test_strict_multi_tenant_query_and_insert_isolation():
     """Verify tenant isolation on collection reads, writes, and cross-tenant rejections."""
-    mock_coll = FakeMongoCollection()
+    mock_coll = FakeCollection()
     scoped_coll = TenantScopedCollection(mock_coll)
 
     # 1. Company A writes a job
     set_current_tenant_id("company_a")
     clear_platform_admin()
     try:
-        await scoped_coll.insert_one({"title": "React Dev A", "salary": "120k"})
+        await scoped_coll.add({"title": "React Dev A", "salary": "120k"})
         # 2. Company B writes a job
         set_current_tenant_id("company_b")
-        await scoped_coll.insert_one({"title": "Python Dev B", "salary": "130k"})
+        await scoped_coll.add({"title": "Python Dev B", "salary": "130k"})
 
         # 3. Company B should only see Company B's job
-        found = await scoped_coll.find_one({"title": "React Dev A"})
+        found = await scoped_coll.get({"title": "React Dev A"})
         assert found is None  # Cannot see Company A's job!
 
-        found_b = await scoped_coll.find_one({"title": "Python Dev B"})
+        found_b = await scoped_coll.get({"title": "Python Dev B"})
         assert found_b is not None
         assert found_b["tenant_id"] == "company_b"
 
         # Count for Company B
-        count_b = await scoped_coll.count_documents({})
+        count_b = await scoped_coll.count({})
         assert count_b == 1
 
         # 4. Cross-tenant spoofing in query is blocked
         with pytest.raises(TenantAccessDeniedError):
-            await scoped_coll.find_one({"tenant_id": "company_a"})
+            await scoped_coll.get({"tenant_id": "company_a"})
 
         # 5. Cross-tenant spoofing in insert is blocked
         with pytest.raises(TenantAccessDeniedError):
-            await scoped_coll.insert_one({"title": "Spoofed Job", "tenant_id": "company_a"})
+            await scoped_coll.add({"title": "Spoofed Job", "tenant_id": "company_a"})
 
     finally:
         clear_current_tenant_id()
@@ -165,7 +168,7 @@ async def test_strict_multi_tenant_query_and_insert_isolation():
 @pytest.mark.asyncio
 async def test_platform_admin_query_bypass():
     """Verify PLATFORM_ADMIN can query across tenants using platform_admin_context."""
-    mock_coll = FakeMongoCollection()
+    mock_coll = FakeCollection()
     mock_coll.docs = [
         {"_id": "1", "title": "Job A", "tenant_id": "company_a"},
         {"_id": "2", "title": "Job B", "tenant_id": "company_b"},
@@ -175,11 +178,11 @@ async def test_platform_admin_query_bypass():
 
     with platform_admin_context():
         # Unscoped count
-        total = await scoped_coll.count_documents({})
+        total = await scoped_coll.count({})
         assert total == 2
 
         # Can query company_a explicitly
-        doc_a = await scoped_coll.find_one({"tenant_id": "company_a"})
+        doc_a = await scoped_coll.get({"tenant_id": "company_a"})
         assert doc_a is not None
         assert doc_a["tenant_id"] == "company_a"
 

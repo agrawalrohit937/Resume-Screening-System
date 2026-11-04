@@ -4,8 +4,11 @@ CareerShala ATS v2.0.0 - Enterprise Surface.
 
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from api.deps import get_database, get_current_user, get_optional_current_user
+from api.deps import get_current_user, get_optional_current_user, get_db
+from models.tables import Job, CandidateApplication, JobApplication
 from models.user_model import UserModel
 from models.eeo import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
 from services.eeo_service import EEOService
@@ -18,32 +21,34 @@ router = APIRouter()
 async def submit_eeo_self_id_route(
     payload: EEOSelfIdentificationPayload,
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    db: Any = Depends(get_database),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Records voluntary EEO self-identification demographic responses into an isolated vault.
     This demographic data is mathematically decoupled from candidate ATS scoring pipelines.
     """
-    service = EEOService(db)
-    raw_db = getattr(db, "raw_db", db)
+    service = EEOService()
     tenant_id = getattr(current_user, "tenant_id", "default") if current_user else "default"
     tenant_id = tenant_id or "default"
 
     # If job_id or application_id provided, resolve employer's tenant_id
     if payload.job_id:
         try:
-            from bson import ObjectId
-            job = await raw_db.jobs.find_one({"_id": ObjectId(payload.job_id)})
-            if job and job.get("tenant_id") and job.get("tenant_id") != "default":
-                tenant_id = job.get("tenant_id")
+            stmt = select(Job.tenant_id).where(Job.id == str(payload.job_id))
+            t_id = (await session.execute(stmt)).scalar_one_or_none()
+            if t_id and t_id != "default":
+                tenant_id = t_id
         except Exception:
             pass
     elif payload.application_id:
         try:
-            from bson import ObjectId
-            app_doc = await raw_db.applications.find_one({"_id": ObjectId(payload.application_id)})
-            if app_doc and app_doc.get("tenant_id") and app_doc.get("tenant_id") != "default":
-                tenant_id = app_doc.get("tenant_id")
+            stmt = select(CandidateApplication.tenant_id).where(CandidateApplication.id == str(payload.application_id))
+            t_id = (await session.execute(stmt)).scalar_one_or_none()
+            if not t_id:
+                stmt2 = select(JobApplication.tenant_id).where(JobApplication.id == str(payload.application_id))
+                t_id = (await session.execute(stmt2)).scalar_one_or_none()
+            if t_id and t_id != "default":
+                tenant_id = t_id
         except Exception:
             pass
 
@@ -63,7 +68,6 @@ async def submit_eeo_self_id_route(
 @router.get("/aggregate-report", response_model=Dict[str, Any])
 async def get_eeo_aggregate_report_route(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
 ):
     """
     Generates an aggregate anonymized demographic report for statutory compliance.
@@ -72,7 +76,7 @@ async def get_eeo_aggregate_report_route(
     if not current_user.has_role("admin", "platform_admin", "executive", "exec", "recruiter"):
         raise HTTPException(status_code=403, detail="Unauthorized to access compliance reports")
 
-    service = EEOService(db)
+    service = EEOService()
     tenant_id = getattr(current_user, "tenant_id", "default") or "default"
     return await service.generate_aggregate_report(tenant_id=tenant_id)
 

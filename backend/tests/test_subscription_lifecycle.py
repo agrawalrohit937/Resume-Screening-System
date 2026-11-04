@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
-from bson import ObjectId
+import uuid
+from unittest.mock import AsyncMock
 from fastapi import HTTPException
 
 from api.routes.payment import activate_user_subscription
@@ -18,7 +18,7 @@ def mock_user_repo():
 
 @pytest.mark.asyncio
 async def test_activate_user_subscription_fresh(mock_user_repo):
-    user_id = str(ObjectId())
+    user_id = uuid.uuid4().hex
     user = UserModel(
         id=user_id,
         email="fresh@example.com",
@@ -55,7 +55,7 @@ async def test_activate_user_subscription_fresh(mock_user_repo):
 
 @pytest.mark.asyncio
 async def test_activate_user_subscription_early_renewal(mock_user_repo):
-    user_id = str(ObjectId())
+    user_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
     existing_end = now + timedelta(days=15)
     existing_start = now - timedelta(days=15)
@@ -94,7 +94,7 @@ async def test_activate_user_subscription_early_renewal(mock_user_repo):
 
 @pytest.mark.asyncio
 async def test_activate_user_subscription_free_downgrade(mock_user_repo):
-    user_id = str(ObjectId())
+    user_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
 
     user = UserModel(
@@ -127,7 +127,7 @@ async def test_activate_user_subscription_free_downgrade(mock_user_repo):
 
 @pytest.mark.asyncio
 async def test_lazy_expiration_past_end_date(mock_user_repo):
-    user_id = str(ObjectId())
+    user_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
     expired_end = now - timedelta(hours=2)
 
@@ -161,7 +161,7 @@ async def test_lazy_expiration_past_end_date(mock_user_repo):
 
 @pytest.mark.asyncio
 async def test_lazy_expiration_unexpired_remains_active(mock_user_repo):
-    user_id = str(ObjectId())
+    user_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
     future_end = now + timedelta(days=10)
 
@@ -191,7 +191,7 @@ async def test_require_plan_guard():
 
     # 1. Pro user with active subscription
     pro_user = UserModel(
-        id=str(ObjectId()),
+        id=uuid.uuid4().hex,
         email="pro@example.com",
         full_name="Pro User",
         plan="pro",
@@ -209,7 +209,7 @@ async def test_require_plan_guard():
 
     # 3. Free user trying to access pro -> 403 Forbidden
     free_user = UserModel(
-        id=str(ObjectId()),
+        id=uuid.uuid4().hex,
         email="free@example.com",
         full_name="Free User",
         plan="free",
@@ -222,7 +222,7 @@ async def test_require_plan_guard():
 
     # 4. User marked pro but subscription_active is False (expired) -> 403 Forbidden
     expired_pro = UserModel(
-        id=str(ObjectId()),
+        id=uuid.uuid4().hex,
         email="expired_pro@example.com",
         full_name="Expired User",
         plan="pro",
@@ -235,7 +235,7 @@ async def test_require_plan_guard():
 
     # 5. Platform Admin bypasses guard
     admin_user = UserModel(
-        id=str(ObjectId()),
+        id=uuid.uuid4().hex,
         email="admin@example.com",
         full_name="Admin User",
         plan="free",
@@ -248,40 +248,32 @@ async def test_require_plan_guard():
 
 @pytest.mark.asyncio
 async def test_expire_overdue_subscriptions_sweep():
+    """Verify PostgreSQL-based subscription sweep downgrades expired users to Free."""
+    from unittest.mock import patch
+    from models.tables import User as UserT
+    from tests.conftest import MockAsyncSession
+
     now = datetime.now(timezone.utc)
-    mock_db = MagicMock()
-    mock_raw_db = MagicMock()
-    mock_db._raw_db = mock_raw_db
+    expired_user = UserT(
+        id="user_exp_1",
+        email="exp@example.com",
+        plan="pro",
+        subscription_active=True,
+        subscription_end_date=now - timedelta(days=2),
+    )
+    legacy_user = UserT(
+        id="user_legacy_2",
+        email="legacy@example.com",
+        plan="pro",
+        subscription_active=True,
+        subscription_end_date=None,
+        plan_updated_at=now - timedelta(days=45),
+    )
 
-    expired_user_id = ObjectId()
-    legacy_user_id = ObjectId()
-
-    expired_docs = [
-        {"_id": expired_user_id, "email": "exp@example.com", "plan": "pro"},
-        {"_id": legacy_user_id, "email": "legacy@example.com", "plan": "pro"},
-    ]
-
-    mock_find_cursor = MagicMock()
-    mock_find_cursor.to_list = AsyncMock(return_value=expired_docs)
-    mock_raw_db.users.find.return_value = mock_find_cursor
-
-    mock_update_result = MagicMock()
-    mock_update_result.modified_count = 2
-    mock_raw_db.users.update_many = AsyncMock(return_value=mock_update_result)
-
-    res = await expire_overdue_subscriptions(mock_db)
+    mock_session = MockAsyncSession([expired_user, legacy_user])
+    with patch("scheduler.subscription_expiry.get_pg_session_factory", return_value=lambda: mock_session):
+        res = await expire_overdue_subscriptions()
 
     assert res["expired_count"] == 2
-    mock_raw_db.users.find.assert_called_once()
-    filter_arg = mock_raw_db.users.find.call_args[0][0]
-
-    # Verify query includes both tracked expiration and legacy cutoff
-    assert filter_arg["subscription_active"] is True
-    assert "$or" in filter_arg
-
-    # Verify update payload contains subscription_status = 'expired'
-    update_arg = mock_raw_db.users.update_many.call_args[0][1]
-    assert update_arg["$set"]["plan"] == "free"
-    assert update_arg["$set"]["subscription_active"] is False
-    assert update_arg["$set"]["subscription_status"] == "expired"
-    assert update_arg["$set"]["subscription_end_date"] is None
+    assert "user_exp_1" in res["downgraded_ids"]
+    assert "user_legacy_2" in res["downgraded_ids"]

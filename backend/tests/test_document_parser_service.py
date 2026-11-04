@@ -86,7 +86,7 @@ async def test_azure_di_success():
     mock_client.post = AsyncMock(return_value=mock_submit_resp)
     mock_client.get = AsyncMock(return_value=mock_poll_resp)
 
-    with patch("httpx.AsyncClient") as mock_client_cls:
+    with patch("httpx.AsyncClient") as mock_client_cls, patch.object(service, "_extract_pdfplumber", return_value=None):
         mock_client_cls.return_value.__aenter__.return_value = mock_client
         res = await service.parse_document(pdf_bytes, "pdf")
 
@@ -126,7 +126,7 @@ async def test_azure_di_no_two_page_limit():
     mock_client.post = AsyncMock(return_value=mock_submit_resp)
     mock_client.get = AsyncMock(return_value=mock_poll_resp)
 
-    with patch("httpx.AsyncClient") as mock_client_cls:
+    with patch("httpx.AsyncClient") as mock_client_cls, patch.object(service, "_extract_pdfplumber", return_value=None):
         mock_client_cls.return_value.__aenter__.return_value = mock_client
         res = await service.parse_document(pdf_bytes, "pdf")
 

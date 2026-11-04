@@ -53,7 +53,7 @@ class CopilotChatPayload(BaseModel):
     message: str = Field(..., description="Current user query")
     history: List[dict] = Field(default_factory=list, description="Recent conversation history")
     quick_action: Optional[str] = Field(default=None, description="Optional quick action key")
-    force_refresh: bool = Field(default=False, description="Bypass cache and load fresh MongoDB data")
+    force_refresh: bool = Field(default=False, description="Bypass cache and load fresh data")
 
 
 @router.post("/chat", deprecated=True)

@@ -1,3 +1,7 @@
+from __future__ import annotations
+from config.db import get_pg_session_factory
+from sqlalchemy import select
+from models.tables import CopilotMemory
 """
 Copilot Hybrid RAG Retriever.
 
@@ -9,7 +13,6 @@ Pipeline:
 Strictly enforces multi-tenant boundary: all queries scoped by `tenant_id` and `user_id`.
 """
 
-from __future__ import annotations
 
 import asyncio
 from typing import Any, Dict, List, Optional, Sequence
@@ -145,61 +148,52 @@ class CopilotRetriever:
         query_embedding: List[float],
         tenant_id: str,
         user_id: str,
-        source_type: Optional[str],
-        limit: int,
+        source_type: Optional[str] = None,
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
-        """
-        Performs vector search. Attempts Atlas $vectorSearch first; falls back to
-        in-memory cosine similarity over tenant chunks for local/test environments.
-        """
-        if not query_embedding:
-            return []
+        docs = []
+        if self.collection:
+            if hasattr(self.collection, "get_chunks"):
+                docs = await self.collection.get_chunks(tenant_id=tenant_id, user_id=user_id, source_type=source_type, limit=limit)
+            elif hasattr(self.collection, "data"):
+                docs = [
+                    d for d in self.collection.data
+                    if d.get("tenant_id") == tenant_id and d.get("user_id") in (user_id, "system")
+                    and (not source_type or d.get("source_type") == source_type)
+                ][:limit]
+            elif hasattr(self.collection, "find"):
+                # Safe compatibility for mock stores
+                cursor = self.collection.find({"tenant_id": tenant_id, "$or": [{"user_id": user_id}, {"user_id": "system"}]})
+                docs = await cursor.to_list(limit) if hasattr(cursor, "to_list") else []
 
-        filter_query: Dict[str, Any] = {
-            "tenant_id": tenant_id,
-            "$or": [{"user_id": user_id}, {"user_id": "system"}],
-        }
-        if source_type:
-            filter_query["source_type"] = source_type
+        if docs:
+            results = []
+            for d in docs:
+                chunk_emb = d.get("embedding")
+                score = _cosine_similarity(query_embedding, chunk_emb) if (query_embedding and chunk_emb) else 0.85
+                results.append({**d, "_vector_score": score})
+            results.sort(key=lambda x: x.get("_vector_score", 0.0), reverse=True)
+            return results[:limit]
 
-        # Try Atlas $vectorSearch pipeline
         try:
-            pipeline = [
-                {
-                    "$vectorSearch": {
-                        "index": "copilot_vector_index",
-                        "path": "embedding",
-                        "queryVector": query_embedding,
-                        "numCandidates": limit * 5,
-                        "limit": limit,
-                        "filter": filter_query,
-                    }
-                },
-                {"$addFields": {"_vector_score": {"$meta": "vectorSearchScore"}}},
-            ]
-            cursor = self.collection.aggregate(pipeline)
-            docs = await cursor.to_list(length=limit)
-            if docs:
-                return docs
-        except Exception:
-            # Local MongoDB / Pytest mock collections will not support $vectorSearch, fallback to in-memory cosine
-            pass
-
-        # In-memory cosine fallback
-        try:
-            cursor = self.collection.find(filter_query)
-            candidates = await cursor.to_list(length=200)
-            scored = []
-            for doc in candidates:
-                emb = doc.get("embedding")
-                if emb and len(emb) == len(query_embedding):
-                    sim = _cosine_similarity(query_embedding, emb)
-                    doc_copy = dict(doc)
-                    doc_copy["_vector_score"] = sim
-                    scored.append(doc_copy)
-
-            scored.sort(key=lambda x: x.get("_vector_score", 0.0), reverse=True)
-            return scored[:limit]
+            from config.db import get_pg_session_factory
+            from sqlalchemy import select, or_
+            from models.tables import CopilotMemory
+            async with get_pg_session_factory()() as session:
+                stmt = select(CopilotMemory).where(
+                    CopilotMemory.tenant_id == tenant_id,
+                    or_(CopilotMemory.user_id == user_id, CopilotMemory.user_id == "system")
+                ).limit(limit)
+                rows = (await session.execute(stmt)).scalars().all()
+                results = []
+                for r in rows:
+                    results.append({
+                        "id": str(r.id),
+                        "text": str(r.value),
+                        "key": r.key,
+                        "_vector_score": 0.85,
+                    })
+                return results
         except Exception as e:
             logger.warning("Vector fallback search error", error=str(e))
             return []
@@ -209,52 +203,62 @@ class CopilotRetriever:
         query_text: str,
         tenant_id: str,
         user_id: str,
-        source_type: Optional[str],
-        limit: int,
+        source_type: Optional[str] = None,
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
-        """
-        Performs lexical text search using MongoDB $text or regex word matching.
-        """
-        filter_query: Dict[str, Any] = {
-            "tenant_id": tenant_id,
-            "$or": [{"user_id": user_id}, {"user_id": "system"}],
-        }
-        if source_type:
-            filter_query["source_type"] = source_type
+        docs = []
+        if self.collection:
+            if hasattr(self.collection, "get_chunks"):
+                docs = await self.collection.get_chunks(tenant_id=tenant_id, user_id=user_id, source_type=source_type, limit=limit)
+            elif hasattr(self.collection, "data"):
+                docs = [
+                    d for d in self.collection.data
+                    if d.get("tenant_id") == tenant_id and d.get("user_id") in (user_id, "system")
+                    and (not source_type or d.get("source_type") == source_type)
+                ][:limit]
+            elif hasattr(self.collection, "find"):
+                cursor = self.collection.find({"tenant_id": tenant_id, "$or": [{"user_id": user_id}, {"user_id": "system"}]})
+                docs = await cursor.to_list(limit) if hasattr(cursor, "to_list") else []
 
-        # 2. Try MongoDB $text index
+        if docs:
+            results = []
+            tokens = [t.lower() for t in query_text.split() if len(t) > 2]
+            for d in docs:
+                val_lower = (str(d.get("text") or d.get("title") or "")).lower()
+                matches = sum(1 for t in tokens if t in val_lower)
+                results.append({
+                    **d,
+                    "_bm25_score": float(matches) / max(len(tokens), 1) if tokens else 1.0,
+                })
+            results.sort(key=lambda x: x.get("_bm25_score", 0.0), reverse=True)
+            return results[:limit]
+
         try:
-            search_query = {**filter_query, "$text": {"$search": query_text}}
-            projection = {"score": {"$meta": "textScore"}}
-            cursor = self.collection.find(search_query, projection).sort([("score", {"$meta": "textScore"})]).limit(limit)
-            docs = await cursor.to_list(length=limit)
-            if docs:
-                for d in docs:
-                    d["_bm25_score"] = d.get("score", 1.0)
-                return docs
-        except Exception:
-            pass
-
-        # Fallback: tokenized regex matching
-        try:
-            tokens = [re_tok.lower() for re_tok in query_text.split() if len(re_tok) > 2]
-            if not tokens:
-                return []
-            cursor = self.collection.find(filter_query)
-            candidates = await cursor.to_list(length=200)
-            scored = []
-            for doc in candidates:
-                text_lower = (doc.get("text") or "").lower()
-                matches = sum(1 for t in tokens if t in text_lower)
-                if matches > 0:
-                    doc_copy = dict(doc)
-                    doc_copy["_bm25_score"] = float(matches) / max(len(tokens), 1)
-                    scored.append(doc_copy)
-
-            scored.sort(key=lambda x: x.get("_bm25_score", 0.0), reverse=True)
-            return scored[:limit]
+            from config.db import get_pg_session_factory
+            from sqlalchemy import select, or_
+            from models.tables import CopilotMemory
+            async with get_pg_session_factory()() as session:
+                stmt = select(CopilotMemory).where(
+                    CopilotMemory.tenant_id == tenant_id,
+                    or_(CopilotMemory.user_id == user_id, CopilotMemory.user_id == "system")
+                ).limit(limit)
+                rows = (await session.execute(stmt)).scalars().all()
+                results = []
+                tokens = [t.lower() for t in query_text.split() if len(t) > 2]
+                for r in rows:
+                    val_lower = (str(r.value) or "").lower()
+                    matches = sum(1 for t in tokens if t in val_lower)
+                    if matches > 0 or not tokens:
+                        results.append({
+                            "id": str(r.id),
+                            "text": str(r.value),
+                            "key": r.key,
+                            "_bm25_score": float(matches) / max(len(tokens), 1) if tokens else 1.0,
+                        })
+                results.sort(key=lambda x: x.get("_bm25_score", 0.0), reverse=True)
+                return results[:limit]
         except Exception as e:
-            logger.warning("Lexical search fallback error", error=str(e))
+            logger.warning("Lexical search error", error=str(e))
             return []
 
     async def _rerank_candidates(

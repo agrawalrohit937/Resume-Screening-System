@@ -1,5 +1,6 @@
 """
-Audit Log Repository — Async MongoDB Append-Only Storage for Audit Logs.
+Audit Log Repository — Dual Engine (PostgreSQL via SQLAlchemy 2.0 / PostgreSQL Primary)
+Append-Only Storage for Audit Logs.
 ========================================================================
 Strictly enforces immutable append-only constraints (mutations and deletions
 raise explicit errors) and ensures tenant-scoped query capabilities.
@@ -8,10 +9,13 @@ raise explicit errors) and ensures tenant-scoped query capabilities.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import structlog
-from pymongo.asynchronous.database import AsyncDatabase
+from sqlalchemy import select, func, and_
 
+from core.config import settings
+from config.db import get_pg_session_factory
+from models import AuditLog, gen_uuid_str
 from models.audit_log_model import AuditLogModel
 from repositories.base_repo import BaseRepository
 
@@ -21,15 +25,15 @@ logger = structlog.get_logger(__name__)
 class AuditLogRepository(BaseRepository):
     """
     Append-only repository for compliance audit logs.
+    Pure PostgreSQL Engine: writes to PostgreSQL via SQLAlchemy 2.0.
     """
 
-    def __init__(self, db: AsyncDatabase):
+    def __init__(self, db: Optional[Any] = None, session_factory: Optional[Any] = None):
         self.db = db
-        self.collection = db["audit_logs"]
-
+        self.session_factory = session_factory or (db if callable(db) else get_pg_session_factory())
     async def log_event(self, event: AuditLogModel | Dict[str, Any]) -> AuditLogModel:
         """
-        Appends an immutable audit event to MongoDB audit_logs collection.
+        Appends an immutable audit event.
         """
         if isinstance(event, AuditLogModel):
             doc = event.model_dump(by_alias=False, exclude_none=False)
@@ -47,15 +51,49 @@ class AuditLogRepository(BaseRepository):
         if "tenant_id" not in doc or not doc["tenant_id"]:
             doc["tenant_id"] = "default"
 
-        # Pop id if None or empty
         if "_id" in doc and doc["_id"] is None:
             doc.pop("_id")
         if "id" in doc and doc["id"] is None:
             doc.pop("id")
 
-        res = await self.collection.insert_one(doc)
-        doc["_id"] = str(res.inserted_id)
-        doc["id"] = str(res.inserted_id)
+        log_id = str(doc.get("id") or doc.get("_id") or gen_uuid_str())
+        event_id = str(doc.get("event_id") or f"evt_{log_id[:16]}")
+        actor_id = str(doc.get("actor_id") or "system")
+        act = doc.get("action")
+        action = act.value if hasattr(act, "value") else str(act or "unknown")
+        target_id = str(doc.get("resource_id") or doc.get("target_id") or "")
+        tenant_id = str(doc.get("tenant_id") or "default")
+        ip_address = str(doc.get("ip_address") or "") if doc.get("ip_address") else None
+        ts = doc["timestamp"]
+        if not ts.tzinfo:
+            ts = ts.replace(tzinfo=timezone.utc)
+
+        payload_data = dict(doc.get("payload") or {})
+        payload_data["actor_email"] = doc.get("actor_email")
+        payload_data["actor_role"] = doc.get("actor_role")
+        payload_data["resource_type"] = doc.get("resource_type")
+        payload_data["resource_id"] = doc.get("resource_id")
+        payload_data["user_agent"] = doc.get("user_agent")
+
+
+        async with self.session_factory() as session:
+            log_row = AuditLog(
+                id=log_id,
+                event_id=event_id,
+                tenant_id=tenant_id,
+                actor_id=actor_id,
+                action=action,
+                target_id=target_id,
+                payload=payload_data,
+                ip_address=ip_address,
+                created_at=ts,
+            )
+            session.add(log_row)
+            await session.commit()
+
+        doc["_id"] = log_id
+        doc["id"] = log_id
+        doc["event_id"] = event_id
         return AuditLogModel(**doc)
 
     async def query_logs(
@@ -73,37 +111,59 @@ class AuditLogRepository(BaseRepository):
         """
         Queries audit logs with multi-tenant filtering, optional criteria, and pagination.
         """
-        filter_query: Dict[str, Any] = {}
-        if tenant_id != "*":
-            filter_query["tenant_id"] = tenant_id
-
-        if actor_id:
-            filter_query["actor_id"] = actor_id
-        if resource_type:
-            filter_query["resource_type"] = resource_type
-        if action:
-            filter_query["action"] = action
-        if resource_id:
-            filter_query["resource_id"] = resource_id
-
-        if start_time or end_time:
-            time_filter: Dict[str, Any] = {}
+        async with self.session_factory() as session:
+            filters = []
+            if tenant_id != "*":
+                filters.append(AuditLog.tenant_id == tenant_id)
+            if actor_id:
+                filters.append(AuditLog.actor_id == actor_id)
+            if action:
+                filters.append(AuditLog.action == action)
+            if resource_id:
+                filters.append(AuditLog.target_id == resource_id)
             if start_time:
-                time_filter["$gte"] = start_time
+                filters.append(AuditLog.created_at >= start_time)
             if end_time:
-                time_filter["$lte"] = end_time
-            filter_query["timestamp"] = time_filter
+                filters.append(AuditLog.created_at <= end_time)
 
-        total_count = await self.collection.count_documents(filter_query)
-        cursor = self.collection.find(filter_query).sort("timestamp", -1).skip(skip).limit(limit)
-        docs = await cursor.to_list(length=limit)
+            count_stmt = select(func.count()).select_from(AuditLog).where(*filters)
+            count_res = await session.execute(count_stmt)
+            total_count = count_res.scalar() or 0
 
-        results = []
-        for d in docs:
-            d["_id"] = str(d["_id"])
-            results.append(AuditLogModel(**d))
+            stmt = (
+                select(AuditLog)
+                .where(*filters)
+                .order_by(AuditLog.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+            res = await session.execute(stmt)
+            rows = res.scalars().all()
 
-        return results, total_count
+            results = []
+            for row in rows:
+                payload = row.payload or {}
+                res_type = payload.get("resource_type") or "system"
+                if resource_type and res_type != resource_type:
+                    continue
+                m = AuditLogModel(
+                    id=row.id,
+                    event_id=row.event_id or f"evt_{row.id[:16]}",
+                    tenant_id=row.tenant_id or "default",
+                    actor_id=row.actor_id or "system",
+                    actor_email=payload.get("actor_email"),
+                    actor_role=payload.get("actor_role") or "system",
+                    action=row.action,
+                    resource_type=res_type,
+                    resource_id=row.target_id or payload.get("resource_id") or "",
+                    payload=payload,
+                    ip_address=row.ip_address,
+                    user_agent=payload.get("user_agent"),
+                    timestamp=row.created_at or datetime.now(timezone.utc),
+                )
+                results.append(m)
+
+            return results, total_count
 
     async def update(self, *args, **kwargs):
         """Forbidden: Audit logs are immutable."""

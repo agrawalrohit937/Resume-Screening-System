@@ -4,7 +4,7 @@ import { getGamificationProfile, getLeaderboard, getBadgeCatalog } from '../serv
 import { useAuth } from '../context/AuthContext'
 
 import '../components/gamification/scrollbar.css'
-import { BADGE_CATALOG_FALLBACK, LEVELS } from '../components/gamification/mockConfig'
+import { BADGE_CATALOG_FALLBACK, LEVELS } from '../components/gamification/gamificationConfig'
 import ProfileHero from '../components/gamification/ProfileHero'
 import SectionTabs from '../components/gamification/SectionTabs'
 import CareerPathMap from '../components/gamification/CareerPathMap'
@@ -29,10 +29,12 @@ export default function CareerQuest() {
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
         const data = JSON.parse(cached)
-        setProfile(data.profile || null)
-        setLeaderboard(data.leaderboard || [])
-        if (data.catalog?.length) setCatalog(data.catalog)
-        setLoading(false)
+        if (data && data.profile) {
+          setProfile(data.profile)
+          setLeaderboard(data.leaderboard || [])
+          if (data.catalog?.length) setCatalog(data.catalog)
+          setLoading(false)
+        }
       }
     } catch {
       sessionStorage.removeItem(cacheKey)
@@ -40,25 +42,33 @@ export default function CareerQuest() {
 
     const loadGamification = async () => {
       const [p, b, l] = await Promise.all([
-        getGamificationProfile().catch(() => ({ data: null })),
+        getGamificationProfile().catch((err) => {
+          console.warn('Gamification profile fetch failed:', err)
+          return { data: null }
+        }),
         getBadgeCatalog().catch(() => ({ data: { badges: [] } })),
-        getLeaderboard(30).catch(() => ({ data: { leaderboard: [] } })),
+        getLeaderboard(30).catch((err) => {
+          console.warn('Leaderboard fetch failed:', err)
+          return { data: { leaderboard: [] } }
+        }),
       ])
 
-      setProfile(p.data)
-      setLeaderboard(l.data?.leaderboard || [])
+      if (p?.data) setProfile(p.data)
+      if (l.data?.leaderboard) setLeaderboard(l.data.leaderboard)
 
       const remoteBadges = b.data?.badges || []
       if (remoteBadges.length && remoteBadges.every((x) => x.id && x.tier)) setCatalog(remoteBadges)
 
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify({
-          profile: p.data || null,
-          leaderboard: l.data?.leaderboard || [],
-          catalog: remoteBadges.length ? remoteBadges : BADGE_CATALOG_FALLBACK,
-        }))
-      } catch {
-        // Session storage is an optional performance cache.
+      if (p?.data || (l.data?.leaderboard && l.data.leaderboard.length > 0)) {
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            profile: p?.data || null,
+            leaderboard: l.data?.leaderboard || [],
+            catalog: remoteBadges.length ? remoteBadges : BADGE_CATALOG_FALLBACK,
+          }))
+        } catch {
+          // Session storage is an optional performance cache.
+        }
       }
     }
 

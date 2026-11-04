@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Worker Task Implementations for Asynchronous Background Processing.
 ===================================================================
@@ -8,13 +10,14 @@ Provides asynchronous background pipelines for:
 4. Bulk Rescoring Pipeline: Model upgrade rescoring
 """
 
-from __future__ import annotations
-
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import structlog
-from bson import ObjectId
+from sqlalchemy import select, update, delete
 
+from config.db import get_pg_session_factory
+from models.tables import Job, CandidateApplication, CopilotMemory
 from models.resume_model import ResumeStatus
 
 logger = structlog.get_logger(__name__)
@@ -37,11 +40,9 @@ async def execute_resume_parse(
     from repositories.resume_repo import ResumeRepository
     from repositories.user_repo import UserRepository
     from services.parser_service import ParserService
-    from config.db import get_database
 
-    db = get_database()
-    r_repo = resume_repo or ResumeRepository(db)
-    u_repo = user_repo or UserRepository(db)
+    r_repo = resume_repo or ResumeRepository()
+    u_repo = user_repo or UserRepository()
     p_service = parser or ParserService()
 
     try:
@@ -55,10 +56,6 @@ async def execute_resume_parse(
         err_msg = f"Resume parse failed: {str(exc)}"
         logger.error("Async worker: Resume parsing failed", resume_id=resume_id, error=str(exc))
         await r_repo.update_status(resume_id, ResumeStatus.FAILED, error=err_msg)
-        await r_repo.collection.update_one(
-            {"_id": ObjectId(resume_id)},
-            {"$set": {"error_message": err_msg, "parse_error": err_msg}},
-        )
         raise exc
     finally:
         if file_path and os.path.exists(file_path):
@@ -88,11 +85,9 @@ async def execute_resume_upload_pipeline(
     from services.parser_service import ParserService
     from services.chunking_service import chunk_resume
     from services.embedding_service import embedding_model
-    from config.db import get_database
 
-    db = get_database()
-    r_repo = ResumeRepository(db)
-    u_repo = UserRepository(db)
+    r_repo = ResumeRepository()
+    u_repo = UserRepository()
     p_service = ParserService()
 
     try:
@@ -118,11 +113,8 @@ async def execute_resume_upload_pipeline(
             for idx, c in enumerate(chunks):
                 c["embedding"] = vectors[idx] if idx < len(vectors) else None
 
-            from bson import ObjectId
-            await r_repo.collection.update_one(
-                {"_id": ObjectId(resume_id)},
-                {"$set": {"parsed_data.chunks": chunks}}
-            )
+            parsed_dict["chunks"] = chunks
+            await r_repo.update_parsed_data(resume_id, parsed_dict)
 
         if repo and job_id:
             await repo.update_progress(job_id, progress=100, stage_message="Resume pipeline completed", tenant_id=tenant_id)
@@ -160,16 +152,16 @@ async def execute_batch_ats_scoring(
     Batch ATS Scoring Worker:
     Evaluates candidate resumes against a job description in parallel batches with live progress reporting.
     """
-    from config.db import get_database
     from repositories.resume_repo import ResumeRepository
     from repositories.result_repo import ResultRepository
     from services.scoring_engine import score_resume
 
-    db = get_database()
-    r_repo = ResumeRepository(db)
-    res_repo = ResultRepository(db)
+    r_repo = ResumeRepository()
+    res_repo = ResultRepository()
 
-    job_doc = await db.jobs.find_one({"_id": ObjectId(job_id_target)})
+    async with get_pg_session_factory()() as session:
+        j_row = (await session.execute(select(Job).where(Job.id == str(job_id_target)))).scalar_one_or_none()
+        job_doc = {c.name: getattr(j_row, c.name) for c in Job.__table__.columns} if j_row else None
     if not job_doc:
         raise ValueError(f"Job {job_id_target} not found for batch scoring")
 
@@ -191,11 +183,11 @@ async def execute_batch_ats_scoring(
             score_data["job_id"] = job_id_target
             score_data["tenant_id"] = tenant_id
 
-            # Save in ats_results collection
+            # Save in ats_results table
             saved_result = await res_repo.save_result(score_data)
             results.append({
                 "resume_id": str(resume.id),
-                "result_id": str(saved_result.id) if hasattr(saved_result, "id") else str(saved_result.get("_id")),
+                "result_id": str(saved_result.id) if hasattr(saved_result, "id") else str(saved_result.get("_id", "")),
                 "final_score": score_data.get("final_score"),
                 "math_score": score_data.get("math_score"),
                 "vector_score": score_data.get("vector_score"),
@@ -235,29 +227,50 @@ async def execute_copilot_lru_eviction(
     Copilot LRU Memory Eviction Worker:
     Enforces maximum capacity (40 items) in background, compacting memory without blocking chat turns.
     """
-    from config.db import get_database
-    database = db or get_database()
 
-    mem_coll = database.copilot_memory
-    docs = await mem_coll.find({
-        "tenant_id": tenant_id,
-        "user_id": user_id,
-    }).sort("last_accessed_at", 1).to_list(length=1000)
 
     evicted_count = 0
-    if len(docs) > max_items:
-        excess = len(docs) - max_items
-        to_delete = docs[:excess]
-        delete_ids = [d["_id"] for d in to_delete]
-        res = await mem_coll.delete_many({"_id": {"$in": delete_ids}})
-        evicted_count = res.deleted_count
+    total_docs = 0
+    factory = None
+    if db:
+        if callable(db):
+            factory = db
+        elif hasattr(db, "session_factory"):
+            factory = db.session_factory
+        elif hasattr(db, "execute"):
+            class _Ctx:
+                async def __aenter__(self):
+                    return db
+                async def __aexit__(self, *args):
+                    pass
+            factory = lambda: _Ctx()
+    if not factory:
+        factory = get_pg_session_factory()
+
+    async with factory() as session:
+        stmt = (
+            select(CopilotMemory)
+            .where(CopilotMemory.tenant_id == tenant_id, CopilotMemory.user_id == user_id)
+            .order_by(CopilotMemory.updated_at.asc())
+        )
+        res = await session.execute(stmt)
+        docs = res.scalars().all()
+        total_docs = len(docs)
+        if total_docs > max_items:
+            excess = total_docs - max_items
+            to_delete = docs[:excess]
+            delete_ids = [d.id for d in to_delete]
+            del_stmt = delete(CopilotMemory).where(CopilotMemory.id.in_(delete_ids))
+            await session.execute(del_stmt)
+            await session.commit()
+            evicted_count = len(delete_ids)
 
     logger.info("Copilot LRU eviction completed", user_id=user_id, evicted_count=evicted_count)
     return {
         "status": "success",
         "user_id": user_id,
         "evicted_count": evicted_count,
-        "remaining_count": max(0, len(docs) - evicted_count),
+        "remaining_count": max(0, total_docs - evicted_count),
     }
 
 
@@ -271,14 +284,14 @@ async def execute_bulk_rescore(
     """
     Re-scores multiple candidate resumes against a job description in background.
     """
-    from config.db import get_database
     from repositories.resume_repo import ResumeRepository
     from services.scoring_engine import score_resume_dual
 
-    database = db or get_database()
-    r_repo = ResumeRepository(database)
+    r_repo = ResumeRepository()
 
-    job_doc = await database.jobs.find_one({"_id": ObjectId(job_id)})
+    async with get_pg_session_factory()() as session:
+        j_row = (await session.execute(select(Job).where(Job.id == str(job_id)))).scalar_one_or_none()
+        job_doc = {c.name: getattr(j_row, c.name) for c in Job.__table__.columns} if j_row else None
     if not job_doc:
         raise ValueError(f"Job {job_id} not found for bulk rescore")
 
@@ -296,15 +309,18 @@ async def execute_bulk_rescore(
                 min_years=job_doc.get("min_years"),
             )
             # Update application if exists
-            await database.applications.update_many(
-                {"job_id": job_id, "resume_id": str(resume.id)},
-                {"$set": {
-                    "match_score": dual_result["recruiter_score"],
-                    "quality_score": dual_result["quality_score"],
-                    "eligibility": dual_result["eligibility"],
-                    "updated_at_rescore": dual_result["scoring_version"],
-                }}
-            )
+            async with get_pg_session_factory()() as session:
+                await session.execute(
+                    update(CandidateApplication)
+                    .where(CandidateApplication.job_id == str(job_id), CandidateApplication.resume_id == str(resume.id))
+                    .values(
+                        match_score=dual_result.get("recruiter_score"),
+                        quality_score=dual_result.get("quality_score"),
+                        eligibility=dual_result.get("eligibility"),
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+                await session.commit()
             rescored_count += 1
         except Exception as e:
             logger.warning("Failed rescoring resume in bulk batch", resume_id=str(resume.id), error=str(e))
@@ -320,4 +336,3 @@ async def execute_bulk_rescore(
         "job_id": job_id,
         "rescored_count": rescored_count,
     }
-

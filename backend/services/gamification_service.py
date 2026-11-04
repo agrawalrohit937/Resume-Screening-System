@@ -1,5 +1,6 @@
 """
-Gamification Service — points, badges, streaks, levels, and leaderboard
+Gamification Service — points, badges, streaks, levels, and leaderboard.
+100% Native PostgreSQL via SQLAlchemy 2.0.
 """
 
 import time
@@ -7,7 +8,10 @@ from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any
 
 import structlog
-from pymongo.asynchronous.database import AsyncDatabase
+from sqlalchemy import select, func, desc
+
+from config.db import get_pg_session_factory
+from models import UserGamification, User, gen_uuid_str
 
 logger = structlog.get_logger(__name__)
 
@@ -51,21 +55,41 @@ LEVEL_THRESHOLDS = [
     (6000, "Legend",       "👑"),
 ]
 
+
+def _profile_to_dict(profile: UserGamification) -> Dict[str, Any]:
+    return {
+        "_id": str(profile.id),
+        "id": str(profile.id),
+        "user_id": str(profile.user_id),
+        "total_points": profile.total_points or 0,
+        "current_streak": profile.current_streak or 0,
+        "longest_streak": profile.longest_streak or 0,
+        "last_practice_date": profile.last_practice_date,
+        "last_daily_reward_date": profile.last_daily_reward_date,
+        "active_dates": profile.active_dates or [],
+        "total_interviews": profile.interviews_completed or 0,
+        "interviews_completed": profile.interviews_completed or 0,
+        "total_questions_answered": profile.questions_answered or 0,
+        "questions_answered": profile.questions_answered or 0,
+        "average_score": float(profile.average_score or 0.0),
+        "best_score": float(profile.best_score or 0.0),
+        "badges": profile.badges or [],
+        "recent_points": profile.recent_points or [],
+        "created_at": profile.created_at.isoformat() if profile.created_at else None,
+        "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+    }
+
+
 class GamificationService:
+    def __init__(self, db: Optional[Any] = None, session_factory=None):
+        self.session_factory = session_factory or get_pg_session_factory()
 
-    def __init__(self, db: AsyncDatabase):
-        self.db = db
-        self.collection = db.user_gamification
-        self.events_col = db.gamification_events
-
-    # ─── Dynamic Streak Calculation ──────────────────────────────────────────
     def _calculate_streak(self, active_dates: List[str], today: Optional[date] = None) -> Dict[str, int]:
         if not today:
             today = datetime.now(timezone.utc).date()
         if not active_dates:
             return {"current_streak": 0, "longest_streak": 0}
 
-        # Parse and sort unique valid dates
         parsed_dates = []
         for d_str in active_dates:
             try:
@@ -79,8 +103,6 @@ class GamificationService:
             return {"current_streak": 0, "longest_streak": 0}
 
         date_set = set(parsed_dates)
-
-        # Current streak: check if today or yesterday is in date_set
         yesterday = today - timedelta(days=1)
         current_streak = 0
 
@@ -96,7 +118,6 @@ class GamificationService:
                 current_streak += 1
                 check_date -= timedelta(days=1)
 
-        # Longest streak calculation across all time
         longest_streak = 0
         temp_streak = 0
         prev_d = None
@@ -114,109 +135,97 @@ class GamificationService:
             "longest_streak": max(longest_streak, current_streak)
         }
 
-    # ─── Get or Create Profile ────────────────────────────────────────────────
-    async def get_profile(self, user_id: str) -> Dict:
-        doc = await self.collection.find_one({"user_id": user_id})
-        if not doc:
-            doc = await self._create_profile(user_id)
-        doc["_id"] = str(doc["_id"])
+    async def get_profile(self, user_id: str) -> Dict[str, Any]:
+        async with self.session_factory() as session:
+            stmt = select(UserGamification).where(UserGamification.user_id == str(user_id))
+            res = await session.execute(stmt)
+            profile = res.scalar_one_or_none()
 
-        now = datetime.now(timezone.utc)
-        today = now.date()
-        active_dates = doc.get("active_dates") or []
-        last_str = doc.get("last_practice_date")
-        # Backfill active_dates for legacy profiles if active_dates is empty but last_practice_date exists
-        if not active_dates and last_str:
-            try:
-                active_dates = [last_str[:10]]
-                doc["active_dates"] = active_dates
-                await self.collection.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"active_dates": active_dates}}
-                )
-            except Exception:
-                pass
+            if not profile:
+                profile = await self._create_profile(user_id)
+                return profile
 
-        # Compute accurate dynamic streak strictly derived from active_dates
-        streak_info = self._calculate_streak(active_dates, today)
-        doc["current_streak"] = streak_info["current_streak"]
-        doc["longest_streak"] = max(doc.get("longest_streak", 0), streak_info["longest_streak"])
+            now = datetime.now(timezone.utc)
+            today = now.date()
+            active_dates = list(profile.active_dates or [])
 
-        # Auto-heal database to ensure current_streak and longest_streak are always in sync
-        await self.collection.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "current_streak": doc["current_streak"],
-                "longest_streak": doc["longest_streak"]
-            }}
-        )
+            if not active_dates and profile.last_practice_date:
+                active_dates = [profile.last_practice_date[:10]]
+                profile.active_dates = active_dates
 
-        doc["level_info"] = self._compute_level(doc.get("total_points", 0))
+            streak_info = self._calculate_streak(active_dates, today)
+            profile.current_streak = streak_info["current_streak"]
+            profile.longest_streak = max(profile.longest_streak or 0, streak_info["longest_streak"])
 
-        # Ensure best_score is always tracked and synced
-        if doc.get("best_score") is None:
-            doc["best_score"] = round(float(doc.get("average_score", 0.0) or 0.0), 3)
-            await self.collection.update_one(
-                {"user_id": user_id},
-                {"$set": {"best_score": doc["best_score"]}}
+            if profile.best_score is None:
+                profile.best_score = round(float(profile.average_score or 0.0), 3)
+
+            await session.commit()
+            await session.refresh(profile)
+
+            # Global rank
+            rank_stmt = select(func.count()).select_from(UserGamification).where(
+                UserGamification.total_points > (profile.total_points or 0)
             )
+            rank_res = await session.execute(rank_stmt)
+            rank = (rank_res.scalar() or 0) + 1
 
-        # Calculate exact global leaderboard rank dynamically
-        total_pts = doc.get("total_points", 0)
-        higher_count = await self.collection.count_documents({"total_points": {"$gt": total_pts}})
-        doc["rank"] = higher_count + 1
+            doc = _profile_to_dict(profile)
+            doc["level_info"] = self._compute_level(doc.get("total_points", 0))
+            doc["rank"] = rank
+            return doc
 
-        return doc
-
-    async def claim_daily_visit_reward(self, user_id: str) -> Dict:
-        """Award the daily visit bonus once per UTC calendar day."""
+    async def claim_daily_visit_reward(self, user_id: str) -> Dict[str, Any]:
         global _leaderboard_cache
-        await self.get_profile(user_id)
         today = datetime.now(timezone.utc).date().isoformat()
         points = POINT_RULES["daily_practice"]
         now = datetime.now(timezone.utc)
-        result = await self.collection.update_one(
-            {
-                "user_id": user_id,
-                "$or": [
-                    {"last_daily_reward_date": {"$exists": False}},
-                    {"last_daily_reward_date": {"$ne": today}},
-                ],
-            },
-            {
-                "$inc": {"total_points": points},
-                "$set": {
-                    "last_daily_reward_date": today,
-                    "updated_at": now,
-                },
-                "$push": {
-                    "recent_points": {
-                        "$each": [{
-                            "points": points,
-                            "event": "daily_practice",
-                            "ts": now.isoformat(),
-                        }],
-                        "$slice": -20,
-                    },
-                },
-            },
-        )
 
-        if result.modified_count == 0:
-            return {
-                "awarded": 0,
-                "points_awarded": 0,
-                "already_claimed": True,
-                "reward_date": today,
-            }
+        async with self.session_factory() as session:
+            async with session.begin():
+                stmt = select(UserGamification).where(UserGamification.user_id == str(user_id))
+                res = await session.execute(stmt)
+                profile = res.scalar_one_or_none()
 
-        await self.events_col.insert_one({
-            "user_id": user_id,
-            "event_type": "daily_practice",
-            "points": points,
-            "details": {"source": "daily_visit"},
-            "created_at": now,
-        })
+                if not profile:
+                    profile = UserGamification(
+                        id=gen_uuid_str(),
+                        user_id=str(user_id),
+                        total_points=0,
+                        current_streak=0,
+                        longest_streak=0,
+                        interviews_completed=0,
+                        questions_answered=0,
+                        average_score=0.0,
+                        best_score=0.0,
+                        badges=[],
+                        active_dates=[],
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    session.add(profile)
+                    await session.flush()
+
+                if profile.last_daily_reward_date == today:
+                    return {
+                        "awarded": 0,
+                        "points_awarded": 0,
+                        "already_claimed": True,
+                        "reward_date": today,
+                    }
+
+                profile.total_points = (profile.total_points or 0) + points
+                profile.last_daily_reward_date = today
+                profile.updated_at = now
+
+                recent = list(profile.recent_points or [])
+                recent.append({
+                    "points": points,
+                    "event": "daily_practice",
+                    "ts": now.isoformat(),
+                })
+                profile.recent_points = recent[-20:]
+
         _leaderboard_cache["data"] = None
         return {
             "awarded": points,
@@ -225,196 +234,185 @@ class GamificationService:
             "reward_date": today,
         }
 
-    async def _create_profile(self, user_id: str) -> Dict:
+    async def _create_profile(self, user_id: str) -> Dict[str, Any]:
         global _leaderboard_cache
-        profile = {
-            "user_id": user_id,
-            "total_points": 0,
-            "current_streak": 0,
-            "longest_streak": 0,
-            "last_practice_date": None,
-            "active_dates": [],
-            "total_interviews": 0,
-            "total_questions_answered": 0,
-            "average_score": 0.0,
-            "best_score": 0.0,
-            "badges": [],
-            "recent_points": [],
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
-        }
-        result = await self.collection.insert_one(profile)
-        profile["_id"] = result.inserted_id
-        _leaderboard_cache["data"] = None
-        return profile
+        now = datetime.now(timezone.utc)
+        async with self.session_factory() as session:
+            async with session.begin():
+                profile = UserGamification(
+                    id=gen_uuid_str(),
+                    user_id=str(user_id),
+                    total_points=0,
+                    current_streak=0,
+                    longest_streak=0,
+                    interviews_completed=0,
+                    questions_answered=0,
+                    average_score=0.0,
+                    best_score=0.0,
+                    badges=[],
+                    active_dates=[],
+                    recent_points=[],
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(profile)
+            await session.refresh(profile)
 
-    # ─── Process Interview Result ─────────────────────────────────────────────
+        _leaderboard_cache["data"] = None
+        doc = _profile_to_dict(profile)
+        doc["level_info"] = self._compute_level(0)
+        doc["rank"] = 1
+        return doc
+
     async def process_interview_result(
         self,
         user_id: str,
         interview_score: float,
         questions_answered: int,
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
-        profile = await self.get_profile(user_id)
-        awarded_points = 0
-        new_badges = []
-        events_log = []
+        today = now.date()
+        today_str = today.isoformat()
 
-        # Base completion points
-        awarded_points += POINT_RULES["interview_completed"]
-        events_log.append({"type": "interview_completed", "pts": POINT_RULES["interview_completed"]})
+        async with self.session_factory() as session:
+            async with session.begin():
+                stmt = select(UserGamification).where(UserGamification.user_id == str(user_id))
+                res = await session.execute(stmt)
+                profile = res.scalar_one_or_none()
 
-        # Score-based bonus
-        pct = interview_score * 100
-        if pct >= 90:
-            awarded_points += POINT_RULES["score_9_plus"]
-            events_log.append({"type": "score_9_plus", "pts": POINT_RULES["score_9_plus"]})
-        elif pct >= 70:
-            awarded_points += POINT_RULES["score_7_plus"]
-            events_log.append({"type": "score_7_plus", "pts": POINT_RULES["score_7_plus"]})
-        elif pct >= 50:
-            awarded_points += POINT_RULES["score_5_plus"]
-            events_log.append({"type": "score_5_plus", "pts": POINT_RULES["score_5_plus"]})
+                if not profile:
+                    profile = UserGamification(
+                        id=gen_uuid_str(),
+                        user_id=str(user_id),
+                        total_points=0,
+                        current_streak=0,
+                        longest_streak=0,
+                        interviews_completed=0,
+                        questions_answered=0,
+                        average_score=0.0,
+                        best_score=0.0,
+                        badges=[],
+                        active_dates=[],
+                        recent_points=[],
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    session.add(profile)
+                    await session.flush()
 
-        # Per-question points
-        q_pts = questions_answered * POINT_RULES["question_answered"]
-        awarded_points += q_pts
-        events_log.append({"type": "questions_answered", "pts": q_pts, "count": questions_answered})
+                awarded_points = 0
+                new_badges = []
+                events_log = []
 
-        # Streak update
-        streak_result = await self._update_streak(user_id, profile, now)
-        awarded_points += streak_result["streak_bonus"]
-        if streak_result["streak_bonus"] > 0:
-            events_log.append({"type": "streak_bonus", "pts": streak_result["streak_bonus"]})
+                # Base completion points
+                awarded_points += POINT_RULES["interview_completed"]
+                events_log.append({"type": "interview_completed", "pts": POINT_RULES["interview_completed"]})
 
-        # Badge checks
-        total_interviews = profile.get("total_interviews", 0) + 1
-        badge_checks = [
-            ("first_interview", total_interviews == 1),
-            ("ai_ready", pct >= 80),
-            ("top_performer", pct >= 90),
-            ("consistent_learner", total_interviews == 5),
-            ("interview_master", total_interviews == 20),
-            ("perfect_score", pct == 100),
-            ("streak_3", streak_result["new_streak"] >= 3),
-            ("streak_7", streak_result["new_streak"] >= 7),
-            ("streak_30", streak_result["new_streak"] >= 30),
-        ]
-        existing_badges = set(b.get("id") for b in profile.get("badges", []))
-        for badge_id, condition in badge_checks:
-            if condition and badge_id not in existing_badges:
-                badge_data = {**BADGES[badge_id], "id": badge_id, "earned_at": now.isoformat()}
-                new_badges.append(badge_data)
-                awarded_points += BADGES[badge_id]["points"]
-                existing_badges.add(badge_id)
+                # Score-based bonus
+                pct = interview_score * 100
+                if pct >= 90:
+                    awarded_points += POINT_RULES["score_9_plus"]
+                    events_log.append({"type": "score_9_plus", "pts": POINT_RULES["score_9_plus"]})
+                elif pct >= 70:
+                    awarded_points += POINT_RULES["score_7_plus"]
+                    events_log.append({"type": "score_7_plus", "pts": POINT_RULES["score_7_plus"]})
+                elif pct >= 50:
+                    awarded_points += POINT_RULES["score_5_plus"]
+                    events_log.append({"type": "score_5_plus", "pts": POINT_RULES["score_5_plus"]})
 
-        total_points_new = profile.get("total_points", 0) + awarded_points
+                # Per-question points
+                q_pts = questions_answered * POINT_RULES["question_answered"]
+                awarded_points += q_pts
+                events_log.append({"type": "questions_answered", "pts": q_pts, "count": questions_answered})
 
-        # Update running average and best score
-        old_avg = profile.get("average_score", 0.0)
-        old_best = float(profile.get("best_score") if profile.get("best_score") is not None else old_avg)
-        old_count = profile.get("total_interviews", 0)
-        new_avg = ((old_avg * old_count) + interview_score) / (old_count + 1)
-        new_best = max(old_best, float(interview_score))
+                # Streak update
+                existing_active = list(profile.active_dates or [])
+                if today_str not in existing_active:
+                    existing_active.append(today_str)
+                profile.active_dates = existing_active
 
-        point_events = [
-            {"points": e["pts"], "event": e["type"], "ts": now.isoformat()}
-            for e in events_log
-            if e["pts"] != 0
-        ]
-        for b in new_badges:
-            point_events.append({
-                "points": b["points"],
-                "event": f"badge_earned:{b['id']}",
-                "ts": now.isoformat(),
-            })
+                streak_info = self._calculate_streak(existing_active, today)
+                new_streak = streak_info["current_streak"]
+                profile.current_streak = new_streak
+                profile.longest_streak = max(profile.longest_streak or 0, streak_info["longest_streak"])
 
-        update_inc = {
-            "total_points": awarded_points,
-            "total_interviews": 1,
-            "total_questions_answered": questions_answered,
-        }
-        update_set = {
-            "average_score": round(new_avg, 3),
-            "best_score": round(new_best, 3),
-            "updated_at": now,
-            "current_streak": streak_result["new_streak"],
-        }
-        update_doc = {"$inc": update_inc, "$set": update_set}
-        push_doc = {}
-        if new_badges:
-            push_doc["badges"] = {"$each": new_badges}
-        if point_events:
-            push_doc["recent_points"] = {"$each": point_events, "$slice": -20}
-        if push_doc:
-            update_doc["$push"] = push_doc
-        await self.collection.update_one({"user_id": user_id}, update_doc, upsert=True)
+                streak_bonus = 0
+                if profile.last_practice_date:
+                    try:
+                        last_d = date.fromisoformat(profile.last_practice_date[:10])
+                        if last_d == today - timedelta(days=1):
+                            streak_bonus = POINT_RULES["streak_bonus_daily"] * new_streak
+                    except Exception:
+                        pass
 
-        if point_events:
-            await self.events_col.insert_many([
-                {
-                    "user_id": user_id,
-                    "event_type": pe["event"],
-                    "points": pe["points"],
-                    "details": {"source": "process_interview_result"},
-                    "created_at": now,
-                }
-                for pe in point_events
-            ])
+                profile.last_practice_date = today_str
+                awarded_points += streak_bonus
+                if streak_bonus > 0:
+                    events_log.append({"type": "streak_bonus", "pts": streak_bonus})
 
+                # Badge checks
+                total_interviews = (profile.interviews_completed or 0) + 1
+                badge_checks = [
+                    ("first_interview", total_interviews == 1),
+                    ("ai_ready", pct >= 80),
+                    ("top_performer", pct >= 90),
+                    ("consistent_learner", total_interviews == 5),
+                    ("interview_master", total_interviews == 20),
+                    ("perfect_score", pct == 100),
+                    ("streak_3", new_streak >= 3),
+                    ("streak_7", new_streak >= 7),
+                    ("streak_30", new_streak >= 30),
+                ]
+                existing_badges = set(b.get("id") for b in (profile.badges or []))
+                for badge_id, condition in badge_checks:
+                    if condition and badge_id not in existing_badges:
+                        badge_data = {**BADGES[badge_id], "id": badge_id, "earned_at": now.isoformat()}
+                        new_badges.append(badge_data)
+                        awarded_points += BADGES[badge_id]["points"]
+                        existing_badges.add(badge_id)
+
+                if new_badges:
+                    profile.badges = list(profile.badges or []) + new_badges
+
+                # Running average and best score
+                old_avg = float(profile.average_score or 0.0)
+                old_best = float(profile.best_score or 0.0)
+                old_count = profile.interviews_completed or 0
+                new_avg = ((old_avg * old_count) + interview_score) / (old_count + 1)
+                new_best = max(old_best, float(interview_score))
+
+                profile.total_points = (profile.total_points or 0) + awarded_points
+                profile.interviews_completed = total_interviews
+                profile.questions_answered = (profile.questions_answered or 0) + questions_answered
+                profile.average_score = round(new_avg, 3)
+                profile.best_score = round(new_best, 3)
+                profile.updated_at = now
+
+                point_events = [
+                    {"points": e["pts"], "event": e["type"], "ts": now.isoformat()}
+                    for e in events_log if e["pts"] != 0
+                ]
+                for b in new_badges:
+                    point_events.append({
+                        "points": b["points"],
+                        "event": f"badge_earned:{b['id']}",
+                        "ts": now.isoformat(),
+                    })
+
+                recent = list(profile.recent_points or []) + point_events
+                profile.recent_points = recent[-20:]
+                total_points_new = profile.total_points
 
         return {
             "points_awarded": awarded_points,
             "new_badges": new_badges,
-            "streak": streak_result["new_streak"],
+            "streak": new_streak,
             "events_log": events_log,
             "new_total": total_points_new,
             "level_info": self._compute_level(total_points_new),
         }
 
-    async def _update_streak(self, user_id: str, profile: Dict, now: datetime) -> Dict:
-        today = now.date()
-        today_str = today.isoformat()
-        last_str = profile.get("last_practice_date")
-
-        # Combine existing active_dates with today
-        existing_active = list(profile.get("active_dates") or [])
-        if today_str not in existing_active:
-            existing_active.append(today_str)
-
-        # Calculate accurate streak from active_dates
-        streak_info = self._calculate_streak(existing_active, today)
-        new_streak = streak_info["current_streak"]
-        longest = max(profile.get("longest_streak", 0), streak_info["longest_streak"])
-
-        # Determine streak bonus
-        streak_bonus = 0
-        if last_str:
-            try:
-                last_date = date.fromisoformat(last_str[:10])
-                if last_date == today - timedelta(days=1):
-                    streak_bonus = POINT_RULES["streak_bonus_daily"] * new_streak
-            except Exception:
-                pass
-
-        await self.collection.update_one(
-            {"user_id": user_id},
-            {
-                "$set": {
-                    "last_practice_date": today_str,
-                    "current_streak": new_streak,
-                    "longest_streak": longest,
-                },
-                "$addToSet": {
-                    "active_dates": today_str
-                }
-            },
-            upsert=True,
-        )
-        return {"new_streak": new_streak, "streak_bonus": streak_bonus}
-
-    def _compute_level(self, total_points: int) -> Dict:
+    def _compute_level(self, total_points: int) -> Dict[str, Any]:
         level_num, level_name, level_icon = LEVEL_THRESHOLDS[0]
         for i, (threshold, name, icon) in enumerate(LEVEL_THRESHOLDS):
             if total_points >= threshold:
@@ -440,126 +438,56 @@ class GamificationService:
             "points_to_next": pts_to_next,
         }
 
-
-    # ─── Leaderboard ──────────────────────────────────────────────────────────
-    async def get_leaderboard(self, limit: int = 20) -> List[Dict]:
+    async def get_leaderboard(self, limit: int = 20) -> List[Dict[str, Any]]:
         global _leaderboard_cache
         now = time.time()
         if _leaderboard_cache["data"] is not None and (now - _leaderboard_cache["ts"]) < _LEADERBOARD_CACHE_TTL:
-            logger.debug("Returning cached leaderboard", age_seconds=round(now - _leaderboard_cache["ts"], 1))
             return _leaderboard_cache["data"]
 
-        pipeline = [
-            {"$sort": {"total_points": -1}},
-            {
-                "$lookup": {
-                    "from": "users",
-                    "let": {"uid": "$user_id"},
-                    "pipeline": [
-                        {
-                            "$match": {
-                                "$expr": {
-                                    "$and": [
-                                        {"$eq": [{"$toString": "$_id"}, {"$toString": "$$uid"}]},
-                                        {"$ne": ["$role", "admin"]},
-                                        {"$ne": ["$role", "recruiter"]},
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            "$project": {
-                                "full_name": 1,
-                                "email": 1,
-                                "username": 1,
-                                "name": 1,
-                                "role": 1,
-                                "profile_picture": 1,
-                                "avatar_url": 1,
-                                "picture": 1,
-                                "display_picture": 1,
-                                "google_picture": 1,
-                                "linked_accounts": 1,
-                                "profile_photo_url": 1,
-                                "photo_url": 1,
-                            }
-                        },
-                    ],
-                    "as": "user_info",
-                }
-            },
-            # Strict filter: only include records where user exists in 'users' collection AND is candidate mode
-            {"$match": {"user_info": {"$ne": []}}},
-            {"$addFields": {"user_info": {"$arrayElemAt": ["$user_info", 0]}}},
-            {"$limit": limit},
-        ]
-
-        cursor_or_coro = self.collection.aggregate(pipeline)
-        if hasattr(cursor_or_coro, "__await__"):
-            cursor = await cursor_or_coro
-        else:
-            cursor = cursor_or_coro
-        docs = await cursor.to_list(length=limit)
+        async with self.session_factory() as session:
+            stmt = (
+                select(UserGamification, User)
+                .join(User, UserGamification.user_id == User.id)
+                .where(User.role.notin_(["admin", "recruiter"]))
+                .order_by(desc(UserGamification.total_points))
+                .limit(limit)
+            )
+            res = await session.execute(stmt)
+            rows = res.all()
 
         result = []
         rank = 1
-        for doc in docs:
-            user_info = doc.get("user_info")
-            if not user_info:
-                continue  # Skip if user does not exist in users table
-
-            user_role = (user_info.get("role") or "candidate").lower()
-            if user_role in ["admin", "recruiter"]:
-                continue  # Only candidate mode users should be shown on leaderboard
-
-            full_name = (user_info.get("full_name") or "").strip()
+        for gam_profile, user_obj in rows:
+            user_role = (user_obj.role or "candidate").lower()
+            full_name = (getattr(user_obj, "full_name", None) or getattr(user_obj, "name", None) or "").strip()
             if not full_name:
-                full_name = (user_info.get("name") or "").strip()
-            if not full_name:
-                full_name = (user_info.get("username") or "").strip()
-            if not full_name:
-                email = (user_info.get("email") or "").strip()
+                email = (user_obj.email or "").strip()
                 if email and "@" in email:
                     full_name = email.split("@")[0].replace(".", " ").replace("_", " ").title()
-                elif email:
-                    full_name = email
-            if not full_name or full_name.lower() == "unknown":
-                full_name = "Anonymous Candidate"
+                else:
+                    full_name = "Anonymous Candidate"
 
-            # Resolve user's profile photo (custom upload > provider/linked > legacy fields)
-            linked_accounts = user_info.get("linked_accounts") or {}
-            avatar_url = (
-                user_info.get("profile_picture")
-                or user_info.get("avatar_url")
-                or user_info.get("display_picture")
-                or user_info.get("profile_photo_url")
-                or user_info.get("photo_url")
-                or user_info.get("picture")
-                or (linked_accounts.get("google") or {}).get("picture")
-                or (linked_accounts.get("github") or {}).get("picture")
-                or (linked_accounts.get("linkedin") or {}).get("picture")
-                or user_info.get("google_picture")
-                or None
-            )
+            streak_info = self._calculate_streak(gam_profile.active_dates or [])
+            badges = gam_profile.badges or []
+            avatar = getattr(user_obj, "profile_picture", None)
 
-            streak_info = self._calculate_streak(doc.get("active_dates") or [])
             result.append({
                 "rank": rank,
-                "user_id": doc["user_id"],
+                "user_id": str(gam_profile.user_id),
                 "full_name": full_name,
                 "role": user_role,
-                "avatar_url": avatar_url,
-                "profile_picture": avatar_url,
-                "display_picture": avatar_url,
-                "google_picture": user_info.get("google_picture") or (linked_accounts.get("google") or {}).get("picture"),
-                "linked_accounts": linked_accounts,
-                "total_points": doc.get("total_points", 0),
-                "level_info": self._compute_level(doc.get("total_points", 0)),
+                "avatar_url": avatar,
+                "profile_picture": avatar,
+                "display_picture": avatar,
+                "google_picture": avatar,
+                "linked_accounts": {},
+                "total_points": gam_profile.total_points or 0,
+                "level_info": self._compute_level(gam_profile.total_points or 0),
                 "current_streak": streak_info["current_streak"],
-                "total_interviews": doc.get("total_interviews", 0),
-                "average_score": doc.get("average_score", 0.0),
-                "badge_count": len(doc.get("badges", [])),
-                "top_badge": doc["badges"][-1] if doc.get("badges") else None,
+                "total_interviews": gam_profile.interviews_completed or 0,
+                "average_score": float(gam_profile.average_score or 0.0),
+                "badge_count": len(badges),
+                "top_badge": badges[-1] if badges else None,
             })
             rank += 1
 

@@ -1,57 +1,31 @@
 """
-Match Events Telemetry Service.
-
-Phase 1.6:
-- Records impression, interaction, and outcome telemetry to `db.match_events`.
-- Supports event types: job_impression, job_click, match_preview, apply, stage_change,
-  resume_download, eligibility_override.
-- Sets 24-month TTL index on `created_at`.
-- Strict Privacy Guarantee: Raw resume text is NEVER logged to this collection.
-- Guarded behind FEATURE_MATCH_EVENT_LOGGING.
+Match Events Telemetry Service (Pure PostgreSQL SQLAlchemy 2.0).
+Records impression, interaction, and outcome telemetry to PostgreSQL audit_logs.
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-
 import structlog
 
 from core.feature_flags import FEATURE_MATCH_EVENT_LOGGING
+from config.db import get_pg_session_factory
+from models.tables import AuditLog
 
 logger = structlog.get_logger(__name__)
 
-TTL_24_MONTHS_SECONDS = 24 * 30 * 86400  # ~62,208,000 seconds
-_INDEX_INITIALIZED = False
 
-
-async def ensure_telemetry_indexes(db: Any) -> None:
-    """Idempotently ensures 24-month TTL and lookup indexes on db.match_events."""
-    global _INDEX_INITIALIZED
-    if _INDEX_INITIALIZED or db is None:
-        return
-
-    try:
-        await db.match_events.create_index(
-            "created_at",
-            expireAfterSeconds=TTL_24_MONTHS_SECONDS,
-            background=True,
-        )
-        await db.match_events.create_index(
-            [("candidate_id", 1), ("job_id", 1), ("event_type", 1)],
-            background=True,
-        )
-        _INDEX_INITIALIZED = True
-        logger.info("Telemetry match_events indexes verified")
-    except Exception as e:
-        logger.warning("Failed to initialize match_events telemetry index", error=str(e))
+async def ensure_telemetry_indexes(db: Any = None) -> None:
+    pass
 
 
 async def log_match_event(
-    db: Any,
-    event_type: str,
-    candidate_id: str,
-    job_id: str,
+    db: Any = None,
+    event_type: str = "match_preview",
+    candidate_id: str = "anonymous",
+    job_id: str = "",
     application_id: Optional[str] = None,
     position_in_list: Optional[int] = None,
     surface: str = "jobs_for_you",
@@ -61,24 +35,17 @@ async def log_match_event(
     action: Optional[str] = None,
     extra_metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """
-    Asynchronously logs a structured match or impression event to db.match_events.
-    Never logs raw resume text.
-    """
-    if not FEATURE_MATCH_EVENT_LOGGING or db is None:
+    if not FEATURE_MATCH_EVENT_LOGGING:
         return
-
-    await ensure_telemetry_indexes(db)
 
     now = datetime.now(timezone.utc)
     clean_meta = {}
     if extra_metadata:
-        # Sanitize metadata: explicitly purge any text fields
         for k, v in extra_metadata.items():
             if "text" not in k.lower() and "resume" not in k.lower() and "raw" not in k.lower():
                 clean_meta[k] = v
 
-    doc = {
+    payload = {
         "event_type": str(event_type),
         "candidate_id": str(candidate_id),
         "job_id": str(job_id),
@@ -87,15 +54,25 @@ async def log_match_event(
         "surface": str(surface),
         "quality_score": round(float(quality_score), 1) if quality_score is not None else None,
         "features_hash": str(features_hash) if features_hash else None,
-        "shown_at": shown_at or now,
-        "acted_at": now,
+        "shown_at": (shown_at or now).isoformat(),
         "action": action,
         "metadata": clean_meta,
-        "created_at": now,
     }
 
     try:
-        await db.match_events.insert_one(doc)
+        session_factory = get_pg_session_factory()
+        async with session_factory() as session:
+            entry = AuditLog(
+                id=str(uuid.uuid4()),
+                event_id=f"telem_{uuid.uuid4().hex[:12]}",
+                tenant_id="default",
+                actor_id=str(candidate_id),
+                action=str(event_type),
+                target_id=str(job_id),
+                payload=payload,
+                created_at=now,
+            )
+            session.add(entry)
+            await session.commit()
     except Exception as e:
-        # Telemetry failures must never disrupt user requests
         logger.warning("Failed to log match telemetry event", event_type=event_type, error=str(e))

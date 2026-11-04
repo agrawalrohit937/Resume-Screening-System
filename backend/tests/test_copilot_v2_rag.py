@@ -17,114 +17,24 @@ from services.copilot.context import ToolExecutionContext
 from services.copilot.tools.read_tools import RetrieveContextArgs, RetrieveContextTool, SearchResumeArgs, SearchResumeTool
 
 
-class AsyncMockCollection:
-    def __init__(self, initial_data=None):
-        self.data = initial_data or []
+class MockTableStore:
+    def __init__(self, initial_docs=None):
+        self.data = list(initial_docs or [])
+        self.docs = self.data
 
-    async def find_one(self, query=None, *args, **kwargs):
-        docs = await self._filter(query)
-        return dict(docs[0]) if docs else None
+    async def get_chunks(self, tenant_id, user_id, source_type=None, limit=20):
+        return [
+            d for d in self.data
+            if d.get("tenant_id") == tenant_id and d.get("user_id") in (user_id, "system")
+            and (not source_type or d.get("source_type") == source_type)
+        ][:limit]
 
-    def find(self, query=None, *args, **kwargs):
-        async def _generator():
-            docs = await self._filter(query)
-            for d in docs:
-                yield dict(d)
+    def filter(self, query=None, *args, **kwargs):
+        return list(self.data)
 
-        class Cursor:
-            def __init__(self, gen, docs):
-                self._gen = gen
-                self._docs = docs
+    async def get(self, query=None, *args, **kwargs):
+        return self.data[0] if self.data else None
 
-            def sort(self, *args, **kwargs):
-                return self
-
-            def limit(self, n):
-                self._docs = self._docs[:n]
-                return self
-
-            def skip(self, n):
-                self._docs = self._docs[n:]
-                return self
-
-            async def to_list(self, length=None):
-                if length is not None:
-                    return [dict(d) for d in self._docs[:length]]
-                return [dict(d) for d in self._docs]
-
-            def __aiter__(self):
-                return self._gen()
-
-        filtered = self._sync_filter(query)
-        return Cursor(_generator, filtered)
-
-    def aggregate(self, pipeline):
-        class AggCursor:
-            def __init__(self, docs):
-                self.docs = docs
-
-            async def to_list(self, length=None):
-                return self.docs[:length] if length else self.docs
-
-        # In testing mock, return empty to trigger in-memory cosine fallback
-        return AggCursor([])
-
-    def _sync_filter(self, query):
-        if not query:
-            return list(self.data)
-        results = []
-        for d in self.data:
-            match = True
-            for k, v in query.items():
-                if k == "$or" and isinstance(v, list):
-                    or_match = False
-                    for condition in v:
-                        cond_match = all(d.get(ck) == cv for ck, cv in condition.items())
-                        if cond_match:
-                            or_match = True
-                            break
-                    if not or_match:
-                        match = False
-                        break
-                elif k == "$text":
-                    continue
-                elif d.get(k) != v:
-                    match = False
-                    break
-            if match:
-                results.append(d)
-        return results
-
-    async def _filter(self, query):
-        return self._sync_filter(query)
-
-    async def insert_one(self, doc):
-        d = dict(doc)
-        if "_id" not in d:
-            d["_id"] = f"mock_{len(self.data) + 1}"
-        self.data.append(d)
-        return MagicMock(inserted_id=d["_id"])
-
-    async def insert_many(self, docs):
-        ids = []
-        for d in docs:
-            res = await self.insert_one(d)
-            ids.append(res.inserted_id)
-        return MagicMock(inserted_ids=ids)
-
-    async def delete_many(self, query):
-        initial_len = len(self.data)
-        to_keep = []
-        for d in self.data:
-            matched = True
-            for k, v in query.items():
-                if d.get(k) != v:
-                    matched = False
-                    break
-            if not matched:
-                to_keep.append(d)
-        self.data = to_keep
-        return MagicMock(deleted_count=initial_len - len(self.data))
 
 
 # ─── 1. Section-Aware Chunking Tests ──────────────────────────────────────────
@@ -245,7 +155,7 @@ async def test_hybrid_retriever_multi_tenant_isolation():
             "chunk_index": 0,
             "title": "Alice Experience",
             "text": "Senior Distributed Systems Engineer working with Apache Kafka and Go.",
-            "embedding": [0.1] * 768,
+            "embedding": [0.1] * 384,
             "metadata": {"section": "experience"},
         },
         {
@@ -257,7 +167,7 @@ async def test_hybrid_retriever_multi_tenant_isolation():
             "chunk_index": 0,
             "title": "Bob Experience",
             "text": "Frontend Specialist building design systems with React and Tailwind.",
-            "embedding": [0.1] * 768,
+            "embedding": [0.1] * 384,
             "metadata": {"section": "experience"},
         },
         {
@@ -269,13 +179,13 @@ async def test_hybrid_retriever_multi_tenant_isolation():
             "chunk_index": 0,
             "title": "ATS Match Guide",
             "text": "Guidance on optimizing resume keywords for ATS scoring.",
-            "embedding": [0.1] * 768,
+            "embedding": [0.1] * 384,
             "metadata": {"section": "help"},
         },
     ]
 
     mock_db = MagicMock()
-    mock_db.copilot_chunks = AsyncMockCollection(mock_chunks)
+    mock_db.copilot_chunks = MockTableStore(mock_chunks)
 
     retriever = CopilotRetriever(mock_db)
 
@@ -300,7 +210,7 @@ async def test_hybrid_retriever_multi_tenant_isolation():
 @pytest.mark.asyncio
 async def test_semantic_response_cache_hit_and_miss():
     mock_db = MagicMock()
-    mock_db.copilot_cache = AsyncMockCollection([])
+    mock_db.copilot_cache = MockTableStore([])
 
     cache = SemanticResponseCache(mock_db)
     tenant_id = "tenant_1"
@@ -364,13 +274,13 @@ async def test_retrieve_context_tool_execution():
             "chunk_index": 0,
             "title": "Experience: Tech Lead at Stripe",
             "text": "Led migration from monolith to microservices achieving 99.99% uptime.",
-            "embedding": [0.2] * 768,
+            "embedding": [0.2] * 384,
             "metadata": {"section": "experience", "company": "Stripe"},
         }
     ]
 
     mock_db = MagicMock()
-    mock_db.copilot_chunks = AsyncMockCollection(mock_chunks)
+    mock_db.copilot_chunks = MockTableStore(mock_chunks)
 
     ctx = ToolExecutionContext(
         tenant_id="tenant_corp",
@@ -402,13 +312,13 @@ async def test_search_resume_hybrid_rag_with_citation():
             "chunk_index": 0,
             "title": "Technical Skills Overview",
             "text": "Core Technical & Professional Skills: Python, LangChain, PyTorch, Kubernetes",
-            "embedding": [0.1] * 768,
+            "embedding": [0.1] * 384,
             "metadata": {"section": "skills"},
         }
     ]
 
     mock_db = MagicMock()
-    mock_db.copilot_chunks = AsyncMockCollection(mock_chunks)
+    mock_db.copilot_chunks = MockTableStore(mock_chunks)
 
     mock_resume = MagicMock()
     mock_resume.raw_text = "Python, LangChain, PyTorch, Kubernetes"
@@ -433,3 +343,4 @@ async def test_search_resume_hybrid_rag_with_citation():
     assert result.citation is not None
     assert "Resume" in result.citation["label"]
     assert "chunks" in result.data
+

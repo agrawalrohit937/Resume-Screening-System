@@ -1,15 +1,11 @@
-"""
-Regulatory Compliance & Candidate Data Rights API Routes.
-Provides:
-- NYC Local Law 144 Bias Audit Reporting (/api/v1/compliance/bias-audit)
-- Candidate Data Rights Portal (/api/v1/compliance/candidate-portal/{candidate_id})
-"""
-
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from api.deps import get_database, get_current_user
+from api.deps import get_current_user, get_db
+from models.tables import CandidateApplication, User, Resume, AuditLog
 from models.user_model import UserModel
 from services.fairness.impact_monitor import compute_adverse_impact_report
 from utils.pagination import stream_cursor
@@ -29,7 +25,7 @@ class BiasAuditSummary(BaseModel):
 @router.get("/bias-audit", response_model=BiasAuditSummary)
 async def get_bias_audit_report(
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Produces NYC Local Law 144 / EEOC annual independent bias audit data.
@@ -41,13 +37,9 @@ async def get_bias_audit_report(
             detail="Only administrators and compliance auditors may access the bias audit.",
         )
 
-    # In a production environment, EEO self-ID is fetched from a dedicated collection `eeo_responses`
-    # and joined in aggregate with applications
-    cursor = db.applications.find(
-        {},
-        {"stage": 1, "status": 1, "eeo_gender": 1, "eeo_ethnicity": 1, "job_id": 1}
-    )
-    records = await stream_cursor(cursor)
+    stmt = select(CandidateApplication.stage, CandidateApplication.status, CandidateApplication.job_id)
+    res = await session.execute(stmt)
+    records = [{"stage": r.stage or "applied", "status": r.status, "job_id": r.job_id} for r in res.all()]
 
     # Transform records for impact calculation
     gender_records = [{"gender": r.get("eeo_gender", "unspecified"), "stage": r.get("stage", "applied")} for r in records]
@@ -72,7 +64,7 @@ async def get_bias_audit_report(
 async def get_candidate_data_rights_export(
     candidate_id: str,
     current_user: UserModel = Depends(get_current_user),
-    db: Any = Depends(get_database),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Candidate Data-Rights Export Portal (GDPR Art. 15, 22 & India DPDP Act 2023).
@@ -86,19 +78,23 @@ async def get_candidate_data_rights_export(
             detail="Candidates may only access their own personal data principal export.",
         )
 
-    # Fetch candidate profile, resumes, applications, and decision records
-    candidate_doc = await db.users.find_one({"_id": candidate_id})
-    resumes = await stream_cursor(db.resumes.find({"user_id": candidate_id}))
-    applications = await stream_cursor(db.applications.find({"candidate_id": candidate_id}))
-    decisions = await stream_cursor(db.decision_log.find({"candidate_id": candidate_id}))
+    u_res = await session.execute(select(User).where(User.id == str(candidate_id)))
+    user_row = u_res.scalar_one_or_none()
+    candidate_doc = {
+        "id": user_row.id,
+        "email": user_row.email,
+        "full_name": user_row.full_name,
+        "created_at": str(user_row.created_at) if user_row else None,
+    } if user_row else {}
 
-    # Clean ObjectIds for JSON export
-    for d in resumes:
-        d["_id"] = str(d.get("_id", ""))
-    for a in applications:
-        a["_id"] = str(a.get("_id", ""))
-    for dec in decisions:
-        dec["_id"] = str(dec.get("_id", ""))
+    r_res = await session.execute(select(Resume).where(Resume.user_id == str(candidate_id)))
+    resumes = [{"_id": r.id, "filename": r.filename, "file_url": r.file_url, "created_at": str(r.created_at)} for r in r_res.scalars().all()]
+
+    a_res = await session.execute(select(CandidateApplication).where(CandidateApplication.candidate_id == str(candidate_id)))
+    applications = [{"_id": a.id, "job_id": a.job_id, "stage": a.stage, "match_score": a.match_score} for a in a_res.scalars().all()]
+
+    d_res = await session.execute(select(AuditLog).where(AuditLog.target_id == str(candidate_id)))
+    decisions = [{"_id": d.id, "action": d.action, "created_at": str(d.created_at)} for d in d_res.scalars().all()]
 
     return {
         "candidate_id": str(candidate_id),
