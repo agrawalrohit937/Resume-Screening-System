@@ -34,7 +34,13 @@ export default function AvatarRing({ user, ringSize = 44, shape = 'circle', chil
   const plan = getUserPlan(user)
   
   // Free users don't get the premium treatment
-  if (plan === 'free') return children
+  if (plan === 'free') {
+    return (
+      <div className="relative shrink-0 flex items-center justify-center" style={{ width: ringSize, height: ringSize }}>
+        {children}
+      </div>
+    )
+  }
 
   const theme = PLAN_THEMES[plan]
   const isCircle = shape === 'circle'

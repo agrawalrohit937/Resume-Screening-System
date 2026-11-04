@@ -66,6 +66,8 @@ def user_to_public(user: UserModel) -> UserPublicResponse:
         profile_resume_url=user.profile_resume_url,
         profile_resume_name=user.profile_resume_name,
         has_password=bool(user.hashed_password),
+        portfolio_slug=getattr(user, "portfolio_slug", None),
+        is_portfolio_published=getattr(user, "is_portfolio_published", False),
     )
 
 

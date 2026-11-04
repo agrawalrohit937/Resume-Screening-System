@@ -5,7 +5,7 @@ Pydantic v2 Schemas — User Auth & Profile
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
 from models.user_model import UserRole, UserStatus, AuthProvider
 
@@ -77,6 +77,8 @@ class ChangePasswordRequest(BaseModel):
 
 
 class UpdateProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     full_name: Optional[str] = Field(default=None, min_length=2, max_length=100)
     phone: Optional[str] = None
     linkedin_url: Optional[str] = None
@@ -90,6 +92,24 @@ class UpdateProfileRequest(BaseModel):
     bio: Optional[str] = Field(default=None, max_length=500)
     github_url: Optional[str] = None
     portfolio_url: Optional[str] = None
+
+    @field_validator("graduation_year", mode="before")
+    @classmethod
+    def parse_graduation_year(cls, v):
+        if v in (None, "", "null"):
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return None
+
+    @field_validator("full_name", "phone", "college", "degree", "location", "bio", "github_url", "portfolio_url", "linkedin_url", mode="before")
+    @classmethod
+    def clean_empty_strings(cls, v):
+        if isinstance(v, str):
+            trimmed = v.strip()
+            return trimmed if trimmed else None
+        return v
 
 
 # ─── Response Schemas ─────────────────────────────────────────────────────────
@@ -140,6 +160,8 @@ class UserPublicResponse(BaseModel):
     profile_resume_url: Optional[str] = None
     profile_resume_name: Optional[str] = None
     has_password: bool = False
+    portfolio_slug: Optional[str] = None
+    is_portfolio_published: bool = False
 
 
 class SetPrimaryResumeRequest(BaseModel):

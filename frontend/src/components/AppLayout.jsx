@@ -104,7 +104,7 @@ function MobileHeader({ onMenuToggle }) {
               <div className="relative">
                 <AvatarRing user={user} ringSize={44} shape="circle">
                   {userAvatar ? (
-                    <img src={userAvatar} alt={user?.full_name || 'User'} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover ring-2 ring-[#2E9BDA]/20 shadow-sm" />
+                    <img src={userAvatar} alt={user?.full_name || 'User'} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover object-top ring-2 ring-[#2E9BDA]/20 shadow-sm" />
                   ) : (
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 text-white text-xs font-bold shadow-sm ring-2 ring-slate-100">
                       {user?.full_name?.[0]?.toUpperCase() || 'U'}

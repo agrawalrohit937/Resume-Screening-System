@@ -32,6 +32,8 @@ import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 
+const ATS_SESSION_KEY = 'careershala_ats_session'
+
 function SidebarAvatar({ user, isPremium, isPro }) {
   const [imgError, setImgError] = useState(false)
   const avatarUrl = resolveAvatarUrl(user)
@@ -40,43 +42,27 @@ function SidebarAvatar({ user, isPremium, isPro }) {
 
   const initials = getInitials(user?.full_name)
 
-  const ringStyle = isPremium
-    ? 'ring-[#F3C24B]/60 border-[#F3C24B]'
-    : isPro
-    ? 'ring-slate-300 border-slate-300'
-    : 'ring-white border-slate-200'
-
-  const glowStyle = isPremium
-    ? 'bg-[#F3C24B]'
-    : isPro
-    ? 'bg-slate-400'
-    : 'bg-[#2E9BDA]'
-
   return (
-    <div className="relative shrink-0 group cursor-pointer">
-      <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-40 blur-md transition-opacity duration-300 ${glowStyle}`} />
-      
-      <div className={`relative w-11 h-11 rounded-full overflow-hidden shadow-sm border bg-white ring-2 ${ringStyle}`}>
-        {avatarUrl && !imgError ? (
-          <img
-            src={avatarUrl}
-            alt={user?.full_name || 'User'}
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className={`w-full h-full flex items-center justify-center text-white font-black text-sm ${
-            isPremium
-              ? 'bg-gradient-to-br from-[#F3C24B] to-[#B9812A]'
-              : isPro
-              ? 'bg-gradient-to-br from-slate-500 to-slate-700'
-              : 'bg-gradient-to-br from-[#38AEEA] to-[#1d6fa5]'
-          }`}>
-            {initials}
-          </div>
-        )}
-      </div>
+    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-slate-100 border border-slate-200/80 shadow-2xs">
+      {avatarUrl && !imgError ? (
+        <img
+          src={avatarUrl}
+          alt={user?.full_name || 'User'}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover rounded-full"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className={`w-full h-full flex items-center justify-center text-white font-black text-xs ${
+          isPremium
+            ? 'bg-gradient-to-br from-[#F3C24B] to-[#B9812A]'
+            : isPro
+            ? 'bg-gradient-to-br from-slate-500 to-slate-700'
+            : 'bg-gradient-to-br from-[#38AEEA] to-[#1d6fa5]'
+        }`}>
+          {initials}
+        </div>
+      )}
     </div>
   )
 }
@@ -795,6 +781,9 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     key={item.to}
                     to={item.to}
                     onClick={() => {
+                      if (item.to === '/results' && location.pathname !== '/results') {
+                        sessionStorage.removeItem(ATS_SESSION_KEY)
+                      }
                       setViewModeOpen(false)
                       onNavigate?.()
                     }}
@@ -1142,8 +1131,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
           isCompact ? 'justify-center' : ''
         } ${isPremium ? 'bg-gradient-to-r from-[#F3C24B]/10 to-transparent hover:from-[#F3C24B]/20' : isPro ? 'bg-slate-100/60 hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
           
-          <div className="relative">
-            <AvatarRing user={user} ringSize={44} shape="squircle">
+          <div className="relative shrink-0 w-11 h-11 flex items-center justify-center">
+            <AvatarRing user={user} ringSize={44} shape="circle">
               <SidebarAvatar user={user} isPremium={isPremium} isPro={isPro} />
             </AvatarRing>
             

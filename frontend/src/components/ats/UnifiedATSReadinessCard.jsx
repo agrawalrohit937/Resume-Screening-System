@@ -14,7 +14,9 @@ import {
   FileCheck2,
   Layers,
   Copy,
-  Check
+  Check,
+  RotateCcw,
+  ArrowLeft
 } from 'lucide-react'
 import ScoreRing from '../ScoreRing'
 import { dedupeCaseInsensitive } from './ATSHelpers'
@@ -149,7 +151,32 @@ export default function UnifiedATSReadinessCard({
       className="space-y-5"
     >
       
-      {/* ── BENTO GRID HERO: MODERN EXECUTIVE ATS READINESS ─────────────── */}
+      {/* Action Bar: Quick Reset to Scan Another Resume */}
+      <div className="flex items-center justify-between gap-3 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-2xl p-3 shadow-2xs">
+        <button
+          type="button"
+          onClick={onReset}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-[#2E9BDA]/10 text-slate-700 hover:text-[#1d6fa5] border border-slate-200/80 hover:border-[#2E9BDA]/40 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+        >
+          <RotateCcw size={14} className="text-[#2E9BDA]" />
+          <span>New Scan / Match Another Resume</span>
+        </button>
+
+        {onEnhance && (
+          <button
+            type="button"
+            onClick={onEnhance}
+            disabled={enhancing}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] text-white text-xs font-extrabold shadow-sm hover:shadow-md transition-all cursor-pointer"
+          >
+            <Sparkles size={13} />
+            <span className="hidden sm:inline">Supercharge Resume</span>
+            <span className="sm:hidden">Enhance</span>
+          </button>
+        )}
+      </div>
+
+      {/* ─── BENTO GRID HERO: MODERN EXECUTIVE ATS READINESS ──────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-stretch">
         
         {/* Bento Tile 1: Floating ScoreRing & Status (7 Cols) */}

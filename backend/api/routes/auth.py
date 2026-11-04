@@ -9,12 +9,12 @@ router rather than a monolith covering every auth concern.
 
 import structlog
 
-from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from api.deps import get_current_user, get_user_repo
+from api.deps import get_current_user, get_optional_current_user, get_user_repo
 
 logger = structlog.get_logger(__name__)
 from core.config import settings
@@ -170,13 +170,34 @@ async def deactivate_account(
 
 @router.post("/logout")
 async def logout(
-    current_user: UserModel = Depends(get_current_user),
+    request: Request,
+    current_user: Optional[UserModel] = Depends(get_optional_current_user),
     user_repo: UserRepository = Depends(get_user_repo),
 ):
-    await user_repo.update(str(current_user.id), {"refresh_token": None})
-    await TokenService.revoke_all_user_tokens(str(current_user.id), reason="user_logout")
+    token = None
+    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    elif request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
+
+    if token:
+        try:
+            payload = decode_token(token)
+            if payload and payload.get("jti"):
+                await TokenService.revoke_jti(payload["jti"], reason="user_logout")
+        except Exception as e:
+            logger.warning("Failed to revoke access token JTI on logout", error=str(e))
+
+    if current_user:
+        try:
+            await user_repo.update(str(current_user.id), {"refresh_token": None})
+            await TokenService.revoke_all_user_tokens(str(current_user.id), reason="user_logout")
+        except Exception as e:
+            logger.warning("Failed to revoke user refresh tokens on logout", error=str(e))
 
     response = JSONResponse(content={"message": "Logged out successfully"})
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    for key in ("access_token", "refresh_token", settings.TRUSTED_DEVICE_COOKIE_NAME):
+        response.delete_cookie(key=key, path="/", httponly=True, samesite="lax")
+        response.delete_cookie(key=key, path="/")
     return response
