@@ -1,3 +1,4 @@
+from services.cloudinary_service import generate_signed_resume_url, extract_public_id_from_url
 # """
 # ATS Routes — Single match, bulk match, history
 # """
@@ -590,11 +591,14 @@ async def get_latest_ats_result(
         "job_title": getattr(latest, "job_title", "") or (jd_doc.title if jd_doc else "Target Role"),
         "job_description": jd_text,
         "required_skills": getattr(jd_doc, "required_skills", []) if jd_doc else [],
-        "resume": {
-            "id": str(resume.id) if resume else latest.resume_id,
-            "file_name": getattr(resume, "file_name", "Profile Resume.pdf"),
-            "file_url": getattr(resume, "file_url", None),
-        } if (resume or latest.resume_id) else None,
+        "resume": (lambda r, lid: {
+            "id": str(r.id) if r else lid,
+            "file_name": getattr(r, "file_name", "Profile Resume.pdf") if r else "Profile Resume.pdf",
+            "file_url": (lambda u, pid: generate_signed_resume_url(pid or extract_public_id_from_url(u), expires_in=7200) if (pid or (u and "cloudinary.com" in u)) else u)(
+                getattr(r, "file_url", None) if r else None,
+                getattr(r, "cloudinary_public_id", None) if r else None
+            ),
+        })(resume, latest.resume_id) if (resume or latest.resume_id) else None,
     }
 
 

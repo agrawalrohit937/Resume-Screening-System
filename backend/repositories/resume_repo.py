@@ -64,6 +64,17 @@ class ResumeRepository(BaseRepository):
             await session.refresh(resume_inst)
             return _resume_to_pydantic(resume_inst)
 
+    async def get_by_filename(self, filename: str) -> Optional[ResumeModel]:
+        if not filename:
+            return None
+        async with self.session_factory() as session:
+            stmt = select(Resume).where(Resume.filename == filename)
+            res = await session.execute(stmt)
+            row = res.scalar_one_or_none()
+            if row:
+                return _resume_to_pydantic(row)
+            return None
+
     async def get_by_id(self, resume_id: str) -> Optional[ResumeModel]:
         if not resume_id:
             return None

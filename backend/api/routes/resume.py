@@ -1,3 +1,4 @@
+from fastapi.responses import FileResponse, RedirectResponse
 from config.db import get_pg_session_factory
 from sqlalchemy import update
 from models.tables import Resume, User
@@ -32,7 +33,7 @@ from schemas.resume_schema import (
     ResumeListResponse, ResumeUpdateRequest
 )
 from services.parser_service import ParserService
-from services.cloudinary_service import upload_resume, delete_file as cloudinary_delete
+from services.cloudinary_service import upload_resume, delete_file as cloudinary_delete, generate_signed_resume_url, extract_public_id_from_url
 from utils.file_utils import validate_and_save_file, delete_file, sanitize_filename
 from utils.validators import validate_object_id
 from scheduler.job_alerts import sweep_stuck_pending_resumes
@@ -356,15 +357,92 @@ async def delete_resume(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Delete failed.")
 
 
+
+# ─── GET /download/{filename} ─────────────────────────────────────────────────
+@router.get("/download/{filename}")
+async def download_resume_by_filename(
+    filename: str,
+    resume_repo: ResumeRepository = Depends(get_resume_repo),
+):
+    """Download/preview a resume file by its unique storage filename."""
+    resume = await resume_repo.get_by_filename(filename)
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume file not found.")
+
+    pid = getattr(resume, "cloudinary_public_id", None)
+    if not pid and getattr(resume, "file_url", None) and "cloudinary.com" in resume.file_url:
+        pid = extract_public_id_from_url(resume.file_url)
+    if pid:
+        signed = generate_signed_resume_url(pid, expires_in=3600)
+        if signed:
+            return RedirectResponse(url=signed)
+
+    storage_path = getattr(resume, "storage_path", None)
+    if storage_path and os.path.exists(storage_path):
+        media_type = "application/pdf" if storage_path.endswith(".pdf") else "application/octet-stream"
+        return FileResponse(
+            storage_path,
+            media_type=media_type,
+            filename=getattr(resume, "original_filename", "resume.pdf"),
+            headers={"Content-Disposition": f'inline; filename="{getattr(resume, "original_filename", "resume.pdf")}"'}
+        )
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File is not available.")
+
+
+# ─── GET /{resume_id}/preview ─────────────────────────────────────────────────
+@router.get("/{resume_id}/preview")
+async def preview_resume_by_id(
+    resume_id: str,
+    resume_repo: ResumeRepository = Depends(get_resume_repo),
+):
+    """Preview resume PDF directly by resume ID."""
+    validate_object_id(resume_id, "resume_id")
+    resume = await resume_repo.get_by_id(resume_id)
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+
+    pid = getattr(resume, "cloudinary_public_id", None)
+    if not pid and getattr(resume, "file_url", None) and "cloudinary.com" in resume.file_url:
+        pid = extract_public_id_from_url(resume.file_url)
+    if pid:
+        signed = generate_signed_resume_url(pid, expires_in=3600)
+        if signed:
+            return RedirectResponse(url=signed)
+
+    storage_path = getattr(resume, "storage_path", None)
+    if storage_path and os.path.exists(storage_path):
+        media_type = "application/pdf" if storage_path.endswith(".pdf") else "application/octet-stream"
+        return FileResponse(
+            storage_path,
+            media_type=media_type,
+            filename=getattr(resume, "original_filename", "resume.pdf"),
+            headers={"Content-Disposition": f'inline; filename="{getattr(resume, "original_filename", "resume.pdf")}"'}
+        )
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume preview not available.")
+
 def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
     err = getattr(resume, "error_message", None) or getattr(resume, "parse_error", None)
+    file_url = resume.file_url
+    try:
+        pid = getattr(resume, "cloudinary_public_id", None)
+        if not pid and file_url and "cloudinary.com" in file_url:
+            pid = extract_public_id_from_url(file_url)
+        if pid:
+            signed = generate_signed_resume_url(pid, expires_in=7200)
+            if signed:
+                file_url = signed
+    except Exception:
+        pass
+
     return ResumeDetailResponse(
         id=str(resume.id),
         user_id=resume.user_id,
         filename=resume.filename,
         original_filename=resume.original_filename,
         file_type=resume.file_type,
-        file_url=resume.file_url,
+        file_url=file_url,
         file_size_bytes=resume.file_size_bytes,
         status=resume.status,
         parsed_data=resume.parsed_data,
