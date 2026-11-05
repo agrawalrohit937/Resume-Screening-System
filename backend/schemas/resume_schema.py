@@ -7,7 +7,8 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from models.resume_model import (
-    ResumeStatus, ParsedResumeData
+    ResumeStatus, ContactInfo, WorkExperience, Education,
+    Project, Certification, ParsedResumeData
 )
 
 # ── NEW: Human-in-the-Loop (HITL) Wizard Payloads ─────────
@@ -67,7 +68,6 @@ class ResumeUploadResponse(BaseModel):
     filename: str
     status: ResumeStatus
     message: str
-    job_id: Optional[str] = None
 
 
 class ResumeDetailResponse(BaseModel):
@@ -80,8 +80,6 @@ class ResumeDetailResponse(BaseModel):
     file_size_bytes: int
     status: ResumeStatus
     parsed_data: Optional[ParsedResumeData]
-    parse_error: Optional[str] = None
-    error_message: Optional[str] = None
     tags: List[str]
     is_primary: bool
     version: int
@@ -113,7 +111,6 @@ class EnhanceResumeRequest(BaseModel):
     
     # ── Strict ATS Engine Integration ──
     strict_missing_keywords: Optional[List[str]] = None
-    current_score: Optional[float] = Field(default=80.0, description="Current match score before enhancement")
 
     # ── NEW: Human-in-the-Loop Integration ──
     # The HITL wizard bundle. None/absent = user was never shown a wizard (e.g. quick path).
