@@ -34,12 +34,7 @@ def include_object(object, name, type_, reflected, compare_to):
     return True
 
 def get_database_url() -> str:
-    db_url = settings.async_database_url
-    if not db_url:
-        db_url = os.getenv("DATABASE_URL", "")
-    if db_url.startswith("postgresql://"):
-        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return db_url
+    return settings.async_database_url or os.getenv("DATABASE_URL", "")
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""

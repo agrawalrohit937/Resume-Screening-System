@@ -15,20 +15,13 @@ if ENV_FILE_PATH.exists():
     load_dotenv(str(ENV_FILE_PATH))
 
 
-def get_api_keys(prefix: str | List[str], count: int = 5, fallback: Optional[str] = None) -> List[str]:
+def get_api_keys(prefix: str, count: int = 5, fallback: Optional[str] = None) -> List[str]:
     """Collect unique, non-empty, stripped API keys from numbered env vars and optional fallback."""
-    prefixes = [prefix] if isinstance(prefix, str) else prefix
-    keys: List[str] = []
-
-    if fallback and (cleaned_fb := fallback.strip()) and cleaned_fb not in keys:
-        keys.append(cleaned_fb)
-
-    for p in prefixes:
-        for i in range(1, count + 1):
-            val = os.getenv(f"{p}_{i}")
-            if val and (cleaned := val.strip()) and cleaned not in keys:
-                keys.append(cleaned)
-
+    keys: List[str] = [fallback.strip()] if fallback and fallback.strip() else []
+    for i in range(1, count + 1):
+        val = os.getenv(f"{prefix}_{i}", "").strip()
+        if val and val not in keys:
+            keys.append(val)
     return keys
 
 
@@ -45,7 +38,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: Optional[str] = None
 
     # ── 2. Database (PostgreSQL Engine) ───────────────────────────────────────
     DATABASE_URL: Optional[str] = None
@@ -53,10 +46,7 @@ class Settings(BaseSettings):
     POSTGRES_MAX_OVERFLOW: int = 20
 
     # ── 3. Security & JWT ─────────────────────────────────────────────────────
-    SECRET_KEY: str = Field(
-        default="careershala-dev-secret-key-minimum-32-chars-long-for-local-recruiter-preview",
-        min_length=32
-    )
+    SECRET_KEY: Optional[str] = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -71,19 +61,8 @@ class Settings(BaseSettings):
     # ── 5. File & Upload Constraints ──────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 10
     MAX_PDF_PAGES: int = 15
-    ALLOWED_FILE_TYPES: List[str] = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ]
     UPLOAD_DIR: str = "./uploads"
 
-    # ── Rate Limits ───────────────────────────────────────────────────────────
-    RATELIMIT_DEFAULT: str = "300/minute"
-    RATELIMIT_ATS: str = "30/minute"
-    RATELIMIT_RESUME: str = "20/minute"
-    RATELIMIT_COPILOT: str = "30/minute"
-    RATELIMIT_AUTH: str = "10/minute"
-    RATELIMIT_ENHANCE: str = "20/minute"
 
     PROFILE_MAX_SIZE_MB: int = 5
     PROFILE_ALLOWED_CONTENT_TYPES: List[str] = [
@@ -113,7 +92,6 @@ class Settings(BaseSettings):
     # ── 9. AI / LLM Providers ─────────────────────────────────────────────────
     GROQ_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
-    GOOGLE_API_KEY: Optional[str] = None
 
     OPENROUTER_API_KEY: Optional[str] = None
     OPENROUTER_MODEL: str = "openai/gpt-4o-mini"
@@ -122,7 +100,7 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = None
 
     # ── 10. OAuth Integrations ────────────────────────────────────────────────
-    GOOGLE_CLIENT_ID: str = Field(default="dev-google-client-id.apps.googleusercontent.com")
+    GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_GMAIL_REDIRECT_URI: Optional[str] = None
 
@@ -150,7 +128,6 @@ class Settings(BaseSettings):
 
     # ── 12. Certificates & Pagination ─────────────────────────────────────────
     CERT_VERIFY_BASE_URL: Optional[str] = None
-    CERT_ISSUER_NAME: str = "CareerShala"
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
@@ -175,49 +152,14 @@ class Settings(BaseSettings):
     def _finalize_settings(self) -> "Settings":
         if self.FRONTEND_URL:
             self.FRONTEND_URL = self.FRONTEND_URL.strip().rstrip("/")
-
-        default_origins = [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://localhost:8000",
-            "https://careershala.tech",
-            "https://www.careershala.tech",
-        ]
-
-        origins_set = set(self.ALLOWED_ORIGINS or [])
-        origins_set.update(default_origins)
-
-        if self.FRONTEND_URL:
-            origins_set.add(self.FRONTEND_URL)
-            if "://" in self.FRONTEND_URL:
-                scheme, domain = self.FRONTEND_URL.split("://", 1)
-                if domain.startswith("www."):
-                    origins_set.add(f"{scheme}://{domain[4:]}")
-                else:
-                    origins_set.add(f"{scheme}://www.{domain}")
-
-        self.ALLOWED_ORIGINS = sorted(list(origins_set))
-
-        if not self.CORS_ORIGIN_REGEX:
-            self.CORS_ORIGIN_REGEX = r"^https:\/\/(.*\.)?careershala\.tech$|^https:\/\/.*\.vercel\.app$"
-
+            if self.FRONTEND_URL not in self.ALLOWED_ORIGINS:
+                self.ALLOWED_ORIGINS.append(self.FRONTEND_URL)
         return self
 
     # ── Helper Properties ─────────────────────────────────────────────────────
     @property
     def async_database_url(self) -> Optional[str]:
-        if not self.DATABASE_URL:
-            return None
-        url = self.DATABASE_URL.strip()
-        if url.startswith("postgres://"):
-            url = "postgresql+asyncpg://" + url[len("postgres://"):]
-        elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
-            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
-        # Normalize asyncpg query params
-        url = url.replace("sslmode=require", "ssl=require")
-        url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
-        return url
+        return self.DATABASE_URL.strip() if self.DATABASE_URL else None
 
     @property
     def max_file_bytes(self) -> int:
@@ -245,11 +187,7 @@ class Settings(BaseSettings):
 
     @property
     def gemini_api_keys(self) -> List[str]:
-        return get_api_keys(
-            ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-            count=5,
-            fallback=self.GEMINI_API_KEY or self.GOOGLE_API_KEY,
-        )
+        return get_api_keys("GEMINI_API_KEY", count=5, fallback=self.GEMINI_API_KEY)
 
 
 @lru_cache()
