@@ -59,17 +59,33 @@ export default function EnhancedResumeStudioModal({
   )
 
   const originalPdfUrl = useMemo(() => {
+    let url = null
     if (resumeFile instanceof File || resumeFile instanceof Blob) {
       try {
-        return URL.createObjectURL(resumeFile)
+        url = URL.createObjectURL(resumeFile)
       } catch (e) {
-        return null
+        url = null
+      }
+    } else if (resumeFile?.file_url) {
+      url = resumeFile.file_url
+    } else if (result?.file_url) {
+      url = result.file_url
+    }
+
+    if (url && typeof url === 'string' && url.startsWith('/api')) {
+      const apiOrigin = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || window.location.origin
+      url = apiOrigin + url
+    }
+    return url
+  }, [resumeFile, result])
+
+  useEffect(() => {
+    return () => {
+      if (originalPdfUrl && typeof originalPdfUrl === 'string' && originalPdfUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(originalPdfUrl)
       }
     }
-    if (resumeFile?.file_url) return resumeFile.file_url
-    if (result?.file_url) return result.file_url
-    return null
-  }, [resumeFile, result])
+  }, [originalPdfUrl])
 
   const initialPdfUrl = useMemo(() => {
     if (!data?.pdf_url) return null
@@ -927,8 +943,20 @@ export default function EnhancedResumeStudioModal({
               </h3>
             </div>
 
-            {/* Right: Original ATS Tag */}
+            {/* Right: Original ATS Tag & Fullscreen Link */}
             <div className="flex items-center gap-2 shrink-0">
+              {originalPdfUrl && (
+                <a
+                  href={originalPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-[11px] font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                  title="Open original resume PDF in new tab"
+                >
+                  <ExternalLink size={12} />
+                  <span>Open Full PDF</span>
+                </a>
+              )}
               <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200/90 text-xs font-bold text-slate-700 shadow-2xs">
                 ATS Score: {oldScore}%
               </span>
