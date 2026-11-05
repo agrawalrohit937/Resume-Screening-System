@@ -97,7 +97,6 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str = "openai/gpt-4o-mini"
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
-    HF_TOKEN: Optional[str] = None
 
     # ── 10. OAuth Integrations ────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: Optional[str] = None
@@ -127,7 +126,6 @@ class Settings(BaseSettings):
     LOGIN_CHALLENGE_EXPIRE_MINUTES: int = 10
 
     # ── 12. Certificates & Pagination ─────────────────────────────────────────
-    CERT_VERIFY_BASE_URL: Optional[str] = None
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
@@ -171,15 +169,14 @@ class Settings(BaseSettings):
 
     @property
     def mail_sender(self) -> dict:
-        email = self.MAIL_FROM_EMAIL or self.ADMIN_EMAIL or "notifications@localhost"
-        name = self.MAIL_FROM_NAME or "Career Platform"
+        email = self.MAIL_FROM_EMAIL
+        name = self.MAIL_FROM_NAME
         return {"name": name, "email": email}
 
     @property
     def cert_verify_base_url(self) -> str:
-        if self.CERT_VERIFY_BASE_URL:
-            return self.CERT_VERIFY_BASE_URL.rstrip("/")
-        return f"{self.FRONTEND_URL.rstrip('/')}/verify"
+        base = (self.FRONTEND_URL or "").rstrip("/")
+        return f"{base}/verify" if base else "/verify"
 
     @property
     def groq_api_keys(self) -> List[str]:
