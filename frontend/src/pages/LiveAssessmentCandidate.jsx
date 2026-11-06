@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Bot,
+import {Bot,
   LogOut,
   Volume2,
   VolumeX,
@@ -19,8 +18,7 @@ import {
   XCircle,
   HelpCircle,
   Layers,
-  Lock
-} from 'lucide-react'
+  Lock, Loader2} from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 
@@ -203,14 +201,55 @@ export default function LiveAssessmentCandidate() {
     }
   }, [tts.speaking])
 
-  // Proctoring ML hook — initialized early during onboarding, active during live answering
+  // Proctoring ML hook — zero overhead during onboarding, loaded on demand when user starts
+  const [loadModels, setLoadModels] = useState(false)
+  const [isLaunchingRoom, setIsLaunchingRoom] = useState(false)
+
   const detectionStatus = useAdvancedDetection({
     videoRef,
     canvasRef,
     onEvent: handleCheatingEvent,
-    active: !isMobile && (phase === CANDIDATE_PHASE.ACTIVE || phase === CANDIDATE_PHASE.ONBOARDING),
-    faceInterval: 350,
+    active: !isMobile && (loadModels || phase === CANDIDATE_PHASE.ACTIVE),
+    isLive: phase === CANDIDATE_PHASE.ACTIVE,
+    faceInterval: 650,
+    objectInterval: 8000,
   })
+
+  const handleStartFromSystemCheck = useCallback(async () => {
+    try {
+      await fsGate.enterImmersive()
+    } catch (_) {}
+    setLoadModels(true)
+    setIsLaunchingRoom(true)
+  }, [fsGate])
+
+  useEffect(() => {
+    if (!isLaunchingRoom) return
+    let cancelled = false
+    const launch = async () => {
+      if (detectionStatus?.isWorkerReady) {
+        try {
+          await handleStartSession()
+        } catch (_) {}
+        if (!cancelled) {
+          setIsLaunchingRoom(false)
+        }
+      }
+    }
+    launch()
+    const timer = setTimeout(async () => {
+      if (!cancelled && isLaunchingRoom) {
+        try {
+          await handleStartSession()
+        } catch (_) {}
+        setIsLaunchingRoom(false)
+      }
+    }, 4500)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [isLaunchingRoom, detectionStatus?.isWorkerReady])
 
   // Camera setup
   const startCamera = useCallback(async () => {
@@ -581,6 +620,80 @@ export default function LiveAssessmentCandidate() {
   }
 
   // ── 6. System Check Phase ─────────────────────────────────────────────────
+  if (isLaunchingRoom) {
+    return (
+      <ImmersiveShell active={fsGate.immersive}>
+        <div className="fixed inset-0 z-[999999] w-screen h-screen bg-[#F5F7FB] flex flex-col items-center justify-center p-6 text-center select-none">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="max-w-[460px] w-full bg-white rounded-3xl p-8 shadow-2xl border border-blue-100 flex flex-col items-center space-y-6"
+          >
+            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#2E9BDA] to-[#1d6fa5] flex items-center justify-center text-white shadow-lg shadow-[#2E9BDA]/25">
+              <Bot className="w-8 h-8" />
+              <div className="absolute inset-0 rounded-2xl border-2 border-[#2E9BDA] animate-ping opacity-30" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-[20px] font-black text-blue-950">
+                Initializing AI Proctoring Engine
+              </h3>
+              <p className="text-[13px] text-blue-900/55 font-medium leading-relaxed">
+                Loading facial tracking &amp; gaze detection models in the background. Entering assessment room...
+              </p>
+            </div>
+
+            <div className="w-full space-y-2.5 text-left bg-slate-50 border border-blue-100/80 rounded-2xl p-4 text-[12.5px] font-semibold text-blue-950">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Camera &amp; Microphone
+                </span>
+                <span className="text-emerald-700 font-bold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">VERIFIED</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  {detectionStatus?.isWorkerReady ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                  )}
+                  AI FaceMesh &amp; Gaze Models
+                </span>
+                <span className={`font-bold text-[11px] px-2 py-0.5 rounded-full border ${
+                  detectionStatus?.isWorkerReady
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                    : 'text-[#1d6fa5] bg-blue-50 border-blue-200 animate-pulse'
+                }`}>
+                  {detectionStatus?.isWorkerReady ? 'READY' : 'LOADING...'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                  AI Assessment Session
+                </span>
+                <span className="text-[#1d6fa5] font-bold text-[11px] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 animate-pulse">
+                  PREPARING
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try { await handleStartSession() } catch (_) {}
+                setIsLaunchingRoom(false)
+              }}
+              className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 transition-colors underline underline-offset-2"
+            >
+              Skip wait and launch immediately →
+            </button>
+          </motion.div>
+        </div>
+      </ImmersiveShell>
+    )
+  }
+
   if (phase === CANDIDATE_PHASE.SYSTEM_CHECK) {
     return (
       <SystemCheckStep
@@ -591,8 +704,9 @@ export default function LiveAssessmentCandidate() {
         startCamera={startCamera}
         detectionStatus={detectionStatus}
         fsGate={fsGate}
+        onPrepareAi={() => setLoadModels(true)}
         onBack={() => setPhase(CANDIDATE_PHASE.WELCOME)}
-        onComplete={handleStartSession}
+        onComplete={handleStartFromSystemCheck}
       />
     )
   }

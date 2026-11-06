@@ -227,6 +227,7 @@ async def get_leaderboard(
         "total_participants": len(board),
     }
 
+
 # ─── GET /interview/badges/catalog ───────────────────────────────────────────
 @router.get("/badges/catalog")
 async def get_badge_catalog(current_user: UserModel = Depends(get_current_user)):

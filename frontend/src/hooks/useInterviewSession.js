@@ -64,7 +64,8 @@ export function useInterviewSession() {
       qTimerRef.current = setInterval(() => {
         setQuestionTimer(t => {
           const nextTime = t + 1;
-          const limit = questions[currentQIdx]?.time_limit || 60; 
+          const defaultLimit = config?.difficulty === 'easy' ? 120 : config?.difficulty === 'hard' ? 240 : 180;
+          const limit = questions[currentQIdx]?.time_limit || defaultLimit; 
 
           if (nextTime >= limit) {
             clearInterval(qTimerRef.current);

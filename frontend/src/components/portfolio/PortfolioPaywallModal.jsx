@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createCheckout, verifyPayment, reportPaymentFailure } from '../../services/api';
+import { loadRazorpaySDK } from '../../utils/razorpay';
 import toast from 'react-hot-toast';
 
 export default function PortfolioPaywallModal({
@@ -43,7 +44,8 @@ export default function PortfolioPaywallModal({
         console.warn('Backend checkout order init fallback', checkoutErr);
       }
 
-      // Step 2: If Razorpay SDK is available in window
+      // Step 2: Ensure Razorpay SDK is ready and available in window
+      await loadRazorpaySDK();
       if (window.Razorpay && orderData && orderData.razorpay_key_id) {
         const options = {
           key: orderData.razorpay_key_id,

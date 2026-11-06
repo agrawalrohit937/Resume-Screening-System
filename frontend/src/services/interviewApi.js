@@ -25,11 +25,19 @@ export const submitCheatingReport = (payload) =>
 
 
 // ── Gamification ────────────────────────────────────────────
-export const getGamificationProfile = (config) =>
-  api.get('/interview/ai/gamification/profile', config)
+let _gamiProfileInFlight = null
+export const getGamificationProfile = (config) => {
+  if (_gamiProfileInFlight) return _gamiProfileInFlight
+  _gamiProfileInFlight = api.get('/interview/ai/gamification/profile', config)
+    .finally(() => {
+      setTimeout(() => { _gamiProfileInFlight = null }, 2000)
+    })
+  return _gamiProfileInFlight
+}
 
 export const claimDailyVisitReward = () =>
   api.post('/interview/ai/gamification/daily-visit')
+
 
 
 export const getLeaderboard = (limit = 20) =>

@@ -1,4 +1,3 @@
-import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
@@ -17,17 +16,20 @@ if (!googleClientId) {
   )
 }
 
+const content = (
+  <>
+    <App />
+    <SpeedInsights />
+  </>
+)
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   googleClientId ? (
     <GoogleOAuthProvider clientId={googleClientId}>
-      <App />
-      <SpeedInsights />
+      {content}
     </GoogleOAuthProvider>
   ) : (
-    <>
-      <App />
-      <SpeedInsights />
-    </>
+    content
   )
 )
 
@@ -38,4 +40,4 @@ if ('serviceWorker' in navigator) {
       .register('/service-worker.js')
       .catch(() => {});
   });
-}
+}

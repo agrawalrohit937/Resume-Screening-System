@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import React, { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { TenantProvider } from './context/TenantContext'
@@ -75,16 +75,12 @@ const AcceptInvite = lazy(() => import('./pages/enterprise/AcceptInvite'))
 // ── Route guards ────────────────────────────────────────────────────────────
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
-
-  if (loading) return <Loader />
-
+  const { user } = useAuth()
   return user ? children : <Navigate to="/login" replace />
 }
 
 function PublicRoute({ children }) {
-  const { user, loading } = useAuth()
-  if (loading) return <Loader />
+  const { user } = useAuth()
   if (!user) return children
 
   // Respect the user's active view context when bouncing back from a public page
@@ -93,7 +89,7 @@ function PublicRoute({ children }) {
     user?.role,
   ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
-  const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
+  const savedCtx = localStorage.getItem('careershala_view_context')
   const ENTERPRISE = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
   const hasEnterprise = userRoles.some((r) => ENTERPRISE.includes(r))
   const isPureCandidate = !hasEnterprise
@@ -116,8 +112,7 @@ function PublicRoute({ children }) {
 }
 
 function AdminRoute({ children }) {
-  const { user, loading, hasRole } = useAuth()
-  if (loading) return <Loader />
+  const { user, hasRole } = useAuth()
   if (!user) return <Navigate to="/login" replace />
 
   const allowedRoles = ['admin', 'platform_admin']
@@ -138,8 +133,7 @@ function AdminRoute({ children }) {
 }
 
 function RecruiterRoute({ children }) {
-  const { user, loading, hasRole } = useAuth()
-  if (loading) return <Loader />
+  const { user, hasRole } = useAuth()
   if (!user) return <Navigate to="/login" replace />
 
   const allowedRoles = ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager', 'interviewer']

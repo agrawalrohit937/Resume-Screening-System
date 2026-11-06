@@ -147,28 +147,44 @@ class GamificationService:
 
             now = datetime.now(timezone.utc)
             today = now.date()
-            active_dates = list(profile.active_dates or [])
+            today_str = today.isoformat()
+            yesterday_str = (today - timedelta(days=1)).isoformat()
+            last_date = (profile.last_practice_date or "")[:10]
+            needs_update = False
 
-            if not active_dates and profile.last_practice_date:
-                active_dates = [profile.last_practice_date[:10]]
-                profile.active_dates = active_dates
-
-            streak_info = self._calculate_streak(active_dates, today)
-            profile.current_streak = streak_info["current_streak"]
-            profile.longest_streak = max(profile.longest_streak or 0, streak_info["longest_streak"])
+            # Daily visit automatic streak progression (any platform activity maintains streak)
+            if last_date != today_str:
+                if last_date == yesterday_str:
+                    profile.current_streak = (profile.current_streak or 0) + 1
+                else:
+                    profile.current_streak = 1
+                profile.last_practice_date = today_str
+                profile.longest_streak = max(profile.longest_streak or 0, profile.current_streak)
+                active_dates = list(profile.active_dates or [])
+                if today_str not in active_dates:
+                    active_dates.append(today_str)
+                    profile.active_dates = active_dates[-90:]
+                needs_update = True
 
             if profile.best_score is None:
                 profile.best_score = round(float(profile.average_score or 0.0), 3)
+                needs_update = True
 
-            await session.commit()
-            await session.refresh(profile)
+            # Only commit if state changed to prevent write-locks on read operations
+            if needs_update:
+                await session.commit()
+                await session.refresh(profile)
 
-            # Global rank
-            rank_stmt = select(func.count()).select_from(UserGamification).where(
-                UserGamification.total_points > (profile.total_points or 0)
-            )
-            rank_res = await session.execute(rank_stmt)
-            rank = (rank_res.scalar() or 0) + 1
+            # Global rank — avoid full table scan for users with 0 points
+            points = profile.total_points or 0
+            if points > 0:
+                rank_stmt = select(func.count()).select_from(UserGamification).where(
+                    UserGamification.total_points > points
+                )
+                rank_res = await session.execute(rank_stmt)
+                rank = (rank_res.scalar() or 0) + 1
+            else:
+                rank = 1
 
             doc = _profile_to_dict(profile)
             doc["level_info"] = self._compute_level(doc.get("total_points", 0))

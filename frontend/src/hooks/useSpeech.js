@@ -1,6 +1,6 @@
 /**
- * useSpeech — Speech-to-text input + text-to-speech output
- * Uses Web Speech API (Chrome/Edge native, no API key needed)
+ * useSpeech — Speech-to-text input + Native Browser Text-to-Speech output
+ * Uses Web Speech API (Chrome/Edge native, 0ms network latency, 0 external API overhead)
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 
@@ -54,7 +54,7 @@ export function useSpeechToText({ onTranscript, onFinalTranscript, language = 'e
 
       recognitionRef.current = recognition
     }
-  }, [language])
+  }, [language, onFinalTranscript, onTranscript])
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current) return
@@ -82,8 +82,8 @@ export function useSpeechToText({ onTranscript, onFinalTranscript, language = 'e
   return { listening, transcript, supported, error, startListening, stopListening, toggleListening, resetTranscript }
 }
 
-// ── Text-to-Speech ────────────────────────────────────────────────────────────
-export function useTextToSpeech({ rate = 0.9, pitch = 1, volume = 1, lang = 'en-US' } = {}) {
+// ── Text-to-Speech (Native Web Speech API — Instant 0ms Playback) ─────────────
+export function useTextToSpeech({ rate = 0.95, pitch = 1, volume = 1, lang = 'en-US' } = {}) {
   const [speaking, setSpeaking] = useState(false)
   const [supported, setSupported] = useState(false)
   const [voices, setVoices] = useState([])
@@ -91,32 +91,40 @@ export function useTextToSpeech({ rate = 0.9, pitch = 1, volume = 1, lang = 'en-
   const utteranceRef = useRef(null)
 
   useEffect(() => {
-    if ('speechSynthesis' in window) {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       setSupported(true)
       const loadVoices = () => {
         const available = window.speechSynthesis.getVoices()
+        if (!available || available.length === 0) return
         setVoices(available)
-        // Prefer natural English voices
-        const preferred = available.find(v => v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Alex') || (v.lang.startsWith('en') && v.localService))
-        setSelectedVoice(preferred || available[0] || null)
+
+        // Prefer natural clear male English voices (matches interviewer Alex)
+        const preferred = available.find(
+          v => (v.name.includes('Daniel') || v.name.includes('David') || v.name.includes('George') || v.name.includes('Alex') || v.name.includes('Google UK English Male') || v.name.includes('Natural')) && v.lang.startsWith('en')
+        ) || available.find(v => v.lang.startsWith('en') && v.localService) || available[0] || null
+
+        setSelectedVoice(preferred)
       }
+
       loadVoices()
       window.speechSynthesis.onvoiceschanged = loadVoices
     }
   }, [])
 
   const speak = useCallback((text, options = {}) => {
-    if (!supported || !text) return
+    if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) return
 
     window.speechSynthesis.cancel()
 
-    const utterance = new SpeechSynthesisUtterance(text)
+    const utterance = new SpeechSynthesisUtterance(text.trim())
     utterance.rate = options.rate ?? rate
     utterance.pitch = options.pitch ?? pitch
     utterance.volume = options.volume ?? volume
     utterance.lang = options.lang ?? lang
-    if (options.voice ?? selectedVoice) {
-      utterance.voice = options.voice ?? selectedVoice
+
+    const voice = options.voice ?? selectedVoice
+    if (voice) {
+      utterance.voice = voice
     }
 
     utterance.onstart = () => setSpeaking(true)
@@ -124,21 +132,45 @@ export function useTextToSpeech({ rate = 0.9, pitch = 1, volume = 1, lang = 'en-
       setSpeaking(false)
       options.onEnd?.()
     }
-    utterance.onerror = () => setSpeaking(false)
+    utterance.onerror = () => {
+      setSpeaking(false)
+      options.onEnd?.()
+    }
 
     utteranceRef.current = utterance
     window.speechSynthesis.speak(utterance)
-  }, [supported, rate, pitch, volume, lang, selectedVoice])
+  }, [rate, pitch, volume, lang, selectedVoice])
 
   const stop = useCallback(() => {
-    window.speechSynthesis.cancel()
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
     setSpeaking(false)
   }, [])
 
-  const pause = useCallback(() => window.speechSynthesis.pause(), [])
-  const resume = useCallback(() => window.speechSynthesis.resume(), [])
+  const pause = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.pause()
+    }
+  }, [])
 
-  return { speak, stop, pause, resume, speaking, supported, voices, selectedVoice, setSelectedVoice }
+  const resume = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.resume()
+    }
+  }, [])
+
+  return {
+    speak,
+    stop,
+    pause,
+    resume,
+    speaking,
+    supported,
+    voices,
+    selectedVoice,
+    setSelectedVoice,
+  }
 }
 
 // ── Combined hook for interview use ──────────────────────────────────────────
@@ -155,7 +187,7 @@ export function useInterviewVoice({ onAnswerUpdate } = {}) {
     },
   })
 
-  const tts = useTextToSpeech({ rate: 0.85, pitch: 1 })
+  const tts = useTextToSpeech({ rate: 0.95, pitch: 1 })
 
   const askQuestion = useCallback((question) => {
     tts.stop()

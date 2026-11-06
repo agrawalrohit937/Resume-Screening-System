@@ -141,6 +141,7 @@ async def start_session(
     session_id: str,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     ok = await svc.start_session(session_id, str(user.id))
     if not ok:
@@ -154,6 +155,7 @@ async def submit_answer(
     payload:    SubmitAnswerRequest,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     """Submit answer → evaluate with Groq → save → return feedback."""
     # Evaluate
@@ -205,6 +207,7 @@ async def record_cheating_event(
     payload:    CheatingEventRequest,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     event = {
         "event_type": payload.event_type,
@@ -222,6 +225,7 @@ async def complete_session(
     payload:    CompleteSessionRequest,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     """Finalize session — compute aggregated stats + AI summary report."""
     session = await svc.get_session(session_id, str(user.id))
@@ -244,11 +248,14 @@ async def complete_session(
     avg_relev = sum(relev) / len(relev) if relev  else 0
 
     questions_answered = len(answers)
-    await gamification.process_interview_result(
-        user_id=str(user.id),
-        interview_score=round(avg_score / 10.0, 2),
-        questions_answered=questions_answered,
-    )
+    try:
+        await gamification.process_interview_result(
+            user_id=str(user.id),
+            interview_score=round(avg_score / 10.0, 2),
+            questions_answered=questions_answered,
+        )
+    except Exception as ge:
+        logger.warning("Gamification progress update failed non-critically", error=str(ge))
 
     # Generate AI summary
     qa_pairs = [{"question": a["question_text"], "answer": a["user_answer"], "score": a.get("ai_score",0)} for a in answers]
@@ -288,6 +295,7 @@ async def get_session(
     session_id: str,
     user:       UserModel = Depends(get_current_user),
     svc:        LiveInterviewService = Depends(get_svc),
+    gamification: GamificationService = Depends(get_gamification_service),
 ):
     session = await svc.get_session(session_id, str(user.id))
     if not session:

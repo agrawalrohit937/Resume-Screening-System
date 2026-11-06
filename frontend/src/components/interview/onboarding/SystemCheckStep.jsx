@@ -19,14 +19,28 @@ function useMicLevelTest() {
   const rafRef = useRef(null)
   const peakRef = useRef(0)
   const timeoutRef = useRef(null)
+  const lastUpdateRef = useRef(0)
 
   const stop = useCallback(() => {
-    cancelAnimationFrame(rafRef.current)
-    clearTimeout(timeoutRef.current)
-    streamRef.current?.getTracks().forEach((t) => t.stop())
-    if (ctxRef.current && ctxRef.current.state !== 'closed') ctxRef.current.close().catch(() => { })
-    streamRef.current = null
-    ctxRef.current = null
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => {
+        try { t.stop() } catch (_) { }
+      })
+      streamRef.current = null
+    }
+    if (ctxRef.current && ctxRef.current.state !== 'closed') {
+      try { ctxRef.current.close().catch(() => { }) } catch (_) { }
+      ctxRef.current = null
+    }
+    setLevel(0)
   }, [])
 
   const start = useCallback(async () => {
@@ -34,6 +48,7 @@ function useMicLevelTest() {
     setErrorMsg('')
     setLevel(0)
     peakRef.current = 0
+    lastUpdateRef.current = 0
     setState('requesting')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -43,28 +58,37 @@ function useMicLevelTest() {
       ctxRef.current = ctx
       const source = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 512
-      analyser.smoothingTimeConstant = 0.6
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.5
       source.connect(analyser)
       const data = new Uint8Array(analyser.frequencyBinCount)
       setState('testing')
 
       const tick = () => {
+        if (!analyser || !ctxRef.current) return
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((a, b) => a + b, 0) / data.length
         const pct = Math.min(100, Math.round((avg / 90) * 100))
-        setLevel(pct)
         if (pct > peakRef.current) peakRef.current = pct
+
+        // Throttle React state updates to every 100ms (10fps instead of 60fps) to eliminate UI lag
+        const now = Date.now()
+        if (now - lastUpdateRef.current >= 100) {
+          lastUpdateRef.current = now
+          setLevel(pct)
+        }
         rafRef.current = requestAnimationFrame(tick)
       }
       tick()
 
-      // Give the person ~4.5s to make some noise, then judge from the peak.
+      // Give candidate ~4.5s to speak, judge peak, and immediately release hardware
       timeoutRef.current = setTimeout(() => {
-        cancelAnimationFrame(rafRef.current)
-        setState(peakRef.current > 6 ? 'ok' : 'silent')
+        const peak = peakRef.current
+        stop()
+        setState(peak > 6 ? 'ok' : 'silent')
       }, 4500)
     } catch (e) {
+      stop()
       setState('error')
       setErrorMsg(e?.name === 'NotAllowedError' ? 'Microphone permission denied.' : 'Could not access microphone.')
     }
@@ -83,6 +107,7 @@ export default function SystemCheckStep({
   startCamera,
   detectionStatus,
   fsGate,
+  onPrepareAi,
   onBack,
   onComplete,
 }) {
@@ -102,10 +127,27 @@ export default function SystemCheckStep({
   const mic = useMicLevelTest()
   const tts = useTextToSpeech({ rate: 0.95 })
   const [speakerConfirmed, setSpeakerConfirmed] = useState(null) // null | true | false
+  const [canSkipAi, setCanSkipAi] = useState(false)
 
-  const faceCount = detectionStatus?.faceCount ?? 0
-  const faceLabel = faceCount === 0 ? 'No face detected yet' : faceCount === 1 ? 'Face detected' : 'Multiple faces detected'
-  const faceOk = faceCount === 1
+  // Automatically release audio hardware when changing steps
+  useEffect(() => {
+    if (step !== 'microphone') {
+      mic.stop()
+    }
+    if (step !== 'speaker') {
+      tts.stop()
+    }
+  }, [step, mic, tts])
+
+  // Camera stream verification — fast, lightweight, 0 AI overhead during onboarding
+  const faceOk = Boolean(cameraReady && !cameraError)
+  const faceLabel = cameraReady ? 'Camera Feed Active' : cameraError ? 'Camera Error' : 'Connecting Camera...'
+
+  useEffect(() => {
+    // Failsafe timer: allow skip if network takes time
+    const timer = setTimeout(() => setCanSkipAi(true), 8000)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (startedRef.current) return
@@ -122,6 +164,8 @@ export default function SystemCheckStep({
   }
 
   const playSpeakerTest = () => {
+    mic.stop()
+    tts.stop()
     setSpeakerConfirmed(null)
     if (tts.supported) {
       tts.speak("Hi, this is your AI interviewer. If you can hear this clearly, select 'I heard it' below.")
@@ -145,15 +189,10 @@ export default function SystemCheckStep({
     }
   }
 
-  const handleEnterAndStart = useCallback(async () => {
-    setIsWaitingForModels(false)
+  const handleStartClicked = useCallback(() => {
     setEnteringFs(true)
-    try {
-      await fsGate?.enterImmersive?.()
-    } catch (_) { }
-    setEnteringFs(false)
     onComplete?.()
-  }, [fsGate, onComplete])
+  }, [onComplete])
 
   return (
     <div className="w-full relative overflow-hidden text-slate-900 antialiased flex flex-col py-2">
@@ -260,6 +299,8 @@ export default function SystemCheckStep({
                       type="button"
                       onClick={() => {
                         if (item.key === 'camera' || checklist.camera) {
+                          if (item.key !== 'microphone') mic.stop()
+                          if (item.key !== 'speaker') tts.stop()
                           setStep(item.key)
                         }
                       }}
@@ -288,7 +329,7 @@ export default function SystemCheckStep({
                     <motion.div key="camera" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.3 }} className="space-y-5">
                       <StepHeader icon={Camera} title="Camera Check" desc="We use your webcam to confirm you're present throughout the session." />
                       <StatusRow label="Camera stream" ok={cameraReady && !cameraError} pending={!cameraReady && !cameraError} errorText={cameraError} />
-                      <StatusRow label="Face framing" ok={faceOk} pending={cameraReady && !faceOk} note={!faceOk && cameraReady ? 'Center your face in the frame with good lighting.' : ''} />
+                      <StatusRow label="Face framing" ok={cameraReady && !cameraError} pending={!cameraReady && !cameraError} note={cameraReady ? 'Position your face clearly in the frame.' : ''} />
                       <StepActions
                         onBack={onBack}
                         backLabel="← Back to guidelines"
@@ -339,12 +380,24 @@ export default function SystemCheckStep({
                       </div>
 
                       <StepActions
-                        onBack={() => setStep('camera')}
+                        onBack={() => {
+                          mic.stop()
+                          setStep('camera')
+                        }}
                         backLabel="← Back"
                         primaryLabel="Continue to speaker check"
                         primaryDisabled={mic.state !== 'ok'}
-                        onPrimary={() => setStep('speaker')}
-                        skip={mic.state !== 'ok' ? { label: "Having trouble? Skip this check", onClick: () => setStep('speaker') } : null}
+                        onPrimary={() => {
+                          mic.stop()
+                          setStep('speaker')
+                        }}
+                        skip={mic.state !== 'ok' ? {
+                          label: "Having trouble? Skip this check",
+                          onClick: () => {
+                            mic.stop()
+                            setStep('speaker')
+                          }
+                        } : null}
                       />
                     </motion.div>
                   )}
@@ -387,12 +440,24 @@ export default function SystemCheckStep({
                       </div>
 
                       <StepActions
-                        onBack={() => setStep('microphone')}
+                        onBack={() => {
+                          tts.stop()
+                          setStep('microphone')
+                        }}
                         backLabel="← Back"
                         primaryLabel="Continue"
                         primaryDisabled={speakerConfirmed !== true}
-                        onPrimary={() => setStep('ready')}
-                        skip={speakerConfirmed !== true ? { label: 'Skip this check', onClick: () => setStep('ready') } : null}
+                        onPrimary={() => {
+                          tts.stop()
+                          setStep('ready')
+                        }}
+                        skip={speakerConfirmed !== true ? {
+                          label: 'Skip this check',
+                          onClick: () => {
+                            tts.stop()
+                            setStep('ready')
+                          }
+                        } : null}
                       />
                     </motion.div>
                   )}
@@ -411,22 +476,24 @@ export default function SystemCheckStep({
                       </div>
                       <motion.button
                         type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleEnterAndStart}
+                        whileHover={!enteringFs && !isMobile ? { scale: 1.02 } : {}}
+                        whileTap={!enteringFs && !isMobile ? { scale: 0.98 } : {}}
+                        onClick={handleStartClicked}
                         disabled={enteringFs || isMobile}
                         title={isMobile ? 'Switch to a desktop or laptop to start the interview' : undefined}
-                        className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg disabled:opacity-60 transition-all ${isMobile
+                        className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg disabled:opacity-85 transition-all ${
+                          isMobile
                             ? 'bg-amber-200 text-amber-800 border-2 border-amber-300 cursor-not-allowed shadow-none'
                             : 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white shadow-[#2E9BDA]/25'
-                          }`}
+                        }`}
                       >
-                        {isMobile
-                          ? <><Smartphone className="h-4 w-4" /> Not available on mobile</>
-                          : enteringFs
-                            ? <><Loader2 className="h-4 w-4 animate-spin" /> Entering full-screen…</>
-                            : <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start</>
-                        }
+                        {isMobile ? (
+                          <><Smartphone className="h-4 w-4" /> Not available on mobile</>
+                        ) : enteringFs ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Launching Interview…</>
+                        ) : (
+                          <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start</>
+                        )}
                       </motion.button>
                       {isMobile && (
                         <p className="text-[11.5px] text-amber-700 font-semibold">
@@ -445,56 +512,7 @@ export default function SystemCheckStep({
         </div>
       </div>
 
-      {/* ── Waiting for AI Models Loading Modal ── */}
-      <AnimatePresence>
-        {isWaitingForModels && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              className="max-w-[420px] w-full bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl border border-blue-100 space-y-5"
-            >
-              <div className="relative mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#2E9BDA]/20 to-[#1d6fa5]/20 flex items-center justify-center text-[#1d6fa5]">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1d6fa5]" />
-                <div className="absolute inset-0 rounded-2xl border-2 border-[#2E9BDA]/30 animate-ping opacity-25" />
-              </div>
 
-              <div className="space-y-2">
-                <h4 className="text-[18px] font-extrabold text-blue-950 tracking-tight">
-                  Preparing AI Proctoring
-                </h4>
-                <p className="text-[13px] text-blue-900/60 font-medium leading-relaxed">
-                  Initializing facial &amp; gaze tracking models in the background. You will automatically enter the interview room as soon as it's ready.
-                </p>
-              </div>
-
-              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 flex items-center justify-center gap-2 text-[12px] font-bold text-[#1d6fa5]">
-                <span className="w-2 h-2 rounded-full bg-[#2E9BDA] animate-pulse" />
-                <span>
-                  Status: {detectionStatus?.workerStatus === 'loading_scripts' ? 'Loading AI Engine...' : 'Loading AI Models...'}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsWaitingForModels(false)
-                  handleEnterAndStart()
-                }}
-                className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 transition-colors underline underline-offset-2"
-              >
-                Skip wait and start anyway →
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
