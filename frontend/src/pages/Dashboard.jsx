@@ -33,12 +33,15 @@ export default function Dashboard() {
       const cached = sessionStorage.getItem(dashboardCacheKey)
       if (!cached) return
       const data = JSON.parse(cached)
-      if (data && data.analytics) {
-        setAnalytics(data.analytics)
+      if (data && (data.analytics || data.gami)) {
+        if (data.analytics) {
+          setAnalytics(data.analytics)
+          setScoreTrend(data.scoreTrend || [])
+        }
         setHistory(data.history || [])
-        setGami(data.gami || null)
+        if (data.gami) setGami(data.gami)
         setResumeCount(data.resumeCount || 0)
-        setScoreTrend(data.scoreTrend || [])
+        setLoading(false)
       }
     } catch {
       sessionStorage.removeItem(dashboardCacheKey)
@@ -89,65 +92,76 @@ export default function Dashboard() {
       return () => { mounted = false }
     }
 
-    Promise.all([
-      getMyAnalytics(undefined, { signal: controller.signal }).catch((err) => {
-        console.warn('Analytics fetch error:', err)
-        return { data: null }
-      }),
-      getATSHistory({ page_size: 5 }, { signal: controller.signal }).catch(() => ({ data: { items: [] } })),
-      getResumes({ page_size: 1 }, { signal: controller.signal }).catch(() => ({ data: { resumes: [] } })),
-      getGamificationProfile({ signal: controller.signal }).catch((err) => {
-        console.warn('Gamification fetch error:', err)
-        return { data: null }
-      }),
-    ]).then(([a, h, r, g]) => {
-      if (!mounted) return
-      const analyticsData = a?.data || null
-      if (analyticsData) {
-        setAnalytics(analyticsData)
-        setScoreTrend(analyticsData.score_trend || [])
-      }
-      if (h?.data?.items) {
-        setHistory(h.data.items)
-      }
-      if (g?.data) {
+    // 1. Ultra-fast progressive Gamification fetch (Score Ring, Streak, Badge)
+    getGamificationProfile({ signal: controller.signal })
+      .then((g) => {
+        if (!mounted || !g?.data) return
         setGami(g.data)
-      }
-      if (r?.data?.resumes) {
-        setResumeCount(r.data.resumes.length)
-      }
-
-      if (analyticsData) {
+        setLoading(false)
         try {
-          sessionStorage.setItem(dashboardCacheKey, JSON.stringify({
-            analytics: analyticsData,
-            history: h?.data?.items || [],
-            gami: g?.data || null,
-            resumeCount: r?.data?.resumes?.length || 0,
-            scoreTrend: analyticsData.score_trend || [],
-          }))
-        } catch {
-          // Session storage is an optional performance cache.
+          const streakVal = g.data.current_streak || 0
+          const cached = JSON.parse(localStorage.getItem('careershala_cached_stats') || '{}')
+          localStorage.setItem('careershala_cached_stats', JSON.stringify({ ...cached, streak: streakVal }))
+        } catch {}
+      })
+      .catch((err) => {
+        console.warn('Gamification fetch error:', err)
+      })
+
+    // 2. Fetch Resumes count independently
+    getResumes({ page_size: 1 }, { signal: controller.signal })
+      .then((r) => {
+        if (!mounted || !r?.data?.resumes) return
+        setResumeCount(r.data.resumes.length)
+      })
+      .catch(() => {})
+
+    // 3. Fetch ATS History independently
+    getATSHistory({ page_size: 5 }, { signal: controller.signal })
+      .then((h) => {
+        if (!mounted || !h?.data?.items) return
+        setHistory(h.data.items)
+      })
+      .catch(() => {})
+
+    // 4. Fetch Deep Analytics & Score Trends in background
+    getMyAnalytics(undefined, { signal: controller.signal })
+      .then((a) => {
+        if (!mounted) return
+        const analyticsData = a?.data || null
+        if (analyticsData) {
+          setAnalytics(analyticsData)
+          setScoreTrend(analyticsData.score_trend || [])
+
+          try {
+            sessionStorage.setItem(dashboardCacheKey, JSON.stringify({
+              analytics: analyticsData,
+              scoreTrend: analyticsData.score_trend || [],
+            }))
+          } catch {}
+
+          try {
+            const sum = analyticsData.summary || {}
+            const best = sum.best_score ?? 0
+            const normBest = best > 1 ? Math.round(best) : Math.round(best * 100)
+            const totalChecks = sum.total_ats_checks || 0
+            if (totalChecks > 0) {
+              const cached = JSON.parse(localStorage.getItem('careershala_cached_stats') || '{}')
+              localStorage.setItem('careershala_cached_stats', JSON.stringify({
+                ...cached,
+                score: normBest,
+                totalChecks: totalChecks
+              }))
+            }
+          } catch {}
         }
-      }
-      
-      try {
-        const sum = analyticsData?.summary || {}
-        const best = sum.best_score ?? 0
-        const normBest = best > 1 ? Math.round(best) : Math.round(best * 100)
-        const totalChecks = sum.total_ats_checks || 0
-        const streakVal = g?.data?.current_streak || 0
-        if (totalChecks > 0 || streakVal > 0) {
-          localStorage.setItem('careershala_cached_stats', JSON.stringify({
-            score: totalChecks > 0 ? normBest : 0,
-            streak: streakVal,
-            totalChecks: totalChecks
-          }))
-        }
-      } catch {}
-    }).finally(() => {
-      if (mounted) setLoading(false)
-    })
+      })
+      .catch((err) => {
+        console.warn('Analytics fetch error:', err)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
 
     return () => {
       mounted = false

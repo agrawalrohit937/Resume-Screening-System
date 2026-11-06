@@ -22,13 +22,11 @@
  *     the rest of the onboarding flow (RoleConfigStep / GuidelinesStep /
  *     SystemCheckStep) instead of being a visually disconnected screen.
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Bot, LogOut, Volume2, VolumeX, AlertTriangle,
-  Mic, ShieldCheck, Repeat,
-} from 'lucide-react'
+import {Bot, LogOut, Volume2, VolumeX, AlertTriangle,
+  Mic, ShieldCheck, Repeat, CheckCircle2, Loader2} from 'lucide-react'
 
 import { useInterviewSession, SESSION_PHASE } from '../hooks/useInterviewSession'
 import { useSpeechToText, useTextToSpeech } from '../hooks/useSpeech'
@@ -147,7 +145,7 @@ function WarningToast({ warning, count, max }) {
 }
 
 // ── Question grid sidebar ──────────────────────────────────────────────────
-function QuestionGridMatrixSidebar({ currentQIdx, totalQ, phase, answers = [] }) {
+const QuestionGridMatrixSidebar = React.memo(function QuestionGridMatrixSidebar({ currentQIdx, totalQ, phase, answers = [] }) {
   const count = typeof totalQ === 'number' ? totalQ : 0
   const doneCount = answers.filter((a) => a?.evaluation?.overall_score >= 50).length
 
@@ -198,10 +196,10 @@ function QuestionGridMatrixSidebar({ currentQIdx, totalQ, phase, answers = [] })
       </div>
     </div>
   )
-}
+})
 
 // ── Answer input workspace ─────────────────────────────────────────────────
-function AnswerInput({ value, onChange, onSubmit, loading, questionTimer, diffCfg, sttHook, isSpeaking }) {
+const AnswerInput = React.memo(function AnswerInput({ value, onChange, onSubmit, loading, questionTimer, diffCfg, sttHook, isSpeaking }) {
   const timeLimit = diffCfg?.time || 180
   const remaining = Math.max(0, timeLimit - questionTimer)
   const pct = Math.min(100, (questionTimer / timeLimit) * 100)
@@ -281,10 +279,10 @@ function AnswerInput({ value, onChange, onSubmit, loading, questionTimer, diffCf
       </div>
     </div>
   )
-}
+})
 
 // ── Rubric feedback panel ──────────────────────────────────────────────────
-function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReattempt, loading }) {
+function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, loading }) {
   const score = ev?.overall_score || 0
   const scoreColor = score >= 70 ? 'text-emerald-600' : score >= 50 ? 'text-[#1d6fa5]' : 'text-rose-600'
 
@@ -328,16 +326,24 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, onReat
         )}
       </div>
 
-      <div className="px-6 py-4 border-t border-blue-50 bg-slate-50/60 flex gap-3">
-        <button onClick={onReattempt} className="flex-1 h-11 rounded-xl border border-blue-200 bg-white text-blue-900/60 font-bold text-[13px] hover:border-blue-300 transition-all">
-          Reattempt
-        </button>
+      <div className="px-6 py-4 border-t border-blue-50 bg-slate-50/60 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-blue-900/60">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+          <span className="text-[12.5px] font-semibold">Answer evaluated & recorded securely</span>
+        </div>
         <motion.button
           whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
           onClick={onNext} disabled={loading}
-          className="flex-[2] h-11 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white font-bold text-[13px] shadow-md shadow-[#2E9BDA]/25 disabled:opacity-50 transition-all"
+          className="h-11 px-7 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white font-bold text-[13px] shadow-md shadow-[#2E9BDA]/25 disabled:opacity-60 transition-all inline-flex items-center justify-center gap-2"
         >
-          {isLast ? 'View Full Report →' : 'Next Question →'}
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+              {isLast ? 'Synthesizing Full Performance Report...' : 'Loading Next Question...'}
+            </>
+          ) : (
+            isLast ? 'View Full Report →' : 'Next Question →'
+          )}
         </motion.button>
       </div>
     </div>
@@ -400,12 +406,61 @@ export default function LiveInterviewV2() {
     }
   }, [tts.speaking]);
 
-  // Start background worker model loading as soon as candidate is on briefing/guidelines step (on laptop)
+  // Load models ONLY on demand when user clicks "Enter Full-Screen & Start" (zero AI overhead during setup)
+  const [loadModels, setLoadModels] = useState(false)
+  const [isLaunchingRoom, setIsLaunchingRoom] = useState(false)
+
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
-    active: !isMobile && (session.phase === SESSION_PHASE.ACTIVE || session.phase === SESSION_PHASE.BRIEFING),
-    faceInterval: 250,
+    active: !isMobile && (loadModels || session.phase === SESSION_PHASE.ACTIVE),
+    isLive: session.phase === SESSION_PHASE.ACTIVE,
+    faceInterval: 650,
+    objectInterval: 8000,
   })
+
+  const handleStartFromSystemCheck = useCallback(async () => {
+    // 1. Enter fullscreen on direct user activation
+    try {
+      await fsGate.enterImmersive()
+    } catch (_) {}
+    // 2. Trigger background AI engine initialization
+    setLoadModels(true)
+    // 3. Immediately switch into dedicated full-screen launch screen
+    setIsLaunchingRoom(true)
+  }, [fsGate])
+
+  // Automatically start the session and enter ACTIVE room once AI engine is ready
+  useEffect(() => {
+    if (!isLaunchingRoom) return
+    let cancelled = false
+
+    const launch = async () => {
+      if (detectionStatus?.isWorkerReady) {
+        try {
+          await session.startSession()
+        } catch (_) {}
+        if (!cancelled) {
+          setIsLaunchingRoom(false)
+        }
+      }
+    }
+    launch()
+
+    // Failsafe timeout: if models take > 4.5s, launch anyway
+    const timer = setTimeout(async () => {
+      if (!cancelled && isLaunchingRoom) {
+        try {
+          await session.startSession()
+        } catch (_) {}
+        setIsLaunchingRoom(false)
+      }
+    }, 4500)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [isLaunchingRoom, detectionStatus?.isWorkerReady, session])
 
   const startCamera = useCallback(async () => {
     try {
@@ -592,8 +647,83 @@ export default function LiveInterviewV2() {
       <SystemCheckStep
         videoRef={videoRef} canvasRef={canvasRef} cameraReady={cameraReady} cameraError={cameraError}
         startCamera={startCamera} detectionStatus={detectionStatus} fsGate={fsGate}
-        onBack={() => setBriefStep('guidelines')} onComplete={() => session.startSession()}
+        onPrepareAi={() => setLoadModels(true)}
+        onBack={() => setBriefStep('guidelines')} onComplete={handleStartFromSystemCheck}
       />
+    )
+  }
+
+  if (isLaunchingRoom) {
+    return (
+      <ImmersiveShell active={fsGate.immersive}>
+        <div className="fixed inset-0 z-[999999] w-screen h-screen bg-[#F5F7FB] flex flex-col items-center justify-center p-6 text-center select-none">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="max-w-[460px] w-full bg-white rounded-3xl p-8 shadow-2xl border border-blue-100 flex flex-col items-center space-y-6"
+          >
+            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#2E9BDA] to-[#1d6fa5] flex items-center justify-center text-white shadow-lg shadow-[#2E9BDA]/25">
+              <Bot className="w-8 h-8" />
+              <div className="absolute inset-0 rounded-2xl border-2 border-[#2E9BDA] animate-ping opacity-30" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-[20px] font-black text-blue-950">
+                Initializing AI Proctoring Engine
+              </h3>
+              <p className="text-[13px] text-blue-900/55 font-medium leading-relaxed">
+                Loading facial tracking &amp; gaze detection models in the background. Entering interview room...
+              </p>
+            </div>
+
+            <div className="w-full space-y-2.5 text-left bg-slate-50 border border-blue-100/80 rounded-2xl p-4 text-[12.5px] font-semibold text-blue-950">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Camera &amp; Microphone
+                </span>
+                <span className="text-emerald-700 font-bold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">VERIFIED</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  {detectionStatus?.isWorkerReady ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                  )}
+                  AI FaceMesh &amp; Gaze Models
+                </span>
+                <span className={`font-bold text-[11px] px-2 py-0.5 rounded-full border ${
+                  detectionStatus?.isWorkerReady
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                    : 'text-[#1d6fa5] bg-blue-50 border-blue-200 animate-pulse'
+                }`}>
+                  {detectionStatus?.isWorkerReady ? 'READY' : 'LOADING...'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                  AI Interviewer Alex
+                </span>
+                <span className="text-[#1d6fa5] font-bold text-[11px] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 animate-pulse">
+                  PREPARING
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try { await session.startSession() } catch (_) {}
+                setIsLaunchingRoom(false)
+              }}
+              className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 transition-colors underline underline-offset-2"
+            >
+              Skip wait and launch immediately →
+            </button>
+          </motion.div>
+        </div>
+      </ImmersiveShell>
     )
   }
 
@@ -682,7 +812,134 @@ export default function LiveInterviewV2() {
 
           <div className="flex-1 grid gap-5 p-5 overflow-hidden" style={{ gridTemplateColumns: '1fr 350px' }}>
             <div className="flex flex-col gap-4 min-h-0 h-full">
+              {/* Real-time Heads-up Proctoring Alert Banner */}
+              <AnimatePresence>
+                {session.phase === SESSION_PHASE.ACTIVE && (
+                  detectionStatus.phone ? (
+                    <motion.div
+                      key="alert-phone"
+                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                      className="px-4 py-3 rounded-2xl bg-rose-50 border-2 border-rose-400 text-rose-800 flex items-center justify-between shadow-sm animate-pulse shrink-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-[20px]">📱</span>
+                        <div>
+                          <p className="text-[12.5px] font-extrabold uppercase tracking-wide leading-tight">
+                            Restricted Object Detected: {detectionStatus.objectLabel || 'Mobile / Device'}
+                          </p>
+                          <p className="text-[11.5px] font-medium text-rose-700/80 mt-0.5">
+                            Please remove all phones, notes, books, and secondary devices immediately.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-600 text-white uppercase tracking-wider shrink-0">
+                        Proctoring Alert
+                      </span>
+                    </motion.div>
+                  ) : detectionStatus.lookDownMs >= 1000 ? (
+                    <motion.div
+                      key="alert-lookdown"
+                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                      className="px-4 py-2.5 rounded-2xl bg-amber-50 border-2 border-amber-400 text-amber-900 flex items-center justify-between shadow-sm shrink-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-[20px]">⚠️</span>
+                        <div>
+                          <p className="text-[12.5px] font-extrabold uppercase tracking-wide leading-tight">
+                            Looking Down Detected — Please Look at the Screen
+                          </p>
+                          <p className="text-[11.5px] font-medium text-amber-800/80 mt-0.5">
+                            Keep your gaze focused on the screen. Looking down for 2+ seconds flags an integrity violation ({((detectionStatus.lookDownMs || 0) / 1000).toFixed(1)}s).
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500 text-white uppercase tracking-wider shrink-0">
+                        Look Up
+                      </span>
+                    </motion.div>
+                  ) : detectionStatus.faceCount === 0 ? (
+                    <motion.div
+                      key="alert-noface"
+                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                      className="px-4 py-2.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 flex items-center gap-2.5 shadow-sm shrink-0"
+                    >
+                      <span className="text-[18px]">👤</span>
+                      <p className="text-[12px] font-bold">
+                        Face not visible in camera frame. Please reposition yourself directly in front of the webcam.
+                      </p>
+                    </motion.div>
+                  ) : detectionStatus.faceCount > 1 ? (
+                    <motion.div
+                      key="alert-multi"
+                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                      className="px-4 py-2.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 flex items-center gap-2.5 shadow-sm shrink-0"
+                    >
+                      <span className="text-[18px]">👥</span>
+                      <p className="text-[12px] font-bold">
+                        Multiple people detected ({detectionStatus.faceCount}). Only you must be present during the interview.
+                      </p>
+                    </motion.div>
+                  ) : null
+                )}
+              </AnimatePresence>
+
               <AnimatePresence mode="wait">
+                {session.phase === SESSION_PHASE.EVALUATING && (
+                  <motion.div
+                    key="evaluating"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex-1 flex flex-col justify-center items-center bg-white rounded-3xl border border-blue-100 p-8 text-center shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-6 min-h-[420px]"
+                  >
+                    <div className="relative w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#2E9BDA]/15 to-[#1d6fa5]/20 flex items-center justify-center text-[#1d6fa5] shadow-inner">
+                      <Bot className="w-8 h-8 text-[#1d6fa5]" />
+                      <div className="absolute inset-0 rounded-3xl border-2 border-[#2E9BDA]/40 animate-ping opacity-35" />
+                    </div>
+
+                    <div className="space-y-2 max-w-md">
+                      <h3 className="text-[20px] font-black text-blue-950 tracking-tight">
+                        Evaluating Your Response...
+                      </h3>
+                      <p className="text-[13px] text-blue-900/55 font-medium leading-relaxed">
+                        AI interviewer is analyzing your answer across technical depth, correctness, and problem-solving clarity.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-blue-50 text-[#1d6fa5] border border-blue-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2E9BDA] animate-pulse" />
+                        Scoring Technical Depth
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Analyzing Clarity
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                        Generating Rubric Feedback
+                      </span>
+                    </div>
+
+                    <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-3">
+                      <motion.div
+                        animate={{ x: ['-100%', '100%'] }}
+                        transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+                        className="w-1/2 h-full bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] rounded-full"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
                 {session.phase === SESSION_PHASE.ACTIVE && q && (
                   <motion.div
                     key={`q-${session.currentQIdx}`}
@@ -723,7 +980,7 @@ export default function LiveInterviewV2() {
                   <motion.div key="feedback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 min-h-0">
                     <FeedbackPanel
                       eval={session.currentEval} question={q} questionNum={session.currentQIdx + 1}
-                      isLast={session.isLastQ} onNext={session.nextQuestion} onReattempt={session.reattemptQuestion} loading={session.loading}
+                      isLast={session.isLastQ} onNext={session.nextQuestion} loading={session.loading}
                     />
                   </motion.div>
                 )}

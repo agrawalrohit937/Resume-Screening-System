@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Briefcase, Sliders, Layers, Sparkles, ArrowRight, Zap, Target,
-  Crosshair, Rocket, CheckCircle2, Search, Bot, Clock, List, Check, Star
+  Crosshair, Rocket, CheckCircle2, Search, Bot, Clock, List, Check, Star, Loader2
 } from 'lucide-react'
 import FlowStepper from './FlowStepper'
 
@@ -294,14 +294,24 @@ export default function RoleConfigStep({ onContinue, loading, navState }) {
                 whileTap={{ scale: isFormValid && !loading ? 0.99 : 1 }}
                 disabled={loading || !isFormValid}
                 onClick={() => onContinue(form)}
-                className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] hover:from-[#2587bf] hover:to-[#1e74a8] px-8 text-[15px] font-bold text-white shadow-md shadow-sky-500/25 hover:shadow-lg transition-all duration-300 disabled:opacity-40 cursor-pointer"
+                className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] hover:from-[#2587bf] hover:to-[#1e74a8] px-8 text-[15px] font-bold text-white shadow-md shadow-sky-500/25 hover:shadow-lg transition-all duration-300 disabled:opacity-50 cursor-pointer"
               >
-                {loading ? 'Preparing setup...' : (
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    Generating AI Questions with Groq...
+                  </span>
+                ) : (
                   <>
                     <Sparkles className="h-4.5 w-4.5" /> Continue to Guidelines <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </motion.button>
+              {loading && (
+                <p className="text-center text-[12px] font-semibold text-[#1d6fa5] mt-2 animate-pulse">
+                  Groq AI is curating custom technical questions for "{form.job_title}"...
+                </p>
+              )}
             </div>
 
           </motion.div>

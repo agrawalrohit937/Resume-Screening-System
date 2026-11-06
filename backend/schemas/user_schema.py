@@ -150,6 +150,7 @@ class UserPublicResponse(BaseModel):
     subscription_start_date: Optional[datetime] = None
     subscription_end_date: Optional[datetime] = None
     plan_updated_at: Optional[datetime] = None
+    payment_history: List[Dict[str, Any]] = Field(default_factory=list)
 
     # ── NEW multi-provider auth fields ─────────────────────────────────────
     auth_methods: List[str] = Field(default_factory=list)

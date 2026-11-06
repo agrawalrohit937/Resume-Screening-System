@@ -51,11 +51,12 @@ export function useAdvancedDetection({
   canvasRef,
   onEvent,
   active = false,
-  faceInterval = 250,
-  objectInterval = 1000,
+  isLive = false,
+  faceInterval = 650,
+  objectInterval = 2500,
 }) {
   const [status, setStatus] = useState({
-    faceCount:       0,
+    faceCount:       null,  // null = initializing, 0 = no face, 1 = face ok, >1 = multiple
     gazeDir:         'center',   // center | left | right | up | down
     gazeOffX:        0,
     gazeOffY:        0,
@@ -88,6 +89,35 @@ export function useAdvancedDetection({
   const isProcessingRef     = useRef(false)
   const isRunningObjRef     = useRef(false)
   const missedFramesRef     = useRef(0)
+  const offscreenCanvasRef  = useRef(null)
+  const cocoCanvasRef       = useRef(null)
+  const prevValuesRef       = useRef({
+    faceCount: null,
+    gazeDir: 'center',
+    gazeOffX: 0,
+    gazeOffY: 0,
+    eyeOpen: 1.0,
+    isLookingDown: false,
+    emotion: 'neutral',
+    lastUpdateTs: 0,
+    lastLookDownMs: 0,
+    lastLookAwayMs: 0,
+  })
+
+  // Initialize reusable offscreen canvases: 320x240 for FaceMesh, 192x144 for ultra-fast COCO-SSD
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const c = document.createElement('canvas')
+      c.width = 320
+      c.height = 240
+      offscreenCanvasRef.current = c
+
+      const coco = document.createElement('canvas')
+      coco.width = 192
+      coco.height = 144
+      cocoCanvasRef.current = coco
+    }
+  }, [])
 
   // ── 1. Fast Dynamic Script Loader ──────────────────────────────────────────
   const loadScript = useCallback((src, id) => new Promise((resolve, reject) => {
@@ -104,10 +134,11 @@ export function useAdvancedDetection({
 
   // ── 2. Emit Event with Throttle ───────────────────────────────────────────
   const emitEvent = useCallback((type, severity, details) => {
+    if (!isLive) return
     const fn = onEventRef.current
     if (!fn) return
     const now = Date.now()
-    const throttleMs = type === 'looking_down' ? 3000 : type === 'phone_detected' ? 3000 : severity === 'high' ? 2000 : 4500
+    const throttleMs = type === 'looking_down' ? 2500 : type === 'phone_detected' ? 2500 : severity === 'high' ? 2000 : 4500
     if (lastEvents.current[type] && now - lastEvents.current[type] < throttleMs) return
     lastEvents.current[type] = now
     fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })
@@ -115,6 +146,7 @@ export function useAdvancedDetection({
 
   // ── 3. Continuous Looking Down Tracker (3.0s threshold) ───────────────────
   const trackLookingDown = useCallback((isDown) => {
+    if (!isLive) return
     if (isDown) {
       if (lookDownResetTimer.current) {
         clearTimeout(lookDownResetTimer.current)
@@ -122,41 +154,61 @@ export function useAdvancedDetection({
       }
       if (!lookDownStart.current) lookDownStart.current = Date.now()
       const ms = Date.now() - lookDownStart.current
-      setStatus(s => ({ ...s, lookDownMs: ms }))
 
-      if (ms >= 3000) {
-        console.warn("🚨 [Proctoring] Sustained 3s Looking Down detected!", ms)
+      // Throttle lookDownMs status update to 500ms intervals so React doesn't churn every frame
+      const step500 = Math.floor(ms / 500) * 500
+      if (prevValuesRef.current.lastLookDownMs !== step500) {
+        prevValuesRef.current.lastLookDownMs = step500
+        setStatus(s => ({ ...s, lookDownMs: ms }))
+      }
+
+      if (ms >= 2000) {
+        console.warn("🚨 [Proctoring] Sustained 2s Looking Down detected!", ms)
         emitEvent('looking_down', 'high', `Sustained look down below screen detected (${(ms / 1000).toFixed(1)}s)`)
-        lookDownStart.current = Date.now() // reset for subsequent 3s warning
+        lookDownStart.current = Date.now() // reset for subsequent 2s warning
       }
     } else {
       if (!lookDownResetTimer.current && lookDownStart.current) {
         lookDownResetTimer.current = setTimeout(() => {
           lookDownStart.current = null
           lookDownResetTimer.current = null
-          setStatus(s => ({ ...s, lookDownMs: 0 }))
-        }, 1000) // 1000ms grace period for landmark flutter
+          prevValuesRef.current.lastLookDownMs = 0
+          setStatus(s => (s.lookDownMs !== 0 ? { ...s, lookDownMs: 0 } : s))
+        }, 500) // 500ms grace period for landmark flutter
       } else if (!lookDownStart.current) {
-        setStatus(s => ({ ...s, lookDownMs: 0 }))
+        if (prevValuesRef.current.lastLookDownMs !== 0) {
+          prevValuesRef.current.lastLookDownMs = 0
+          setStatus(s => (s.lookDownMs !== 0 ? { ...s, lookDownMs: 0 } : s))
+        }
       }
     }
-  }, [emitEvent])
+  }, [isLive, emitEvent])
 
   // ── 4. Continuous Look Away Tracker ───────────────────────────────────────
   const trackLookAway = useCallback((isAway) => {
+    if (!isLive) return
     if (isAway) {
       if (!lookAwayStart.current) lookAwayStart.current = Date.now()
       const ms = Date.now() - lookAwayStart.current
-      setStatus(s => ({ ...s, lookAwayMs: ms }))
+
+      const step500 = Math.floor(ms / 500) * 500
+      if (prevValuesRef.current.lastLookAwayMs !== step500) {
+        prevValuesRef.current.lastLookAwayMs = step500
+        setStatus(s => ({ ...s, lookAwayMs: ms }))
+      }
+
       if (ms > 3500) {
         emitEvent('looking_away', 'medium', `Looking away from screen for ${(ms / 1000).toFixed(1)}s`)
         lookAwayStart.current = Date.now()
       }
     } else {
       lookAwayStart.current = null
-      setStatus(s => ({ ...s, lookAwayMs: 0 }))
+      if (prevValuesRef.current.lastLookAwayMs !== 0) {
+        prevValuesRef.current.lastLookAwayMs = 0
+        setStatus(s => (s.lookAwayMs !== 0 ? { ...s, lookAwayMs: 0 } : s))
+      }
     }
-  }, [emitEvent])
+  }, [isLive, emitEvent])
 
   // ── 5. Process FaceMesh Results ───────────────────────────────────────────
   const handleFaceMeshResults = useCallback((results) => {
@@ -166,11 +218,25 @@ export function useAdvancedDetection({
     const faces = results.multiFaceLandmarks || []
     const count = faces.length
 
+    // When NOT in live interview room (onboarding/briefing), only update faceCount if it changed and exit early
+    if (!isLive) {
+      if (prevValuesRef.current.faceCount !== count) {
+        prevValuesRef.current.faceCount = count
+        setStatus(s => ({
+          ...s,
+          faceCount: count,
+          workerStatus: 'ready',
+          isWorkerReady: true,
+        }))
+      }
+      return
+    }
+
     if (count === 0) {
       missedFramesRef.current++
       // Only switch to No face after 3 consecutive missed frames (~750ms) to prevent false flickers
       if (missedFramesRef.current >= 3) {
-        setStatus(s => ({ ...s, faceCount: 0, gazeDir: 'unknown', confidence: 0 }))
+        setStatus(s => ({ ...s, faceCount: 0, gazeDir: 'unknown', confidence: 0, workerStatus: 'ready' }))
         emitEvent('face_missing', 'medium', 'No face detected in camera frame')
         trackLookAway(true)
         trackLookingDown(false)
@@ -203,25 +269,58 @@ export function useAdvancedDetection({
       emitEvent('eyes_closed', 'low', 'Eyes appear closed or obstructed')
     }
 
-    if (mountedRef.current) {
-      setStatus(s => ({
-        ...s,
-        faceCount:   count,
-        gazeDir:     isLookingDown ? 'down' : gaze.dir,
-        gazeOffX:    gaze.offsetX,
-        gazeOffY:    gaze.offsetY,
-        eyeOpenness: eyeOpen,
-        headPose,
-        emotion:     currentEmotion,
-        confidence:  count === 1 ? 0.95 : 0.60,
-      }))
+    // State Churn Throttling — Only trigger React re-renders on genuine state shifts or heartbeats
+    const prev = prevValuesRef.current
+    const now = Date.now()
+    const faceChanged = prev.faceCount !== count
+    const gazeDirChanged = prev.gazeDir !== (isLookingDown ? 'down' : gaze.dir)
+    const lookingDownChanged = prev.isLookingDown !== isLookingDown
+    const significantGazeShift = Math.abs(gaze.offsetX - prev.gazeOffX) > 0.08 || Math.abs(gaze.offsetY - prev.gazeOffY) > 0.08
+    const significantEyeShift = Math.abs(eyeOpen - prev.eyeOpen) > 0.15
+    const emotionChanged = prev.emotion !== currentEmotion
+    const heartbeatTimeout = now - prev.lastUpdateTs > 1500
+
+    if (
+      faceChanged ||
+      gazeDirChanged ||
+      lookingDownChanged ||
+      significantGazeShift ||
+      significantEyeShift ||
+      emotionChanged ||
+      heartbeatTimeout
+    ) {
+      prevValuesRef.current = {
+        faceCount: count,
+        gazeDir: isLookingDown ? 'down' : gaze.dir,
+        gazeOffX: gaze.offsetX,
+        gazeOffY: gaze.offsetY,
+        eyeOpen: eyeOpen,
+        isLookingDown,
+        emotion: currentEmotion,
+        lastUpdateTs: now,
+      }
+
+      if (mountedRef.current) {
+        setStatus(s => ({
+          ...s,
+          faceCount:   count,
+          workerStatus: 'ready',
+          gazeDir:     isLookingDown ? 'down' : gaze.dir,
+          gazeOffX:    gaze.offsetX,
+          gazeOffY:    gaze.offsetY,
+          eyeOpenness: eyeOpen,
+          headPose,
+          emotion:     currentEmotion,
+          confidence:  count === 1 ? 0.95 : 0.60,
+        }))
+      }
     }
 
     // Clean overlay without obstructing eyes or mirrored text
     if (canvasRef?.current) {
       drawOverlay(canvasRef.current, lm, gaze, headPose, count)
     }
-  }, [canvasRef, emitEvent, trackLookAway, trackLookingDown])
+  }, [canvasRef, isLive, emitEvent, trackLookAway, trackLookingDown])
 
   // ── 6. Lazy Initialize Engines (FaceMesh + Background Object Detection) ──
   useEffect(() => {
@@ -300,6 +399,10 @@ export function useAdvancedDetection({
           }
 
           if (window.tf) {
+            try {
+              // Isolate TF.js to CPU so MediaPipe retains 100% exclusive WebGL acceleration
+              await window.tf.setBackend('cpu')
+            } catch (_) {}
             await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js', 'coco-ssd-cdn')
             let cocoRetry = 0
             while (!window.cocoSsd && cocoRetry < 20) {
@@ -344,53 +447,87 @@ export function useAdvancedDetection({
     }
   }, [active, handleFaceMeshResults, loadScript])
 
-  // ── 7. Face Tracking Loop (~250ms) ────────────────────────────────────────
+  // ── 7. Face Tracking Loop (~250ms in live, 1600ms in onboarding) ─────────
   useEffect(() => {
     if (!active || !status.isWorkerReady) return
 
+    let lastSendTimestamp = 0
+    const effectiveInterval = isLive ? faceInterval : 1600
+
     faceTimerRef.current = setInterval(async () => {
+      // Watchdog: auto-release lock if previous frame was stuck > 1500ms
+      if (isProcessingRef.current && Date.now() - lastSendTimestamp > 1500) {
+        isProcessingRef.current = false
+      }
       if (isProcessingRef.current || !faceMeshRef.current || !videoRef?.current) return
       const vid = videoRef.current
       if (vid.readyState < 2 || vid.paused || vid.ended || !vid.videoWidth || !vid.videoHeight) return
 
       try {
         isProcessingRef.current = true
-        await faceMeshRef.current.send({ image: vid })
+        lastSendTimestamp = Date.now()
+
+        // Downscale to 320x240 offscreen canvas (75% pixel reduction = 4x faster inference)
+        let inputTarget = vid
+        if (offscreenCanvasRef.current) {
+          const offCtx = offscreenCanvasRef.current.getContext('2d', { willReadFrequently: true })
+          if (offCtx) {
+            offCtx.drawImage(vid, 0, 0, 320, 240)
+            inputTarget = offscreenCanvasRef.current
+          }
+        }
+
+        await faceMeshRef.current.send({ image: inputTarget })
       } catch (err) {
         console.warn('[useAdvancedDetection] FaceMesh frame send error:', err)
       } finally {
         isProcessingRef.current = false
       }
-    }, faceInterval)
+    }, effectiveInterval)
 
-    // DevTools / Console open detector
-    const checkDevTools = () => {
-      const widthDiff = window.outerWidth - window.innerWidth > 160
-      const heightDiff = window.outerHeight - window.innerHeight > 160
-      if (widthDiff || heightDiff) {
-        emitEvent('devtools_opened', 'high', 'Browser Developer Console / Inspect Element opened')
+    // DevTools / Console open detector — only run in live interview
+    let devToolsTimer = null
+    if (isLive) {
+      const checkDevTools = () => {
+        const widthDiff = window.outerWidth - window.innerWidth > 160
+        const heightDiff = window.outerHeight - window.innerHeight > 160
+        if (widthDiff || heightDiff) {
+          emitEvent('devtools_opened', 'high', 'Browser Developer Console / Inspect Element opened')
+        }
       }
+      devToolsTimer = setInterval(checkDevTools, 2000)
     }
-    const devToolsTimer = setInterval(checkDevTools, 2000)
 
     return () => {
       if (faceTimerRef.current) clearInterval(faceTimerRef.current)
-      clearInterval(devToolsTimer)
+      if (devToolsTimer) clearInterval(devToolsTimer)
     }
-  }, [active, status.isWorkerReady, faceInterval, videoRef, emitEvent])
+  }, [active, isLive, status.isWorkerReady, faceInterval, videoRef, emitEvent])
 
-  // ── 8. Object Detection Loop (Phone / Tablet / Device Detection ~1000ms) ──
+  // ── 8. Object Detection Loop (Phone / Tablet / Device Detection — Ultra-lightweight Idle Task) ──
   useEffect(() => {
-    if (!active || !status.tfReady) return
+    // Zero CPU object inference during onboarding — model stays warm in memory for live phase
+    if (!active || !isLive || !status.tfReady) return
+
+    let isCancelled = false
 
     const checkObjects = async () => {
-      if (isRunningObjRef.current || !cocoModelRef.current || !videoRef?.current) return
+      if (isCancelled || isRunningObjRef.current || !cocoModelRef.current || !videoRef?.current) return
       const vid = videoRef.current
       if (vid.readyState < 2 || vid.paused || vid.ended) return
 
       try {
         isRunningObjRef.current = true
-        const predictions = await cocoModelRef.current.detect(vid)
+        let objTarget = vid
+        if (cocoCanvasRef.current) {
+          const offCtx = cocoCanvasRef.current.getContext('2d', { willReadFrequently: true })
+          if (offCtx) {
+            offCtx.drawImage(vid, 0, 0, 192, 144)
+            objTarget = cocoCanvasRef.current
+          }
+        }
+        const predictions = await cocoModelRef.current.detect(objTarget)
+        if (isCancelled) return
 
         const suspiciousObjects = (predictions || []).filter(p => {
           return isProhibitedDevice(p.class) && p.score >= 0.35
@@ -415,14 +552,38 @@ export function useAdvancedDetection({
       }
     }
 
-    // Run first check immediately, then on interval
-    checkObjects()
-    objTimerRef.current = setInterval(checkObjects, objectInterval)
+    const scheduleNextCheck = () => {
+      if (isCancelled) return
+      objTimerRef.current = setTimeout(() => {
+        if (isCancelled) return
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          window.requestIdleCallback(async () => {
+            await checkObjects()
+            scheduleNextCheck()
+          }, { timeout: 4000 })
+        } else {
+          checkObjects().then(scheduleNextCheck)
+        }
+      }, objectInterval)
+    }
+
+    // Delay initial check by 2.5s so room transitions and layout render smoothly with 0 stutter
+    objTimerRef.current = setTimeout(() => {
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(async () => {
+          await checkObjects()
+          scheduleNextCheck()
+        }, { timeout: 4000 })
+      } else {
+        checkObjects().then(scheduleNextCheck)
+      }
+    }, 2500)
 
     return () => {
-      if (objTimerRef.current) clearInterval(objTimerRef.current)
+      isCancelled = true
+      if (objTimerRef.current) clearTimeout(objTimerRef.current)
     }
-  }, [active, status.tfReady, objectInterval, videoRef, emitEvent])
+  }, [active, isLive, status.tfReady, objectInterval, videoRef, emitEvent])
 
   useEffect(() => {
     mountedRef.current = true

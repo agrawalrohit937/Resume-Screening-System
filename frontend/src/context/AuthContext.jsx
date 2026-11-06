@@ -58,7 +58,16 @@ export function AuthProvider({ children }) {
       return null
     }
   })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => {
+    try {
+      const explicitLogout = sessionStorage.getItem("careershala_explicit_logout") === "true"
+      const token = localStorage.getItem("access_token")
+      if (explicitLogout || !token) return false
+      return true
+    } catch (_) {
+      return false
+    }
+  })
 
   // 🔐 LOGOUT — Strict Session Isolation: wipes local storage, resets global state, fires background backend notify
   const logout = useCallback(async () => {

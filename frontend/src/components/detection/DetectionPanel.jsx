@@ -3,7 +3,7 @@
  * Shows: face status, gaze direction, eye openness, object detection, emotion, confidence
  * Designed to sit in the sidebar of the live interview UI
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ── Gaze direction visual ─────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ function ModelStatus({ isWorkerReady, isWorkerLoading, workerStatus }) {
           boxShadow: isReady ? '0 0 6px rgba(16,185,129,0.6)' : 'none' }}/>
         <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700,
           color: isReady ? '#065F46' : isLoading ? '#92400E' : '#94A3B8', letterSpacing:'0.04em' }}>
-          {isReady ? '⚡ Worker AI (Off-Thread)' : isLoading ? '⏳ Initializing Web Worker...' : '🛡️ AI Proctoring Standby'}
+          {isReady ? '⚡ AI Proctoring Active' : isLoading ? '⏳ Initializing AI Engine...' : '🛡️ AI Proctoring Standby'}
         </span>
       </div>
     </div>
@@ -176,7 +176,7 @@ function ConfidenceMeter({ value = 1 }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN DetectionPanel
 // ══════════════════════════════════════════════════════════════════════════════
-export default function DetectionPanel({
+function DetectionPanel({
   detectionStatus,
   videoRef,
   canvasRef,
@@ -200,7 +200,7 @@ export default function DetectionPanel({
 
       {/* ── Camera Feed ── */}
       <div style={{ position:'relative', borderRadius:14, overflow:'hidden', background:'#0F172A',
-        border:`2px solid ${faceOk && gazeOk ? '#10B981' : faceCount === 0 ? '#F43F5E' : '#F59E0B'}30`,
+        border:`2px solid ${faceCount === null || isWorkerLoading ? '#3B82F6' : faceOk && gazeOk ? '#10B981' : faceCount === 0 ? '#F43F5E' : '#F59E0B'}30`,
         aspectRatio:'4/3', transition:'border-color 0.4s' }}>
         <video ref={videoRef} autoPlay playsInline muted={true} crossOrigin="anonymous" onError={(e) => console.warn('[DetectionPanel] Camera stream error:', e)}
           style={{ width:'100%', height:'100%', objectFit:'cover', transform:'scaleX(-1)' }}/>
@@ -260,10 +260,10 @@ export default function DetectionPanel({
         <div style={{ position:'absolute', bottom:7, left:7, display:'flex', alignItems:'center', gap:5,
           padding:'3px 8px', borderRadius:20, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(4px)' }}>
           <div style={{ width:5, height:5, borderRadius:'50%',
-            background: faceCount === 0 ? '#F43F5E' : faceCount > 1 ? '#F59E0B' : '#10B981',
-            boxShadow: `0 0 6px ${faceCount === 1 ? 'rgba(16,185,129,0.6)' : 'rgba(244,63,94,0.6)'}` }}/>
+            background: faceCount === null || isWorkerLoading ? '#3B82F6' : faceCount === 0 ? '#F43F5E' : faceCount > 1 ? '#F59E0B' : '#10B981',
+            boxShadow: `0 0 6px ${faceCount === 1 ? 'rgba(16,185,129,0.6)' : faceCount === null || isWorkerLoading ? 'rgba(59,130,246,0.6)' : 'rgba(244,63,94,0.6)'}` }}/>
           <span style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:'white', fontWeight:600 }}>
-            {faceCount === 0 ? 'No face' : faceCount === 1 ? 'Face OK' : `${faceCount} faces`}
+            {faceCount === null || isWorkerLoading ? 'Detecting face...' : faceCount === 0 ? 'No face' : faceCount === 1 ? 'Face OK' : `${faceCount} faces`}
           </span>
         </div>
       </div>
@@ -353,3 +353,5 @@ export default function DetectionPanel({
   )
 }
 
+
+export default React.memo(DetectionPanel)
