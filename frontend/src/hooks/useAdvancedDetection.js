@@ -144,16 +144,16 @@ export function useAdvancedDetection({
   }), [])
 
   // ── 2. Emit Event with Throttle ───────────────────────────────────────────
-  const emitEvent = useCallback((type, severity, details) => {
+  const emitEvent = useCallback((type, severity = 'high', details) => {
     if (!isLiveRef.current) return
     if (Date.now() < graceCooldownUntil.current) return
     const fn = onEventRef.current
     if (!fn) return
     const now = Date.now()
-    const throttleMs = type === 'looking_down' ? 2500 : type === 'phone_detected' ? 2500 : severity === 'high' ? 2000 : 4500
+    const throttleMs = 2500
     if (lastEvents.current[type] && now - lastEvents.current[type] < throttleMs) return
     lastEvents.current[type] = now
-    fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })
+    fn({ event_type: type, severity: 'high', details, timestamp: new Date().toISOString() })
   }, [])
 
   // ── 3. Continuous Looking Down Tracker (1.8s threshold) ───────────────────
@@ -200,9 +200,13 @@ export function useAdvancedDetection({
     }
   }, [emitEvent])
 
-  // ── 4. Continuous Look Away Tracker ───────────────────────────────────────
+  // ── 4. Continuous Look Away Tracker (2.8s threshold) ─────────────────────
   const trackLookAway = useCallback((isAway) => {
     if (!isLiveRef.current) return
+    if (Date.now() < graceCooldownUntil.current) {
+      lookAwayStart.current = null
+      return
+    }
     if (isAway) {
       if (!lookAwayStart.current) lookAwayStart.current = Date.now()
       const ms = Date.now() - lookAwayStart.current
@@ -213,8 +217,8 @@ export function useAdvancedDetection({
         setStatus(s => ({ ...s, lookAwayMs: ms }))
       }
 
-      if (ms > 3500) {
-        emitEvent('looking_away', 'medium', `Looking away from screen for ${(ms / 1000).toFixed(1)}s`)
+      if (ms >= 2800) {
+        emitEvent('looking_away', 'high', `Looking away from screen detected (${(ms / 1000).toFixed(1)}s)`)
         lookAwayStart.current = Date.now()
       }
     } else {
@@ -253,7 +257,7 @@ export function useAdvancedDetection({
       // Only switch to No face after 3 consecutive missed frames (~750ms) to prevent false flickers
       if (missedFramesRef.current >= 3) {
         setStatus(s => ({ ...s, faceCount: 0, gazeDir: 'unknown', confidence: 0, workerStatus: 'ready' }))
-        emitEvent('face_missing', 'medium', 'No face detected in camera frame')
+        emitEvent('face_missing', 'high', 'No face detected in camera frame')
         trackLookAway(true)
         trackLookingDown(false)
       }
@@ -263,7 +267,7 @@ export function useAdvancedDetection({
     missedFramesRef.current = 0
 
     if (count > 1) {
-      emitEvent('multiple_faces', 'high', `${count} faces detected — potential unauthorized assistance`)
+      emitEvent('multiple_faces', 'high', `${count} faces detected — unauthorized assistance prohibited`)
     }
     trackLookAway(false)
 
@@ -282,7 +286,7 @@ export function useAdvancedDetection({
     trackLookAway(isAway)
 
     if (eyeOpen < 0.15) {
-      emitEvent('eyes_closed', 'low', 'Eyes appear closed or obstructed')
+      emitEvent('eyes_closed', 'high', 'Eyes closed or face obstructed')
     }
 
     // State Churn Throttling — Only trigger React re-renders on genuine state shifts or heartbeats

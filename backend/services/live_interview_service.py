@@ -1186,7 +1186,5 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         return round(min(1.0, raw), 3)
 
     def _count_warnings(self, events: List[Dict]) -> int:
-        """Each HIGH/CRITICAL or looking_down event is a warning; every 3 mediums is 1 warning."""
-        high_events = sum(1 for e in events if e.get("severity") in ("high","critical") or e.get("event_type") == "looking_down")
-        med_events  = sum(1 for e in events if e.get("severity") == "medium" and e.get("event_type") != "looking_down")
-        return high_events + (med_events // 3)
+        """Each proctoring integrity violation is 1 direct warning strike."""
+        return len(events)

@@ -572,12 +572,6 @@ export default function LiveInterviewV2() {
     warningTimerRef.current = setTimeout(() => setCurrentWarning(null), 6000)
   }, [session])
 
-  const handleDismissWarning = useCallback(() => {
-    setCurrentWarning(null)
-    clearTimeout(warningTimerRef.current)
-    detectionStatus?.setGraceCooldown?.(4500)
-  }, [detectionStatus])
-
   const fsGate = useFullscreenImmersive({
     onUnexpectedExit: () => handleCheatingEvent({ event_type: 'fullscreen_exit', severity: 'high', details: 'Exited full-screen mode' }),
   })
@@ -611,6 +605,12 @@ export default function LiveInterviewV2() {
     faceInterval: 650,
     objectInterval: 4000,
   })
+
+  const handleDismissWarning = useCallback(() => {
+    setCurrentWarning(null)
+    clearTimeout(warningTimerRef.current)
+    detectionStatus?.setGraceCooldown?.(4500)
+  }, [detectionStatus])
 
   // Pre-load AI proctoring models as soon as candidate arrives on BRIEFING or SYSTEM_CHECK
   useEffect(() => {

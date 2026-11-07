@@ -6,9 +6,7 @@ import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const SEVERITY_CONFIG = {
-  low:      { bg:'#FFFBEB', border:'#FDE68A', text:'#92400E', accent:'#F59E0B', icon:'⚠️',  title:'Minor Alert'    },
-  medium:   { bg:'#FFF7ED', border:'#FED7AA', text:'#9A3412', accent:'#F97316', icon:'⚠️',  title:'Integrity Warning' },
-  high:     { bg:'#FFF1F2', border:'#FECDD3', text:'#881337', accent:'#F43F5E', icon:'🚨',  title:'Serious Violation' },
+  high:     { bg:'#FFF1F2', border:'#FECDD3', text:'#881337', accent:'#F43F5E', icon:'🚨',  title:'Integrity Violation' },
   critical: { bg:'#FFF1F2', border:'#F43F5E', text:'#7F1D1D', accent:'#DC2626', icon:'🔴',  title:'Critical Violation' },
 }
 
@@ -39,7 +37,7 @@ export default function CheatingWarningModal({
     return () => clearTimeout(t)
   }, [event, autoClose, onDismiss])
 
-  const cfg = event ? (SEVERITY_CONFIG[event.severity] || SEVERITY_CONFIG.medium) : null
+  const cfg = event ? (SEVERITY_CONFIG[event.severity] || SEVERITY_CONFIG.high) : null
   const em  = event ? (EVENT_MESSAGES[event.event_type] || { msg: event.details || 'Integrity event detected.', sub:'' }) : null
   const isLast = warningCount >= Math.max(1, maxWarnings - 1)
 

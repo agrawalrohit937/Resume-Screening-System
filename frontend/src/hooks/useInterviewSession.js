@@ -140,10 +140,8 @@ export function useInterviewSession() {
   const recordCheatingEvent = useCallback((event) => {
     setCheatingData(prev => {
       const newEvents = [...prev.events, event]
-      const highCount = newEvents.filter(e => e.severity === 'high' || e.severity === 'critical' || e.event_type === 'looking_down').length
-      const medCount = newEvents.filter(e => e.severity === 'medium' && e.event_type !== 'looking_down').length
-      const calculatedWarnings = highCount + Math.floor(medCount / 3)
-      const calculatedScore = Math.min(1.0, Math.max(prev.score || 0, calculatedWarnings / 3))
+      const calculatedWarnings = newEvents.length
+      const calculatedScore = Math.min(1.0, calculatedWarnings / 3)
       return {
         ...prev,
         score: calculatedScore,
