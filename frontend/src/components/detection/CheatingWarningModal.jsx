@@ -6,9 +6,7 @@ import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const SEVERITY_CONFIG = {
-  low:      { bg:'#FFFBEB', border:'#FDE68A', text:'#92400E', accent:'#F59E0B', icon:'⚠️',  title:'Minor Alert'    },
-  medium:   { bg:'#FFF7ED', border:'#FED7AA', text:'#9A3412', accent:'#F97316', icon:'⚠️',  title:'Integrity Warning' },
-  high:     { bg:'#FFF1F2', border:'#FECDD3', text:'#881337', accent:'#F43F5E', icon:'🚨',  title:'Serious Violation' },
+  high:     { bg:'#FFF1F2', border:'#FECDD3', text:'#881337', accent:'#F43F5E', icon:'🚨',  title:'Integrity Violation' },
   critical: { bg:'#FFF1F2', border:'#F43F5E', text:'#7F1D1D', accent:'#DC2626', icon:'🔴',  title:'Critical Violation' },
 }
 
@@ -39,38 +37,39 @@ export default function CheatingWarningModal({
     return () => clearTimeout(t)
   }, [event, autoClose, onDismiss])
 
-  if (!event) return null
-
-  const cfg = SEVERITY_CONFIG[event.severity] || SEVERITY_CONFIG.medium
-  const em  = EVENT_MESSAGES[event.event_type] || { msg: event.details || 'Integrity event detected.', sub:'' }
-  const isLast = warningCount >= maxWarnings
+  const cfg = event ? (SEVERITY_CONFIG[event.severity] || SEVERITY_CONFIG.high) : null
+  const em  = event ? (EVENT_MESSAGES[event.event_type] || { msg: event.details || 'Integrity event detected.', sub:'' }) : null
+  const isLast = warningCount >= Math.max(1, maxWarnings - 1)
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-        style={{
-          position:'fixed', inset:0, zIndex:99999999,
-          background: isLast ? 'rgba(127,29,29,0.75)' : 'rgba(0,0,0,0.45)',
-          backdropFilter:'blur(4px)',
-          display:'flex', alignItems:'flex-start', justifyContent:'center',
-          padding:'80px 24px 0',
-        }}
-        onClick={onDismiss}
-      >
+      {event && cfg && (
         <motion.div
-          initial={{ opacity:0, y:-40, scale:0.9 }}
-          animate={{ opacity:1, y:0,   scale:1   }}
-          exit={{   opacity:0, y:-40, scale:0.9  }}
-          transition={{ type:'spring', stiffness:400, damping:28 }}
-          onClick={e => e.stopPropagation()}
+          key="cheating-modal-backdrop"
+          initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
           style={{
-            maxWidth:460, width:'100%',
-            background:cfg.bg, border:`2px solid ${cfg.border}`,
-            borderRadius:20, overflow:'hidden',
-            boxShadow:`0 24px 64px rgba(0,0,0,0.25), 0 0 0 4px ${cfg.accent}15`,
+            position:'fixed', inset:0, zIndex:99999999,
+            background: isLast ? 'rgba(127,29,29,0.80)' : 'rgba(15,23,42,0.60)',
+            backdropFilter:'blur(6px)',
+            display:'flex', alignItems:'flex-start', justifyContent:'center',
+            padding:'80px 24px 0',
           }}
+          onClick={onDismiss}
         >
+          <motion.div
+            key="cheating-modal-card"
+            initial={{ opacity:0, y:-40, scale:0.92 }}
+            animate={{ opacity:1, y:0,   scale:1   }}
+            exit={{   opacity:0, y:-40, scale:0.92  }}
+            transition={{ type:'spring', stiffness:400, damping:28 }}
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth:460, width:'100%',
+              background:cfg.bg, border:`2px solid ${cfg.border}`,
+              borderRadius:20, overflow:'hidden',
+              boxShadow:`0 24px 64px rgba(0,0,0,0.30), 0 0 0 4px ${cfg.accent}20`,
+            }}
+          >
           {/* Animated top strip */}
           <motion.div
             animate={{ backgroundPosition:['0% 50%','100% 50%','0% 50%'] }}
@@ -152,12 +151,19 @@ export default function CheatingWarningModal({
 
             {/* Dismiss */}
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={onDismiss}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  onDismiss?.()
+                }}
                 style={{
-                  flex:1, padding:'10px 0', borderRadius:12, border:'none', cursor:'pointer',
-                  fontFamily:"'Inter',sans-serif", fontWeight:600, fontSize:13, color:'white',
-                  background:`linear-gradient(135deg,${cfg.accent},${cfg.accent}CC)`,
-                  boxShadow:`0 3px 10px ${cfg.accent}40`,
+                  flex:1, padding:'12px 0', borderRadius:14, border:'none', cursor:'pointer',
+                  fontFamily:"'Inter',sans-serif", fontWeight:700, fontSize:14, color:'white',
+                  background:`linear-gradient(135deg,${cfg.accent},${cfg.accent}EE)`,
+                  boxShadow:`0 4px 14px ${cfg.accent}50`,
+                  transition:'all 0.15s ease',
                 }}>
                 I Understand — Continue
               </button>
@@ -170,6 +176,7 @@ export default function CheatingWarningModal({
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   )
 }

@@ -26,7 +26,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {Bot, LogOut, Volume2, VolumeX, AlertTriangle,
-  Mic, ShieldCheck, Repeat, CheckCircle2, Loader2} from 'lucide-react'
+  Mic, MicOff, ShieldCheck, Repeat, CheckCircle2, Loader2, RotateCcw, Trash2, ArrowRight, Edit3} from 'lucide-react'
 
 import { useInterviewSession, SESSION_PHASE } from '../hooks/useInterviewSession'
 import { useSpeechToText, useTextToSpeech } from '../hooks/useSpeech'
@@ -42,7 +42,7 @@ import GuidelinesStep from '../components/interview/onboarding/GuidelinesStep'
 import SystemCheckStep from '../components/interview/onboarding/SystemCheckStep'
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-const MAX_WARNINGS = 5
+const MAX_WARNINGS = 3
 
 const DIFF_CONFIG = {
   easy: { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Easy', time: 120 },
@@ -120,34 +120,15 @@ function EndPracticeModal({ open, onCancel, onConfirm }) {
   )
 }
 
-// ── Cheating warning toast (self-contained, no external component needed) ─
-function WarningToast({ warning, count, max }) {
-  return (
-    <AnimatePresence>
-      {warning && (
-        <motion.div
-          initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[3000000001] w-[min(92vw,420px)]"
-        >
-          <div className="flex items-start gap-3 bg-white rounded-2xl border border-amber-200 shadow-xl shadow-amber-900/10 p-4">
-            <div className="h-9 w-9 shrink-0 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <AlertTriangle className="h-4.5 w-4.5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold text-blue-950">Integrity flag {count}/{max}</p>
-              <p className="text-[12px] text-blue-900/55 font-medium mt-0.5 truncate">{warning.details || 'Unusual activity detected'}</p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
 
 // ── Question grid sidebar ──────────────────────────────────────────────────
-const QuestionGridMatrixSidebar = React.memo(function QuestionGridMatrixSidebar({ currentQIdx, totalQ, phase, answers = [] }) {
+const QuestionGridMatrixSidebar = React.memo(function QuestionGridMatrixSidebar({ currentQIdx, totalQ, phase, answers = [], config, cheatingData, maxWarnings = 3 }) {
   const count = typeof totalQ === 'number' ? totalQ : 0
   const doneCount = answers.filter((a) => a?.evaluation?.overall_score >= 50).length
+  const warningCount = cheatingData?.warning_count || 0
+  const warningPenalty = Math.round((warningCount / maxWarnings) * 100)
+  const cheatPct = Math.min(100, Math.max(warningPenalty, Math.round(((cheatingData?.score) || 0) * 100)))
+  const integrityScore = Math.max(0, 100 - cheatPct)
 
   const cellClass = (i) => {
     const isCurrent = phase === SESSION_PHASE.ACTIVE && i === currentQIdx
@@ -163,43 +144,111 @@ const QuestionGridMatrixSidebar = React.memo(function QuestionGridMatrixSidebar(
   }
 
   return (
-    <div className="w-[210px] shrink-0 h-full bg-white border-r border-blue-100 p-4 flex flex-col gap-3.5 overflow-hidden">
-      <div>
-        <div className="flex items-baseline justify-between mb-2">
-          <span className="text-[10.5px] font-extrabold text-blue-900/45 uppercase tracking-wider">Question Map</span>
-          <span className="text-[11px] font-mono font-bold text-[#1d6fa5] tabular-nums">{doneCount}/{count}</span>
+    <div className="w-[230px] shrink-0 h-full bg-white border-r border-blue-100 p-4 flex flex-col justify-between overflow-hidden">
+      <div className="flex flex-col gap-3.5 min-h-0">
+        <div>
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-[10.5px] font-extrabold text-blue-900/45 uppercase tracking-wider">Question Map</span>
+            <span className="text-[11px] font-mono font-bold text-[#1d6fa5] tabular-nums">{doneCount}/{count}</span>
+          </div>
+          <div className="h-[5px] rounded-full bg-blue-50 overflow-hidden">
+            <motion.div
+              animate={{ width: `${count ? (doneCount / count) * 100 : 0}%` }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="h-full rounded-full bg-gradient-to-r from-[#2E9BDA] to-emerald-500"
+            />
+          </div>
         </div>
-        <div className="h-[5px] rounded-full bg-blue-50 overflow-hidden">
-          <motion.div
-            animate={{ width: `${count ? (doneCount / count) * 100 : 0}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="h-full rounded-full bg-gradient-to-r from-[#2E9BDA] to-emerald-500"
-          />
+
+        <div className="grid grid-cols-4 gap-2 p-1.5 rounded-2xl border border-blue-50 bg-slate-50/50 content-start max-h-[160px] overflow-y-auto">
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} title={`Question ${i + 1}`} className={`aspect-square rounded-xl border flex items-center justify-center text-[12px] font-mono font-extrabold transition-all ${cellClass(i)}`}>
+              {i + 1}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-1.5 pt-1">
+          {[['bg-emerald-400', 'Completed'], ['bg-[#2E9BDA]', 'Current'], ['bg-rose-400', 'Needs review']].map(([c, label]) => (
+            <div key={label} className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${c}`} />
+              <span className="text-[11px] font-semibold text-blue-900/45">{label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-2 p-1.5 rounded-2xl border border-blue-50 bg-slate-50/50 overflow-y-auto flex-1 content-start">
-        {Array.from({ length: count }).map((_, i) => (
-          <div key={i} title={`Q${i + 1}`} className={`aspect-square rounded-xl border flex items-center justify-center text-[12px] font-mono font-extrabold transition-all ${cellClass(i)}`}>
-            {i + 1}
+      {/* Session Details & Security Safeguards in Left Sidebar */}
+      <div className="flex flex-col gap-3 pt-3 border-t border-blue-50">
+        <div className="p-3 rounded-2xl bg-slate-50/90 border border-blue-100/70">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900/50">Integrity Score</span>
+            <span className={`text-[12px] font-mono font-black ${cheatPct > 60 ? 'text-rose-600' : cheatPct > 30 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {integrityScore}%
+            </span>
           </div>
-        ))}
-      </div>
+          <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden mb-2.5">
+            <motion.div
+              animate={{ width: `${integrityScore}%` }}
+              transition={{ duration: 0.5 }}
+              className={`h-full rounded-full ${cheatPct > 60 ? 'bg-rose-500' : cheatPct > 30 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+            />
+          </div>
 
-      <div className="flex flex-col gap-1.5">
-        {[['bg-emerald-400', 'Completed'], ['bg-[#2E9BDA]', 'Current'], ['bg-rose-400', 'Needs review']].map(([c, label]) => (
-          <div key={label} className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${c}`} />
-            <span className="text-[11px] font-semibold text-blue-900/45">{label}</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-900/50">Session Warnings</span>
+            <span className={`text-[11px] font-mono font-bold ${warningCount === 0 ? 'text-emerald-600' : warningCount === 1 ? 'text-amber-600' : 'text-rose-600'}`}>
+              {warningCount}/{maxWarnings}
+            </span>
           </div>
-        ))}
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: maxWarnings }).map((_, i) => (
+              <span
+                key={i}
+                className={`h-2 flex-1 rounded-full transition-all duration-300 ${
+                  i < warningCount ? 'bg-rose-500 shadow-sm shadow-rose-500/40' : 'bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-[9.5px] text-blue-900/40 font-semibold mt-1.5 text-center">
+            {maxWarnings - warningCount > 0 ? `${maxWarnings - warningCount} warnings remaining` : 'Integrity limit reached'}
+          </p>
+        </div>
+
+        <div className="p-2.5 rounded-xl bg-blue-50/40 border border-blue-100/50 text-[10.5px] text-blue-900/60 flex flex-col gap-1 font-medium">
+          <div className="flex items-center gap-1.5 text-blue-900/80 font-bold mb-0.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-[#2E9BDA]" /> Exam Security HUD
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Fullscreen:</span>
+            <span className="text-emerald-600 font-semibold">Locked</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Camera Feed:</span>
+            <span className="text-emerald-600 font-semibold">Monitored</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Speech AI:</span>
+            <span className="text-emerald-600 font-semibold">Active</span>
+          </div>
+        </div>
       </div>
     </div>
   )
 })
 
-// ── Answer input workspace ─────────────────────────────────────────────────
-const AnswerInput = React.memo(function AnswerInput({ value, onChange, onSubmit, loading, questionTimer, diffCfg, sttHook, isSpeaking }) {
+// ── Pure Voice-First Answer Workspace (Internshala AI Style) ──────────────
+const AnswerInput = React.memo(function AnswerInput({
+  value,
+  onChange,
+  onSubmit,
+  loading,
+  questionTimer,
+  diffCfg,
+  sttHook,
+  isSpeaking,
+}) {
   const timeLimit = diffCfg?.time || 180
   const remaining = Math.max(0, timeLimit - questionTimer)
   const pct = Math.min(100, (questionTimer / timeLimit) * 100)
@@ -207,74 +256,213 @@ const AnswerInput = React.memo(function AnswerInput({ value, onChange, onSubmit,
   const timerColor = urgent ? 'text-rose-600' : questionTimer > timeLimit * 0.6 ? 'text-amber-600' : 'text-[#1d6fa5]'
   const barColor = urgent ? 'bg-rose-500' : questionTimer > timeLimit * 0.6 ? 'bg-amber-500' : 'bg-[#2E9BDA]'
 
+  const isRecording = Boolean(sttHook?.listening)
+
+  // Real-time streaming transcription: committed text + live interim words (50ms response)
+  const interim = sttHook?.interimTranscript || ''
+  const fullText = (value ? value + (interim ? ' ' + interim : '') : interim).trim()
+  const trimmed = fullText
+  const hasContent = Boolean(trimmed.length >= 3)
+  const wordCount = trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0
+  const charCount = trimmed.length
+
+  const handleClear = useCallback(() => {
+    onChange('')
+    sttHook?.resetTranscript?.()
+  }, [onChange, sttHook])
+
+  const handleSubmit = useCallback(() => {
+    onSubmit({
+      answerText: fullText || value,
+      answerSource: 'spoken',
+    })
+  }, [fullText, value, onSubmit])
+
   return (
     <div className="bg-white rounded-3xl border border-blue-100 flex flex-col flex-1 min-h-0 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+      {/* Top progress bar */}
       <div className="h-[3px] bg-blue-50 w-full">
-        <motion.div animate={{ width: `${Math.max(0, 100 - pct)}%` }} transition={{ duration: 1, ease: 'linear' }} className={`h-full ${barColor}`} />
-      </div>
-
-      <div className="px-5 py-3.5 flex items-center justify-between border-b border-blue-50">
-        <span className="text-[13px] font-extrabold text-blue-950">Your Response</span>
-        <div className="flex items-center gap-3.5">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-blue-100 rounded-full px-3 py-1">
-            <span className="text-[11px]">⏱</span>
-            <span className={`font-mono text-[13px] font-bold tabular-nums ${timerColor}`}>{fmt(remaining)}</span>
-          </div>
-          <span className="text-[11.5px] text-blue-900/35 font-semibold">{value.length} chars</span>
-        </div>
-      </div>
-
-      {sttHook?.listening && sttHook?.transcript && (
-        <div className="mx-5 mt-3 px-3.5 py-2.5 rounded-xl bg-[#2E9BDA]/[0.06] border border-[#2E9BDA]/20">
-          <p className="text-[12px] text-[#1d6fa5] italic font-medium">🎤 "{sttHook.transcript}"</p>
-        </div>
-      )}
-
-      <div className="flex-1 p-5 flex">
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={isSpeaking}
-          placeholder={
-            isSpeaking
-              ? 'The interviewer is asking the question — think through your approach, then type or speak your answer here.'
-              : 'Type your answer. Cover the approach, key trade-offs, and how you would validate it.'
-          }
-          className="w-full h-full outline-none resize-none bg-transparent text-[14px] text-blue-950 placeholder:text-blue-900/25 font-medium leading-relaxed disabled:text-blue-900/30"
+        <motion.div
+          animate={{ width: `${Math.max(0, 100 - pct)}%` }}
+          transition={{ duration: 1, ease: 'linear' }}
+          className={`h-full ${barColor}`}
         />
       </div>
 
-      <div className="px-5 py-3.5 border-t border-blue-50 bg-slate-50/60 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      {/* Header */}
+      <div className="px-6 py-3.5 flex items-center justify-between border-b border-blue-50/80">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 relative">
+              {isRecording && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+              )}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isRecording ? 'bg-violet-600' : 'bg-[#2E9BDA]'}`} />
+            </span>
+            <span className="text-[13.5px] font-extrabold text-blue-950">Spoken Response</span>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-100/70 text-[10.5px] font-bold text-[#1d6fa5]">
+            🎙️ Voice AI
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 bg-blue-50/60 border border-blue-100/80 rounded-full px-3 py-1">
+            <span className="text-[12px]">⏱</span>
+            <span className={`font-mono text-[13px] font-bold tabular-nums ${timerColor}`}>
+              {fmt(remaining)}
+            </span>
+            <span className="text-[11px] text-blue-900/40 font-semibold">/ {fmt(timeLimit)}</span>
+          </div>
+          <span className="text-[11.5px] text-blue-900/45 font-semibold tabular-nums">
+            {wordCount} words • {charCount} chars
+          </span>
+        </div>
+      </div>
+
+      {/* Main Center Stage — 100% Dedicated to Spoken Assessment */}
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-5 relative overflow-hidden">
+        <div className="w-full max-w-lg flex flex-col items-center justify-center my-auto">
+          {/* Center Glowing Mic Button & Concentric Ripple Waves */}
+          <div className="relative flex items-center justify-center h-40 w-40 mb-3">
+            <AnimatePresence>
+              {isRecording && (
+                <>
+                  <motion.div
+                    key="wave-1"
+                    initial={{ scale: 0.9, opacity: 0.7 }}
+                    animate={{ scale: [1, 1.45, 1.7], opacity: [0.6, 0.25, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                    className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-500/25 to-indigo-500/30 blur-sm pointer-events-none"
+                  />
+                  <motion.div
+                    key="wave-2"
+                    initial={{ scale: 0.9, opacity: 0.7 }}
+                    animate={{ scale: [1, 1.3, 1.5], opacity: [0.5, 0.2, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.6, ease: 'easeOut' }}
+                    className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#2E9BDA]/25 to-violet-500/25 blur-xs pointer-events-none"
+                  />
+                </>
+              )}
+            </AnimatePresence>
+
+            {/* Ambient Circular Halo */}
+            <div
+              className={`absolute w-32 h-32 rounded-full blur-xl transition-all duration-500 ${
+                isRecording ? 'bg-violet-400/35' : 'bg-slate-200/50'
+              }`}
+            />
+
+            {/* Interactive Center Mic Button */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: isSpeaking ? 1 : 1.05 }}
+              whileTap={{ scale: isSpeaking ? 1 : 0.95 }}
+              disabled={isSpeaking || loading}
+              onClick={sttHook?.toggleListening}
+              className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-xl ${
+                isRecording
+                  ? 'bg-gradient-to-tr from-violet-600 via-indigo-600 to-purple-500 text-white shadow-violet-500/40 ring-4 ring-violet-200 animate-pulse'
+                  : 'bg-gradient-to-b from-white to-blue-50/70 border-2 border-blue-200 text-[#1d6fa5] shadow-blue-500/10 hover:border-[#2E9BDA] hover:shadow-md'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <Mic className={`h-9 w-9 transition-transform duration-300 ${isRecording ? 'scale-110' : ''}`} />
+            </motion.button>
+          </div>
+
+          {/* Dynamic Sound Waveform Bars when recording */}
+          {isRecording ? (
+            <div className="flex items-center gap-1.5 h-6 mb-3">
+              {[12, 22, 16, 28, 14, 26, 18, 24, 15].map((h, i) => (
+                <motion.span
+                  key={i}
+                  animate={{
+                    height: [`${h * 0.4}px`, `${h}px`, `${h * 0.3}px`],
+                  }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 0.6 + (i % 3) * 0.15,
+                    ease: 'easeInOut',
+                  }}
+                  className="w-[3px] rounded-full bg-gradient-to-t from-violet-500 to-indigo-600"
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-[13.5px] font-bold text-blue-950 mb-3 tracking-tight">
+              {isSpeaking ? 'Interviewer is speaking...' : 'Click microphone to speak your answer'}
+            </p>
+          )}
+
+          {/* Live Streaming Spoken Preview Card — Instant 0ms Word Streaming */}
+          <div className="w-full rounded-2xl bg-slate-50/90 border border-blue-100/70 p-4 max-h-[130px] overflow-y-auto text-center shadow-inner">
+            {trimmed ? (
+              <p className="text-[13.5px] text-blue-950 font-medium leading-relaxed italic">
+                "{value ? <span>{value} </span> : null}
+                {interim ? (
+                  <span className="text-violet-600 font-semibold underline decoration-violet-300">
+                    {interim}
+                  </span>
+                ) : null}"
+              </p>
+            ) : isRecording ? (
+              <p className="text-[12.5px] text-violet-600 font-semibold animate-pulse">
+                Listening... start speaking your answer clearly
+              </p>
+            ) : (
+              <p className="text-[12px] text-blue-900/40 font-medium">
+                Tap the microphone button above to start answering verbally. Words stream in real time.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Action Bar */}
+      <div className="px-6 py-3.5 border-t border-blue-50/90 bg-slate-50/70 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
           {sttHook?.supported && (
             <button
               type="button"
               disabled={isSpeaking}
               onClick={sttHook.toggleListening}
-              className={`inline-flex items-center gap-2 h-9 px-3.5 rounded-xl text-[12px] font-bold border transition-all ${
-                sttHook.listening ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-blue-200 bg-white text-blue-900/60 hover:border-blue-300'
+              className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-[12px] font-bold border transition-all ${
+                isRecording
+                  ? 'border-rose-300 bg-rose-50 text-rose-600 shadow-xs'
+                  : 'border-blue-200 bg-white text-blue-900/70 hover:border-blue-300 hover:bg-blue-50/50'
               } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
-              <Mic className="h-3.5 w-3.5" /> {sttHook.listening ? 'Recording…' : 'Speak Answer'}
+              <RotateCcw className="h-3.5 w-3.5" /> {isRecording ? 'Stop Recording' : 'Speak Again'}
             </button>
           )}
+
           <button
             type="button"
-            onClick={() => { onChange(''); sttHook?.resetTranscript?.() }}
-            className="h-9 px-3.5 rounded-xl border border-blue-200 bg-white text-blue-900/50 text-[12px] font-bold hover:border-blue-300 transition-all"
+            onClick={handleClear}
+            disabled={!trimmed}
+            className="h-9 px-3.5 rounded-xl border border-blue-200 bg-white text-blue-900/50 text-[12px] font-bold hover:border-blue-300 hover:text-rose-600 disabled:opacity-40 transition-all inline-flex items-center gap-1.5"
           >
-            Clear
+            <Trash2 className="h-3.5 w-3.5" /> Clear Answer
           </button>
         </div>
 
+        {/* Submit Spoken Answer Button */}
         <motion.button
-          whileHover={{ scale: value.trim().length >= 5 && !isSpeaking && !loading ? 1.02 : 1 }}
-          whileTap={{ scale: value.trim().length >= 5 && !isSpeaking && !loading ? 0.98 : 1 }}
-          onClick={() => onSubmit({ answerText: value, answerSource: sttHook?.listening ? 'voice' : 'text' })}
-          disabled={loading || value.trim().length < 5 || isSpeaking}
-          className="h-10 px-6 rounded-xl font-bold text-[13px] text-white bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] shadow-md shadow-[#2E9BDA]/25 disabled:opacity-40 disabled:shadow-none transition-all"
+          whileHover={{ scale: hasContent && !isSpeaking && !loading ? 1.02 : 1 }}
+          whileTap={{ scale: hasContent && !isSpeaking && !loading ? 0.98 : 1 }}
+          onClick={handleSubmit}
+          disabled={loading || !hasContent || isSpeaking}
+          className="h-10 px-6 rounded-xl font-bold text-[13px] text-white bg-gradient-to-r from-violet-600 via-[#1d6fa5] to-indigo-600 shadow-md shadow-violet-500/25 disabled:opacity-40 disabled:shadow-none transition-all inline-flex items-center gap-2"
         >
-          {loading ? 'Scoring…' : 'Submit Answer →'}
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Scoring...
+            </>
+          ) : (
+            <>
+              Finish Answer <ArrowRight className="h-4 w-4" />
+            </>
+          )}
         </motion.button>
       </div>
     </div>
@@ -415,52 +603,79 @@ export default function LiveInterviewV2() {
     active: !isMobile && (loadModels || session.phase === SESSION_PHASE.ACTIVE),
     isLive: session.phase === SESSION_PHASE.ACTIVE,
     faceInterval: 650,
-    objectInterval: 8000,
+    objectInterval: 4000,
   })
 
+  const handleDismissWarning = useCallback(() => {
+    setCurrentWarning(null)
+    clearTimeout(warningTimerRef.current)
+    detectionStatus?.setGraceCooldown?.(4500)
+  }, [detectionStatus])
+
+  // Pre-load AI proctoring models as soon as candidate arrives on BRIEFING or SYSTEM_CHECK
+  useEffect(() => {
+    if (session.phase === SESSION_PHASE.BRIEFING || session.phase === SESSION_PHASE.SYSTEM_CHECK) {
+      setLoadModels(true)
+    }
+  }, [session.phase])
+
   const handleStartFromSystemCheck = useCallback(async () => {
-    // 1. Enter fullscreen on direct user activation
+    setLoadModels(true)
+    const isReady = Boolean(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady))
+
+    if (!isReady) {
+      // Hold entering full-screen until all models finish activating!
+      setIsLaunchingRoom(true)
+      return
+    }
+
+    // All models are 100% active and verified! Now safely enter full-screen and start test room
     try {
       await fsGate.enterImmersive()
     } catch (_) {}
-    // 2. Trigger background AI engine initialization
-    setLoadModels(true)
-    // 3. Immediately switch into dedicated full-screen launch screen
-    setIsLaunchingRoom(true)
-  }, [fsGate])
+    try {
+      await session.startSession()
+    } catch (_) {}
+  }, [fsGate, session, detectionStatus])
 
-  // Automatically start the session and enter ACTIVE room once AI engine is ready
+  // Automatically enter full-screen and start test room once ALL models are 100% active
   useEffect(() => {
     if (!isLaunchingRoom) return
     let cancelled = false
 
-    const launch = async () => {
-      if (detectionStatus?.isWorkerReady) {
+    const checkAndLaunch = async () => {
+      const isReady = Boolean(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady))
+      if (isReady && !cancelled) {
+        setIsLaunchingRoom(false)
+        try {
+          await fsGate.enterImmersive()
+        } catch (_) {}
         try {
           await session.startSession()
         } catch (_) {}
-        if (!cancelled) {
-          setIsLaunchingRoom(false)
-        }
       }
     }
-    launch()
 
-    // Failsafe timeout: if models take > 4.5s, launch anyway
+    checkAndLaunch()
+
+    // Fallback: after 20s if network CDN was slow, allow manual skip or fallback
     const timer = setTimeout(async () => {
-      if (!cancelled && isLaunchingRoom) {
+      if (!cancelled && isLaunchingRoom && detectionStatus?.mpReady) {
+        setIsLaunchingRoom(false)
+        try {
+          await fsGate.enterImmersive()
+        } catch (_) {}
         try {
           await session.startSession()
         } catch (_) {}
-        setIsLaunchingRoom(false)
       }
-    }, 4500)
+    }, 20000)
 
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [isLaunchingRoom, detectionStatus?.isWorkerReady, session])
+  }, [isLaunchingRoom, detectionStatus?.mpReady, detectionStatus?.tfReady, detectionStatus?.allModelsReady, session, fsGate])
 
   const startCamera = useCallback(async () => {
     try {
@@ -561,9 +776,10 @@ export default function LiveInterviewV2() {
   }, [session.phase, handleCheatingEvent, session.abortSession])
 
 
-  const handleSubmitAnswer = useCallback(async ({ answerText: text, answerSource }) => {
+  const handleSubmitAnswer = useCallback(async ({ answerText: text, answerSource = 'spoken' }) => {
     tts.stop()
-    await session.submitAnswer({ answerText: text, answerSource })
+    stt.stopListening?.()
+    await session.submitAnswer({ answerText: text, answerSource: 'spoken' })
     setAnswerText('')
     stt.resetTranscript?.()
   }, [session, stt])
@@ -572,7 +788,7 @@ export default function LiveInterviewV2() {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && session.phase === SESSION_PHASE.ACTIVE) {
         e.preventDefault()
-        handleSubmitAnswer({ answerText, answerSource: 'text' })
+        handleSubmitAnswer({ answerText, answerSource: 'spoken' })
       }
     }
     window.addEventListener('keydown', handler)
@@ -702,11 +918,28 @@ export default function LiveInterviewV2() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                  {detectionStatus?.tfReady ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                  )}
+                  Device Detection (COCO-SSD)
+                </span>
+                <span className={`font-bold text-[11px] px-2 py-0.5 rounded-full border ${
+                  detectionStatus?.tfReady
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                    : 'text-[#1d6fa5] bg-blue-50 border-blue-200 animate-pulse'
+                }`}>
+                  {detectionStatus?.tfReady ? 'READY' : 'INITIALIZING...'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   AI Interviewer Alex
                 </span>
-                <span className="text-[#1d6fa5] font-bold text-[11px] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 animate-pulse">
-                  PREPARING
+                <span className="text-emerald-700 font-bold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  READY
                 </span>
               </div>
             </div>
@@ -714,8 +947,9 @@ export default function LiveInterviewV2() {
             <button
               type="button"
               onClick={async () => {
-                try { await session.startSession() } catch (_) {}
                 setIsLaunchingRoom(false)
+                try { await fsGate.enterImmersive() } catch (_) {}
+                try { await session.startSession() } catch (_) {}
               }}
               className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 transition-colors underline underline-offset-2"
             >
@@ -765,16 +999,19 @@ export default function LiveInterviewV2() {
           event={currentWarning}
           warningCount={session.cheatingData?.warning_count || 0}
           maxWarnings={MAX_WARNINGS}
-          onDismiss={() => setCurrentWarning(null)}
+          onDismiss={handleDismissWarning}
         />
-        <WarningToast warning={currentWarning} count={session.cheatingData?.warning_count} max={MAX_WARNINGS} />
 
         {/* Top bar */}
         <div className="h-16 bg-white border-b border-blue-100 flex items-center justify-between px-6 shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#2E9BDA] to-[#1d6fa5] text-white font-black text-[15px] flex items-center justify-center shadow-md shadow-[#2E9BDA]/30">
-              C
-            </div>
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo_t.webp"
+              alt="CareerShala Logo"
+              className="h-9 w-auto object-contain cursor-pointer transition-transform hover:scale-105"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            <div className="h-5 w-[1px] bg-blue-100 mx-0.5" />
             <div>
               <p className="text-[14px] font-extrabold text-blue-950 leading-tight">
                 Career<span className="text-[#1d6fa5]">Shala</span> Live Interview
@@ -808,89 +1045,10 @@ export default function LiveInterviewV2() {
 
         {/* Body */}
         <div className="flex-1 flex overflow-hidden">
-          <QuestionGridMatrixSidebar currentQIdx={session.currentQIdx} totalQ={session.totalQ} phase={session.phase} answers={session.answers} />
+          <QuestionGridMatrixSidebar currentQIdx={session.currentQIdx} totalQ={session.totalQ} phase={session.phase} answers={session.answers} config={session.config} cheatingData={session.cheatingData} maxWarnings={MAX_WARNINGS} />
 
           <div className="flex-1 grid gap-5 p-5 overflow-hidden" style={{ gridTemplateColumns: '1fr 350px' }}>
             <div className="flex flex-col gap-4 min-h-0 h-full">
-              {/* Real-time Heads-up Proctoring Alert Banner */}
-              <AnimatePresence>
-                {session.phase === SESSION_PHASE.ACTIVE && (
-                  detectionStatus.phone ? (
-                    <motion.div
-                      key="alert-phone"
-                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                      className="px-4 py-3 rounded-2xl bg-rose-50 border-2 border-rose-400 text-rose-800 flex items-center justify-between shadow-sm animate-pulse shrink-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-[20px]">📱</span>
-                        <div>
-                          <p className="text-[12.5px] font-extrabold uppercase tracking-wide leading-tight">
-                            Restricted Object Detected: {detectionStatus.objectLabel || 'Mobile / Device'}
-                          </p>
-                          <p className="text-[11.5px] font-medium text-rose-700/80 mt-0.5">
-                            Please remove all phones, notes, books, and secondary devices immediately.
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-600 text-white uppercase tracking-wider shrink-0">
-                        Proctoring Alert
-                      </span>
-                    </motion.div>
-                  ) : detectionStatus.lookDownMs >= 1000 ? (
-                    <motion.div
-                      key="alert-lookdown"
-                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                      className="px-4 py-2.5 rounded-2xl bg-amber-50 border-2 border-amber-400 text-amber-900 flex items-center justify-between shadow-sm shrink-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-[20px]">⚠️</span>
-                        <div>
-                          <p className="text-[12.5px] font-extrabold uppercase tracking-wide leading-tight">
-                            Looking Down Detected — Please Look at the Screen
-                          </p>
-                          <p className="text-[11.5px] font-medium text-amber-800/80 mt-0.5">
-                            Keep your gaze focused on the screen. Looking down for 2+ seconds flags an integrity violation ({((detectionStatus.lookDownMs || 0) / 1000).toFixed(1)}s).
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500 text-white uppercase tracking-wider shrink-0">
-                        Look Up
-                      </span>
-                    </motion.div>
-                  ) : detectionStatus.faceCount === 0 ? (
-                    <motion.div
-                      key="alert-noface"
-                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                      className="px-4 py-2.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 flex items-center gap-2.5 shadow-sm shrink-0"
-                    >
-                      <span className="text-[18px]">👤</span>
-                      <p className="text-[12px] font-bold">
-                        Face not visible in camera frame. Please reposition yourself directly in front of the webcam.
-                      </p>
-                    </motion.div>
-                  ) : detectionStatus.faceCount > 1 ? (
-                    <motion.div
-                      key="alert-multi"
-                      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                      className="px-4 py-2.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 flex items-center gap-2.5 shadow-sm shrink-0"
-                    >
-                      <span className="text-[18px]">👥</span>
-                      <p className="text-[12px] font-bold">
-                        Multiple people detected ({detectionStatus.faceCount}). Only you must be present during the interview.
-                      </p>
-                    </motion.div>
-                  ) : null
-                )}
-              </AnimatePresence>
-
               <AnimatePresence mode="wait">
                 {session.phase === SESSION_PHASE.EVALUATING && (
                   <motion.div
@@ -950,21 +1108,84 @@ export default function LiveInterviewV2() {
                     onAnimationComplete={handleQuestionRevealed}
                     className="flex flex-col gap-4 flex-1 min-h-0"
                   >
-                    <div className="bg-white rounded-3xl border border-blue-100 p-6 shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-                      <div className="flex items-center gap-2.5 mb-3">
-                        <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full border ${diffCfg.color} ${diffCfg.bg} ${diffCfg.border}`}>
-                          {diffCfg.label.toUpperCase()}
-                        </span>
-                        <span className="text-[11px] font-bold text-blue-900/40">{(q.category || 'TECHNICAL').toUpperCase()}</span>
-                        <span className="ml-auto font-mono text-[11px] text-blue-900/30 font-semibold">Q{session.currentQIdx + 1} / {session.totalQ}</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <h1 className="text-[18px] font-bold text-blue-950 leading-relaxed flex-1">{q.text}</h1>
-                        {tts.supported && (
-                          <button onClick={repeatQuestion} title="Replay question" className="shrink-0 h-8 w-8 rounded-lg border border-blue-200 text-blue-900/40 hover:border-[#2E9BDA] hover:text-[#1d6fa5] flex items-center justify-center transition-all">
-                            <Repeat className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                    <div className="bg-white rounded-3xl border border-blue-100 p-5 shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                        {/* Alex — AI Interviewer Avatar Video (Internshala AI Style) */}
+                        <div
+                          className="relative rounded-2xl overflow-hidden shrink-0 w-full sm:w-[220px] aspect-[4/3] border transition-all duration-500 bg-slate-950 shadow-sm"
+                          style={{
+                            borderColor: aiSpeaking ? 'rgba(139,92,246,0.5)' : 'rgba(46,155,218,0.3)',
+                            boxShadow: aiSpeaking ? '0 0 0 3px rgba(139,92,246,0.18), 0 12px 24px -10px rgba(139,92,246,0.45)' : 'none',
+                          }}
+                        >
+                          <video
+                            ref={avatarVideoRef}
+                            autoPlay
+                            loop
+                            muted={true}
+                            playsInline
+                            crossOrigin="anonymous"
+                            onError={(e) => console.warn('[LiveInterview] Avatar video load error:', e)}
+                            className="absolute inset-0 w-full h-full object-cover z-0"
+                          >
+                            <source src="/interviewer-avatar.mp4" type="video/mp4" />
+                          </video>
+
+                          <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            <span className="text-white text-[9px] font-extrabold tracking-wide">LIVE</span>
+                          </div>
+
+                          <div className={`absolute top-2 right-2 z-20 rounded-full px-2 py-0.5 text-[9.5px] font-bold text-white shadow-sm ${aiSpeaking ? 'bg-violet-600' : 'bg-[#2E9BDA]'}`}>
+                            {aiSpeaking ? "AI'S TURN" : 'YOUR TURN'}
+                          </div>
+
+                          <div className="absolute bottom-2 left-2 right-2 z-20 bg-black/45 backdrop-blur-sm rounded-xl px-2.5 py-1.5 border border-white/10 flex items-center justify-between">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-bold text-white leading-tight truncate">Alex</p>
+                              <p className="text-[9.5px] text-slate-300 font-medium">AI Interviewer</p>
+                            </div>
+                            {aiSpeaking && (
+                              <div className="flex items-center gap-0.5">
+                                <span className="w-1 h-3 rounded-full bg-violet-400 animate-pulse" />
+                                <span className="w-1 h-4 rounded-full bg-violet-300 animate-pulse delay-75" />
+                                <span className="w-1 h-2 rounded-full bg-violet-400 animate-pulse delay-150" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Question Details */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${diffCfg.color} ${diffCfg.bg} ${diffCfg.border}`}>
+                                {diffCfg.label.toUpperCase()}
+                              </span>
+                              <span className="text-[10.5px] font-bold text-blue-900/40">{(q.category || 'TECHNICAL').toUpperCase()}</span>
+                              <span className="ml-auto font-mono text-[11px] text-blue-900/40 font-bold">Q{session.currentQIdx + 1} / {session.totalQ}</span>
+                            </div>
+                            <h1 className="text-[16.5px] sm:text-[17.5px] font-bold text-blue-950 leading-relaxed">{q.text}</h1>
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-2.5 mt-2 border-t border-blue-50/80">
+                            {tts.supported && (
+                              <button
+                                onClick={repeatQuestion}
+                                title="Replay question"
+                                className="h-8 px-3 rounded-xl border border-blue-200 text-[#1d6fa5] hover:bg-blue-50/70 font-semibold text-[11.5px] flex items-center gap-1.5 transition-all"
+                              >
+                                <Repeat className="h-3.5 w-3.5" /> Replay Question Audio
+                              </button>
+                            )}
+                            {aiSpeaking && (
+                              <span className="text-[11px] font-semibold text-violet-600 flex items-center gap-1.5">
+                                <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-ping" />
+                                Speaking question...
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -987,61 +1208,34 @@ export default function LiveInterviewV2() {
               </AnimatePresence>
             </div>
 
-            {/* Right rail: AI avatar + proctoring */}
-            <div className="flex flex-col gap-4 h-full min-h-0 overflow-y-auto pr-1">
-              <div
-                className="relative rounded-3xl overflow-hidden shrink-0 aspect-[16/12] border transition-all duration-500"
-                style={{
-                  background: 'linear-gradient(160deg, #0B1220, #161225)',
-                  borderColor: aiSpeaking ? 'rgba(139,92,246,0.4)' : 'rgba(46,155,218,0.25)',
-                  boxShadow: aiSpeaking ? '0 0 0 3px rgba(139,92,246,0.18), 0 20px 40px -20px rgba(139,92,246,0.4)' : '0 10px 30px -15px rgba(0,0,0,0.5)',
-                }}
-              >
-                
-                {/* LIVE AVATAR VIDEO */}
-                <video 
-                  ref={avatarVideoRef}
-                  autoPlay
-                  loop 
-                  muted={true}
-                  playsInline
-                  crossOrigin="anonymous"
-                  onError={(e) => console.warn('[LiveInterview] Avatar video load error:', e)}
-                  className="absolute inset-0 w-full h-full object-cover z-0"
-                >
-                  <source src="/interviewer-avatar.mp4" type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-
-                {/* Note: I added z-10 and z-20 to these overlays so the video doesn't hide them */}
-                <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-white text-[10px] font-extrabold tracking-wide">LIVE</span>
-                </div>
-
-                <div className={`absolute top-3 right-3 z-20 rounded-full px-2.5 py-1 text-[10px] font-bold text-white ${aiSpeaking ? 'bg-violet-500' : 'bg-[#2E9BDA]'}`}>
-                  {aiSpeaking ? "AI'S TURN" : 'YOUR TURN'}
-                </div>
-
-                <div className="absolute bottom-3 left-3 right-3 z-20 bg-black/35 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/10">
-                  <p className="text-[12px] font-bold text-slate-100">Alex — AI Interviewer</p>
-                  <p className="text-[10.5px] text-slate-400">{session.config?.job_title || 'Technical Assessment'}</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-3xl border border-blue-100 p-4 shrink-0">
-                <div className="flex items-center justify-between border-b border-blue-50 pb-2.5 mb-3">
-                  <span className="text-[11px] font-extrabold text-blue-900/45 uppercase tracking-wider inline-flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Proctoring
+            {/* Right rail: Candidate Proctoring Station ONLY (Camera at the very top, zero scroll lag) */}
+            <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+              <div className="bg-white rounded-3xl border border-blue-100 p-3.5 flex flex-col gap-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] h-full overflow-hidden">
+                <div className="flex items-center justify-between border-b border-blue-50 pb-2.5 shrink-0">
+                  <span className="text-[11px] font-extrabold text-blue-900/50 uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#2E9BDA]" /> Candidate Camera & Proctoring
                   </span>
-                  <span className="font-mono text-[11px] font-bold text-emerald-600">● ACTIVE</span>
+                  <span className="font-mono text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE
+                  </span>
                 </div>
-                <DetectionPanel detectionStatus={detectionStatus} videoRef={videoRef} canvasRef={canvasRef} warningCount={session.cheatingData.warning_count} maxWarnings={MAX_WARNINGS} cheatingScore={session.cheatingData.score} />
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <DetectionPanel
+                    detectionStatus={detectionStatus}
+                    videoRef={videoRef}
+                    canvasRef={canvasRef}
+                    warningCount={session.cheatingData.warning_count}
+                    maxWarnings={MAX_WARNINGS}
+                    cheatingScore={session.cheatingData.score}
+                    hideIntegrity={true}
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+    
     </ImmersiveShell>
   )
 }

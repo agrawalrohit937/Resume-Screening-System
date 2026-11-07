@@ -948,33 +948,8 @@ export default function JobFeed() {
                 )}
               </div>
             ) : (
-              /* Fallback Card & Empty State */
+              /* Fallback Empty State */
               <div className="space-y-4">
-                {/* Fallback diagnostic card verifying component mounting */}
-                <div className="bg-amber-50/90 border border-amber-200/90 rounded-3xl p-5 shadow-2xs mb-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-black text-xs shrink-0">
-                        FEED
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-amber-900">JobFeed Component Mounted & Active</h4>
-                        <p className="text-[11px] text-amber-700 mt-0.5">
-                          Query returned 0 records. Check browser console for <code>Raw API Response</code> payload.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => fetchJobListings({})}
-                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
-                    >
-                      <RotateCcw size={13} />
-                      Force Fetch (Empty Params)
-                    </button>
-                  </div>
-                </div>
-
                 <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm max-w-lg mx-auto my-4">
                   <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4 shadow-2xs">
                     <Briefcase size={28} />
