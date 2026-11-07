@@ -23,6 +23,26 @@ def _user_to_pydantic(user_row: User) -> UserModel:
     """Helper to convert SQLAlchemy User model instance to Pydantic UserModel."""
     d = {c.name: getattr(user_row, c.name) for c in User.__table__.columns}
     d["_id"] = d.pop("id")
+    
+    # Normalize enum string values
+    if "status" in d and d["status"]:
+        d["status"] = str(d["status"]).replace("UserStatus.", "").lower().strip()
+    else:
+        d["status"] = "active"
+
+    if "provider" in d and d["provider"]:
+        d["provider"] = str(d["provider"]).replace("AuthProvider.", "").lower().strip()
+    else:
+        d["provider"] = "email"
+
+    if "role" in d and d["role"]:
+        d["role"] = str(d["role"]).replace("UserRole.", "").lower().strip()
+    else:
+        d["role"] = "candidate"
+
+    if "roles" in d and d["roles"] and isinstance(d["roles"], list):
+        d["roles"] = [str(r).replace("UserRole.", "").lower().strip() for r in d["roles"]]
+
     return UserModel(**d)
 
 
@@ -39,14 +59,27 @@ class UserRepository(BaseRepository):
             roles = [str(roles)]
 
         now = datetime.now(timezone.utc)
+        role_val = data.get("role", "candidate")
+        role_str = role_val.value if hasattr(role_val, "value") else str(role_val).replace("UserRole.", "").lower().strip()
+        
+        status_val = data.get("status", "active")
+        status_str = status_val.value if hasattr(status_val, "value") else str(status_val).replace("UserStatus.", "").lower().strip()
+
+        provider_val = data.get("provider", "email")
+        provider_str = provider_val.value if hasattr(provider_val, "value") else str(provider_val).replace("AuthProvider.", "").lower().strip()
+
+        clean_roles = []
+        for r in roles:
+            clean_roles.append(r.value if hasattr(r, "value") else str(r).replace("UserRole.", "").lower().strip())
+
         user_vals = {
             "id": u_id,
             "email": str(data.get("email", "")).lower().strip(),
             "hashed_password": data.get("hashed_password"),
             "full_name": data.get("full_name", "User"),
-            "role": str(data.get("role", "candidate")),
-            "roles": roles,
-            "status": str(data.get("status", "active")),
+            "role": role_str,
+            "roles": clean_roles,
+            "status": status_str,
             "tenant_id": data.get("tenant_id"),
             "is_invited_staff": bool(data.get("is_invited_staff", False)),
             "invited_by": data.get("invited_by"),
@@ -71,7 +104,7 @@ class UserRepository(BaseRepository):
             "gmail_refresh_token": data.get("gmail_refresh_token"),
             "gmail_token_expiry": data.get("gmail_token_expiry"),
             "auth_method": data.get("auth_method"),
-            "provider": str(data.get("provider", "email")),
+            "provider": provider_str,
             "email_verified": bool(data.get("email_verified", False)),
             "google_picture": data.get("google_picture"),
             "auth_methods": data.get("auth_methods") or [],

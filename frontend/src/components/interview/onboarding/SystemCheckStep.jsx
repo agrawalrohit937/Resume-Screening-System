@@ -139,6 +139,13 @@ export default function SystemCheckStep({
     }
   }, [step, mic, tts])
 
+  // Trigger early background model pre-loading
+  useEffect(() => {
+    onPrepareAi?.()
+  }, [onPrepareAi])
+
+  const allAiReady = Boolean(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady))
+
   // Camera stream verification — fast, lightweight, 0 AI overhead during onboarding
   const faceOk = Boolean(cameraReady && !cameraError)
   const faceLabel = cameraReady ? 'Camera Feed Active' : cameraError ? 'Camera Error' : 'Connecting Camera...'
@@ -190,9 +197,21 @@ export default function SystemCheckStep({
   }
 
   const handleStartClicked = useCallback(() => {
+    if (!allAiReady && !canSkipAi) {
+      setIsWaitingForModels(true)
+      return
+    }
     setEnteringFs(true)
     onComplete?.()
-  }, [onComplete])
+  }, [allAiReady, canSkipAi, onComplete])
+
+  useEffect(() => {
+    if (isWaitingForModels && allAiReady) {
+      setIsWaitingForModels(false)
+      setEnteringFs(true)
+      onComplete?.()
+    }
+  }, [isWaitingForModels, allAiReady, onComplete])
 
   return (
     <div className="w-full relative overflow-hidden text-slate-900 antialiased flex flex-col py-2">
@@ -465,36 +484,109 @@ export default function SystemCheckStep({
                   {/* ── Ready ── */}
                   {step === 'ready' && (
                     <motion.div key="ready" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="space-y-6 text-center">
-                      <div className="h-14 w-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                        <CheckCircle2 className="h-7 w-7" />
+                      <div className={`h-14 w-14 mx-auto rounded-2xl flex items-center justify-center border transition-all ${
+                        allAiReady ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-[#1d6fa5] border-blue-100'
+                      }`}>
+                        {allAiReady ? <CheckCircle2 className="h-7 w-7" /> : <Loader2 className="h-7 w-7 animate-spin text-[#2E9BDA]" />}
                       </div>
+
                       <div className="space-y-2">
-                        <h3 className="text-[20px] font-extrabold text-blue-950">You're all set</h3>
+                        <h3 className="text-[20px] font-extrabold text-blue-950">
+                          {allAiReady ? "You're all set" : "Activating AI Proctoring Engines"}
+                        </h3>
                         <p className="text-[13.5px] text-blue-900/55 font-medium max-w-md mx-auto leading-relaxed">
-                          Camera, microphone, and speakers are verified. The interview runs in full-screen — clicking below will switch you into the interview room and start monitoring.
+                          {allAiReady
+                            ? "Camera, microphone, and AI proctoring engines are verified and 100% active. Clicking below will enter full-screen mode and start your interview."
+                            : "Please wait a moment while facial tracking and object detection engines initialize in your browser. Entering full-screen is held until all engines are active."}
                         </p>
                       </div>
+
+                      {/* Engine activation status checklist */}
+                      <div className="max-w-md mx-auto w-full bg-slate-50 border border-blue-100 rounded-2xl p-4 text-[12px] space-y-2 text-left font-semibold text-blue-950">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Camera &amp; Microphone
+                          </span>
+                          <span className="text-emerald-700 font-bold text-[10.5px] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            VERIFIED
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            {detectionStatus?.mpReady ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                            )}
+                            Face Landmark &amp; Gaze Tracking (MediaPipe)
+                          </span>
+                          <span className={`font-bold text-[10.5px] px-2 py-0.5 rounded-full border ${
+                            detectionStatus?.mpReady
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              : 'text-[#1d6fa5] bg-blue-50 border-blue-200 animate-pulse'
+                          }`}>
+                            {detectionStatus?.mpReady ? 'READY' : 'INITIALIZING...'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            {detectionStatus?.tfReady ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
+                            )}
+                            Prohibited Object Detection (COCO-SSD)
+                          </span>
+                          <span className={`font-bold text-[10.5px] px-2 py-0.5 rounded-full border ${
+                            detectionStatus?.tfReady
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              : 'text-[#1d6fa5] bg-blue-50 border-blue-200 animate-pulse'
+                          }`}>
+                            {detectionStatus?.tfReady ? 'READY' : 'INITIALIZING...'}
+                          </span>
+                        </div>
+                      </div>
+
                       <motion.button
                         type="button"
-                        whileHover={!enteringFs && !isMobile ? { scale: 1.02 } : {}}
-                        whileTap={!enteringFs && !isMobile ? { scale: 0.98 } : {}}
+                        whileHover={allAiReady && !enteringFs && !isMobile ? { scale: 1.02 } : {}}
+                        whileTap={allAiReady && !enteringFs && !isMobile ? { scale: 0.98 } : {}}
                         onClick={handleStartClicked}
-                        disabled={enteringFs || isMobile}
+                        disabled={enteringFs || isMobile || (!allAiReady && !canSkipAi)}
                         title={isMobile ? 'Switch to a desktop or laptop to start the interview' : undefined}
-                        className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg disabled:opacity-85 transition-all ${
+                        className={`inline-flex items-center gap-2 h-[52px] px-8 rounded-2xl text-[14px] font-bold shadow-lg transition-all ${
                           isMobile
                             ? 'bg-amber-200 text-amber-800 border-2 border-amber-300 cursor-not-allowed shadow-none'
-                            : 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white shadow-[#2E9BDA]/25'
+                            : !allAiReady && !canSkipAi
+                            ? 'bg-blue-100 text-blue-400 border border-blue-200 cursor-not-allowed shadow-none'
+                            : enteringFs || isWaitingForModels
+                            ? 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white opacity-90 shadow-[#2E9BDA]/25'
+                            : 'bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white shadow-[#2E9BDA]/25 cursor-pointer'
                         }`}
                       >
                         {isMobile ? (
                           <><Smartphone className="h-4 w-4" /> Not available on mobile</>
-                        ) : enteringFs ? (
-                          <><Loader2 className="h-4 w-4 animate-spin" /> Launching Interview…</>
+                        ) : enteringFs || isWaitingForModels ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> {allAiReady ? 'Entering Full-Screen...' : 'Activating Models… Launching Shortly'}</>
+                        ) : !allAiReady && !canSkipAi ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Activating AI Engines… Please wait</>
                         ) : (
-                          <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start</>
+                          <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start Interview</>
                         )}
                       </motion.button>
+
+                      {canSkipAi && !allAiReady && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => { setEnteringFs(true); onComplete?.(); }}
+                            className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 underline underline-offset-2"
+                          >
+                            Network taking time? Proceed with core proctoring →
+                          </button>
+                        </div>
+                      )}
+
                       {isMobile && (
                         <p className="text-[11.5px] text-amber-700 font-semibold">
                           Please open this page on a laptop or desktop to start the interview.

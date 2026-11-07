@@ -77,6 +77,9 @@ export function useAdvancedDetection({
 
   const onEventRef          = useRef(onEvent)
   onEventRef.current        = onEvent
+  const isLiveRef           = useRef(isLive)
+  isLiveRef.current         = isLive
+  const graceCooldownUntil  = useRef(0)
   const faceMeshRef         = useRef(null)
   const cocoModelRef        = useRef(null)
   const lookAwayStart       = useRef(null)
@@ -91,6 +94,14 @@ export function useAdvancedDetection({
   const missedFramesRef     = useRef(0)
   const offscreenCanvasRef  = useRef(null)
   const cocoCanvasRef       = useRef(null)
+
+  const setGraceCooldown = useCallback((durationMs = 4000) => {
+    graceCooldownUntil.current = Date.now() + durationMs
+    lookDownStart.current = null
+    lookAwayStart.current = null
+    prevValuesRef.current.lastLookDownMs = 0
+    setStatus(s => ({ ...s, lookDownMs: 0, lookAwayMs: 0 }))
+  }, [])
   const prevValuesRef       = useRef({
     faceCount: null,
     gazeDir: 'center',
@@ -134,7 +145,8 @@ export function useAdvancedDetection({
 
   // ── 2. Emit Event with Throttle ───────────────────────────────────────────
   const emitEvent = useCallback((type, severity, details) => {
-    if (!isLive) return
+    if (!isLiveRef.current) return
+    if (Date.now() < graceCooldownUntil.current) return
     const fn = onEventRef.current
     if (!fn) return
     const now = Date.now()
@@ -144,9 +156,13 @@ export function useAdvancedDetection({
     fn({ event_type: type, severity, details, timestamp: new Date().toISOString() })
   }, [])
 
-  // ── 3. Continuous Looking Down Tracker (3.0s threshold) ───────────────────
+  // ── 3. Continuous Looking Down Tracker (1.8s threshold) ───────────────────
   const trackLookingDown = useCallback((isDown) => {
-    if (!isLive) return
+    if (!isLiveRef.current) return
+    if (Date.now() < graceCooldownUntil.current) {
+      lookDownStart.current = null
+      return
+    }
     if (isDown) {
       if (lookDownResetTimer.current) {
         clearTimeout(lookDownResetTimer.current)
@@ -162,10 +178,10 @@ export function useAdvancedDetection({
         setStatus(s => ({ ...s, lookDownMs: ms }))
       }
 
-      if (ms >= 2000) {
-        console.warn("🚨 [Proctoring] Sustained 2s Looking Down detected!", ms)
+      if (ms >= 1800) {
+        console.warn("🚨 [Proctoring] Sustained Looking Down detected!", ms)
         emitEvent('looking_down', 'high', `Sustained look down below screen detected (${(ms / 1000).toFixed(1)}s)`)
-        lookDownStart.current = Date.now() // reset for subsequent 2s warning
+        lookDownStart.current = Date.now() // reset for subsequent warning
       }
     } else {
       if (!lookDownResetTimer.current && lookDownStart.current) {
@@ -182,11 +198,11 @@ export function useAdvancedDetection({
         }
       }
     }
-  }, [isLive, emitEvent])
+  }, [emitEvent])
 
   // ── 4. Continuous Look Away Tracker ───────────────────────────────────────
   const trackLookAway = useCallback((isAway) => {
-    if (!isLive) return
+    if (!isLiveRef.current) return
     if (isAway) {
       if (!lookAwayStart.current) lookAwayStart.current = Date.now()
       const ms = Date.now() - lookAwayStart.current
@@ -208,7 +224,7 @@ export function useAdvancedDetection({
         setStatus(s => (s.lookAwayMs !== 0 ? { ...s, lookAwayMs: 0 } : s))
       }
     }
-  }, [isLive, emitEvent])
+  }, [emitEvent])
 
   // ── 5. Process FaceMesh Results ───────────────────────────────────────────
   const handleFaceMeshResults = useCallback((results) => {
@@ -219,7 +235,7 @@ export function useAdvancedDetection({
     const count = faces.length
 
     // When NOT in live interview room (onboarding/briefing), only update faceCount if it changed and exit early
-    if (!isLive) {
+    if (!isLiveRef.current) {
       if (prevValuesRef.current.faceCount !== count) {
         prevValuesRef.current.faceCount = count
         setStatus(s => ({
@@ -320,7 +336,10 @@ export function useAdvancedDetection({
     if (canvasRef?.current) {
       drawOverlay(canvasRef.current, lm, gaze, headPose, count)
     }
-  }, [canvasRef, isLive, emitEvent, trackLookAway, trackLookingDown])
+  }, [canvasRef, emitEvent, trackLookAway, trackLookingDown])
+
+  const handleFaceMeshResultsRef = useRef(handleFaceMeshResults)
+  handleFaceMeshResultsRef.current = handleFaceMeshResults
 
   // ── 6. Lazy Initialize Engines (FaceMesh + Background Object Detection) ──
   useEffect(() => {
@@ -375,7 +394,9 @@ export function useAdvancedDetection({
           minTrackingConfidence: 0.30,  // Stable continuous tracking
         })
 
-        fm.onResults(handleFaceMeshResults)
+        fm.onResults((res) => {
+          handleFaceMeshResultsRef.current?.(res)
+        })
         faceMeshRef.current = fm
 
         if (!isCancelled && mountedRef.current) {
@@ -411,7 +432,11 @@ export function useAdvancedDetection({
               cocoRetry++
             }
 
-            if (window.cocoSsd && !cocoModelRef.current) {
+            if (cocoModelRef.current) {
+              if (!isCancelled && mountedRef.current) {
+                setStatus(s => ({ ...s, tfReady: true }))
+              }
+            } else if (window.cocoSsd) {
               const model = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' })
               cocoModelRef.current = model
               if (!isCancelled && mountedRef.current) {
@@ -595,7 +620,11 @@ export function useAdvancedDetection({
     }
   }, [])
 
-  return status
+  return {
+    ...status,
+    allModelsReady: Boolean(status.mpReady && status.tfReady),
+    setGraceCooldown,
+  }
 }
 
 // ── Landmark Math Helpers ───────────────────────────────────────────────────

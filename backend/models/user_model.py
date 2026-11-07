@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, field_validator
 
 
 class UserRole(str, Enum):
@@ -79,6 +79,64 @@ class UserModel(BaseModel):
     roles: List[UserRole] = Field(default_factory=lambda: [UserRole.CANDIDATE])
     status: UserStatus = UserStatus.ACTIVE
     tenant_id: Optional[str] = Field(default=None, description="Multi-tenant organization identifier")
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, v):
+        if not v:
+            return UserStatus.ACTIVE
+        if isinstance(v, UserStatus):
+            return v
+        v_str = str(v).replace("UserStatus.", "").lower().strip()
+        try:
+            return UserStatus(v_str)
+        except ValueError:
+            return UserStatus.ACTIVE
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def normalize_provider(cls, v):
+        if not v:
+            return AuthProvider.EMAIL
+        if isinstance(v, AuthProvider):
+            return v
+        v_str = str(v).replace("AuthProvider.", "").lower().strip()
+        try:
+            return AuthProvider(v_str)
+        except ValueError:
+            return AuthProvider.EMAIL
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v):
+        if not v:
+            return UserRole.CANDIDATE
+        if isinstance(v, UserRole):
+            return v
+        v_str = str(v).replace("UserRole.", "").replace("userrole.", "").lower().strip()
+        try:
+            return UserRole(v_str)
+        except ValueError:
+            return UserRole.CANDIDATE
+
+    @field_validator("roles", mode="before")
+    @classmethod
+    def normalize_roles(cls, v):
+        if not v:
+            return [UserRole.CANDIDATE]
+        if not isinstance(v, list):
+            v = [v]
+        res = []
+        for r in v:
+            if isinstance(r, UserRole):
+                res.append(r)
+                continue
+            r_str = str(r).replace("UserRole.", "").replace("userrole.", "").lower().strip()
+            try:
+                res.append(UserRole(r_str))
+            except ValueError:
+                res.append(UserRole.CANDIDATE)
+        return res
     is_invited_staff: bool = False
     invited_by: Optional[str] = None
     company_name: Optional[str] = None

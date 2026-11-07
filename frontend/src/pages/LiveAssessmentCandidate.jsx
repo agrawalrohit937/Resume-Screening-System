@@ -32,7 +32,7 @@ import SystemCheckStep from '../components/interview/onboarding/SystemCheckStep'
 import EmployerAssessmentComplete from '../components/interview/EmployerAssessmentComplete'
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-const MAX_WARNINGS = 5
+const MAX_WARNINGS = 3
 
 const DIFF_CONFIG = {
   easy: { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Warm-up / Easy', time: 120 },

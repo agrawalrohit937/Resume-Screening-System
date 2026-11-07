@@ -130,6 +130,15 @@ async def connect_db() -> None:
             res = await conn.execute(text("SELECT 1;"))
             _ = res.scalar()
         logger.info("PostgreSQL primary engine connected successfully")
+
+        # Automatically ensure all tables exist in database (essential for local dev)
+        try:
+            import models  # noqa: F401
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("PostgreSQL schema verified and tables ensured")
+        except Exception as e:
+            logger.warning("Auto table creation notice", error=str(e))
     except Exception as exc:
         logger.error("Failed to connect to PostgreSQL engine", error=str(exc))
         raise exc

@@ -8,9 +8,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 export function useSpeechToText({ onTranscript, onFinalTranscript, language = 'en-US' } = {}) {
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [interimTranscript, setInterimTranscript] = useState('')
   const [supported, setSupported] = useState(false)
   const [error, setError] = useState(null)
   const recognitionRef = useRef(null)
+
+  const onTranscriptRef = useRef(onTranscript)
+  onTranscriptRef.current = onTranscript
+  const onFinalTranscriptRef = useRef(onFinalTranscript)
+  onFinalTranscriptRef.current = onFinalTranscript
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -34,10 +40,14 @@ export function useSpeechToText({ onTranscript, onFinalTranscript, language = 'e
           }
         }
         if (final) {
+          setInterimTranscript('')
           setTranscript(prev => prev + final)
-          onFinalTranscript?.(final.trim())
+          onFinalTranscriptRef.current?.(final.trim())
         }
-        onTranscript?.(interim)
+        if (interim !== undefined) {
+          setInterimTranscript(interim)
+          onTranscriptRef.current?.(interim)
+        }
       }
 
       recognition.onerror = (event) => {
@@ -54,7 +64,7 @@ export function useSpeechToText({ onTranscript, onFinalTranscript, language = 'e
 
       recognitionRef.current = recognition
     }
-  }, [language, onFinalTranscript, onTranscript])
+  }, [language])
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current) return
@@ -72,14 +82,17 @@ export function useSpeechToText({ onTranscript, onFinalTranscript, language = 'e
     setListening(false)
   }, [])
 
-  const resetTranscript = useCallback(() => setTranscript(''), [])
+  const resetTranscript = useCallback(() => {
+    setTranscript('')
+    setInterimTranscript('')
+  }, [])
 
   const toggleListening = useCallback(() => {
     if (listening) stopListening()
     else startListening()
   }, [listening, startListening, stopListening])
 
-  return { listening, transcript, supported, error, startListening, stopListening, toggleListening, resetTranscript }
+  return { listening, transcript, interimTranscript, supported, error, startListening, stopListening, toggleListening, resetTranscript }
 }
 
 // ── Text-to-Speech (Native Web Speech API — Instant 0ms Playback) ─────────────

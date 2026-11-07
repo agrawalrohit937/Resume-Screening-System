@@ -41,7 +41,7 @@ export function useInterviewSession() {
   // ── 1. FAILSAFE: Warning Limit Check ─────────────────────────────────────
   // Abort session universally on 5 warnings across all interviews
   useEffect(() => {
-    if (cheatingData.warning_count >= 5 && phase !== SESSION_PHASE.ABORTED) {
+    if (cheatingData.warning_count >= 3 && phase !== SESSION_PHASE.ABORTED) {
       console.warn("CRITICAL: Integrity limit reached. Aborting...");
       setPhase(SESSION_PHASE.ABORTED);
     }
@@ -143,8 +143,10 @@ export function useInterviewSession() {
       const highCount = newEvents.filter(e => e.severity === 'high' || e.severity === 'critical' || e.event_type === 'looking_down').length
       const medCount = newEvents.filter(e => e.severity === 'medium' && e.event_type !== 'looking_down').length
       const calculatedWarnings = highCount + Math.floor(medCount / 3)
+      const calculatedScore = Math.min(1.0, Math.max(prev.score || 0, calculatedWarnings / 3))
       return {
         ...prev,
+        score: calculatedScore,
         warning_count: calculatedWarnings,
         events: newEvents,
       };
@@ -166,9 +168,10 @@ export function useInterviewSession() {
 
         setCheatingData(prev => {
           const newCount = (typeof data.warning_count === 'number') ? data.warning_count : prev.warning_count;
+          const backendScore = (typeof data.cheating_score === 'number') ? data.cheating_score : (prev.score || 0);
           return {
             ...prev,
-            score: data.cheating_score !== undefined ? data.cheating_score : prev.score,
+            score: Math.min(1.0, Math.max(backendScore, (newCount / 3))),
             warning_count: newCount,
           };
         });
