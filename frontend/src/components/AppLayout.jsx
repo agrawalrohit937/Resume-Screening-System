@@ -27,6 +27,10 @@ const PAGE_TITLES = {
   '/recruiter/jobs': { title: 'Jobs & Applicants', sub: 'Active requisitions & applicant pipeline' },
   '/recruiter/company': { title: 'Employer Branding', sub: 'Company identity, culture & public presentation' },
   '/recruiter/settings': { title: 'Recruiter Settings', sub: 'Hiring lead preferences, alerts & security' },
+  '/interviewer/dashboard': { title: 'Assigned Scorecards', sub: 'Candidate evaluations & scoring' },
+  '/hiring-manager/dashboard': { title: 'Pipeline & Approvals', sub: 'Active requisitions & offers' },
+  '/exec/dashboard': { title: 'Executive Intelligence', sub: 'Strategic talent & workforce metrics' },
+  '/admin': { title: 'Admin Console', sub: 'System oversight & administration' },
   '/jobs': { title: 'Job Marketplace', sub: 'Explore opportunities with AI vector matching' },
   '/applications': { title: 'Application Tracker', sub: 'Track your hiring stages and match feedback' },
   '/profile': { title: 'Profile & Assets', sub: 'Personal identity, portfolio & resume' },
@@ -42,6 +46,29 @@ function MobileHeader({ onMenuToggle }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileMenuRef = useRef(null)
   const dropdownRef = useRef(null)
+
+  const userRolesArray = Array.isArray(user?.roles) ? user.roles : []
+  const userRoles = [...userRolesArray, user?.role].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+  const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
+  const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
+  const isHiringManager = userRoles.includes('hiring_manager')
+  const isInterviewerRole = userRoles.includes('interviewer')
+  const isRecruiterRole = userRoles.includes('recruiter')
+
+  const savedContext = typeof window !== 'undefined'
+    ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context'))
+    : null
+  const hasEmployerRole = isExecutive || isRecruiterRole || isHiringManager || isInterviewerRole || isPlatformAdmin
+  const isEmployerContext = savedContext === 'employer' || (!savedContext && hasEmployerRole)
+
+  let homeRoute = '/dashboard'
+  if (isEmployerContext) {
+    if (isPlatformAdmin) homeRoute = '/admin'
+    else if (isExecutive) homeRoute = '/exec/dashboard'
+    else if (isHiringManager) homeRoute = '/hiring-manager/dashboard'
+    else if (isInterviewerRole) homeRoute = '/interviewer/dashboard'
+    else if (isRecruiterRole) homeRoute = '/recruiter/dashboard'
+  }
 
   const isPremium = user?.plan === 'premium' || user?.subscription_tier === 'premium'
   const isPro = user?.plan === 'pro' || user?.subscription_tier === 'pro'
@@ -70,7 +97,7 @@ function MobileHeader({ onMenuToggle }) {
         <div className="flex items-center justify-between gap-3 px-4.5 py-3 min-h-[66px]">
           {/* Left: Brand Identity (Clean, native app feel) */}
           <Link
-            to={user?.role === 'recruiter' ? '/recruiter/dashboard' : '/dashboard'}
+            to={homeRoute}
             className="flex items-center gap-3 min-w-0 select-none group touch-manipulation focus:outline-none"
             aria-label="Go to dashboard"
           >

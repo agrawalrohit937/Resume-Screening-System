@@ -9,57 +9,193 @@ import {
   Building2,
   Shield,
   Sparkles,
-  X
+  X,
+  ClipboardCheck,
+  Video,
+  TrendingUp,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useCopilot } from '../features/copilot/CopilotProvider'
+
+const DASHBOARD_ROUTES = new Set([
+  '/dashboard',
+  '/recruiter',
+  '/recruiter/dashboard',
+  '/interviewer/dashboard',
+  '/hiring-manager/dashboard',
+  '/exec/dashboard',
+  '/admin',
+])
+
+function isItemActive(itemTo, currentPath) {
+  if (currentPath === itemTo) return true
+  if (DASHBOARD_ROUTES.has(itemTo)) return false
+  return currentPath.startsWith(itemTo)
+}
+
+function resolveEffectiveRole(user, pathname) {
+  const userRolesArray = Array.isArray(user?.roles) ? user.roles : []
+  const userRoles = [
+    ...userRolesArray,
+    user?.role,
+  ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+
+  const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
+  const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
+  const isHiringManager = userRoles.includes('hiring_manager')
+  const isRecruiterRole = userRoles.includes('recruiter')
+  const isInterviewerRole = userRoles.includes('interviewer')
+  const isAdmin = isPlatformAdmin
+  const hasEmployerRole = isExecutive || isRecruiterRole || isHiringManager || isInterviewerRole || isAdmin
+  const hasCandidateRole = userRolesArray.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
+
+  // If Admin, check adminViewMode simulation
+  if (isAdmin) {
+    const adminMode = typeof window !== 'undefined' ? (localStorage.getItem('admin_view_mode') || 'admin') : 'admin'
+    if (['candidate', 'recruiter', 'hiring_manager', 'interviewer', 'exec', 'executive', 'admin'].includes(adminMode)) {
+      if (adminMode === 'exec') return 'executive'
+      return adminMode
+    }
+    return 'admin'
+  }
+
+  // Employer vs Candidate context check
+  const savedContext = typeof window !== 'undefined'
+    ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context'))
+    : null
+
+  const isEmployerRoute = pathname && (
+    pathname.startsWith('/interviewer') ||
+    pathname.startsWith('/recruiter') ||
+    pathname.startsWith('/hiring-manager') ||
+    pathname.startsWith('/exec') ||
+    pathname.startsWith('/admin')
+  )
+
+  const isCandidateRoute = pathname && (
+    pathname === '/dashboard' ||
+    pathname === '/results' ||
+    pathname === '/interview' ||
+    pathname === '/upload' ||
+    pathname === '/gamification' ||
+    pathname === '/applications'
+  )
+
+  let inEmployerMode = false
+  if (isEmployerRoute) {
+    inEmployerMode = true
+  } else if (isCandidateRoute && hasCandidateRole) {
+    inEmployerMode = false
+  } else if (savedContext === 'employer' && hasEmployerRole) {
+    inEmployerMode = true
+  } else if (savedContext === 'candidate' && hasCandidateRole) {
+    inEmployerMode = false
+  } else if (hasEmployerRole) {
+    inEmployerMode = true
+  }
+
+  if (!inEmployerMode) {
+    return 'candidate'
+  }
+
+  // Active employer role resolution
+  if (isInterviewerRole) return 'interviewer'
+  if (isHiringManager) return 'hiring_manager'
+  if (isExecutive) return 'executive'
+  if (isRecruiterRole) return 'recruiter'
+
+  return 'candidate'
+}
+
+function getNavItemsForRole(effectiveRole) {
+  switch (effectiveRole) {
+    case 'admin':
+      return {
+        left: [
+          { to: '/admin', label: 'Admin', icon: Shield },
+          { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
+        ],
+        right: [
+          { to: '/profile', label: 'Profile', icon: UserCircle },
+        ],
+      }
+
+    case 'interviewer':
+      return {
+        left: [
+          { to: '/interviewer/dashboard', label: 'Scorecards', icon: ClipboardCheck },
+          { to: '/live-interview', label: 'Live Mock', icon: Video },
+        ],
+        right: [
+          { to: '/recruiter/company', label: 'Company', icon: Building2 },
+        ],
+      }
+
+    case 'hiring_manager':
+      return {
+        left: [
+          { to: '/hiring-manager/dashboard', label: 'Pipeline', icon: LayoutDashboard },
+          { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
+        ],
+        right: [
+          { to: '/recruiter/company', label: 'Company', icon: Building2 },
+        ],
+      }
+
+    case 'executive':
+    case 'exec':
+      return {
+        left: [
+          { to: '/exec/dashboard', label: 'Insights', icon: TrendingUp },
+          { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
+        ],
+        right: [
+          { to: '/recruiter/company', label: 'Company', icon: Building2 },
+        ],
+      }
+
+    case 'recruiter':
+      return {
+        left: [
+          { to: '/recruiter/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+          { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
+        ],
+        right: [
+          { to: '/recruiter/company', label: 'Company', icon: Building2 },
+        ],
+      }
+
+    case 'candidate':
+    default:
+      return {
+        left: [
+          { to: '/dashboard', label: 'Home', icon: LayoutDashboard },
+          { to: '/jobs', label: 'Jobs', icon: Briefcase },
+        ],
+        right: [
+          { to: '/results', label: 'ATS Scan', icon: ScanSearch },
+        ],
+      }
+  }
+}
 
 export default function MobileBottomNav({ onMenuToggle }) {
   const { user } = useAuth()
   const location = useLocation()
   const { isOpen, setIsOpen } = useCopilot()
-  const role = user?.role?.toLowerCase() || 'candidate'
 
-  // Define Left and Right tabs based on user role (Total 5 items with center CareerMitra Hero)
-  let leftItems = []
-  let rightItems = []
-
-  if (role === 'admin') {
-    leftItems = [
-      { to: '/admin', label: 'Admin', icon: Shield },
-      { to: '/recruiter', label: 'Jobs', icon: Briefcase },
-    ]
-    rightItems = [
-      { to: '/profile', label: 'Profile', icon: UserCircle },
-    ]
-  } else if (role === 'recruiter' || role === 'hiring_manager' || role === 'executive') {
-    leftItems = [
-      { to: '/recruiter/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
-    ]
-    rightItems = [
-      { to: '/recruiter/company', label: 'Company', icon: Building2 },
-    ]
-  } else {
-    // Default Candidate Navigation
-    leftItems = [
-      { to: '/dashboard', label: 'Home', icon: LayoutDashboard },
-      { to: '/jobs', label: 'Jobs', icon: Briefcase },
-    ]
-    rightItems = [
-      { to: '/results', label: 'ATS Scan', icon: ScanSearch },
-    ]
-  }
+  const effectiveRole = resolveEffectiveRole(user, location.pathname)
+  const { left: leftItems, right: rightItems } = getNavItemsForRole(effectiveRole)
 
   // Active check for secondary pages (opens via Menu drawer)
-  const isPrimaryActive = [...leftItems, ...rightItems].some(
-    (item) => location.pathname === item.to || (item.to !== '/dashboard' && item.to !== '/recruiter/dashboard' && location.pathname.startsWith(item.to))
+  const isPrimaryActive = [...leftItems, ...rightItems].some((item) =>
+    isItemActive(item.to, location.pathname)
   )
   const isMenuRelatedActive = !isPrimaryActive
 
   const renderNavLink = (item) => {
     const Icon = item.icon
-    const isActive = location.pathname === item.to || (item.to !== '/dashboard' && item.to !== '/recruiter/dashboard' && location.pathname.startsWith(item.to))
+    const isActive = isItemActive(item.to, location.pathname)
 
     return (
       <NavLink
