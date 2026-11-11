@@ -1,11 +1,5 @@
 """
-CareerShala AI Copilot v2 Domain Models & Typed Schemas
-=========================================================
-Database schema and Pydantic validation models for:
-- copilot_sessions: conversation threads with metadata and token accounting
-- copilot_messages: transcript items with role, cards, citations, and feedback
-- copilot_memory: durable user facts learned by the agent (max 40/user, LRU)
-- SSE event protocol payloads and API request/response structures.
+CareerShala AI Copilot v2 Schemas and DTOs.
 """
 
 from datetime import datetime, timezone
@@ -113,3 +107,69 @@ class CopilotV2ChatPayload(BaseModel):
 
 class MigrateLocalPayload(BaseModel):
     messages: List[Dict[str, Any]] = Field(..., description="Legacy localStorage history items to migrate")
+
+
+# ─── Copilot RAG Schemas ───────────────────────────────────────────────────────
+
+class CopilotChunkModel(BaseModel):
+    """
+    Stored document chunk in Database `copilot_chunks`.
+    Scoped strictly by `tenant_id` and `user_id`.
+    """
+    id: Optional[str] = Field(default=None, alias="_id")
+    tenant_id: str = Field(..., description="Multi-tenant boundary identifier")
+    user_id: str = Field(..., description="User boundary or 'system' for global documents")
+    source_type: Literal["resume", "job_description", "interview_transcript", "help_doc"] = Field(...)
+    source_id: str = Field(..., description="Document identifier (e.g. resume_id, job_id)")
+    chunk_index: int = Field(default=0, description="Sequential ordering within the source document")
+    title: str = Field(..., description="Hierarchical breadcrumb or section title")
+    text: str = Field(..., description="Chunk content (~500 tokens max)")
+    text_hash: str = Field(..., description="SHA-256 hash for deduplication and cache validation")
+    embedding: List[float] = Field(default_factory=list, description="Dense vector embedding")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata like section, role, company, skills")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+
+
+class RetrievedChunk(BaseModel):
+    """
+    Represents a retrieved and reranked document chunk returned to the Copilot.
+    """
+    chunk_id: str
+    source_type: str
+    source_id: str
+    chunk_index: int
+    title: str
+    text: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    vector_score: Optional[float] = None
+    bm25_score: Optional[float] = None
+    rrf_score: Optional[float] = None
+    rerank_score: Optional[float] = None
+    final_score: float = 0.0
+
+    @property
+    def citation_label(self) -> str:
+        prefix = self.source_type.replace("_", " ").title()
+        section = self.metadata.get("section") or self.title
+        return f"{prefix} ({section})"
+
+
+class CitationEvent(BaseModel):
+    """
+    Typed SSE payload emitted when Copilot cites retrieved grounding chunks.
+    """
+    type: Literal["citation"] = "citation"
+    chunk_id: str
+    source_type: str
+    source_id: str
+    title: str
+    citation_label: str
+    snippet: str
+    score: float
+

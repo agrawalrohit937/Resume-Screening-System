@@ -22,18 +22,19 @@ from core.security import (
     verify_device_id,
     generate_challenge_token,
 )
-from models.user_model import UserRole, UserStatus, AuthProvider, TrustedDevice
-from models.otp_model import OTPPurpose
-from repositories.user_repo import UserRepository
-from repositories.otp_repo import OTPRepository
-from services.otp_service import OTPService
-from schemas.user_schema import SignupRequest, LoginRequest
+from schemas.user_schema import (
+    UserRole, UserStatus, AuthProvider, TrustedDevice,
+    SignupRequest, LoginRequest, MessageResponse,
+)
 from schemas.otp_schema import (
+    OTPPurpose,
     VerifyEmailRequest, ResendOtpRequest, ForgotPasswordRequest,
     VerifyResetOtpRequest, ResetPasswordRequest, VerifyLoginOtpRequest,
     LoginChallengeResponse, OtpMessageResponse,
 )
-from schemas.user_schema import MessageResponse
+from repositories.user_repo import UserRepository
+from repositories.otp_repo import OTPRepository
+from services.otp_service import OTPService
 from api.routes.auth_helpers import build_and_persist_tokens, verify_otp_and_consume
 
 logger = structlog.get_logger(__name__)

@@ -10,7 +10,7 @@ from sqlalchemy import update
 
 from config.db import get_pg_session_factory
 from models.tables import CandidateApplication
-from models.interview_kit import (
+from schemas.interview_schema import (
     InterviewKitModel,
     ScorecardModel,
     CalibrationReport,

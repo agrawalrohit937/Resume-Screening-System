@@ -39,7 +39,7 @@ class CopilotService:
     def __init__(self):
         self.router = CopilotRouter()
 
-    async def record_turn_telemetry_bg(
+    async def record_turn_cost_bg(
         self,
         copilot_repo: CopilotRepository,
         tenant_id: str,
@@ -363,11 +363,10 @@ CORE BEHAVIOR & EMPTY-STATE COACHING:
             })
             yield sse_format({"type": "done"})
 
-            # Move database telemetry tracking (token calculation, cost update, history saving, semantic cache)
-            # into FastAPI BackgroundTasks so API returns immediately without waiting for DB writes
+            # Move background token/cost recording into FastAPI BackgroundTasks
             if background_tasks:
                 background_tasks.add_task(
-                    self.record_turn_telemetry_bg,
+                    self.record_turn_cost_bg,
                     copilot_repo=copilot_repo,
                     tenant_id=tenant_id,
                     user_id=user_id,
@@ -381,7 +380,7 @@ CORE BEHAVIOR & EMPTY-STATE COACHING:
                 )
             else:
                 asyncio.create_task(
-                    self.record_turn_telemetry_bg(
+                    self.record_turn_cost_bg(
                         copilot_repo=copilot_repo,
                         tenant_id=tenant_id,
                         user_id=user_id,

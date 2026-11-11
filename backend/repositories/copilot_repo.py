@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import select, update, delete, desc, asc
+from sqlalchemy.orm import selectinload
 
 from config.db import get_pg_session_factory
 from models import (
@@ -20,7 +21,7 @@ from models import (
     CopilotMemory,
     gen_uuid_str,
 )
-from models.copilot_model import (
+from schemas.copilot_schema import (
     CopilotSessionModel,
     CopilotMessageModel,
     CopilotMemoryModel,
@@ -166,6 +167,8 @@ class CopilotRepository(BaseRepository):
         tenant_id: str,
         user_id: str,
         session_id: str,
+        *,
+        include_messages: bool = False,
     ) -> Optional[CopilotSessionModel]:
         if not session_id:
             return None
@@ -178,6 +181,8 @@ class CopilotRepository(BaseRepository):
                 CopilotSession.user_id == str(user_id),
                 CopilotSession.deleted_at.is_(None),
             )
+            if include_messages:
+                stmt = stmt.options(selectinload(CopilotSession.messages))
             res = await session.execute(stmt)
             row = res.scalar_one_or_none()
             if row:

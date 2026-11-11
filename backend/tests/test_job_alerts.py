@@ -13,7 +13,7 @@ Verifies:
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
-from models.cron_run_model import DeliveryStatus
+from schemas.cron_schema import DeliveryStatus
 from scheduler.job_alerts import (
     calculate_slot_id,
     run_nightly_job_alerts,

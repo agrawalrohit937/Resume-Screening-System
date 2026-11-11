@@ -1,16 +1,13 @@
 """
-Equal Employment Opportunity (EEO) Self-Identification Models.
-
-Phase 5, Task 5.2:
+Equal Employment Opportunity (EEO) Self-Identification Schemas.
 Voluntary demographic data collection stored strictly outside the scoring pipeline.
 """
 
 from __future__ import annotations
-
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EEOGender(str, Enum):
@@ -64,4 +61,5 @@ class EEOSelfIdentificationRecord(BaseModel):
     job_id: Optional[str] = None
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(populate_by_name=True)
+

@@ -2,8 +2,88 @@
 Pydantic v2 Schemas — ATS Matching, Skill Analysis
 """
 
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+# ─── Seniority & Domain DTOs ───────────────────────────────────────────────────
+
+class SeniorityLevel(str, Enum):
+    INTERN = "intern"
+    JUNIOR = "junior"
+    MID = "mid"
+    SENIOR = "senior"
+    LEAD = "lead"
+    PRINCIPAL = "principal"
+    EXECUTIVE = "executive"
+
+
+class JobDescriptionModel(BaseModel):
+    id: Optional[str] = Field(default=None, alias="_id")
+    user_id: str
+    title: str
+    company: Optional[str] = None
+    description: str
+    required_skills: List[str] = []
+    preferred_skills: List[str] = []
+    experience_years_min: Optional[int] = None
+    experience_years_max: Optional[int] = None
+    seniority_level: Optional[SeniorityLevel] = None
+    location: Optional[str] = None
+    remote: bool = False
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    industry: Optional[str] = None
+    raw_text: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ATSResultModel(BaseModel):
+    id: Optional[str] = Field(default=None, alias="_id")
+    user_id: str
+    tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
+    resume_id: str
+    job_description_id: str
+
+    final_score: float = 0.0
+    experience_score: float = 0.0
+    education_score: float = 0.0
+
+    matched_skills: List[str] = []
+    missing_skills: List[str] = []
+    soft_skills: List[str] = []
+    matched_keywords: List[str] = []
+    missing_keywords: List[str] = []
+
+    recommendation: str = ""
+    improvement_suggestions: List[str] = []
+    strengths: List[str] = []
+    weaknesses: List[str] = []
+    overall_assessment: str = ""
+
+    strict_ats_score: Optional[float] = 0.0
+    is_knockout: Optional[bool] = False
+    knockout_reasons: List[str] = []
+    knockout_advisories: List[str] = []
+    match_band: Optional[str] = None
+    confidence: Optional[Dict[str, Any]] = None
+    needs_input: List[str] = []
+    dropped_components: List[str] = []
+
+    processing_time_ms: int = 0
+    scoring_version: Optional[str] = "2.3.0"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        protected_namespaces=(),
+        extra="allow",
+    )
+
 
 # ─── ATS Request (NO CHANGES HERE) ────────────────────────────────────────────
 class ATSMatchRequest(BaseModel):

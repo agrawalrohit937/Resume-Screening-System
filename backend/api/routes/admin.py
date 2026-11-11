@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from models.tables import User
 from api.deps import get_admin_user, get_db
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from repositories.career_application_repo import CareerApplicationRepository
 from repositories.support_ticket_repo import SupportTicketRepository
 

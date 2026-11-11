@@ -3,8 +3,8 @@ Unit Tests for Phase A: Jobs Foundation — Models, BGE Local Embeddings & Jobs 
 """
 
 import pytest
-from models.job import JobModel, WorkMode
-from models.application import ApplicationModel, ApplicationStage
+from schemas.job_schema import JobModel, WorkMode
+from schemas.application_schema import ApplicationModel, ApplicationStage
 from services.embedding_service import embedding_model, EMBEDDING_DIMENSIONS
 
 
@@ -209,7 +209,7 @@ async def test_update_job_with_active_applicants_rejects_core_changes():
     from unittest.mock import AsyncMock, MagicMock
     from main import create_application
     from api.deps import get_job_repo, get_current_user
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     app = create_application()
 
@@ -289,7 +289,7 @@ async def test_recruiter_can_view_all_jobs_in_same_tenant():
     """
     from unittest.mock import patch
     from api.routes.jobs import get_my_posted_jobs
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
     from models.tables import Job as JobT
     from tests.conftest import MockAsyncSession
 
@@ -336,7 +336,7 @@ async def test_match_job_ats_resolves_open_job_cross_tenant():
     """
     from unittest.mock import AsyncMock, MagicMock, patch
     from api.routes.jobs import match_job_ats
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     candidate = UserModel(
         id="660000000000000000000010",
@@ -416,7 +416,7 @@ async def test_match_job_ats_allows_external_jobs():
     """Verify that external job listings now support full ATS matching without 400 rejection."""
     from unittest.mock import AsyncMock, MagicMock, patch
     from api.routes.jobs import match_job_ats
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     candidate = UserModel(
         id="660000000000000000000010",
@@ -507,7 +507,7 @@ async def test_list_jobs_strict_has_applied_logic():
     """
     from unittest.mock import AsyncMock, MagicMock
     from api.routes.jobs import list_jobs
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     candidate_id = "660000000000000000000099"
     current_user = UserModel(
@@ -621,7 +621,7 @@ async def test_list_jobs_inclusive_or_tenant_isolation_and_external():
     """
     from unittest.mock import AsyncMock, MagicMock
     from api.routes.jobs import list_jobs
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     recruiter_user = UserModel(
         id="660000000000000000000020",
@@ -708,7 +708,7 @@ async def test_get_job_detail_allows_recruiter_and_candidate_on_external_job():
     """Verify GET /api/v1/jobs/{job_id} allows recruiters to view external scraped jobs without 404."""
     from unittest.mock import AsyncMock, MagicMock, patch
     from api.routes.jobs import get_job_detail
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     recruiter_user = UserModel(
         id="660000000000000000000030",
@@ -759,7 +759,7 @@ async def test_list_jobs_skill_filter_lenient_fallback_for_external_jobs():
     """
     from unittest.mock import AsyncMock, MagicMock
     from api.routes.jobs import list_jobs
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     candidate_user = UserModel(
         id="660000000000000000000040",
@@ -824,7 +824,7 @@ async def test_explore_jobs_merges_internal_and_external_with_priority_sort():
     from datetime import datetime, timezone
     from unittest.mock import AsyncMock, MagicMock
     from api.routes.jobs import list_jobs
-    from models.user_model import UserModel, UserRole
+    from schemas.user_schema import UserModel, UserRole
 
     candidate_user = UserModel(
         id="660000000000000000000050",

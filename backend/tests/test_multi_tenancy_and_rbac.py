@@ -16,7 +16,7 @@ from core.rbac import (
     get_role_permissions,
     has_permission,
 )
-from models.user_model import UserRole
+from schemas.user_schema import UserRole
 from services.multi_tenancy import (
     TenantAccessDeniedError,
     TenantScopedRepository,

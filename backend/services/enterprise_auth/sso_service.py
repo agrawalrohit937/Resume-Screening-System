@@ -16,8 +16,8 @@ from sqlalchemy import select, and_
 from config.db import get_pg_session_factory
 from models.tables import User
 from core.security import create_access_token
-from models.enterprise_auth import OIDCConfiguration, SAMLConfiguration
-from models.user_model import UserRole, UserStatus
+from schemas.enterprise_auth_schema import OIDCConfiguration, SAMLConfiguration
+from schemas.user_schema import UserRole, UserStatus
 
 logger = structlog.get_logger(__name__)
 

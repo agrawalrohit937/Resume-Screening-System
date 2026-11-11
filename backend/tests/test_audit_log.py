@@ -14,9 +14,9 @@ from typing import Any, Dict, List
 import pytest
 from unittest.mock import MagicMock
 
-from models.audit_log_model import AuditLogModel, AuditAction, AuditResourceType
+from schemas.audit_schema import AuditLogModel, AuditAction, AuditResourceType
 from repositories.audit_log_repo import AuditLogRepository
-from models.user_model import UserModel, UserRole
+from schemas.user_schema import UserModel, UserRole
 
 
 TENANT_ALPHA = "tenant_alpha"

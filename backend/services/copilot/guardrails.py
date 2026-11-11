@@ -5,7 +5,7 @@ Implements Phase 5 Safety & Observability controls:
 1. Prompt Injection Guard (sanitizes untrusted text and wraps in XML delimiters)
 2. PII Redaction (redacts emails and phone numbers from user messages before logging)
 3. Output Grounding Guardrail (verifies cited scores/percentages against grounded context)
-4. Telemetry Token & Cost Calculations
+4. Token & Cost Calculations
 """
 
 import re
@@ -102,11 +102,6 @@ def calculate_cost_usd(prompt_tokens: int, completion_tokens: int, provider: str
     Calculates estimated USD cost based on token counts across model providers.
     Average blended rate: $0.50 per 1M tokens ($0.0000005 per token).
     """
-    try:
-        from core.metrics import record_copilot_tokens
-        record_copilot_tokens(model=model, provider=provider, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
-    except Exception:
-        pass
     total_tokens = prompt_tokens + completion_tokens
     # $0.50 per 1,000,000 tokens
     return round((total_tokens / 1_000_000) * 0.50, 6)

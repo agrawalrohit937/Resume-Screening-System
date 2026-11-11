@@ -7,7 +7,7 @@ from typing import List, Tuple
 from fastapi import HTTPException, status as http_status
 
 from repositories.application_repo import ApplicationRepository
-from models.apply_assistant_model import ApplicationStatus
+from schemas.application_schema import ApplicationStatus
 from workflows.apply_assistant_graph import apply_assistant_graph
 from services.scoring_engine import score_resume
 from repositories.resume_repo import ResumeRepository

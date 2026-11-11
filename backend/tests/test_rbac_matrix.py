@@ -10,7 +10,7 @@ from core.rbac import (
     check_rbac_access,
     has_permission,
 )
-from models.user_model import UserRole
+from schemas.user_schema import UserRole
 
 
 def test_rbac_roles_permissions_completeness():

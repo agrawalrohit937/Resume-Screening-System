@@ -2,7 +2,11 @@
 Security — JWT token creation/verification, password hashing, OTP hashing
 """
 
+import asyncio
+import hashlib
+import hmac
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 
@@ -13,11 +17,6 @@ from passlib.context import CryptContext
 from core.config import settings
 
 logger = structlog.get_logger(__name__)
-
-import asyncio
-import hashlib
-import hmac
-import uuid
 
 # pwd_context uses argon2 for secure password hashing with bcrypt fallback
 try:

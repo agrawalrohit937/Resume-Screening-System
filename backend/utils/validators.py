@@ -3,15 +3,24 @@ Input Validators — reusable validation helpers
 """
 
 import re
-from core.id import DocumentId
+from typing import Any
 
 
-def is_valid_document_id(value: str) -> bool:
-    if not value or not isinstance(value, str):
+def is_valid_document_id(value: Any) -> bool:
+    """Validate 24-character hexadecimal IDs and 32/36-character UUIDs."""
+    if not value or not isinstance(value, (str, bytes)):
         return False
-    return DocumentId.is_valid(value)
+    s = str(value).strip().replace("-", "")
+    return len(s) in (24, 32) and all(c in "0123456789abcdefABCDEF" for c in s)
 
 
+class DocumentId:
+    @staticmethod
+    def is_valid(value: Any) -> bool:
+        return is_valid_document_id(value)
+
+
+ObjectId = DocumentId
 is_valid_object_id = is_valid_document_id
 
 

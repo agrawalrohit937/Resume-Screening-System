@@ -8,7 +8,7 @@ from sqlalchemy import select, and_, desc
 
 from config.db import get_pg_session_factory
 from models.tables import TalentPoolProfile as TalentPoolTable, AuditLog
-from models.talent_pool import TalentPoolProfile, TalentPoolViewAudit, VisibilityTier
+from schemas.talent_pool_schema import TalentPoolProfile, TalentPoolViewAudit, VisibilityTier
 
 logger = structlog.get_logger(__name__)
 
@@ -25,6 +25,32 @@ class TalentPoolService:
     @property
     def session_factory(self):
         return self._session_factory or get_pg_session_factory()
+
+    async def get_profile(
+        self,
+        candidate_id: str,
+        candidate_name: str = "Candidate",
+        candidate_email: str = "candidate@example.com",
+    ) -> TalentPoolProfile:
+        async with self.session_factory() as session:
+            stmt = select(TalentPoolTable).where(TalentPoolTable.candidate_id == str(candidate_id))
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            if not row:
+                return TalentPoolProfile(
+                    candidate_id=str(candidate_id),
+                    candidate_name=candidate_name,
+                    candidate_email=candidate_email,
+                    opted_in=False,
+                    visibility_tier=VisibilityTier.HIDDEN,
+                )
+            p_data = dict(row.profile_data or {})
+            return TalentPoolProfile(
+                candidate_id=row.candidate_id,
+                opted_in=row.opted_in,
+                visibility_tier=row.visibility_tier,
+                years_experience=row.years_experience or 0.0,
+                **p_data
+            )
 
     async def create_or_update_profile(
         self,

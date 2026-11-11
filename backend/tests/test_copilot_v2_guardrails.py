@@ -6,7 +6,7 @@ Covers:
 - PII Redaction (Emails, Phone Numbers)
 - XML Data-not-instructions encapsulation
 - Output Grounding Verification (Unverified percentage claims get disclaimer)
-- Cost & Token Telemetry in copilot_sessions
+- Cost & Token Tracking in copilot_sessions
 - Rate Limiting logic
 """
 
@@ -75,7 +75,7 @@ def test_output_grounding_unverified_hallucinated_score():
     assert "97%" in verified
 
 
-def test_calculate_cost_telemetry():
+def test_calculate_cost():
     # 1,000 prompt tokens + 1,000 completion tokens = 2,000 tokens
     # At $0.50 / 1M tokens, 2000 tokens = $0.001
     cost = calculate_cost_usd(1000, 1000)
@@ -87,14 +87,14 @@ from tests.conftest import MockAsyncSession
 
 
 @pytest.mark.asyncio
-async def test_session_cost_telemetry_persistence():
+async def test_session_cost_persistence():
     """Verify copilot_sessions accumulates total_tokens and total_cost_usd across turns."""
     session = MockAsyncSession(items=[])
     repo = CopilotRepository(session_factory=lambda: session)
     tenant_id = "test_guardrails_tenant"
     user_id = "user_guard_1"
 
-    session_obj = await repo.create_session(tenant_id, user_id, title="Telemetry Test")
+    session_obj = await repo.create_session(tenant_id, user_id, title="Cost Test")
     assert session_obj.total_tokens == 0
     assert session_obj.total_cost_usd == 0.0
 

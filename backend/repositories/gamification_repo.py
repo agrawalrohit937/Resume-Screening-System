@@ -16,7 +16,9 @@ def _gamification_to_dict(row: UserGamification) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in UserGamification.__table__.columns}
-    d["_id"] = d.get("id")
+    gam_id = str(d.get("id"))
+    d["id"] = gam_id
+    d["_id"] = gam_id
     return d
 
 

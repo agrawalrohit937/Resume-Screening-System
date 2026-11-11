@@ -4,9 +4,9 @@ CareerShala ATS v2.0.0.
 
 import pytest
 
-from models.requisition import RequisitionStatus, ApprovalDecision, ApprovalStep
+from schemas.requisition_schema import RequisitionStatus, ApprovalDecision, ApprovalStep
 from services.requisition_service import RequisitionService
-from models.interview_kit import Competency, RecommendationEnum
+from schemas.interview_schema import Competency, RecommendationEnum
 from services.interview_kit_service import InterviewKitService
 from services.talent_crm_service import TalentCRMService
 from services.multi_tenancy.tenant_context import tenant_context

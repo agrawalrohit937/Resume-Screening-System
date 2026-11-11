@@ -18,7 +18,7 @@ from sqlalchemy import select, update, delete
 
 from config.db import get_pg_session_factory
 from models.tables import Job, CandidateApplication, CopilotMemory
-from models.resume_model import ResumeStatus
+from schemas.resume_schema import ResumeStatus
 
 logger = structlog.get_logger(__name__)
 

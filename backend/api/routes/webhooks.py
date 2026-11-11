@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
 from api.deps import get_current_user
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from services.integrations.webhooks import WebhookService, WebhookSubscription, WebhookDeliveryResult
 
 router = APIRouter()

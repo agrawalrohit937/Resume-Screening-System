@@ -1,17 +1,12 @@
 """
-Cron Run & Job Alert Delivery Models — Structured Audit & State Tracking.
-========================================================================
-Persists:
-1. `cron_job_runs`: Batch-level execution records keyed by deterministic slot_id.
-2. `job_alert_deliveries`: Per-candidate, per-slot atomic claim & delivery states.
+Cron Run & Job Alert Delivery Schemas.
 """
 
 from __future__ import annotations
-
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CronRunStatus(str, Enum):
@@ -48,9 +43,11 @@ class CronJobRunModel(BaseModel):
     emails_uncertain: int = 0
     emails_failed_permanent: int = 0
     retries_count: int = 0
-    triggered_by: str = Field(default="scheduler", description="'scheduler' | 'recovery_on_startup' | 'manual_admin_api'")
+    triggered_by: str = Field(default="scheduler")
     sample_deliveries: List[Dict[str, Any]] = Field(default_factory=list)
     error_summary: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class JobAlertDeliveryModel(BaseModel):
@@ -67,7 +64,9 @@ class JobAlertDeliveryModel(BaseModel):
     delivered_at: Optional[datetime] = None
     error: Optional[str] = None
 
+    model_config = ConfigDict(populate_by_name=True)
+
 
 async def ensure_cron_indexes(db: Any = None) -> None:
-    """Indexes are managed natively in PostgreSQL via Alembic."""
     pass
+

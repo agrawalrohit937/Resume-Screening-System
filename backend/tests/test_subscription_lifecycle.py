@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from api.routes.payment import activate_user_subscription
 from api.deps import _check_and_apply_lazy_expiration, require_plan
 from scheduler.subscription_expiry import expire_overdue_subscriptions
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 
 
 @pytest.fixture

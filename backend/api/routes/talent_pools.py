@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.deps import get_current_user
-from models.user_model import UserModel
-from models.talent_pool import TalentPoolProfile, TalentPoolViewAudit, VisibilityTier
+from schemas.user_schema import UserModel
+from schemas.talent_pool_schema import TalentPoolProfile, TalentPoolViewAudit, VisibilityTier
 from services.talent_pool_service import TalentPoolService
 
 router = APIRouter()
@@ -30,31 +30,15 @@ class ConsentPayload(BaseModel):
 @router.get("/profile", response_model=TalentPoolProfile)
 async def get_talent_profile_route(
     current_user: UserModel = Depends(get_current_user),
+    service: TalentPoolService = Depends(),
 ):
     """Retrieves current candidate's talent pool consent profile."""
     candidate_id = current_user.id or "current_user"
-    from config.db import get_pg_session_factory
-    from sqlalchemy import select
-    from models.tables import TalentPoolProfile as TalentPoolTable
-    async with get_pg_session_factory()() as session:
-        stmt = select(TalentPoolTable).where(TalentPoolTable.candidate_id == candidate_id)
-        row = (await session.execute(stmt)).scalar_one_or_none()
-        if not row:
-            return TalentPoolProfile(
-                candidate_id=candidate_id,
-                candidate_name=current_user.full_name or "Candidate",
-                candidate_email=current_user.email or "candidate@example.com",
-                opted_in=False,
-                visibility_tier=VisibilityTier.HIDDEN,
-            )
-        p_data = dict(row.profile_data or {})
-        return TalentPoolProfile(
-            candidate_id=row.candidate_id,
-            opted_in=row.opted_in,
-            visibility_tier=row.visibility_tier,
-            years_experience=row.years_experience or 0.0,
-            **p_data
-        )
+    return await service.get_profile(
+        candidate_id=candidate_id,
+        candidate_name=current_user.full_name or "Candidate",
+        candidate_email=current_user.email or "candidate@example.com",
+    )
 
 
 @router.post("/profile", response_model=TalentPoolProfile)

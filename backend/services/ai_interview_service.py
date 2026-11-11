@@ -10,7 +10,7 @@ import structlog
 
 from core.config import settings
 from core.llm_client import groq_key_pool
-from models.resume_model import ResumeModel
+from schemas.resume_schema import ResumeModel
 from utils.json_utils import parse_llm_json
 
 logger = structlog.get_logger(__name__)

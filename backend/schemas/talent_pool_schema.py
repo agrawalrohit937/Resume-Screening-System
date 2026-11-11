@@ -1,12 +1,13 @@
-"""Consented Talent Pool Models (Privacy-Preserving Search).
+"""
+Consented Talent Pool Schemas (Privacy-Preserving Search).
 CareerShala ATS v2.0.0 - Enterprise ATS Marketplace.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
 import uuid
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class VisibilityTier(str, Enum):
@@ -19,7 +20,7 @@ class TalentPoolProfile(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     candidate_id: str
     tenant_id: str = "default"
-    opted_in: bool = False  # Strict default OFF
+    opted_in: bool = False
     visibility_tier: VisibilityTier = VisibilityTier.HIDDEN
     headline: str = ""
     summary: str = ""
@@ -28,11 +29,13 @@ class TalentPoolProfile(BaseModel):
     current_company: Optional[str] = None
     candidate_name: str = ""
     candidate_email: str = ""
-    excluded_employers: List[str] = Field(default_factory=list)  # Employer domains / names blocked from seeing candidate
+    excluded_employers: List[str] = Field(default_factory=list)
     consent_granted_at: Optional[datetime] = None
     consent_revoked_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TalentPoolViewAudit(BaseModel):
@@ -41,5 +44,6 @@ class TalentPoolViewAudit(BaseModel):
     recruiter_id: str
     recruiter_company: str
     recruiter_tenant_id: str
-    viewed_at: datetime = Field(default_factory=datetime.utcnow)
+    viewed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     visibility_tier_at_view: VisibilityTier
+

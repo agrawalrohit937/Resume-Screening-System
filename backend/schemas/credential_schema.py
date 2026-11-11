@@ -1,12 +1,10 @@
 """
-Credential and Professional Licensure Data Model.
-Supports professional credentials (RN, CA, Bar, CTET, AWS, PMP, Welding 6G)
-with jurisdiction, validity periods, and dynamic scoring-time expiry checks.
+Credential and Professional Licensure Data Schemas.
 """
 
 from datetime import date
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Credential(BaseModel):
@@ -25,23 +23,20 @@ class Credential(BaseModel):
         description="unverified | self_attested | document_provided | registry_verified"
     )
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     def is_expired(self, reference_date: Optional[date] = None) -> bool:
-        """
-        Dynamically evaluated at scoring time (never cached at write time).
-        Returns True if credential has expired relative to reference_date (defaults to today).
-        """
         if self.expires_on is None:
             return False
         ref = reference_date or date.today()
         return self.expires_on < ref
 
     def is_valid_for_jurisdiction(self, required_jurisdiction: Optional[str]) -> bool:
-        """Checks if credential jurisdiction matches or covers the required jurisdiction."""
         if not required_jurisdiction or not self.jurisdiction:
             return True
         req_clean = required_jurisdiction.strip().upper()
         cand_clean = self.jurisdiction.strip().upper()
-        # Direct match or country-level coverage (e.g. 'IN' covers 'IN-MH')
         if req_clean == cand_clean or cand_clean.startswith(req_clean) or req_clean.startswith(cand_clean):
             return True
         return False
+

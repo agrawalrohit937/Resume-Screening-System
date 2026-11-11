@@ -12,8 +12,8 @@ from sqlalchemy import select, update, and_
 
 from config.db import get_pg_session_factory
 from models.tables import User
-from models.enterprise_auth import SCIMUserPayload, SCIMUserResponse
-from models.user_model import UserRole, UserStatus
+from schemas.enterprise_auth_schema import SCIMUserPayload, SCIMUserResponse
+from schemas.user_schema import UserRole, UserStatus
 
 logger = structlog.get_logger(__name__)
 
@@ -25,7 +25,7 @@ class SCIMService:
     @staticmethod
     def _to_scim_response(doc: Dict[str, Any]) -> SCIMUserResponse:
         u_id = str(doc.get("id") or doc.get("_id", ""))
-        from models.enterprise_auth import SCIMName
+        from schemas.enterprise_auth_schema import SCIMName
         fn = doc.get("full_name") or ""
         parts = fn.split()
         gn = parts[0] if parts else ""

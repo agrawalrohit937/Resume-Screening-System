@@ -6,9 +6,8 @@ from sqlalchemy import select
 
 from api.deps import get_current_user, get_db
 from models.tables import CandidateApplication, User, Resume, AuditLog
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from services.fairness.impact_monitor import compute_adverse_impact_report
-from utils.pagination import stream_cursor
 
 router = APIRouter(prefix="/api/v1/compliance", tags=["Regulatory Compliance & Fairness"])
 

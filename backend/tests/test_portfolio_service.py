@@ -1,8 +1,8 @@
 from services.portfolio_service import (
     sanitize_portfolio_skills,
 )
-from models.portfolio_model import PortfolioProfileModel, PortfolioProject, MetricModel
-from models.user_model import UserModel
+from schemas.portfolio_schema import PortfolioProfileModel, PortfolioProject, MetricModel
+from schemas.user_schema import UserModel
 
 def test_sanitize_portfolio_skills_no_other():
     """Verify that 'other', 'others', etc. are completely eradicated and mapped to domains."""

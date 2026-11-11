@@ -3,7 +3,7 @@ CareerShala ATS v2.0.0.
 """
 
 import pytest
-from models.talent_pool import VisibilityTier
+from schemas.talent_pool_schema import VisibilityTier
 from services.talent_pool_service import TalentPoolService
 
 

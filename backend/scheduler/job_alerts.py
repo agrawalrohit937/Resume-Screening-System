@@ -32,13 +32,12 @@ try:
 except Exception:
     IST = timezone(timedelta(hours=5, minutes=30))
 
-from models.cron_run_model import CronRunStatus, DeliveryStatus, ensure_cron_indexes
-from models.user_model import UserRole
+from schemas.cron_schema import CronRunStatus, DeliveryStatus, ensure_cron_indexes
+from schemas.user_schema import UserRole
 from services.email_service import send_job_alert_email
 from services.job_matcher import find_jobs_for_candidate
 from services.job_scraper import scrape_external_jobs
 from services.locking import distributed_lock
-from utils.pagination import stream_cursor
 
 logger = structlog.get_logger(__name__)
 

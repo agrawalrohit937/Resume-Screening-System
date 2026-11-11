@@ -12,17 +12,18 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from pydantic import BaseModel, Field
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.deps import get_current_user, get_resume_repo, get_db
+from api.deps import get_current_user, get_resume_repo, get_db, get_interview_service
 
-from models.resume_model import ResumeStatus
-from models.user_model import UserModel
+from schemas.resume_schema import ResumeStatus
+from schemas.user_schema import UserModel
 from repositories.resume_repo import ResumeRepository
 from services.ai_interview_service import AIInterviewService
 from services.cheating_service import CheatingDetectionService
 from services.gamification_service import GamificationService
 
 logger = structlog.get_logger(__name__)
-router = APIRouter(prefix="/ai", tags=["AI Interview"])
+router = APIRouter(tags=["AI Interview"])
+ai_router = APIRouter(prefix="/ai", tags=["AI Interview"])
 
 # ─── Singletons ───────────────────────────────────────────────────────────────
 _ai_interview_svc = AIInterviewService()
@@ -34,6 +35,12 @@ def get_gamification_service() -> GamificationService:
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
+class QuickPracticeRequest(BaseModel):
+    topic: str
+    difficulty: str = "medium"
+    num_questions: int = 5
+
+
 class AIInterviewRequest(BaseModel):
     resume_id: str
     job_title: str = "Software Engineer"
@@ -63,8 +70,40 @@ class InterviewCompleteRequest(BaseModel):
     questions_answered: int
 
 
+# ─── POST /interview/quick-practice ──────────────────────────────────────────
+@router.post("/quick-practice")
+@ai_router.post("/quick-practice")
+async def generate_quick_practice(
+    payload: QuickPracticeRequest,
+    current_user: UserModel = Depends(get_current_user),
+    interview_service: AIInterviewService = Depends(get_interview_service),
+):
+    """
+    Generate instant AI-powered Multiple Choice Questions (MCQs)
+    for quick concept practice. No resume required.
+    """
+    if not payload.topic or not payload.topic.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Topic cannot be empty."
+        )
+        
+    try:
+        result = await interview_service.generate_quick_practice_mcqs(
+            topic=payload.topic,
+            difficulty=payload.difficulty,
+            num_questions=payload.num_questions
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to generate practice questions: {str(e)}"
+        )
+
+
 # ─── POST /interview/ai/generate ──────────────────────────────────────────────
-@router.post("/generate")
+@ai_router.post("/generate")
 async def generate_ai_interview(
     payload: AIInterviewRequest,
     current_user: UserModel = Depends(get_current_user),
@@ -98,7 +137,7 @@ async def generate_ai_interview(
 
 
 # ─── POST /interview/feedback ──────────────────────────────────────────────────
-@router.post("/feedback")
+@ai_router.post("/feedback")
 async def evaluate_answer(
     payload: AnswerFeedbackRequest,
     current_user: UserModel = Depends(get_current_user),
@@ -130,7 +169,7 @@ async def evaluate_answer(
 
 
 # ─── POST /interview/cheating/report ─────────────────────────────────────────
-@router.post("/cheating/report")
+@ai_router.post("/cheating/report")
 async def submit_cheating_report(
     payload: CheatingReportRequest,
     current_user: UserModel = Depends(get_current_user),
@@ -170,7 +209,7 @@ async def submit_cheating_report(
 
 
 # ─── POST /interview/complete ─────────────────────────────────────────────────
-@router.post("/complete")
+@ai_router.post("/complete")
 async def complete_interview_session(
     payload: InterviewCompleteRequest,
     current_user: UserModel = Depends(get_current_user),
@@ -191,7 +230,7 @@ async def complete_interview_session(
 
 
 # ─── GET /interview/gamification/profile ─────────────────────────────────────
-@router.get("/gamification/profile")
+@ai_router.get("/gamification/profile")
 async def get_gamification_profile(
     current_user: UserModel = Depends(get_current_user),
     gamification: GamificationService = Depends(get_gamification_service),
@@ -200,7 +239,7 @@ async def get_gamification_profile(
     return await gamification.get_profile(str(current_user.id))
 
 
-@router.post("/gamification/daily-visit")
+@ai_router.post("/gamification/daily-visit")
 async def claim_daily_visit_reward(
     current_user: UserModel = Depends(get_current_user),
     gamification: GamificationService = Depends(get_gamification_service),
@@ -210,7 +249,7 @@ async def claim_daily_visit_reward(
 
 
 # ─── GET /interview/gamification/leaderboard ─────────────────────────────────
-@router.get("/gamification/leaderboard")
+@ai_router.get("/gamification/leaderboard")
 async def get_leaderboard(
     limit: int = 20,
     current_user: UserModel = Depends(get_current_user),
@@ -229,7 +268,7 @@ async def get_leaderboard(
 
 
 # ─── GET /interview/badges/catalog ───────────────────────────────────────────
-@router.get("/badges/catalog")
+@ai_router.get("/badges/catalog")
 async def get_badge_catalog(current_user: UserModel = Depends(get_current_user)):
     """List all available badges with requirements."""
     from services.gamification_service import BADGES
@@ -261,7 +300,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@router.websocket("/ws/{session_id}")
+@ai_router.websocket("/ws/{session_id}")
 async def interview_websocket(session_id: str, ws: WebSocket):
     """
     WebSocket for real-time interview session:
@@ -322,3 +361,7 @@ async def interview_websocket(session_id: str, ws: WebSocket):
     except Exception as e:
         logger.error("WebSocket error", session_id=session_id, error=str(e))
         manager.disconnect(session_id)
+
+
+# Mount AI sub-router under main interview router
+router.include_router(ai_router)

@@ -1,16 +1,12 @@
 """
-Task Job Model — Schema for Asynchronous Background Job Execution & Polling.
-=============================================================================
-Tracks asynchronous jobs (resume processing, batch scoring, memory compaction)
-with multi-tenant isolation, live progress tracking, and retry lifecycle state.
+Task Job Schemas for Asynchronous Background Job Execution & Polling.
 """
 
 from __future__ import annotations
-
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class JobStatus(str, Enum):
@@ -44,5 +40,5 @@ class TaskJobModel(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
+

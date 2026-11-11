@@ -16,7 +16,7 @@ from sqlalchemy import select, func, and_
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import AuditLog, gen_uuid_str
-from models.audit_log_model import AuditLogModel
+from schemas.audit_schema import AuditLogModel
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)

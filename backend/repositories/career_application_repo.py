@@ -10,7 +10,7 @@ from sqlalchemy import select, update, func, or_
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import CareerApplication, gen_uuid_str
-from models.career_application_model import (
+from schemas.application_schema import (
     CareerApplicationModel,
 )
 from repositories.base_repo import BaseRepository
@@ -20,7 +20,9 @@ logger = structlog.get_logger(__name__)
 
 def _capp_to_pydantic(row: CareerApplication) -> CareerApplicationModel:
     d = {c.name: getattr(row, c.name) for c in CareerApplication.__table__.columns}
-    d["_id"] = d.pop("id")
+    capp_id = str(d.get("id"))
+    d["id"] = capp_id
+    d["_id"] = capp_id
     return CareerApplicationModel(**d)
 
 

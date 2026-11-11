@@ -1,15 +1,12 @@
 """
-Enterprise Authentication & SCIM Provisioning Models.
-
-Phase 5, Task 5.2:
+Enterprise Authentication & SCIM Provisioning Schemas.
 SAML 2.0, OIDC SSO configurations, and SCIM 2.0 provisioning schemas.
 """
 
 from __future__ import annotations
-
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class SAMLConfiguration(BaseModel):
@@ -58,7 +55,6 @@ class SCIMUserPayload(BaseModel):
     emails: List[SCIMEmail] = []
     active: bool = True
     roles: List[str] = ["recruiter"]
-    tenant_id: str = "default"
 
 
 class SCIMUserResponse(BaseModel):
@@ -66,7 +62,9 @@ class SCIMUserResponse(BaseModel):
     id: str
     userName: str
     name: Optional[SCIMName] = None
+    displayName: Optional[str] = None
     emails: List[SCIMEmail] = []
     active: bool = True
     roles: List[str] = []
     meta: Dict[str, Any] = Field(default_factory=dict)
+

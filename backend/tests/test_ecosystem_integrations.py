@@ -8,7 +8,7 @@ from xml.etree import ElementTree as ET
 from services.integrations.webhooks import WebhookService, compute_webhook_signature
 from services.integrations.adapters import GreenhouseAdapter, LeverAdapter, WorkdayAdapter
 from services.integrations.syndication import generate_indeed_xml_feed, generate_google_job_posting_ld_json
-from models.job import JobModel, WorkMode
+from schemas.job_schema import JobModel, WorkMode
 from services.multi_tenancy.tenant_context import tenant_context
 
 

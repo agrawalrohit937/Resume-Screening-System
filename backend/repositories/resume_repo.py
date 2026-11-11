@@ -6,19 +6,22 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 import structlog
 from sqlalchemy import select, update, delete, func
+from sqlalchemy.orm import selectinload, joinedload
 
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import Resume, gen_uuid_str
-from models.resume_model import ResumeModel, ResumeStatus
+from schemas.resume_schema import ResumeModel, ResumeStatus
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)
 
 
 def _resume_to_pydantic(row: Resume) -> ResumeModel:
-    d = {c.name: getattr(row, c.name) for c in Resume.__table__.columns}
-    d["_id"] = d.pop("id")
+    d = {c.name: getattr(row, c.name) for c in Resume.__table__.columns if getattr(row, c.name) is not None}
+    res_id = str(getattr(row, "id", None) or d.get("id"))
+    d["id"] = res_id
+    d["_id"] = res_id
     return ResumeModel(**d)
 
 
@@ -75,24 +78,42 @@ class ResumeRepository(BaseRepository):
                 return _resume_to_pydantic(row)
             return None
 
-    async def get_by_id(self, resume_id: str) -> Optional[ResumeModel]:
+    async def get_by_id(
+        self,
+        resume_id: str,
+        *,
+        include_ats_results: bool = False,
+        include_user: bool = False,
+    ) -> Optional[ResumeModel]:
         if not resume_id:
             return None
 
         async with self.session_factory() as session:
             stmt = select(Resume).where(Resume.id == str(resume_id))
+            if include_ats_results:
+                stmt = stmt.options(selectinload(Resume.ats_results))
+            if include_user:
+                stmt = stmt.options(joinedload(Resume.user))
             res = await session.execute(stmt)
             row = res.scalar_one_or_none()
             if row:
                 return _resume_to_pydantic(row)
             return None
 
-    async def get_by_id_and_user(self, resume_id: str, user_id: str) -> Optional[ResumeModel]:
+    async def get_by_id_and_user(
+        self,
+        resume_id: str,
+        user_id: str,
+        *,
+        include_ats_results: bool = False,
+    ) -> Optional[ResumeModel]:
         if not resume_id or not user_id:
             return None
 
         async with self.session_factory() as session:
             stmt = select(Resume).where(Resume.id == str(resume_id), Resume.user_id == str(user_id))
+            if include_ats_results:
+                stmt = stmt.options(selectinload(Resume.ats_results))
             res = await session.execute(stmt)
             row = res.scalar_one_or_none()
             if row:
@@ -202,10 +223,6 @@ class ResumeRepository(BaseRepository):
         now = datetime.now(timezone.utc)
         clean_update = dict(update_data)
         clean_update["updated_at"] = now
-
-        if "$set" in clean_update:
-            clean_update = dict(clean_update["$set"])
-            clean_update["updated_at"] = now
 
         valid_cols = {c.name for c in Resume.__table__.columns}
         filtered = {k: v for k, v in clean_update.items() if k in valid_cols}

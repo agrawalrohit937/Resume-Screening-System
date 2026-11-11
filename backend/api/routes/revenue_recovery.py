@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 import structlog
 
 from api.deps import get_admin_user, get_current_user, get_db
-from models.user_model import UserModel
-from models.revenue_recovery_model import (
+from schemas.user_schema import UserModel
+from schemas.revenue_recovery_schema import (
     RecoveryStatus,
     ActorType,
 )

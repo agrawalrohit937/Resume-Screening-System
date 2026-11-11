@@ -17,21 +17,21 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPExcep
 
 from services.tasks import task_manager, execute_resume_parse
 from services.tasks.workers import execute_resume_upload_pipeline
-from models.task_job_model import JobType
+from schemas.task_job_schema import JobType
 
 from api.deps import (
     get_current_user, get_resume_repo, get_parser_service, get_user_repo,
     PaginationParams
 )
 from core.config import settings
-from models.resume_model import ResumeModel, ResumeStatus
-from models.user_model import UserModel
+from schemas.resume_schema import (
+    ResumeModel, ResumeStatus,
+    ResumeUploadResponse, ResumeDetailResponse,
+    ResumeListResponse, ResumeUpdateRequest,
+)
+from schemas.user_schema import UserModel
 from repositories.resume_repo import ResumeRepository
 from repositories.user_repo import UserRepository
-from schemas.resume_schema import (
-    ResumeUploadResponse, ResumeDetailResponse,
-    ResumeListResponse, ResumeUpdateRequest
-)
 from services.parser_service import ParserService
 from services.cloudinary_service import upload_resume, delete_file as cloudinary_delete, generate_signed_resume_url, extract_public_id_from_url
 from utils.file_utils import validate_and_save_file, delete_file, sanitize_filename

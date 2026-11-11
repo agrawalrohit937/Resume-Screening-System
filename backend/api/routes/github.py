@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.deps import get_current_user, get_github_service
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from services.github_service import GitHubService
 from utils.validators import is_valid_github_username
 

@@ -1,5 +1,3 @@
-from repositories.job_repo import JobRepository
-from models.job import JobModel
 """Enterprise ATS Ecosystem Integrations & Syndication API Routes.
 CareerShala ATS v2.0.0 - Enterprise ATS Ecosystem.
 """
@@ -8,7 +6,8 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from models.job import JobModel
+from repositories.job_repo import JobRepository
+from schemas.job_schema import JobModel
 from services.integrations.adapters import GreenhouseAdapter, LeverAdapter, WorkdayAdapter
 from services.integrations.syndication import generate_indeed_xml_feed, generate_google_job_posting_ld_json
 

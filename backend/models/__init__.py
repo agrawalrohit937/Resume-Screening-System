@@ -39,6 +39,7 @@ from models.tables import (
     WebhookSubscription,
     DistributedLockModel,
     InterviewSessionModel,
+    UserNotificationState,
     gen_uuid_str,
     now_utc,
 )
@@ -79,6 +80,7 @@ __all__ = [
     "WebhookSubscription",
     "DistributedLockModel",
     "InterviewSessionModel",
+    "UserNotificationState",
     "gen_uuid_str",
     "now_utc",
 ]

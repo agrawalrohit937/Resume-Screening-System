@@ -15,7 +15,9 @@ def _invite_to_dict(row: TeamInvite) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in TeamInvite.__table__.columns}
-    d["_id"] = d.get("id")
+    inv_id = str(d.get("id"))
+    d["id"] = inv_id
+    d["_id"] = inv_id
     return d
 
 
@@ -57,6 +59,32 @@ class TeamInviteRepository:
             await session.commit()
             await session.refresh(invite)
             return _invite_to_dict(invite)
+
+    async def upsert_pending_invite(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        email = str(data.get("email", "")).strip().lower()
+        tenant_id = str(data.get("tenant_id", "default"))
+        async with self.session_factory() as session:
+            stmt = select(TeamInvite).where(
+                TeamInvite.email.ilike(email),
+                TeamInvite.tenant_id == tenant_id,
+                TeamInvite.status == "pending",
+            )
+            existing = (await session.execute(stmt)).scalar_one_or_none()
+            if existing:
+                for k, v in data.items():
+                    if hasattr(existing, k) and k not in ("id", "created_at"):
+                        setattr(existing, k, v)
+                await session.commit()
+                await session.refresh(existing)
+                return _invite_to_dict(existing)
+            else:
+                now = datetime.now(timezone.utc)
+                clean_data = {k: v for k, v in data.items() if hasattr(TeamInvite, k) and k != "id"}
+                invite = TeamInvite(id=gen_uuid_str(), created_at=now, **clean_data)
+                session.add(invite)
+                await session.commit()
+                await session.refresh(invite)
+                return _invite_to_dict(invite)
 
     async def update_status(self, token: str, status: str) -> Optional[Dict[str, Any]]:
         async with self.session_factory() as session:

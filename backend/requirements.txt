@@ -46,12 +46,9 @@ httpx==0.27.0
 fastapi-cache2==0.2.2
 slowapi>=0.1.9
 
-# ─── Environment, Logging & Observability ─────────────────────
+# ─── Environment & Logging ─────────────────────────────────────
 python-dotenv==1.0.1
 structlog==24.1.0
-prometheus-client>=0.20.0
-opentelemetry-api>=1.24.0
-opentelemetry-sdk>=1.24.0
 tzdata>=2024.1
 
 

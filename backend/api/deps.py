@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from core.config import settings
 from core.security import decode_token, verify_token_type
-from models.user_model import UserModel, UserRole
+from schemas.user_schema import UserModel, UserRole
 from repositories.user_repo import UserRepository
 from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
@@ -25,6 +25,8 @@ from repositories.gamification_repo import GamificationRepository
 from repositories.interview_kit_repo import InterviewKitRepository
 from repositories.team_invite_repo import TeamInviteRepository
 from repositories.audit_log_repo import AuditLogRepository
+from repositories.certificate_repo import CertificateRepository
+from repositories.analytics_repo import AnalyticsRepository
 from services.parser_service import ParserService
 from services.ai_interview_service import AIInterviewService
 from services.github_service import GitHubService
@@ -106,6 +108,14 @@ def get_team_invite_repo() -> TeamInviteRepository:
 
 def get_audit_repo() -> AuditLogRepository:
     return AuditLogRepository()
+
+
+def get_certificate_repo() -> CertificateRepository:
+    return CertificateRepository()
+
+
+def get_analytics_repo() -> AnalyticsRepository:
+    return AnalyticsRepository()
 
 
 # ─── Services ─────────────────────────────────────────────────────────────────
@@ -241,15 +251,11 @@ async def get_current_user(
     # inherit the company's active subscription if the company executive upgraded the tenant!
     if user.tenant_id and user.tenant_id != "default" and not user.subscription_active:
         try:
-            from config.db import get_pg_session_factory
-            from sqlalchemy import select
-            from models.tables import Company
-            async with get_pg_session_factory()() as session:
-                company_row = (await session.execute(select(Company).where(Company.tenant_id == user.tenant_id))).scalar_one_or_none()
-                if company_row:
-                    user.plan = "recruiter_pro"
-                    user.subscription_active = True
-                    user.subscription_status = "active"
+            company_doc = await get_company_repo().get_by_tenant_id(user.tenant_id)
+            if company_doc and company_doc.get("subscription_active"):
+                user.plan = company_doc.get("plan", "recruiter_pro")
+                user.subscription_active = True
+                user.subscription_status = "active"
         except Exception:
             pass
 

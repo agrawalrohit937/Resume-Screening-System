@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 from api.deps import get_current_user, get_user_repo
 from core.config import settings
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from repositories.user_repo import UserRepository
 
 logger = structlog.get_logger(__name__)

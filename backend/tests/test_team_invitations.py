@@ -16,7 +16,7 @@ from core.security import (
     decode_token,
     verify_token_type,
 )
-from models.user_model import UserModel, UserRole, UserStatus
+from schemas.user_schema import UserModel, UserRole, UserStatus
 from schemas.team_schema import AcceptInviteRequest
 
 

@@ -20,7 +20,6 @@ os.environ["RAZORPAY_KEY_SECRET"] = os.getenv("RAZORPAY_KEY_SECRET", "mocksecret
 os.environ["GOOGLE_CLIENT_ID"] = os.getenv("GOOGLE_CLIENT_ID", "mock-google-client-id.apps.googleusercontent.com")
 
 import config.db
-from unittest.mock import MagicMock, AsyncMock
 
 async def _noop_connect(*args, **kwargs):
     pass
@@ -467,7 +466,7 @@ async def _override_get_db():
 app.dependency_overrides[get_db] = _override_get_db
 
 from api.deps import get_user_repo
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 
 class MockUserRepo:
     async def create(self, user_data: dict):

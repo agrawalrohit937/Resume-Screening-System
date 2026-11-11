@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any
 from xml.etree import ElementTree as ET
 
-from models.job import JobModel, WorkMode
+from schemas.job_schema import JobModel, WorkMode
 
 
 def generate_indeed_xml_feed(

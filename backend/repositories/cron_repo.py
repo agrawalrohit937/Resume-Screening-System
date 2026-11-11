@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from config.db import get_pg_session_factory
 from models import CronJobRun, JobAlertDelivery, User, Resume, Job, Company, gen_uuid_str
-from models.cron_run_model import CronRunStatus, DeliveryStatus
+from schemas.cron_schema import CronRunStatus, DeliveryStatus
 
 logger = structlog.get_logger(__name__)
 
@@ -22,7 +22,9 @@ def _cron_run_to_dict(model: CronJobRun) -> Optional[Dict[str, Any]]:
     if not model:
         return None
     d = {c.name: getattr(model, c.name) for c in CronJobRun.__table__.columns}
-    d["_id"] = str(d.get("id"))
+    cron_id = str(d.get("id"))
+    d["id"] = cron_id
+    d["_id"] = cron_id
     return d
 
 
@@ -30,7 +32,9 @@ def _delivery_to_dict(model: JobAlertDelivery) -> Optional[Dict[str, Any]]:
     if not model:
         return None
     d = {c.name: getattr(model, c.name) for c in JobAlertDelivery.__table__.columns}
-    d["_id"] = str(d.get("id"))
+    deliv_id = str(d.get("id"))
+    d["id"] = deliv_id
+    d["_id"] = deliv_id
     return d
 
 

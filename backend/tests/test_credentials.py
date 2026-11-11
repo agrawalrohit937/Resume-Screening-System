@@ -5,7 +5,7 @@ Tests dynamic expiry evaluation, jurisdiction validation, and mandatory knockout
 
 from datetime import date, timedelta
 
-from models.credential_model import Credential
+from schemas.credential_schema import Credential
 from services.credential_service import (
     evaluate_credential_eligibility,
     CredentialVerifier,

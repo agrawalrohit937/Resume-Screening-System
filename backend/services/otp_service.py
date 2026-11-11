@@ -12,7 +12,7 @@ import structlog
 
 from core.config import settings
 from core.security import generate_otp, hash_otp, verify_otp_hash
-from models.otp_model import OTPModel, OTPPurpose
+from schemas.otp_schema import OTPModel, OTPPurpose
 from repositories.otp_repo import OTPRepository
 from services.email_service import EmailService
 

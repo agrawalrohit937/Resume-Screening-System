@@ -9,7 +9,7 @@ Verifies Phase 5 B2B Multi-Tenancy invariants:
 """
 
 import pytest
-from models.user_model import UserModel, UserRole
+from schemas.user_schema import UserModel, UserRole
 from core.rbac import (
     Permission,
     get_user_combined_permissions,
@@ -189,7 +189,7 @@ async def test_platform_admin_query_bypass():
 
 def test_employer_role_in_enterprise_roles():
     """Verify EMPLOYER is recognized in UserRole and ENTERPRISE_ROLES."""
-    from models.user_model import ENTERPRISE_ROLES
+    from schemas.user_schema import ENTERPRISE_ROLES
     assert UserRole.EMPLOYER == "employer"
     assert UserRole.EMPLOYER in ENTERPRISE_ROLES
 

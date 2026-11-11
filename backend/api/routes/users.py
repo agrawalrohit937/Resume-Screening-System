@@ -16,9 +16,10 @@ from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile,
 from api.deps import get_current_user, get_user_repo, get_db
 from core.config import settings
 from scheduler.subscription_expiry import expire_overdue_subscriptions
-from models.user_model import UserModel
+from schemas.user_schema import (
+    UserModel, UserPublicResponse, UpdateProfileRequest, SetPrimaryResumeRequest,
+)
 from repositories.user_repo import UserRepository
-from schemas.user_schema import UserPublicResponse, UpdateProfileRequest, SetPrimaryResumeRequest
 from services.cloudinary_service import delete_file, extract_public_id_from_url
 from utils.image_utils import validate_and_save_profile_image, delete_profile_image
 

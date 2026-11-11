@@ -6,7 +6,7 @@ All tests run with mocked LLM calls (pure unit tests, zero external network depe
 from unittest.mock import AsyncMock, patch
 import pytest
 
-from models.resume_model import ParsedResumeData, WorkExperience
+from schemas.resume_schema import ParsedResumeData, WorkExperience
 from services.parser_service import (
     ParserService,
     _grounded,

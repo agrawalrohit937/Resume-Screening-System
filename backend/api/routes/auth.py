@@ -10,24 +10,25 @@ router rather than a monolith covering every auth concern.
 import structlog
 
 from typing import Any, Optional
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from api.deps import get_current_user, get_optional_current_user, get_user_repo
-
-logger = structlog.get_logger(__name__)
+from api.routes import auth_otp, auth_google, auth_linkedin, auth_github
+from api.routes.auth_helpers import user_to_public, set_auth_cookies
 from core.config import settings
 from core.security import decode_token, verify_password_async, hash_password_async
-from models.user_model import UserModel, UserStatus
 from repositories.user_repo import UserRepository
 from schemas.user_schema import (
+    UserModel, UserStatus,
     RefreshTokenRequest, TokenResponse, UserPublicResponse,
     MessageResponse, ChangePasswordRequest, UpdateProfileRequest,
 )
-from api.routes.auth_helpers import user_to_public, set_auth_cookies
-from api.routes import auth_otp, auth_google, auth_linkedin, auth_github
+from services.token_service import TokenService
 
+logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 # Mount the split-out modules under the same /auth prefix so the public API
@@ -37,8 +38,6 @@ router.include_router(auth_google.router)
 router.include_router(auth_linkedin.router)
 router.include_router(auth_github.router)
 
-
-from services.token_service import TokenService
 
 # ─── POST /auth/refresh ───────────────────────────────────────────────────────
 @router.post("/refresh", response_model=TokenResponse)
