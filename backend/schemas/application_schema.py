@@ -1,11 +1,172 @@
 """Pydantic request and response schemas for the AI Apply Assistant API."""
 
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from core.id import DocumentId
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from utils.validators import DocumentId
 
-from models.apply_assistant_model import ApplicationStatus
+
+# ─── Application Stages & Statuses ─────────────────────────────────────────────
+
+class ApplicationStage(str, Enum):
+    APPLIED = "Applied"
+    UNDER_REVIEW = "Under Review"
+    SHORTLISTED = "Shortlisted"
+    INTERVIEW = "Interview"
+    HIRED = "Hired"
+    REJECTED = "Rejected"
+
+
+class ApplicationStatus(str, Enum):
+    DRAFT = "draft"
+    READY_FOR_REVIEW = "ready_for_review"
+    SENDING = "sending"
+    SENT = "sent"
+    FAILED = "failed"
+
+
+_VALID_TRANSITIONS = {
+    ApplicationStatus.DRAFT: {ApplicationStatus.READY_FOR_REVIEW, ApplicationStatus.FAILED},
+    ApplicationStatus.READY_FOR_REVIEW: {ApplicationStatus.DRAFT, ApplicationStatus.SENDING, ApplicationStatus.FAILED},
+    ApplicationStatus.SENDING: {ApplicationStatus.SENT, ApplicationStatus.FAILED},
+    ApplicationStatus.SENT: set(),
+    ApplicationStatus.FAILED: {ApplicationStatus.DRAFT, ApplicationStatus.SENDING},
+}
+
+
+def is_valid_transition(current: Any, next_status: Any) -> bool:
+    try:
+        curr = ApplicationStatus(current) if isinstance(current, str) else current
+        nxt = ApplicationStatus(next_status) if isinstance(next_status, str) else next_status
+        return nxt in _VALID_TRANSITIONS.get(curr, set())
+    except (ValueError, KeyError):
+        return False
+
+
+
+class CareerApplicationStatus(str, Enum):
+    APPLIED = "applied"
+    SHORTLISTED = "shortlisted"
+    INTERVIEWED = "interviewed"
+    REJECTED = "rejected"
+    HIRED = "hired"
+
+
+class CareerApplicationModel(BaseModel):
+    id: Optional[str] = Field(default=None, alias="_id")
+    applicant_name: str
+    email: str
+    role_title: str
+    portfolio_url: Optional[str] = None
+    resume_url: Optional[str] = None
+    resume_filename: Optional[str] = None
+    resume_public_id: Optional[str] = None
+    cover_letter: str
+    status: str = CareerApplicationStatus.APPLIED.value
+    admin_notes: Optional[str] = None
+    email_sent: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+
+
+
+def new_application_document(
+    *,
+    user_id: str,
+    resume_id: str,
+    company_name: str,
+    job_title: str,
+    hr_email: str,
+    job_description: str,
+) -> dict:
+    return {
+        "user_id": str(user_id),
+        "resume_id": str(resume_id),
+        "company_name": company_name,
+        "job_title": job_title,
+        "hr_email": hr_email,
+        "job_description": job_description,
+        "jd_analysis": None,
+        "ats_result_ref": None,
+        "generated_draft": None,
+        "edited_draft": None,
+        "cover_letter_pdf_path": None,
+        "status": ApplicationStatus.DRAFT.value,
+        "needs_manual_review": False,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }
+
+
+class ApplicationModel(BaseModel):
+    """Domain DTO for candidate job applications."""
+    id: Optional[str] = Field(default=None, alias="_id")
+    job_id: str
+    candidate_id: str
+    resume_id: str
+    tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
+    match_score: Optional[float] = Field(default=None, description="Candidate-facing match score (0-100)")
+    quality_score: Optional[float] = Field(default=None, description="Quality score (0-100)")
+    eligibility: Optional[Dict[str, Any]] = None
+    eligibility_rank: Optional[int] = 0
+    eligibility_override: Optional[Dict[str, Any]] = None
+    recruiter_score: Optional[float] = None
+    knockout_status: Optional[Dict[str, Any]] = None
+    resume_snapshot: Optional[Dict[str, Any]] = None
+    stage: str = Field(default=ApplicationStage.APPLIED.value)
+    scoring_version: Optional[str] = "2.0.0"
+    features: Optional[Dict[str, Any]] = None
+    candidate_name: Optional[str] = None
+    candidate_email: Optional[str] = None
+    hire_outcome: Optional[str] = None
+    hire_outcome_recorded_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+
+
+class ApplicationCreateRequest(BaseModel):
+    job_id: str
+    resume_id: str
+    notes: Optional[str] = None
+
+
+class ApplicationResponse(BaseModel):
+    id: str
+    job_id: str
+    candidate_id: str
+    resume_id: str
+    match_score: Optional[float] = None
+    quality_score: Optional[float] = None
+    eligibility: Optional[Dict[str, Any]] = None
+    eligibility_rank: Optional[int] = 0
+    eligibility_override: Optional[Dict[str, Any]] = None
+    recruiter_score: Optional[float] = None
+    knockout_status: Optional[Dict[str, Any]] = None
+    resume_snapshot: Optional[Dict[str, Any]] = None
+    features: Optional[Dict[str, Any]] = None
+    stage: str
+    scoring_version: Optional[str] = None
+    candidate_name: Optional[str] = None
+    candidate_email: Optional[str] = None
+    hire_outcome: Optional[str] = None
+    hire_outcome_recorded_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    tenant_id: Optional[str] = "default"
+    created_at: datetime
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 def _validate_document_id(v: str) -> str:

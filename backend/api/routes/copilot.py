@@ -25,8 +25,8 @@ from api.deps import (
     get_result_repo,
     get_copilot_repo,
 )
-from models.user_model import UserModel
-from models.copilot_model import (
+from schemas.user_schema import UserModel
+from schemas.copilot_schema import (
     CreateSessionPayload,
     UpdateSessionPayload,
     MessageFeedbackPayload,

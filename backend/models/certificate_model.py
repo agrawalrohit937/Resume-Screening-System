@@ -26,33 +26,30 @@ class CertificateRecord:
     schema_version: int = field(default=SCHEMA_VERSION)
 
     async def persist(self) -> None:
-        from config.db import get_pg_session_factory
-        from models.tables import Certificate
+        from repositories.certificate_repo import CertificateRepository
         t_val = self.topic or (
             self.snapshot.get("assessment_slug")
             or self.snapshot.get("assessment_name")
             or "general"
         ).lower().strip()
 
-        async with get_pg_session_factory()() as session:
-            cert_row = Certificate(
-                id=self.id,
-                certificate_type=self.certificate_type,
-                template_used=self.template_used,
-                user_id=str(self.user_id),
-                recipient_name=self.recipient_name,
-                snapshot=self.snapshot,
-                status=self.status,
-                issued_at=self.issued_at,
-                revoked_at=self.revoked_at,
-                public_url=self.public_url,
-                topic=t_val,
-                superseded_by=self.superseded_by,
-                superseded_at=self.superseded_at,
-                schema_version=self.schema_version,
-            )
-            session.add(cert_row)
-            await session.commit()
+        repo = CertificateRepository()
+        await repo.create({
+            "id": self.id,
+            "certificate_type": self.certificate_type,
+            "template_used": self.template_used,
+            "user_id": str(self.user_id),
+            "recipient_name": self.recipient_name,
+            "snapshot": self.snapshot,
+            "status": self.status,
+            "issued_at": self.issued_at,
+            "revoked_at": self.revoked_at,
+            "public_url": self.public_url,
+            "topic": t_val,
+            "superseded_by": self.superseded_by,
+            "superseded_at": self.superseded_at,
+            "schema_version": self.schema_version,
+        })
 
     @classmethod
     def from_doc(cls, doc: dict) -> "CertificateRecord":
@@ -65,56 +62,50 @@ class CertificateRecord:
 
     @staticmethod
     async def find_by_id(cert_id: str) -> Optional["CertificateRecord"]:
-        from config.db import get_pg_session_factory
-        from models.tables import Certificate
-        from sqlalchemy import select
-        async with get_pg_session_factory()() as session:
-            stmt = select(Certificate).where(Certificate.id == str(cert_id))
-            row = (await session.execute(stmt)).scalar_one_or_none()
-            if not row:
-                return None
-            return CertificateRecord(
-                id=row.id,
-                certificate_type=row.certificate_type,
-                template_used=row.template_used,
-                user_id=row.user_id,
-                recipient_name=row.recipient_name,
-                snapshot=row.snapshot or {},
-                status=row.status,
-                issued_at=row.issued_at,
-                revoked_at=row.revoked_at,
-                public_url=row.public_url or "",
-                topic=row.topic,
-                superseded_by=row.superseded_by,
-                superseded_at=row.superseded_at,
-                schema_version=row.schema_version or 1,
-            )
+        from repositories.certificate_repo import CertificateRepository
+        repo = CertificateRepository()
+        row = await repo.get_by_id(str(cert_id))
+        if not row:
+            return None
+        return CertificateRecord(
+            id=row["id"],
+            certificate_type=row.get("certificate_type") or "",
+            template_used=row.get("template_used") or "",
+            user_id=row.get("user_id") or "",
+            recipient_name=row.get("recipient_name") or "",
+            snapshot=row.get("snapshot") or {},
+            status=row.get("status") or "active",
+            issued_at=row.get("issued_at"),
+            revoked_at=row.get("revoked_at"),
+            public_url=row.get("public_url") or "",
+            topic=row.get("topic"),
+            superseded_by=row.get("superseded_by"),
+            superseded_at=row.get("superseded_at"),
+            schema_version=row.get("schema_version") or 1,
+        )
 
     @staticmethod
     async def find_by_user(user_id: str, page_size: int = 20) -> list["CertificateRecord"]:
-        from config.db import get_pg_session_factory
-        from models.tables import Certificate
-        from sqlalchemy import select, desc
-        async with get_pg_session_factory()() as session:
-            stmt = select(Certificate).where(Certificate.user_id == str(user_id)).order_by(desc(Certificate.issued_at)).limit(page_size)
-            rows = (await session.execute(stmt)).scalars().all()
-            return [
-                CertificateRecord(
-                    id=row.id,
-                    certificate_type=row.certificate_type,
-                    template_used=row.template_used,
-                    user_id=row.user_id,
-                    recipient_name=row.recipient_name,
-                    snapshot=row.snapshot or {},
-                    status=row.status,
-                    issued_at=row.issued_at,
-                    revoked_at=row.revoked_at,
-                    public_url=row.public_url or "",
-                    topic=row.topic,
-                    superseded_by=row.superseded_by,
-                    superseded_at=row.superseded_at,
-                    schema_version=row.schema_version or 1,
-                )
-                for row in rows
-            ]
+        from repositories.certificate_repo import CertificateRepository
+        repo = CertificateRepository()
+        rows = await repo.list_by_user(str(user_id), limit=page_size)
+        return [
+            CertificateRecord(
+                id=row["id"],
+                certificate_type=row.get("certificate_type") or "",
+                template_used=row.get("template_used") or "",
+                user_id=row.get("user_id") or "",
+                recipient_name=row.get("recipient_name") or "",
+                snapshot=row.get("snapshot") or {},
+                status=row.get("status") or "active",
+                issued_at=row.get("issued_at"),
+                revoked_at=row.get("revoked_at"),
+                public_url=row.get("public_url") or "",
+                topic=row.get("topic"),
+                superseded_by=row.get("superseded_by"),
+                superseded_at=row.get("superseded_at"),
+                schema_version=row.get("schema_version") or 1,
+            )
+            for row in rows
+        ]
 

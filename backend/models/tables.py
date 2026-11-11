@@ -13,7 +13,9 @@ from sqlalchemy import (
     DateTime,
     Text,
     Index,
+    ForeignKey,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
 from config.db import Base
@@ -100,6 +102,15 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    # ── User Relationships ──────────────────────────────────────────────────
+    resumes = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
+    candidate_applications = relationship("CandidateApplication", foreign_keys="CandidateApplication.candidate_id", back_populates="candidate", cascade="all, delete-orphan")
+    posted_jobs = relationship("Job", foreign_keys="Job.created_by", back_populates="creator")
+    copilot_sessions = relationship("CopilotSession", back_populates="user", cascade="all, delete-orphan")
+    certificates = relationship("Certificate", back_populates="user", cascade="all, delete-orphan")
+    profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    gamification = relationship("UserGamification", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
 
 # ─── 2. Job Entity ─────────────────────────────────────────────────────────────
 class Job(Base):
@@ -124,7 +135,7 @@ class Job(Base):
     is_external = Column(Boolean, default=False)
     external_apply_url = Column(Text, nullable=True)
     external_job_id = Column(Text, nullable=True)
-    created_by = Column(String(64), nullable=True, index=True)
+    created_by = Column(String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     tenant_id = Column(String(64), default="default", index=True)
     applicant_count = Column(Integer, default=0)
     education_requirement_mode = Column(String(50), default="preferred")
@@ -133,13 +144,18 @@ class Job(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    # ── Job Relationships ────────────────────────────────────────────────────
+    creator = relationship("User", foreign_keys=[created_by], back_populates="posted_jobs")
+    applications = relationship("CandidateApplication", back_populates="job", cascade="all, delete-orphan")
+    interview_kits = relationship("InterviewKit", back_populates="job", cascade="all, delete-orphan")
+
 
 # ─── 3. Resume Entity ──────────────────────────────────────────────────────────
 class Resume(Base):
     __tablename__ = "resumes"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     tenant_id = Column(String(64), default="default", index=True)
     filename = Column(Text, nullable=False)
     original_filename = Column(Text, nullable=False)
@@ -160,13 +176,18 @@ class Resume(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    # ── Resume Relationships ─────────────────────────────────────────────────
+    user = relationship("User", back_populates="resumes")
+    applications = relationship("CandidateApplication", back_populates="resume")
+    ats_results = relationship("ATSResult", back_populates="resume", cascade="all, delete-orphan")
+
 
 # ─── 4. Job Description & ATS Results ──────────────────────────────────────────
 class JobDescription(Base):
     __tablename__ = "job_descriptions"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(Text, nullable=False)
     company = Column(Text, nullable=True)
     description = Column(Text, nullable=False)
@@ -183,14 +204,16 @@ class JobDescription(Base):
     raw_text = Column(Text, default="")
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
 
+    user = relationship("User")
+
 
 class ATSResult(Base):
     __tablename__ = "ats_results"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     tenant_id = Column(String(64), default="default", index=True)
-    resume_id = Column(String(64), nullable=False, index=True)
+    resume_id = Column(String(64), ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True)
     job_description_id = Column(String(64), nullable=False, index=True)
 
     final_score = Column(Float, default=0.0)
@@ -203,14 +226,17 @@ class ATSResult(Base):
 
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
 
+    user = relationship("User")
+    resume = relationship("Resume", back_populates="ats_results")
+
 
 # ─── 5. Applications (AI Apply Assistant & Careers Page) ───────────────────────
 class JobApplication(Base):
     __tablename__ = "job_applications"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=False, index=True)
-    resume_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    resume_id = Column(String(64), ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, index=True)
     company_name = Column(String(255), nullable=False)
     job_title = Column(String(255), nullable=False)
     hr_email = Column(String(255), nullable=False)
@@ -226,6 +252,9 @@ class JobApplication(Base):
 
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    user = relationship("User")
+    resume = relationship("Resume")
 
 
 class CareerApplication(Base):
@@ -252,9 +281,9 @@ class CandidateApplication(Base):
     __tablename__ = "candidate_applications"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    job_id = Column(String(64), nullable=False, index=True)
-    candidate_id = Column(String(64), nullable=False, index=True)
-    resume_id = Column(String(64), nullable=False, index=True)
+    job_id = Column(String(64), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    resume_id = Column(String(64), ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True, index=True)
     tenant_id = Column(String(64), default="default", index=True)
     match_score = Column(Float, nullable=True)
     quality_score = Column(Float, nullable=True)
@@ -266,6 +295,12 @@ class CandidateApplication(Base):
 
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    # ── CandidateApplication Relationships ──────────────────────────────────
+    job = relationship("Job", back_populates="applications")
+    candidate = relationship("User", foreign_keys=[candidate_id], back_populates="candidate_applications")
+    resume = relationship("Resume", back_populates="applications")
+    scorecards = relationship("Scorecard", back_populates="application", cascade="all, delete-orphan")
 
 
 # ─── 6. OTP & Security Verification ───────────────────────────────────────────
@@ -291,11 +326,13 @@ class TeamInvite(Base):
     tenant_id = Column(String(64), nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
     role = Column(String(50), nullable=False)
-    invited_by = Column(String(64), nullable=False)
+    invited_by = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token = Column(String(255), nullable=False, unique=True, index=True)
     status = Column(String(50), default="pending", index=True)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    inviter = relationship("User")
 
 
 class Requisition(Base):
@@ -316,13 +353,15 @@ class TalentPoolProfile(Base):
     __tablename__ = "talent_pool_profiles"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    candidate_id = Column(String(64), unique=True, nullable=False, index=True)
+    candidate_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
     opted_in = Column(Boolean, default=False, index=True)
     visibility_tier = Column(String(50), default="public")
     years_experience = Column(Float, default=0.0)
     profile_data = Column(JSONB, default=dict)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    candidate = relationship("User")
 
 
 # ─── 8. Audit Logs, Support & System ───────────────────────────────────────────
@@ -345,7 +384,7 @@ class SupportTicket(Base):
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     ticket_id = Column(String(64), unique=True, nullable=False, index=True)
-    user_id = Column(String(64), nullable=True, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     email = Column(String(255), nullable=False)
     subject = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
@@ -357,6 +396,8 @@ class SupportTicket(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    user = relationship("User")
+
 
 class Certificate(Base):
     __tablename__ = "certificates"
@@ -364,7 +405,7 @@ class Certificate(Base):
     id = Column(String(64), primary_key=True)
     certificate_type = Column(String(100), nullable=False)
     template_used = Column(String(100), nullable=False)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     recipient_name = Column(String(255), nullable=False)
     snapshot = Column(JSONB, default=dict)
     status = Column(String(50), default="active", index=True)
@@ -376,6 +417,8 @@ class Certificate(Base):
     superseded_at = Column(DateTime(timezone=True), nullable=True)
     schema_version = Column(Integer, default=1)
 
+    user = relationship("User", back_populates="certificates")
+
 
 # ─── 9. Copilot v2 & Conversational Memory ────────────────────────────────────
 class CopilotSession(Base):
@@ -383,7 +426,7 @@ class CopilotSession(Base):
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     tenant_id = Column(String(64), default="default", index=True)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), default="New Conversation")
     last_message_preview = Column(Text, nullable=True)
     message_count = Column(Integer, default=0)
@@ -395,14 +438,17 @@ class CopilotSession(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    user = relationship("User", back_populates="copilot_sessions")
+    messages = relationship("CopilotMessage", back_populates="session", cascade="all, delete-orphan", foreign_keys="CopilotMessage.session_id")
+
 
 class CopilotMessage(Base):
     __tablename__ = "copilot_messages"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    session_id = Column(String(64), nullable=False, index=True)
+    session_id = Column(String(64), ForeignKey("copilot_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     tenant_id = Column(String(64), default="default", index=True)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(50), nullable=False)
     content = Column(Text, default="")
     ui_cards = Column(JSONB, default=list)
@@ -417,18 +463,23 @@ class CopilotMessage(Base):
     feedback_note = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
 
+    session = relationship("CopilotSession", back_populates="messages", foreign_keys=[session_id])
+    user = relationship("User")
+
 
 class CopilotMemory(Base):
     __tablename__ = "copilot_memory"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     tenant_id = Column(String(64), default="default", index=True)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     key = Column(String(255), nullable=False, index=True)
     value = Column(Text, nullable=False)
     source_message_id = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    user = relationship("User")
 
 
 # ─── 10. Background Task Jobs ─────────────────────────────────────────────────
@@ -502,7 +553,7 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=False, unique=True, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     username = Column(String(255), nullable=False, unique=True, index=True)
     full_name = Column(String(255), nullable=False)
     headline = Column(Text, default="Software Developer")
@@ -526,6 +577,8 @@ class UserProfile(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    user = relationship("User", back_populates="profile")
+
 
 class PortfolioAnalytics(Base):
     __tablename__ = "portfolio_analytics"
@@ -547,12 +600,14 @@ class InterviewKit(Base):
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     tenant_id = Column(String(64), default="default", index=True)
-    job_id = Column(String(64), nullable=False, index=True)
+    job_id = Column(String(64), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     stage_name = Column(String(100), nullable=False)
     competencies = Column(JSONB, default=list)
     standard_questions = Column(JSONB, default=list)
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    job = relationship("Job", back_populates="interview_kits")
 
 
 class Scorecard(Base):
@@ -560,9 +615,9 @@ class Scorecard(Base):
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     tenant_id = Column(String(64), default="default", index=True)
-    application_id = Column(String(64), nullable=True, index=True)
-    candidate_id = Column(String(64), nullable=True, index=True)
-    interviewer_id = Column(String(64), nullable=False, index=True)
+    application_id = Column(String(64), ForeignKey("candidate_applications.id", ondelete="CASCADE"), nullable=True, index=True)
+    candidate_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    interviewer_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     stage_name = Column(String(100), nullable=False)
     ratings = Column(JSONB, default=dict)
     recommendation = Column(String(50), nullable=False)
@@ -570,13 +625,17 @@ class Scorecard(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    application = relationship("CandidateApplication", back_populates="scorecards")
+    candidate = relationship("User", foreign_keys=[candidate_id])
+    interviewer = relationship("User", foreign_keys=[interviewer_id])
+
 
 # ─── 15. User Gamification ────────────────────────────────────────────────────
 class UserGamification(Base):
     __tablename__ = "user_gamification"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=False, unique=True, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     total_points = Column(Integer, default=0)
     current_streak = Column(Integer, default=0)
     longest_streak = Column(Integer, default=0)
@@ -591,6 +650,8 @@ class UserGamification(Base):
     recent_points = Column(JSONB, default=list)
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    user = relationship("User", back_populates="gamification")
 
 
 # ─── 16. Cron & Job Alert Deliveries ──────────────────────────────────────────
@@ -655,12 +716,14 @@ class RefreshToken(Base):
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     token_hash = Column(String(255), nullable=False, unique=True, index=True)
     family_id = Column(String(64), nullable=False, index=True)
-    user_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     jti = Column(String(255), nullable=True, index=True)
     used = Column(Boolean, default=False)
     revoked = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("User")
 
 
 class RevokedToken(Base):
@@ -703,7 +766,7 @@ class InterviewSessionModel(Base):
     __tablename__ = "interview_sessions"
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    user_id = Column(String(64), nullable=True, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     job_title = Column(String(255), nullable=True)
     difficulty = Column(String(50), default="medium")
     interview_type = Column(String(50), default="mixed")
@@ -742,15 +805,20 @@ class InterviewSessionModel(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    user = relationship("User")
+
+
 class UserNotificationState(Base):
     __tablename__ = "user_notification_states"
 
     id = Column(String(64), primary_key=True)
-    user_id = Column(String(64), index=True, nullable=False, unique=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False, unique=True)
     read_ids = Column(JSONB, default=list)
     dismissed_ids = Column(JSONB, default=list)
     cleared_at = Column(DateTime(timezone=True), nullable=True)
     all_read_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    user = relationship("User")
 

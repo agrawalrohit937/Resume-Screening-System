@@ -13,18 +13,16 @@ from api.deps import (
     get_current_user, get_resume_repo, get_result_repo,
     get_user_repo, PaginationParams, get_db
 )
-from models.result_model import ATSResultModel
-from models.resume_model import ResumeStatus
-from models.user_model import UserModel
+from schemas.ats_schema import (
+    ATSResultModel, ATSMatchRequest, ATSMatchResponse,
+    BulkATSMatchRequest, BulkATSMatchResponse, BulkATSResultItem,
+)
+from schemas.resume_schema import ResumeStatus
+from schemas.user_schema import UserModel
 from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
 from repositories.user_repo import UserRepository
 from services.parser_service import ParserService
-
-from schemas.ats_schema import (
-    ATSMatchRequest, ATSMatchResponse, BulkATSMatchRequest,
-    BulkATSMatchResponse, BulkATSResultItem
-)
 
 from services.scoring_engine import score_resume
 from services.skill_ontology import canonicalize_skills
@@ -626,7 +624,7 @@ async def get_ats_history(
 # ─── POST /match/batch & POST /batch (Async Background Job) ──────────────────
 from pydantic import BaseModel, Field
 from typing import List
-from models.task_job_model import JobType
+from schemas.task_job_schema import JobType
 from repositories.task_job_repo import TaskJobRepository
 from services.tasks import task_manager
 from services.tasks.workers import execute_batch_ats_scoring

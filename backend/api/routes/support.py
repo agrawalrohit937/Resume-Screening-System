@@ -14,7 +14,7 @@ from api.deps import (
     get_user_repo,
 )
 from core.config import settings
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
 from services.support_service import SupportService

@@ -12,7 +12,7 @@ Tests:
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
-from models.task_job_model import JobStatus, JobType
+from schemas.task_job_schema import JobStatus, JobType
 from repositories.task_job_repo import TaskJobRepository
 from services.tasks import task_manager
 from services.tasks.workers import (

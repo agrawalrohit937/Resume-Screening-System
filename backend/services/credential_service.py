@@ -9,7 +9,7 @@ from datetime import date
 from typing import Dict, List, Optional, Tuple, Any
 import structlog
 
-from models.credential_model import Credential
+from schemas.credential_schema import Credential
 
 logger = structlog.get_logger(__name__)
 

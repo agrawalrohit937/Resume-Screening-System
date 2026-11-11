@@ -1,6 +1,3 @@
-from config.db import get_pg_session_factory
-from sqlalchemy import select, update, desc, and_, or_, func
-from models.tables import Certificate
 """
 Certificate API Router
 ======================
@@ -16,22 +13,21 @@ Endpoints:
 """
 
 import asyncio
-import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 import structlog
 
-from api.deps import get_current_user
+from api.deps import get_current_user, get_certificate_repo
 from certificates.email import dispatch_certificate_email
 from certificates.rate_limit import limiter
 from certificates.service import CertificateService
 from certificates.skill_icons import slugify, resolve_skill_icon_path
 from certificates.renderer import render_certificate_pdf
 from certificates.qr import build_verification_url, generate_qr_image
-from models.certificate_model import CertificateRecord
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
+from repositories.certificate_repo import CertificateRepository
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -64,6 +60,7 @@ async def _do_issue(
     assessment_slug: Optional[str] = None,
     score: int,
     difficulty: str,
+    cert_repo: CertificateRepository,
 ):
     """Core issuance logic shared between /issue and /claim with update / re-issue support."""
     if score < 80:
@@ -76,27 +73,12 @@ async def _do_issue(
     final_slug = slugify(assessment_slug) if assessment_slug else slugify(assessment_name)
     if not final_slug:
         final_slug = "assessment"
+
     # Detect if user already received an active certificate for this assessment
-    async with get_pg_session_factory()() as session:
-        stmt = (
-            select(Certificate)
-            .where(
-                and_(
-                    Certificate.user_id == str(current_user.id),
-                    Certificate.status == "active",
-                    or_(
-                        Certificate.topic == final_slug,
-                        func.lower(Certificate.topic) == final_slug.lower(),
-                    )
-                )
-            )
-            .order_by(desc(Certificate.issued_at))
-            .limit(1)
-        )
-        existing_cert = (await session.execute(stmt)).scalar_one_or_none()
+    existing_cert = await cert_repo.get_active_by_user_and_topic(str(current_user.id), final_slug)
 
     is_update = bool(existing_cert)
-    prev_score = existing_cert.get("snapshot", {}).get("score", 0) if existing_cert else None
+    prev_score = (existing_cert.get("snapshot") or {}).get("score", 0) if existing_cert else None
 
     context = {
         "recipient_name": current_user.full_name or "Certified Candidate",
@@ -124,22 +106,13 @@ async def _do_issue(
         )
 
     # Mark previously-issued certificate as superseded so the new credential is primary
-    if existing_cert and str(getattr(existing_cert, "id", None) or existing_cert.get("_id")) != record.id:
-        try:
-            old_id = getattr(existing_cert, "id", None) or existing_cert.get("_id")
-            async with get_pg_session_factory()() as session:
-                await session.execute(
-                    update(Certificate)
-                    .where(Certificate.id == str(old_id))
-                    .values(
-                        status="superseded",
-                        superseded_by=record.id,
-                        superseded_at=datetime.now(timezone.utc),
-                    )
-                )
-                await session.commit()
-        except Exception as e:
-            logger.warning("Could not mark previous certificate as superseded", error=str(e))
+    if existing_cert:
+        old_id = str(existing_cert.get("id") or existing_cert.get("_id"))
+        if old_id != record.id:
+            try:
+                await cert_repo.supersede(old_id, record.id)
+            except Exception as e:
+                logger.warning("Could not mark previous certificate as superseded", error=str(e))
 
     # Fire-and-forget: email PDF to user with update context if applicable
     background_tasks.add_task(
@@ -160,7 +133,7 @@ async def _do_issue(
         "public_url": record.public_url,
         "recipient_name": record.recipient_name,
         "grade": record.snapshot.get("grade_label"),
-        "issued_at": record.issued_at.isoformat(),
+        "issued_at": record.issued_at.isoformat() if hasattr(record.issued_at, "isoformat") else str(record.issued_at),
         "is_update": is_update,
         "previous_score": prev_score,
         "message": (
@@ -178,6 +151,7 @@ async def issue_certificate(
     payload: IssuePayload,
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
+    cert_repo: CertificateRepository = Depends(get_certificate_repo),
 ):
     """Issue a new or updated certificate. Requires authentication and score ≥ 80."""
     if payload.certificate_type != "assessment":
@@ -192,6 +166,7 @@ async def issue_certificate(
         assessment_slug=payload.assessment_slug,
         score=payload.score,
         difficulty=payload.difficulty,
+        cert_repo=cert_repo,
     )
 
 
@@ -200,6 +175,7 @@ async def claim_certificate(
     payload: ClaimPayload,
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
+    cert_repo: CertificateRepository = Depends(get_certificate_repo),
 ):
     """Alias for /issue used by the quiz/gamification flow with full re-issue support."""
     return await _do_issue(
@@ -209,6 +185,7 @@ async def claim_certificate(
         assessment_slug=payload.assessment_slug,
         score=payload.score,
         difficulty=payload.difficulty,
+        cert_repo=cert_repo,
     )
 
 
@@ -216,41 +193,27 @@ async def claim_certificate(
 async def check_certificate_status(
     topic: str = Query(..., description="Assessment topic or slug"),
     current_user: UserModel = Depends(get_current_user),
+    cert_repo: CertificateRepository = Depends(get_certificate_repo),
 ):
     """Checks whether the current candidate already holds an e-certificate for this topic."""
     slug = slugify(topic)
-    async with get_pg_session_factory()() as session:
-        stmt = (
-            select(Certificate)
-            .where(
-                and_(
-                    Certificate.user_id == str(current_user.id),
-                    Certificate.status == "active",
-                    or_(
-                        Certificate.topic == slug,
-                        func.lower(Certificate.topic) == slug.lower(),
-                    )
-                )
-            )
-            .order_by(desc(Certificate.issued_at))
-            .limit(1)
-        )
-        cert = (await session.execute(stmt)).scalar_one_or_none()
+    cert = await cert_repo.get_active_by_user_and_topic(str(current_user.id), slug)
 
     if not cert:
         return {"has_certificate": False, "certificate": None}
 
-    snap = cert.snapshot or {}
+    snap = cert.get("snapshot") or {}
+    issued_dt = cert.get("issued_at")
     return {
         "has_certificate": True,
         "certificate": {
-            "certificate_id": cert.id,
+            "certificate_id": cert.get("id"),
             "topic": snap.get("assessment_name", topic),
             "score": snap.get("score"),
             "grade": snap.get("grade_label"),
             "difficulty": snap.get("difficulty"),
-            "public_url": cert.public_url,
-            "issued_at": cert.issued_at.isoformat() if hasattr(cert.issued_at, "isoformat") else str(cert.issued_at),
+            "public_url": cert.get("public_url") or "",
+            "issued_at": issued_dt.isoformat() if hasattr(issued_dt, "isoformat") else str(issued_dt or ""),
         }
     }
 
@@ -260,28 +223,27 @@ async def resend_certificate(
     certificate_id: str,
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
+    cert_repo: CertificateRepository = Depends(get_certificate_repo),
 ):
     """
     Allows a candidate who already received an e-certificate to have it re-rendered with their
     latest profile information and dispatched directly to their email inbox.
     """
-    async with get_pg_session_factory()() as session:
-        stmt = select(Certificate).where(and_(Certificate.id == certificate_id, Certificate.user_id == str(current_user.id)))
-        cert = (await session.execute(stmt)).scalar_one_or_none()
-    if not cert:
+    cert = await cert_repo.get_by_id(certificate_id)
+    if not cert or str(cert.get("user_id")) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Certificate not found or not owned by current user.",
         )
 
-    snapshot = dict(cert.snapshot or {})
+    snapshot = dict(cert.get("snapshot") or {})
     # Sync with current user profile name if updated
     if current_user.full_name and current_user.full_name.strip():
         snapshot["recipient_name"] = current_user.full_name.strip()
 
-    template_dir = cert.template_used or "assessment"
+    template_dir = cert.get("template_used") or "assessment"
     verification_url = build_verification_url(certificate_id)
-    issued_dt = cert.issued_at
+    issued_dt = cert.get("issued_at")
     render_context = {
         "recipient_name": snapshot.get("recipient_name", current_user.full_name),
         "assessment_name": (
@@ -302,14 +264,8 @@ async def resend_certificate(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to render certificate PDF.")
 
     # Update recipient name in DB if it changed
-    if snapshot.get("recipient_name") != cert.recipient_name:
-        async with get_pg_session_factory()() as session:
-            await session.execute(
-                update(Certificate)
-                .where(Certificate.id == certificate_id)
-                .values(recipient_name=snapshot["recipient_name"], snapshot=snapshot)
-            )
-            await session.commit()
+    if snapshot.get("recipient_name") != cert.get("recipient_name"):
+        await cert_repo.update_recipient(certificate_id, snapshot["recipient_name"], snapshot)
 
     # Dispatch email in background with updated flag
     background_tasks.add_task(
@@ -318,8 +274,8 @@ async def resend_certificate(
         snapshot.get("recipient_name", current_user.full_name),
         snapshot,
         certificate_id,
-        cert["issued_at"],
-        cert.get("public_url", ""),
+        cert.get("issued_at"),
+        cert.get("public_url") or "",
         pdf_bytes,
         True,
     )
@@ -346,24 +302,23 @@ async def verify_certificate(certificate_id: str, request: Request = None):
 @router.get("/my")
 async def my_certificates(
     current_user: UserModel = Depends(get_current_user),
+    cert_repo: CertificateRepository = Depends(get_certificate_repo),
 ):
     """Return the current user's issued certificates (most recent first)."""
-    records: list[CertificateRecord] = await CertificateRecord.find_by_user(
-        str(current_user.id)
-    )
+    records = await cert_repo.list_by_user(str(current_user.id))
     return {
         "status": "success",
         "total": len(records),
         "certificates": [
             {
-                "certificate_id": r.id,
-                "assessment_name": r.snapshot.get("assessment_name", ""),
-                "score": r.snapshot.get("score"),
-                "grade": r.snapshot.get("grade_label"),
-                "difficulty": r.snapshot.get("difficulty"),
-                "status": r.status,
-                "public_url": r.public_url,
-                "issued_at": r.issued_at.isoformat() if r.issued_at else None,
+                "certificate_id": r.get("id"),
+                "assessment_name": (r.get("snapshot") or {}).get("assessment_name", ""),
+                "score": (r.get("snapshot") or {}).get("score"),
+                "grade": (r.get("snapshot") or {}).get("grade_label"),
+                "difficulty": (r.get("snapshot") or {}).get("difficulty"),
+                "status": r.get("status"),
+                "public_url": r.get("public_url") or "",
+                "issued_at": r["issued_at"].isoformat() if hasattr(r.get("issued_at"), "isoformat") else str(r.get("issued_at") or ""),
             }
             for r in records
         ],

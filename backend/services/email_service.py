@@ -18,7 +18,7 @@ import jinja2
 import structlog
 
 from core.config import settings
-from models.otp_model import OTPPurpose
+from schemas.otp_schema import OTPPurpose
 
 logger = structlog.get_logger(__name__)
 

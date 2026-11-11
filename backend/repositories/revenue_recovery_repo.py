@@ -12,7 +12,7 @@ from sqlalchemy import select, update, func, or_, desc
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import RevenueRecoveryCase, gen_uuid_str
-from models.revenue_recovery_model import (
+from schemas.revenue_recovery_schema import (
     RecoveryCaseModel,
     RecoveryStatus,
     RecoveryChannel,
@@ -95,7 +95,7 @@ class RevenueRecoveryRepository:
                 cnt = cnt_res.scalar() or 0
                 case_data["case_id"] = f"REC-{year}-{(cnt + 1):05d}"
 
-            c_id = str(case_data.get("_id") or gen_uuid_str())
+            c_id = str(case_data.get("id") or case_data.get("_id") or gen_uuid_str())
             audit = list(case_data.get("audit_trail") or [])
             if not audit:
                 audit.append({

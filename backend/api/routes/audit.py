@@ -16,8 +16,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_current_user, PaginationParams, get_db, get_audit_repo
 from core.rbac import Permission, check_rbac_access
-from models.user_model import UserModel
-from models.audit_log_model import AuditLogModel
+from schemas.user_schema import UserModel
+from schemas.audit_schema import AuditLogModel
 from repositories.audit_log_repo import AuditLogRepository
 
 logger = structlog.get_logger(__name__)

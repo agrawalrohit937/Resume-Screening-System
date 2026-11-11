@@ -192,7 +192,7 @@ class TaskManager:
         """
         import uuid
         from repositories.task_job_repo import TaskJobRepository
-        from models.task_job_model import JobStatus, JobType
+        from schemas.task_job_schema import JobStatus, JobType
 
         j_id = job_id or uuid.uuid4().hex
         t_id = tenant_id or "default"
@@ -219,20 +219,8 @@ class TaskManager:
                 call_kwargs.pop("repo", None)
                 res = await task_coro_func(job_id=j_id, tenant_id=t_id, repo=repo, **call_kwargs)
                 await repo.mark_done(j_id, result_ref=res if isinstance(res, dict) else {"result": str(res)}, tenant_id=t_id)
-                duration = time.perf_counter() - start_t
-                try:
-                    from core.metrics import record_queue_job_metrics
-                    record_queue_job_metrics(job_type=j_type.value, duration_sec=duration, status="completed")
-                except Exception:
-                    pass
                 return res
             except Exception as exc:
-                duration = time.perf_counter() - start_t
-                try:
-                    from core.metrics import record_queue_job_metrics
-                    record_queue_job_metrics(job_type=j_type.value, duration_sec=duration, status="failed")
-                except Exception:
-                    pass
                 await repo.mark_failed(j_id, error=str(exc), tenant_id=t_id)
                 raise exc
 

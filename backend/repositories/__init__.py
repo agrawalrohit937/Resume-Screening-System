@@ -16,6 +16,8 @@ from repositories.portfolio_repo import PortfolioRepository
 from repositories.gamification_repo import GamificationRepository
 from repositories.interview_kit_repo import InterviewKitRepository
 from repositories.team_invite_repo import TeamInviteRepository
+from repositories.certificate_repo import CertificateRepository
+from repositories.analytics_repo import AnalyticsRepository
 
 __all__ = [
     "UserRepository",
@@ -32,4 +34,6 @@ __all__ = [
     "GamificationRepository",
     "InterviewKitRepository",
     "TeamInviteRepository",
+    "CertificateRepository",
+    "AnalyticsRepository",
 ]

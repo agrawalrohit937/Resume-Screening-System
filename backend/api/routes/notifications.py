@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_db, get_gamification_repo
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from models.tables import UserNotificationState, Certificate
 from repositories.gamification_repo import GamificationRepository
 

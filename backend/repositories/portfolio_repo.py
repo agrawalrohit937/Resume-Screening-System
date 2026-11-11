@@ -16,7 +16,9 @@ def _profile_to_dict(row: UserProfile) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in UserProfile.__table__.columns}
-    d["_id"] = d.get("id")
+    prof_id = str(d.get("id"))
+    d["id"] = prof_id
+    d["_id"] = prof_id
     return d
 
 
@@ -24,7 +26,9 @@ def _analytics_to_dict(row: PortfolioAnalytics) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in PortfolioAnalytics.__table__.columns}
-    d["_id"] = d.get("id")
+    analytics_id = str(d.get("id"))
+    d["id"] = analytics_id
+    d["_id"] = analytics_id
     return d
 
 

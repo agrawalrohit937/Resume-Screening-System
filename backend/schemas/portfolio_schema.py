@@ -1,16 +1,17 @@
 """
-Portfolio Models — Pydantic models for user portfolio documents, categorized skills, projects, and analytics
+Portfolio Schemas — Pydantic models for user portfolio documents, categorized skills, projects, and analytics.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-# ─── Shared Sub-Models (New for Premium Template) ─────────────────────────────
+# ─── Shared Sub-Models (Premium Template) ─────────────────────────────────────
 class MetricModel(BaseModel):
     value: str = Field(..., description="e.g., '20+', 'Python', 'XAI'")
     label: str = Field(..., description="e.g., 'ML & Analytics Projects', 'Primary Stack'")
+
 
 class ProjectHighlight(BaseModel):
     value: str = Field(..., description="e.g., '86.5%', 'XAI'")
@@ -38,8 +39,6 @@ class PortfolioProject(BaseModel):
     github_url: Optional[str] = None
     image_url: Optional[str] = None
     featured: bool = False
-    
-    # Fields for Case Study Mockups
     category: Optional[str] = Field(None, description="e.g., HEALTHCARE AI · XAI")
     year: Optional[str] = Field(None, description="e.g., 2026")
     highlights: List[ProjectHighlight] = Field(default_factory=list)
@@ -66,9 +65,11 @@ class PortfolioEducation(BaseModel):
 
 # ─── User Profile Document ────────────────────────────────────────────────────
 class PortfolioProfileModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: Optional[str] = Field(None, alias="_id")
     user_id: str = Field(..., description="ID of the user who owns this portfolio")
-    username: str = Field(..., description="Unique slug for public portfolio URL (e.g. /portfolio/username)")
+    username: str = Field(..., description="Unique slug for public portfolio URL")
     full_name: str
     headline: Optional[str] = "Software Developer"
     bio: Optional[str] = None
@@ -78,40 +79,33 @@ class PortfolioProfileModel(BaseModel):
     avatar_url: Optional[str] = None
     resume_file_url: Optional[str] = None
     show_resume_publicly: bool = False
-    
-    # New fields for Premium Hero Section
-    hero_badge: Optional[str] = Field("Open to Opportunities", description="Top badge text, e.g., 'Open to Internships'")
+    hero_badge: Optional[str] = Field("Open to Opportunities", description="Top badge text")
     typing_roles: List[str] = Field(default_factory=list, description="Roles for the JS typing effect")
     hero_metrics: List[MetricModel] = Field(default_factory=list, description="Stats shown below hero desc")
-    
     social_links: Dict[str, str] = Field(default_factory=lambda: {
         "github": "", "linkedin": "", "twitter": "", "website": "", "medium": ""
     })
-    skills: Dict[str, List[str]] = Field(default_factory=dict, description="Dynamic domain-agnostic skills categorized by 3-5 custom buckets")
+    skills: Dict[str, List[str]] = Field(default_factory=dict)
     projects: List[PortfolioProject] = Field(default_factory=list)
     experience: List[PortfolioExperience] = Field(default_factory=list)
     education: List[PortfolioEducation] = Field(default_factory=list)
     theme_id: Optional[str] = Field("glassmorphic_pro", description="Selected UI theme ID")
     is_published: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        populate_by_name = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── Analytics Document ───────────────────────────────────────────────────────
 class PortfolioAnalyticsModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: Optional[str] = Field(None, alias="_id")
     username: str = Field(..., description="Unique portfolio username slug")
     total_views: int = 0
     resume_downloads: int = 0
     contact_clicks: int = 0
     messages_received: int = 0
-    last_visited: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        populate_by_name = True
+    last_visited: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── Contact Form Message ─────────────────────────────────────────────────────
@@ -121,3 +115,4 @@ class ContactMessageSchema(BaseModel):
     company: Optional[str] = Field(default=None, max_length=150)
     subject: str = Field(..., min_length=2, max_length=150)
     message: str = Field(..., min_length=5, max_length=2000)
+

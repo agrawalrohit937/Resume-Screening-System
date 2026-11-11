@@ -9,7 +9,7 @@ from sqlalchemy import select, update, delete, func
 
 from config.db import get_pg_session_factory
 from models import JobApplication, gen_uuid_str
-from models.apply_assistant_model import (
+from schemas.application_schema import (
     ApplicationStatus,
     is_valid_transition,
 )
@@ -19,7 +19,9 @@ def _app_to_dict(row: JobApplication) -> Optional[dict]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in JobApplication.__table__.columns}
-    d["_id"] = d.get("id")
+    app_id = str(d.get("id"))
+    d["id"] = app_id
+    d["_id"] = app_id
     return d
 
 

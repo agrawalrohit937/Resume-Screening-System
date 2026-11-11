@@ -29,12 +29,6 @@ if sys.platform == "win32":
 from config.db import connect_db, disconnect_db, init_pg_db, close_pg_db
 from core.config import settings
 from core.logging import setup_logging, trace_context
-from core.metrics import (
-    generate_prometheus_metrics,
-    get_metrics_content_type,
-    record_http_request_metrics,
-)
-from core.telemetry import init_telemetry
 from services.multi_tenancy.tenant_context import TenantAccessDeniedError
 from services.multi_tenancy.tenant_middleware import TenantMiddleware
 
@@ -58,7 +52,6 @@ from api.routes import (
     gmail_oauth,
     health,
     integrations,
-    interview,
     interview_ai,
     interview_kits,
     jobs,
@@ -117,7 +110,6 @@ if not FAVICON_PATH.is_file():
 async def lifespan(app: FastAPI):
     logger.info("Starting AI Career Platform (Pure PostgreSQL Engine)", version=settings.APP_VERSION)
     try:
-        init_telemetry()
         await connect_db()
         FastAPICache.init(InMemoryBackend(), prefix="careershaala-cache")
         logger.info("FastAPICache initialized")
@@ -228,13 +220,6 @@ def create_application() -> FastAPI:
         response = await call_next(request)
         duration = time.perf_counter() - start_time
         response.headers["X-Process-Time"] = f"{duration:.4f}s"
-        # Record Prometheus HTTP metric
-        record_http_request_metrics(
-            method=request.method,
-            endpoint=request.url.path,
-            status_code=response.status_code,
-            duration_sec=duration,
-        )
         return response
 
     # CORS Middleware (Outermost)
@@ -249,14 +234,6 @@ def create_application() -> FastAPI:
         cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
 
     app.add_middleware(CORSMiddleware, **cors_kwargs)
-
-    # Prometheus Metrics Endpoint
-    @app.get("/metrics", include_in_schema=False)
-    async def metrics_endpoint():
-        return Response(
-            content=generate_prometheus_metrics(),
-            media_type=get_metrics_content_type(),
-        )
 
     # Favicon Endpoint
     @app.get("/favicon.ico", include_in_schema=False)
@@ -297,7 +274,6 @@ def create_application() -> FastAPI:
     app.include_router(jobs.router, prefix=f"{p}/jobs", tags=["Jobs Marketplace"])
 
     # Interview Simulation & Analytics
-    app.include_router(interview.router, prefix=f"{p}/interview", tags=["Interview"])
     app.include_router(interview_ai.router, prefix=f"{p}/interview", tags=["AI Interview"])
     app.include_router(live_interview.router, prefix=f"{p}/live-interview", tags=["Live Interview"])
 

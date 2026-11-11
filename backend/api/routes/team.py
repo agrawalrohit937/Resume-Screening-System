@@ -1,7 +1,3 @@
-import uuid
-from config.db import get_pg_session_factory
-from sqlalchemy import select, update, and_
-from models.tables import TeamInvite, User
 """
 Team Management & Invitation Routes for Multi-Tenant SaaS.
 Enterprise Phase 5:
@@ -32,7 +28,7 @@ from core.security import (
     verify_token_type,
     hash_password,
 )
-from models.user_model import UserModel, UserRole, UserStatus
+from schemas.user_schema import UserModel, UserRole, UserStatus
 from repositories.user_repo import UserRepository
 from repositories.team_invite_repo import TeamInviteRepository
 from repositories.company_repo import CompanyRepository
@@ -73,6 +69,8 @@ async def invite_team_member(
     payload: TeamInviteRequest,
     background_tasks: BackgroundTasks,
     current_user: UserModel = Depends(get_current_user),
+    user_repo: UserRepository = Depends(get_user_repo),
+    team_invite_repo: TeamInviteRepository = Depends(get_team_invite_repo),
     email_service: EmailService = Depends(get_email_service),
 ):
     """
@@ -105,12 +103,14 @@ async def invite_team_member(
             detail=f"User '{invitee_email}' is already an active member of this organization.",
         )
 
+    role_str = assigned_role.value if hasattr(assigned_role, "value") else str(assigned_role)
+
     # Generate token
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     token = create_invite_token(
         email=invitee_email,
         tenant_id=tenant_id,
-        role=assigned_role.value if hasattr(assigned_role, "value") else str(assigned_role),
+        role=role_str,
         invited_by=str(current_user.id),
         extra_claims={
             "invited_by_name": current_user.full_name,
@@ -125,7 +125,7 @@ async def invite_team_member(
     invite_doc = {
         "email": invitee_email,
         "tenant_id": tenant_id,
-        "role": assigned_role.value if hasattr(assigned_role, "value") else str(assigned_role),
+        "role": role_str,
         "invited_by": str(current_user.id),
         "invited_by_name": current_user.full_name,
         "invited_by_email": current_user.email,
@@ -135,34 +135,9 @@ async def invite_team_member(
         "expires_at": expires_at,
     }
 
-        # Upsert pending invite for this email + tenant via PostgreSQL
-    async with get_pg_session_factory()() as session:
-        stmt = select(TeamInvite).where(
-            and_(TeamInvite.email == invitee_email, TeamInvite.tenant_id == tenant_id, TeamInvite.status == "pending")
-        )
-        existing_invite = (await session.execute(stmt)).scalar_one_or_none()
-        if existing_invite:
-            existing_invite.token = token
-            existing_invite.role = role_str
-            existing_invite.invited_by = str(current_user.id)
-            existing_invite.expires_at = expires_at
-            invite_id = existing_invite.id
-        else:
-            new_id = f"inv_{uuid.uuid4().hex[:12]}"
-            new_inv = TeamInvite(
-                id=new_id,
-                tenant_id=tenant_id,
-                email=invitee_email,
-                role=role_str,
-                invited_by=str(current_user.id),
-                token=token,
-                status="pending",
-                created_at=datetime.now(timezone.utc),
-                expires_at=expires_at,
-            )
-            session.add(new_inv)
-            invite_id = new_id
-        await session.commit()
+    # Upsert pending invite for this email + tenant via repository
+    saved_invite = await team_invite_repo.upsert_pending_invite(invite_doc)
+    invite_id = saved_invite["id"]
 
     org_name = getattr(current_user, "company_name", None) or tenant_id
     role_str = assigned_role.value if hasattr(assigned_role, "value") else str(assigned_role)
@@ -202,6 +177,7 @@ async def invite_team_member(
 @router.get("/verify-invite", response_model=VerifyInviteResponse)
 async def verify_invite(
     token: str = Query(..., description="The team invite JWT token"),
+    invite_repo: TeamInviteRepository = Depends(get_team_invite_repo),
 ):
     """
     Decodes and validates an invite token for preview on the frontend Accept Invite screen.
@@ -282,13 +258,6 @@ async def accept_team_invite(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Malformed invitation claims.",
         )
-
-    if not hasattr(invite_repo, "get_by_token"):
-        invite_repo = get_team_invite_repo()
-    if not hasattr(company_repo, "get_by_name"):
-        company_repo = get_company_repo()
-    if not hasattr(user_repo, "get_by_email"):
-        user_repo = get_user_repo()
 
     invite_doc = await invite_repo.get_by_token(payload.token)
     if not invite_doc or invite_doc.get("status") != "pending":
@@ -440,7 +409,7 @@ async def list_team_members(
     Lists active team members and pending invitations for the current user's tenant with ultra-fast parallel queries.
     """
     tenant_id = current_user.tenant_id or "default"
-    users_list_models, _ = await user_repo.list_users(skip=0, limit=100)
+    users_list_models, _ = await user_repo.list_users(tenant_id=tenant_id, skip=0, limit=100)
     raw_members = [
         {
             "_id": u.id,
@@ -455,7 +424,7 @@ async def list_team_members(
             "profile_picture": u.profile_picture,
         }
         for u in users_list_models
-        if getattr(u, "tenant_id", None) == tenant_id and getattr(u, "status", None) != "deleted"
+        if getattr(u, "status", None) != "deleted"
     ]
     raw_invites = await invite_repo.list_by_tenant(tenant_id)
 
@@ -464,7 +433,7 @@ async def list_team_members(
         r_list = m.get("roles") or ([m.get("role")] if m.get("role") else ["candidate"])
         members.append(
             TeamMemberItem(
-                id=str(m.get("_id")),
+                id=str(m.get("id") or m.get("_id")),
                 email=m.get("email", ""),
                 full_name=m.get("full_name", ""),
                 role=str(m.get("role", "candidate")),
@@ -485,7 +454,7 @@ async def list_team_members(
         invite_link = f"{frontend_base}/accept-invite?token={token}" if token else None
         pending_invites.append(
             PendingInviteItem(
-                id=str(inv.get("_id")),
+                id=str(inv.get("id") or inv.get("_id")),
                 email=inv.get("email", ""),
                 role=inv.get("role", ""),
                 tenant_id=inv.get("tenant_id", tenant_id),

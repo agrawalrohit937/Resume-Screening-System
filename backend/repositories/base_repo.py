@@ -1,8 +1,8 @@
 """
-Base Repository — Common Document Normalization and Utilities (PostgreSQL).
+Base Repository — Common Record Normalization and Relational Utilities (PostgreSQL).
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional
 
 
 class BaseRepository:
@@ -13,9 +13,13 @@ class BaseRepository:
 
     def _serialize(self, doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """
-        Normalizes document `_id` into a string `_id` for Pydantic model validation.
-        Idempotent and safe for None inputs.
+        Normalizes record identification across relational and serialized representations.
+        Ensures 'id' is always populated as a string; mirrors '_id' for legacy compatibility.
         """
-        if doc and "_id" in doc:
-            doc["_id"] = str(doc["_id"])
+        if not doc:
+            return None
+        record_id = doc.get("id") or doc.get("_id")
+        if record_id is not None:
+            doc["id"] = str(record_id)
+            doc["_id"] = str(record_id)
         return doc

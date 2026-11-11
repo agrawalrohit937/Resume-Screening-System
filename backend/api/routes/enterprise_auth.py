@@ -6,7 +6,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Form, HTTPException, Query, status
 from pydantic import BaseModel
 
-from models.enterprise_auth import (
+from schemas.enterprise_auth_schema import (
     SCIMUserPayload,
     SCIMUserResponse,
 )

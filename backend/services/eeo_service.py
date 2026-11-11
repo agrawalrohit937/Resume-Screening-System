@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from config.db import get_pg_session_factory
 from models.tables import EeoResponse
-from models.eeo import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
+from schemas.eeo_schema import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
 
 logger = structlog.get_logger(__name__)
 

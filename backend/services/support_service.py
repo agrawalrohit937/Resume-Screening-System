@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from models.support_ticket_model import SupportTicketModel, TicketMessage
-from models.user_model import UserModel
+from schemas.support_schema import SupportTicketModel, TicketMessage
+from schemas.user_schema import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
 from services.cloudinary_service import upload_file

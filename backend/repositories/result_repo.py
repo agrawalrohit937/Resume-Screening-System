@@ -10,7 +10,7 @@ from sqlalchemy import select, update, func, case, or_, and_
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import ATSResult, JobDescription, gen_uuid_str
-from models.result_model import ATSResultModel, JobDescriptionModel
+from schemas.ats_schema import ATSResultModel, JobDescriptionModel
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)
@@ -18,13 +18,17 @@ logger = structlog.get_logger(__name__)
 
 def _jd_to_pydantic(row: JobDescription) -> JobDescriptionModel:
     d = {c.name: getattr(row, c.name) for c in JobDescription.__table__.columns}
-    d["_id"] = d.pop("id")
+    jd_id = str(d.get("id"))
+    d["id"] = jd_id
+    d["_id"] = jd_id
     return JobDescriptionModel(**d)
 
 
 def _result_to_pydantic(row: ATSResult) -> ATSResultModel:
     d = {c.name: getattr(row, c.name) for c in ATSResult.__table__.columns}
-    d["_id"] = d.pop("id")
+    res_id = str(d.get("id"))
+    d["id"] = res_id
+    d["_id"] = res_id
     return ATSResultModel(**d)
 
 

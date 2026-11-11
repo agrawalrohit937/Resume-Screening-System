@@ -12,11 +12,13 @@ from config.db import get_pg_session_factory
 from models import Company, gen_uuid_str
 
 
-def _company_to_dict(row: Company) -> Dict[str, Any]:
+def _company_to_dict(row: Company) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in Company.__table__.columns}
-    d["_id"] = d.get("id")
+    comp_id = str(d.get("id"))
+    d["id"] = comp_id
+    d["_id"] = comp_id
     return d
 
 

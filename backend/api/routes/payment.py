@@ -7,8 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from api.deps import get_current_user, get_user_repo
-from models.user_model import UserModel
-from schemas.user_schema import MessageResponse
+from schemas.user_schema import UserModel, MessageResponse
 from services.razorpay_service import razorpay_service
 
 router = APIRouter()
@@ -289,7 +288,7 @@ async def cancel_subscription(
     # If user had an active recovery case, close it as churned
     try:
         from repositories.revenue_recovery_repo import RevenueRecoveryRepository
-        from models.revenue_recovery_model import RecoveryStatus, ActorType
+        from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
         recovery_repo = RevenueRecoveryRepository()
         active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
         if active_case:
@@ -400,7 +399,7 @@ async def verify_payment(
     # If user had an active recovery case, close it as recovered
     try:
         from repositories.revenue_recovery_repo import RevenueRecoveryRepository
-        from models.revenue_recovery_model import RecoveryStatus, ActorType
+        from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
         recovery_repo = RevenueRecoveryRepository()
         active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
         if active_case:
@@ -447,7 +446,7 @@ async def report_payment_failure(
 
     from repositories.revenue_recovery_repo import RevenueRecoveryRepository
     from workflows.revenue_recovery_graph import revenue_recovery_pipeline
-    from models.revenue_recovery_model import RecoveryStatus, ActorType
+    from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
 
     recovery_repo = RevenueRecoveryRepository()
 
@@ -564,7 +563,7 @@ async def razorpay_webhook(
     from repositories.revenue_recovery_repo import RevenueRecoveryRepository
     from repositories.user_repo import UserRepository
     from workflows.revenue_recovery_graph import revenue_recovery_pipeline
-    from models.revenue_recovery_model import RecoveryStatus, ActorType
+    from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
 
     recovery_repo = RevenueRecoveryRepository()
     user_repo = UserRepository()

@@ -12,7 +12,7 @@ from sqlalchemy import select, update, func, or_
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import SupportTicket, gen_uuid_str
-from models.support_ticket_model import SupportTicketModel
+from schemas.support_schema import SupportTicketModel
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)

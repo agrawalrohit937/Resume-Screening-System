@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from models.user_model import UserRole
+from schemas.user_schema import UserRole
 
 
 class TeamInviteRequest(BaseModel):

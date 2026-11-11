@@ -9,8 +9,8 @@ import base64
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from models.eeo import EEOGender, EEORaceEthnicity, EEOSelfIdentificationPayload
-from models.enterprise_auth import SAMLConfiguration, SCIMEmail, SCIMName, SCIMUserPayload
+from schemas.eeo_schema import EEOGender, EEORaceEthnicity, EEOSelfIdentificationPayload
+from schemas.enterprise_auth_schema import SAMLConfiguration, SCIMEmail, SCIMName, SCIMUserPayload
 from services.eeo_service import eeo_service
 from services.enterprise_auth.scim_service import scim_service
 from services.enterprise_auth.sso_service import enterprise_sso_service

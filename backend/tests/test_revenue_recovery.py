@@ -14,7 +14,7 @@ Tests:
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from models.revenue_recovery_model import (
+from schemas.revenue_recovery_schema import (
     RecoveryCaseModel,
     RecoveryStatus,
     RiskLevel,

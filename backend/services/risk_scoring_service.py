@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import structlog
 
-from models.revenue_recovery_model import RiskLevel
-from models.user_model import UserModel
+from schemas.revenue_recovery_schema import RiskLevel
+from schemas.user_schema import UserModel
 
 logger = structlog.get_logger(__name__)
 

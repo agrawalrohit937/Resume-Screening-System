@@ -1,17 +1,81 @@
 """
-Interview Session Model — Database schema for full live interview sessions
+Pydantic Schemas for Structured Interview Kits, Scorecards, and Live AI Interview Sessions.
 """
-from datetime import datetime, timezone
-from typing import List, Optional, Dict
-from enum import Enum
-from pydantic import BaseModel, Field
 
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+import uuid
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# ─── Structured Interview Kits & Scorecards ────────────────────────────────────
+
+class RecommendationEnum(str, Enum):
+    STRONG_NO = "strong_no"
+    NO = "no"
+    MIXED = "mixed"
+    YES = "yes"
+    STRONG_YES = "strong_yes"
+
+
+RECOMMENDATION_SCORES = {
+    RecommendationEnum.STRONG_NO: 1.0,
+    RecommendationEnum.NO: 2.0,
+    RecommendationEnum.MIXED: 3.0,
+    RecommendationEnum.YES: 4.0,
+    RecommendationEnum.STRONG_YES: 5.0,
+}
+
+
+class Competency(BaseModel):
+    name: str
+    description: str
+    weight: float = 1.0
+    rubric: Dict[int, str] = Field(default_factory=dict)
+
+
+class InterviewKitModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tenant_id: str = "default"
+    job_id: str
+    stage_name: str
+    competencies: List[Competency] = Field(default_factory=list)
+    standard_questions: List[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ScorecardModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tenant_id: str = "default"
+    application_id: str
+    candidate_id: str
+    interviewer_id: str
+    stage_name: str
+    ratings: Dict[str, int] = Field(default_factory=dict)
+    recommendation: RecommendationEnum = RecommendationEnum.MIXED
+    notes: Optional[str] = None
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CalibrationReport(BaseModel):
+    application_id: str
+    stage_name: str
+    scorecard_count: int
+    mean_competency_score: float
+    rating_variance: float
+    consensus_recommendation: RecommendationEnum
+    divergent_raters: List[str] = Field(default_factory=list)
+    calibration_status: str
+
+
+# ─── Live Interview Sessions & Proctoring ──────────────────────────────────────
 
 class SessionStatus(str, Enum):
     PENDING   = "pending"
     ACTIVE    = "active"
     COMPLETED = "completed"
-    ABORTED   = "aborted"   # terminated due to cheating
+    ABORTED   = "aborted"
 
 
 class DifficultyLevel(str, Enum):
@@ -36,23 +100,21 @@ class CheatingEventType(str, Enum):
 class CheatingEventRecord(BaseModel):
     event_type:       CheatingEventType
     timestamp:        str
-    severity:         str = "medium"       # low | medium | high | critical
-    frame_snapshot:   Optional[str] = None  # base64 thumb (optional)
+    severity:         str = "medium"
+    frame_snapshot:   Optional[str] = None
     details:          Optional[str] = None
 
 
 class QuestionAnswer(BaseModel):
     question_id:       int
     question_text:     str
-    category:          str                  # technical | behavioral | situational
+    category:          str
     difficulty:        str
     user_answer:       str
-    answer_source:     str = "text"         # text | voice
+    answer_source:     str = "text"
     time_taken_secs:   int = 0
     reattempted:       bool = False
-
-    # AI evaluation
-    ai_score:          Optional[float] = None   # 0-100
+    ai_score:          Optional[float] = None
     relevance_score:   Optional[float] = None
     clarity_score:     Optional[float] = None
     confidence_score:  Optional[float] = None
@@ -70,20 +132,14 @@ class InterviewSession(BaseModel):
     difficulty:       DifficultyLevel = DifficultyLevel.MEDIUM
     interview_type:   str = "mixed"
     status:           SessionStatus = SessionStatus.PENDING
-
-    # Questions & answers
-    questions:        List[Dict] = []
+    questions:        List[Dict[str, Any]] = []
     answers:          List[QuestionAnswer] = []
-
-    # Cheating tracking
     cheating_events:  List[CheatingEventRecord] = []
-    cheating_score:   float = 0.0          # 0-1
+    cheating_score:   float = 0.0
     warning_count:    int = 0
     session_aborted:  bool = False
     abort_reason:     Optional[str] = None
-
-    # Performance
-    overall_score:        Optional[float] = None  # 0-100
+    overall_score:        Optional[float] = None
     avg_confidence:       Optional[float] = None
     avg_clarity:          Optional[float] = None
     avg_relevance:        Optional[float] = None
@@ -92,8 +148,6 @@ class InterviewSession(BaseModel):
     improvement_summary:  Optional[str] = None
     strength_areas:       List[str] = []
     weakness_areas:       List[str] = []
-
-    # Employer-driven B2B Scheduling
     is_employer_scheduled: bool = False
     magic_token:           Optional[str] = None
     expires_at:            Optional[str] = None
@@ -107,8 +161,8 @@ class InterviewSession(BaseModel):
     candidate_name:        Optional[str] = None
     application_id:        Optional[str] = None
     magic_link_url:        Optional[str] = None
-
     started_at:   Optional[str] = None
     completed_at: Optional[str] = None
     created_at:   str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at:   str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+

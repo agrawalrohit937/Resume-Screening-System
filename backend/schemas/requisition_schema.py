@@ -1,12 +1,13 @@
-"""Requisition and Headcount Approval Models.
+"""
+Requisition and Headcount Approval Schemas.
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
 import uuid
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RequisitionStatus(str, Enum):
@@ -28,7 +29,7 @@ class ApprovalDecision(str, Enum):
 class ApprovalStep(BaseModel):
     step_order: int = 1
     approver_id: str
-    approver_role: str = "hiring_manager"  # hiring_manager, finance, exec
+    approver_role: str = "hiring_manager"
     status: ApprovalDecision = ApprovalDecision.PENDING
     decided_at: Optional[datetime] = None
     comments: Optional[str] = None
@@ -49,6 +50,8 @@ class RequisitionModel(BaseModel):
     recruiter_id: Optional[str] = None
     approval_chain: List[ApprovalStep] = Field(default_factory=list)
     status: RequisitionStatus = RequisitionStatus.DRAFT
-    linked_job_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(populate_by_name=True)
+

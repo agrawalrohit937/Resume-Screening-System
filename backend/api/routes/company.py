@@ -13,8 +13,8 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.deps import get_current_user, get_company_repo, get_job_repo
-from models.job import CompanyProfilePayload
-from models.user_model import UserModel, UserRole
+from schemas.job_schema import CompanyProfilePayload
+from schemas.user_schema import UserModel, UserRole
 from repositories.company_repo import CompanyRepository
 from repositories.job_repo import JobRepository
 

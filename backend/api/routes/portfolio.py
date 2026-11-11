@@ -11,19 +11,18 @@ import html
 import re
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, Request, Query, status
-AsyncDatabase = Optional[object]
 from pydantic import BaseModel
 import structlog
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from api.deps import get_db, security, get_current_user, require_plan, get_portfolio_repo, get_user_repo
+from api.deps import security, get_current_user, require_plan, get_portfolio_repo, get_user_repo
 from repositories.portfolio_repo import PortfolioRepository
 from repositories.user_repo import UserRepository
 from core.config import settings
 from core.security import decode_token
 from core.llm_client import groq_key_pool
-from models.portfolio_model import (
+from schemas.portfolio_schema import (
     ContactMessageSchema,
     PortfolioProfileModel,
 )
@@ -51,7 +50,7 @@ def _authenticated_user_id(current_user) -> str:
 
 
 # ─── Helper to optionally get current user ID ─────────────────────────────────
-async def get_optional_user(credentials=Depends(security), db: AsyncDatabase = Depends(get_db)):
+async def get_optional_user(credentials=Depends(security)):
     if not credentials:
         return None
     try:
@@ -136,7 +135,6 @@ async def upload_portfolio_photo(
     current_user=Depends(get_current_user),
     user_repo: UserRepository = Depends(get_user_repo),
     portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
-    db: AsyncDatabase = Depends(get_db)
 ):
     """
     Accepts multipart image upload, streams bytes directly to Cloudinary,
@@ -271,7 +269,6 @@ async def check_slug_availability(
     user_id: Optional[str] = Depends(get_optional_user),
     user_repo: UserRepository = Depends(get_user_repo),
     portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
-    db: AsyncDatabase = Depends(get_db)
 ):
     clean_slug = slug.strip().lower().replace(" ", "-")
     clean_slug = re.sub(r'[^a-z0-9_-]', '', clean_slug)
@@ -339,7 +336,6 @@ async def check_slug_availability(
 async def save_portfolio(
     profile: PortfolioProfileModel,
     current_user=Depends(require_plan("pro")),
-    db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = profile.username.strip().lower()
     clean_username = re.sub(r'[^a-z0-9_-]', '', clean_username)
@@ -417,7 +413,6 @@ async def unpublish_portfolio(
     current_user=Depends(get_current_user),
     user_repo: UserRepository = Depends(get_user_repo),
     portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
-    db: AsyncDatabase = Depends(get_db),
 ):
     uid = _authenticated_user_id(current_user)
     updated = await portfolio_repo.upsert_profile(uid, {"is_published": False})
@@ -432,7 +427,6 @@ async def unpublish_portfolio(
 async def get_my_portfolio(
     sync_from_resume: bool = False,
     user_id: Optional[str] = Depends(get_optional_user),
-    db: AsyncDatabase = Depends(get_db)
 ):
     if not user_id:
         return {"status": "empty", "data": None}
@@ -782,7 +776,7 @@ async def get_my_portfolio(
 
 # ─── 5. Public Portfolio View ─────────────────────────────────────────────────
 @router.get("/public/{username}", summary="Public portfolio viewer data")
-async def get_public_portfolio(username: str, portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo), user_repo: UserRepository = Depends(get_user_repo), db: AsyncDatabase = Depends(get_db)):
+async def get_public_portfolio(username: str, portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo), user_repo: UserRepository = Depends(get_user_repo)):
     clean_username = username.strip().lower()
     norm_query = re.sub(r'[\s\-_]', '', clean_username)
     
@@ -819,7 +813,6 @@ async def track_portfolio_event(
     username: str,
     event_type: str,
     portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
-    db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
     field_map = {
@@ -836,7 +829,7 @@ async def track_portfolio_event(
 
 
 @router.get("/analytics/{username}", summary="Get portfolio metrics")
-async def get_portfolio_analytics(username: str, portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo), db: AsyncDatabase = Depends(get_db)):
+async def get_portfolio_analytics(username: str, portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo)):
     clean_username = username.strip().lower()
     return await portfolio_repo.get_analytics(clean_username)
 
@@ -848,7 +841,6 @@ async def send_contact_message(
     msg: ContactMessageSchema,
     bg_tasks: BackgroundTasks,
     portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
-    db: AsyncDatabase = Depends(get_db)
 ):
     clean_username = username.strip().lower()
     profile = await portfolio_repo.get_by_username(clean_username, published_only=True)

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from models.support_ticket_model import SupportTicketModel
+from schemas.support_schema import SupportTicketModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from services.support_service import SupportService
 from core.config import settings

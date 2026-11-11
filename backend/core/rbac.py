@@ -12,7 +12,7 @@ from enum import Enum
 from typing import Dict, FrozenSet, List, Set, Union
 from fastapi import HTTPException, status
 
-from models.user_model import UserRole
+from schemas.user_schema import UserRole
 
 
 class Permission(str, Enum):

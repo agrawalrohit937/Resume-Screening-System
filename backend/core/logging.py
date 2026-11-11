@@ -51,20 +51,7 @@ def trace_context(trace_id: Optional[str] = None):
 
 
 def add_trace_id(logger, method_name, event_dict):
-    """Processor ensuring trace_id and span_id are present on all log records."""
-    try:
-        from opentelemetry import trace
-        current_span = trace.get_current_span()
-        if current_span:
-            span_ctx = current_span.get_span_context()
-            if span_ctx and span_ctx.is_valid:
-                if "trace_id" not in event_dict:
-                    event_dict["trace_id"] = format(span_ctx.trace_id, "032x")
-                if "span_id" not in event_dict:
-                    event_dict["span_id"] = format(span_ctx.span_id, "016x")
-    except Exception:
-        pass
-
+    """Processor ensuring trace_id is present on all log records."""
     tid = get_trace_id()
     if tid and "trace_id" not in event_dict:
         event_dict["trace_id"] = tid

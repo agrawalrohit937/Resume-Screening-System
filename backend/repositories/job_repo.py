@@ -1,5 +1,5 @@
 """
-Job Repository — Dual Engine (PostgreSQL via SQLAlchemy 2.0 / PostgreSQL Primary)
+Job Repository — Pure PostgreSQL via SQLAlchemy 2.0 Async ORM.
 Handles job marketplace search, recruiter job management, applicant counts, and application tracking.
 """
 
@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import structlog
 from sqlalchemy import select, update, delete, func, or_, Text
+from sqlalchemy.orm import joinedload, selectinload
 
 from core.config import settings
 from config.db import get_pg_session_factory
@@ -19,7 +20,9 @@ logger = structlog.get_logger(__name__)
 def _job_to_dict(job_row: Job) -> dict:
     """Helper to convert SQLAlchemy Job model instance to dictionary matching job document."""
     d = {c.name: getattr(job_row, c.name) for c in Job.__table__.columns}
-    d["_id"] = d.pop("id")
+    job_id = str(d.get("id"))
+    d["id"] = job_id
+    d["_id"] = job_id
     # Exclude embeddings from light API payloads if not explicitly needed
     return d
 
@@ -70,16 +73,30 @@ class JobRepository(BaseRepository):
             await session.refresh(inst)
             return _job_to_dict(inst)
 
-    async def get_by_id(self, job_id: str) -> Optional[dict]:
+    async def get_by_id(
+        self,
+        job_id: str,
+        *,
+        include_applications: bool = False,
+        include_creator: bool = False,
+    ) -> Optional[dict]:
         if not job_id:
             return None
 
         async with self.session_factory() as session:
             stmt = select(Job).where(Job.id == str(job_id))
+            if include_applications:
+                stmt = stmt.options(selectinload(Job.applications))
+            if include_creator:
+                stmt = stmt.options(joinedload(Job.creator))
             res = await session.execute(stmt)
             row = res.scalar_one_or_none()
             if row:
-                return _job_to_dict(row)
+                d = _job_to_dict(row)
+                if include_creator and row.creator:
+                    d["creator_email"] = row.creator.email
+                    d["creator_name"] = row.creator.full_name
+                return d
             return None
 
     async def update(self, job_id: str, update_data: dict) -> Optional[dict]:
@@ -88,10 +105,6 @@ class JobRepository(BaseRepository):
         now = datetime.now(timezone.utc)
         clean_update = dict(update_data)
         clean_update["updated_at"] = now
-
-        if "$set" in clean_update:
-            clean_update = dict(clean_update["$set"])
-            clean_update["updated_at"] = now
 
         valid_cols = {c.name for c in Job.__table__.columns}
         filtered = {k: v for k, v in clean_update.items() if k in valid_cols}
@@ -281,20 +294,39 @@ class JobRepository(BaseRepository):
             d["_id"] = d.get("id")
             return d
 
-    async def list_candidate_applications(self, job_id: str, stage: Optional[str] = None) -> List[dict]:
+    async def list_candidate_applications(
+        self,
+        job_id: str,
+        stage: Optional[str] = None,
+        *,
+        include_candidate: bool = True,
+        include_resume: bool = True,
+    ) -> List[dict]:
         async with self.session_factory() as session:
             stmt = select(CandidateApplication).where(CandidateApplication.job_id == str(job_id))
+            if include_candidate:
+                stmt = stmt.options(joinedload(CandidateApplication.candidate))
+            if include_resume:
+                stmt = stmt.options(joinedload(CandidateApplication.resume))
             if stage:
                 stmt = stmt.where(CandidateApplication.stage == str(stage))
             stmt = stmt.order_by(CandidateApplication.match_score.desc(), CandidateApplication.created_at.desc())
             res = await session.execute(stmt)
-            rows = res.scalars().all()
+            rows = res.scalars().unique().all()
             apps = []
             for r in rows:
                 d = {c.name: getattr(r, c.name) for c in CandidateApplication.__table__.columns}
                 if r.details:
                     d.update(r.details)
-                d["_id"] = d.get("id")
+                app_id = str(d.get("id"))
+                d["id"] = app_id
+                d["_id"] = app_id
+                if include_candidate and r.candidate:
+                    d["candidate_name"] = r.candidate.full_name or d.get("candidate_name")
+                    d["candidate_email"] = r.candidate.email or d.get("candidate_email")
+                if include_resume and r.resume:
+                    d["resume_filename"] = r.resume.filename or d.get("resume_filename")
+                    d["resume_url"] = r.resume.file_url or d.get("resume_url")
                 apps.append(d)
             return apps
 
@@ -303,16 +335,58 @@ class JobRepository(BaseRepository):
             stmt = select(func.count(CandidateApplication.id)).where(CandidateApplication.job_id == str(job_id))
             return (await session.execute(stmt)).scalar() or 0
 
-    async def list_applications_by_candidate(self, candidate_id: str) -> List[dict]:
+    async def list_applications_by_candidate(
+        self,
+        candidate_id: str,
+        *,
+        include_job: bool = True,
+    ) -> List[dict]:
         async with self.session_factory() as session:
-            stmt = select(CandidateApplication).where(CandidateApplication.candidate_id == str(candidate_id)).order_by(CandidateApplication.created_at.desc())
+            stmt = select(CandidateApplication).where(CandidateApplication.candidate_id == str(candidate_id))
+            if include_job:
+                stmt = stmt.options(joinedload(CandidateApplication.job))
+            stmt = stmt.order_by(CandidateApplication.created_at.desc())
             res = await session.execute(stmt)
-            rows = res.scalars().all()
+            rows = res.scalars().unique().all()
             apps = []
             for r in rows:
                 d = {c.name: getattr(r, c.name) for c in CandidateApplication.__table__.columns}
                 if r.details:
                     d.update(r.details)
-                d["_id"] = d.get("id")
+                app_id = str(d.get("id"))
+                d["id"] = app_id
+                d["_id"] = app_id
+                if include_job and r.job:
+                    d["job_title"] = r.job.title or d.get("job_title")
+                    d["company_name"] = r.job.company_name or d.get("company_name")
+                    d["job_location"] = r.job.location or d.get("job_location")
                 apps.append(d)
             return apps
+
+    async def list_candidate_applications_by_tenant(self, tenant_id: str = "default", limit: int = 50) -> List[dict]:
+        async with self.session_factory() as session:
+            stmt = select(CandidateApplication)
+            if tenant_id and tenant_id != "default":
+                stmt = stmt.where(CandidateApplication.tenant_id == tenant_id)
+            stmt = stmt.limit(limit)
+            rows = (await session.execute(stmt)).scalars().all()
+            results = []
+            for r in rows:
+                d = {c.name: getattr(r, c.name) for c in CandidateApplication.__table__.columns}
+                app_id = str(d.get("id"))
+                d["id"] = app_id
+                d["_id"] = app_id
+                results.append(d)
+            return results
+
+    async def get_candidate_application_by_id(self, application_id: str) -> Optional[dict]:
+        async with self.session_factory() as session:
+            stmt = select(CandidateApplication).where(CandidateApplication.id == str(application_id))
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            if not row:
+                return None
+            d = {c.name: getattr(row, c.name) for c in CandidateApplication.__table__.columns}
+            app_id = str(d.get("id"))
+            d["id"] = app_id
+            d["_id"] = app_id
+            return d

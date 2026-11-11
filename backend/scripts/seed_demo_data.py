@@ -152,7 +152,7 @@ DEMO_JOBS = [
         "experience_max": 9,
         "is_fresher": False,
         "skills": ["docker", "kubernetes", "aws", "terraform", "ci/cd", "linux", "prometheus"],
-        "description": "Lead the modernization of multi-cloud Kubernetes clusters, automated zero-downtime deployment pipelines, telemetry monitoring, and high-availability distributed state layers.",
+        "description": "Lead the modernization of multi-cloud Kubernetes clusters, automated zero-downtime deployment pipelines, system monitoring, and high-availability distributed state layers.",
         "salary_range": "INR 26,00,000 - 40,00,000 / year",
         "status": "active",
         "created_at": datetime.now(timezone.utc),

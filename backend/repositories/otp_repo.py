@@ -9,13 +9,15 @@ from sqlalchemy import select, update, delete, func
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import OTP, gen_uuid_str
-from models.otp_model import OTPModel, OTPPurpose
+from schemas.otp_schema import OTPModel, OTPPurpose
 from repositories.base_repo import BaseRepository
 
 
 def _otp_to_pydantic(otp_row: OTP) -> OTPModel:
     d = {c.name: getattr(otp_row, c.name) for c in OTP.__table__.columns}
-    d["_id"] = d.pop("id")
+    otp_id = str(d.get("id"))
+    d["id"] = otp_id
+    d["_id"] = otp_id
     return OTPModel(**d)
 
 

@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import numpy as np
 import structlog
 
-from models.copilot_rag_model import RetrievedChunk
+from schemas.copilot_schema import RetrievedChunk
 from services.embedding_service import embedding_model
 from services.reranker_service import RerankerServiceSingleton
 

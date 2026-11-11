@@ -13,12 +13,14 @@ from fastapi.encoders import jsonable_encoder
 
 from core.config import settings
 from core.security import create_access_token, create_refresh_token
-from models.user_model import UserModel, UserRole, UserStatus, AuthProvider
-from models.otp_model import OTPPurpose
+from schemas.user_schema import (
+    UserModel, UserRole, UserStatus, AuthProvider,
+    TokenResponse, UserPublicResponse,
+)
+from schemas.otp_schema import OTPPurpose
 from repositories.user_repo import UserRepository
 from repositories.otp_repo import OTPRepository
 from services.otp_service import OTPService
-from schemas.user_schema import TokenResponse, UserPublicResponse
 
 COOKIE_SETTINGS = {"httponly": True, "secure": False, "samesite": "lax"}
 

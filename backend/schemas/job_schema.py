@@ -1,16 +1,12 @@
 """
-Job Marketplace Model & Schemas — Database Entity & API Layer.
-
-Phase A: Jobs Foundation:
-- Pydantic models for job listings with 768-dim BGE local embedding vectors.
-- Supports recruiter job creation, candidate feed retrieval, and ATS vector indexing.
+Pydantic Schemas for Job Entity and Job API Endpoints.
 """
 
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class WorkMode(str, Enum):
@@ -26,7 +22,9 @@ class JobStatus(str, Enum):
 
 
 class JobModel(BaseModel):
-    """Domain Model for the 'jobs' collection."""
+    """Domain DTO for Job."""
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
+
     id: Optional[str] = Field(default=None, alias="_id")
     company_name: str
     title: str
@@ -49,7 +47,7 @@ class JobModel(BaseModel):
     is_external: bool = False
     external_apply_url: Optional[str] = None
     external_job_id: Optional[str] = None
-    created_by: Optional[str] = None  # Recruiter / Admin user_id
+    created_by: Optional[str] = None
     tenant_id: str = Field(default="default", description="Multi-tenant organization partition identifier")
     applicant_count: int = 0
     education_requirement_mode: str = Field(
@@ -70,10 +68,6 @@ class JobModel(BaseModel):
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
 
 
 class JobCreateRequest(BaseModel):
@@ -100,6 +94,8 @@ class JobCreateRequest(BaseModel):
 
 class JobResponse(BaseModel):
     """Public representation of a job posting returned to clients."""
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     company_name: str
     title: str
@@ -129,9 +125,6 @@ class JobResponse(BaseModel):
     created_at: datetime
     has_embedding: bool = True
     has_applied: bool = False
-
-    class Config:
-        populate_by_name = True
 
 
 class CompanyProfilePayload(BaseModel):
@@ -169,5 +162,4 @@ class JobUpdateRequest(BaseModel):
     company_industry: Optional[str] = None
     status: Optional[str] = None
     rescore_applicants: bool = False
-
 

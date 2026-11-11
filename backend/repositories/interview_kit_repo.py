@@ -15,7 +15,9 @@ def _kit_to_dict(row: InterviewKit) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in InterviewKit.__table__.columns}
-    d["_id"] = d.get("id")
+    kit_id = str(d.get("id"))
+    d["id"] = kit_id
+    d["_id"] = kit_id
     return d
 
 
@@ -23,7 +25,9 @@ def _scorecard_to_dict(row: Scorecard) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     d = {c.name: getattr(row, c.name) for c in Scorecard.__table__.columns}
-    d["_id"] = d.get("id")
+    sc_id = str(d.get("id"))
+    d["id"] = sc_id
+    d["_id"] = sc_id
     return d
 
 
@@ -113,3 +117,11 @@ class InterviewKitRepository:
                 stmt = stmt.where(InterviewKit.tenant_id == tenant_id)
             res = await session.execute(stmt)
             return [_kit_to_dict(r) for r in res.scalars().all()]
+
+    async def get_kit_by_job(self, job_id: str, tenant_id: str = "default") -> Optional[Dict[str, Any]]:
+        async with self.session_factory() as session:
+            stmt = select(InterviewKit).where(InterviewKit.job_id == str(job_id))
+            if tenant_id and tenant_id != "default":
+                stmt = stmt.where(InterviewKit.tenant_id == tenant_id)
+            res = await session.execute(stmt)
+            return _kit_to_dict(res.scalar_one_or_none())

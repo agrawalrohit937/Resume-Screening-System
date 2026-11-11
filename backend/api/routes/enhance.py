@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.deps import get_current_user, get_resume_repo
-from models.user_model import UserModel
+from schemas.user_schema import UserModel
 from repositories.resume_repo import ResumeRepository
 from schemas.resume_schema import EnhanceResumeRequest, EnhanceResumeResponse
 from services.pdf_generator_service import PDFGeneratorService
@@ -322,4 +322,4 @@ async def recompile_resume_pdf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Recompilation failed: {str(e)}"
-        )
+        )

@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.deps import get_current_user, get_resume_repo, get_pdf_service
-from models.resume_model import ResumeStatus
-from models.user_model import UserModel
+from schemas.resume_schema import ResumeStatus
+from schemas.user_schema import UserModel
 from repositories.resume_repo import ResumeRepository
 from services.pdf_generator_service import PDFGeneratorService
 from utils.validators import validate_object_id

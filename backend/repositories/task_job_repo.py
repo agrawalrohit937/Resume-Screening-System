@@ -1,5 +1,5 @@
 """
-Task Job Repository — Dual Engine (PostgreSQL via SQLAlchemy 2.0 / PostgreSQL Primary)
+Task Job Repository — Pure PostgreSQL via SQLAlchemy 2.0 Async ORM.
 CRUD Operations for Background Jobs.
 ========================================================================
 Enforces strict multi-tenant isolation on all job queries, status updates,
@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import TaskJob, gen_uuid_str
-from models.task_job_model import TaskJobModel, JobStatus, JobType
+from schemas.task_job_schema import TaskJobModel, JobStatus, JobType
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)
@@ -45,8 +45,7 @@ def _task_row_to_model(row: TaskJob) -> TaskJobModel:
 
 class TaskJobRepository(BaseRepository):
     """
-    Repository for managing async background job records.
-    Dual engine: PostgreSQL when DATABASE_URL is set, document collection fallback.
+    Repository for managing async background job records via PostgreSQL.
     """
 
     def __init__(self, db: Optional[Any] = None, session_factory: Optional[Any] = None):

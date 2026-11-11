@@ -45,21 +45,8 @@ from core.feature_flags import (
     FEATURE_PROJECTS_SCORING,
 )
 
-try:
-    from core.telemetry import trace_span
-    from core.metrics import record_ats_match_metrics
-    from services.multi_tenancy.tenant_context import get_current_tenant_id
-except Exception:
-    trace_span = None
-    record_ats_match_metrics = None
-    get_current_tenant_id = None
-
 def _record_metrics(start_t: float, status: str) -> None:
-    if record_ats_match_metrics and get_current_tenant_id:
-        try:
-            record_ats_match_metrics(tenant_id=get_current_tenant_id(), duration_sec=time.perf_counter() - start_t, status=status)
-        except Exception:
-            pass
+    pass
 
 logger = structlog.get_logger(__name__)
 
@@ -1878,8 +1865,7 @@ def score_resume(
     """
     start_t = time.perf_counter()
     try:
-        tracer = trace_span("scoring_engine.score_resume", attributes={"scoring.mode": mode}) if trace_span else nullcontext()
-        with tracer:
+        with nullcontext():
             active_profile = profile or SCORING_PROFILES.get(mode, CANDIDATE_PROFILE)
             components = _compute_shared_components(
                 resume=resume,
@@ -1925,8 +1911,7 @@ def score_resume_dual(
     """
     start_t = time.perf_counter()
     try:
-        tracer = trace_span("scoring_engine.score_resume_dual") if trace_span else nullcontext()
-        with tracer:
+        with nullcontext():
             components = _compute_shared_components(
                 resume=resume,
                 jd=jd,

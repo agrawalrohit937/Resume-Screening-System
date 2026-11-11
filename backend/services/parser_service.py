@@ -14,7 +14,7 @@ import httpx
 import structlog
 
 from core.llm_client import groq_key_pool
-from models.resume_model import (
+from schemas.resume_schema import (
     Certification,
     ContactInfo,
     Education,

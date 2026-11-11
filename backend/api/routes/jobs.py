@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from core.id import DocumentId
+from utils.validators import DocumentId
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, BackgroundTasks, status
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
@@ -48,23 +48,19 @@ from repositories.user_repo import UserRepository
 from models.tables import Job, JobApplication, CandidateApplication, Resume, User, Company, AuditLog
 from config.db import get_pg_session_factory
 from sqlalchemy import select, update, delete, func, or_, and_, desc
-from repositories.application_repo import ApplicationRepository
-from models.application import ApplicationResponse, ApplicationStage
-from models.job import (
+from schemas.application_schema import ApplicationResponse, ApplicationStage
+from schemas.job_schema import (
     CompanyProfilePayload,
     JobCreateRequest,
     JobResponse,
     JobStatus,
     JobUpdateRequest,
 )
-from models.user_model import UserModel, UserRole
-from repositories.resume_repo import ResumeRepository
+from schemas.user_schema import UserModel, UserRole
 from services.cloudinary_service import generate_signed_resume_url, extract_public_id_from_url
 from services.job_matcher import find_jobs_for_candidate
 from services.scoring_engine import score_resume, score_resume_dual
 from services.skill_ontology import canonicalize_skills
-from utils.pagination import stream_cursor
-from services.telemetry_service import log_match_event
 from services.jd_parser_service import (
     parse_jd_with_groq,
     map_job_title_to_occupation,
@@ -1112,7 +1108,7 @@ async def update_application_stage(
         updated_by=str(current_user.id),
     )
 
-    # ── Telemetry: write audit event so analytics engine stays in sync ────────
+    # ── Audit: write audit event so analytics engine stays in sync ────────
     try:
         audit_event = {
             "event_type": "application_stage_changed",
@@ -1136,14 +1132,13 @@ async def update_application_stage(
             await session.commit()
         if target_stage == "Hired":
             logger.info(
-                "Telemetry: hired event logged",
+                "Audit: hired event logged",
                 application_id=app_id,
                 job_id=audit_event["job_id"],
                 tenant_id=audit_event["tenant_id"],
             )
-    except Exception as _tel_err:
-        # Non-critical — never block the API response on telemetry failure
-        logger.warning("Telemetry audit write failed (non-critical)", error=str(_tel_err))
+    except Exception as _audit_err:
+        logger.warning("Audit write failed (non-critical)", error=str(_audit_err))
 
     # ── Fire-and-forget hire offer email ─────────────────────────────────────
     if target_stage == "Hired":
@@ -2183,25 +2178,11 @@ async def apply_to_job(
     created_app = await job_repo.create_candidate_application(app_doc)
     await job_repo.increment_applicant_count(job_id, 1)
 
-    # Telemetry logging (Phase 1.6 - privacy safe)
-    try:
-        f_hash = features_data.get("features_hash") if isinstance(features_data, dict) else None
-        await log_match_event(
-            db=db,
-            event_type="apply",
-            candidate_id=str(current_user.id),
-            job_id=job_id,
-            application_id=str(res.inserted_id),
-            quality_score=quality_score,
-            features_hash=f_hash,
-            extra_metadata={"match_score": match_score, "recruiter_score": recruiter_score},
-        )
-    except Exception as log_err:
-        logger.warning("Failed to log apply match event", error=str(log_err))
+    app_id_res = str(created_app.get("id") or created_app.get("_id") or "")
 
     logger.info(
-        "Application submitted to 'applications' collection",
-        application_id=str(res.inserted_id),
+        "Application submitted to database",
+        application_id=app_id_res,
         job_id=job_id,
         candidate_id=str(current_user.id),
         match_score=match_score,
@@ -2306,19 +2287,6 @@ async def override_application_eligibility(
         )
     except Exception:
         pass
-
-    # Telemetry logging (Phase 1.6)
-    try:
-        await log_match_event(
-            db=db,
-            event_type="eligibility_override",
-            candidate_id=str(app.get("candidate_id")),
-            job_id=job_id,
-            application_id=str(app_oid),
-            extra_metadata={"new_status": payload.new_status, "reason_code": payload.reason_code},
-        )
-    except Exception as log_err:
-        logger.warning("Failed to log eligibility_override match event", error=str(log_err))
 
     updated_app = await job_repo.get_candidate_application(job_id, app_id) or app
     return ApplicationResponse(

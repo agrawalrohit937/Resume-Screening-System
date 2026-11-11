@@ -1,7 +1,6 @@
 """
-User Repository — Dual Engine (PostgreSQL via SQLAlchemy 2.0 / PostgreSQL Primary)
-Automatically routes queries to PostgreSQL when settings.DATABASE_URL is set,
-with graceful fallback to document collection when running in standalone mode.
+User Repository — Pure PostgreSQL via SQLAlchemy 2.0 Async ORM.
+High-performance relational data access with strict tenant isolation and RBAC role normalization.
 """
 
 from datetime import datetime, timezone
@@ -9,11 +8,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import structlog
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import selectinload, joinedload
 
 from core.config import settings
 from config.db import get_pg_session_factory
 from models import User, gen_uuid_str
-from models.user_model import UserModel, UserRole, UserStatus
+from schemas.user_schema import UserModel, UserRole, UserStatus
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)
@@ -21,8 +21,10 @@ logger = structlog.get_logger(__name__)
 
 def _user_to_pydantic(user_row: User) -> UserModel:
     """Helper to convert SQLAlchemy User model instance to Pydantic UserModel."""
-    d = {c.name: getattr(user_row, c.name) for c in User.__table__.columns}
-    d["_id"] = d.pop("id")
+    d = {c.name: getattr(user_row, c.name) for c in User.__table__.columns if getattr(user_row, c.name) is not None}
+    user_id = str(getattr(user_row, "id", None) or d.get("id"))
+    d["id"] = user_id
+    d["_id"] = user_id
     
     # Normalize enum string values
     if "status" in d and d["status"]:
@@ -133,12 +135,25 @@ class UserRepository(BaseRepository):
             await session.refresh(user_instance)
             return _user_to_pydantic(user_instance)
 
-    async def get_by_id(self, user_id: str) -> Optional[UserModel]:
+    async def get_by_id(
+        self,
+        user_id: str,
+        *,
+        include_profile: bool = False,
+        include_resumes: bool = False,
+        include_gamification: bool = False,
+    ) -> Optional[UserModel]:
         if not user_id:
             return None
 
         async with self.session_factory() as session:
             stmt = select(User).where(User.id == str(user_id))
+            if include_profile:
+                stmt = stmt.options(selectinload(User.profile))
+            if include_resumes:
+                stmt = stmt.options(selectinload(User.resumes))
+            if include_gamification:
+                stmt = stmt.options(selectinload(User.gamification))
             res = await session.execute(stmt)
             user_row = res.scalar_one_or_none()
             if user_row:
@@ -165,11 +180,6 @@ class UserRepository(BaseRepository):
         now = datetime.now(timezone.utc)
         clean_update = dict(update_data)
         clean_update["updated_at"] = now
-
-        # Flatten $set dictionary if passed
-        if "$set" in clean_update:
-            clean_update = dict(clean_update["$set"])
-            clean_update["updated_at"] = now
 
         # Filter only valid table columns
         valid_cols = {c.name for c in User.__table__.columns}
@@ -240,6 +250,7 @@ class UserRepository(BaseRepository):
         self,
         role: Optional[UserRole] = None,
         status: Optional[UserStatus] = None,
+        tenant_id: Optional[str] = None,
         skip: int = 0,
         limit: int = 20,
     ) -> tuple[List[UserModel], int]:
@@ -249,6 +260,8 @@ class UserRepository(BaseRepository):
                 filters.append(User.role == (role.value if hasattr(role, "value") else str(role)))
             if status:
                 filters.append(User.status == (status.value if hasattr(status, "value") else str(status)))
+            if tenant_id:
+                filters.append(User.tenant_id == str(tenant_id))
 
             # Count total
             count_stmt = select(func.count()).select_from(User)

@@ -9,8 +9,8 @@ from sqlalchemy import select
 
 from api.deps import get_current_user, get_optional_current_user, get_db
 from models.tables import Job, CandidateApplication, JobApplication
-from models.user_model import UserModel
-from models.eeo import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
+from schemas.user_schema import UserModel
+from schemas.eeo_schema import EEOSelfIdentificationPayload, EEOSelfIdentificationRecord
 from services.eeo_service import EEOService
 
 router = APIRouter()

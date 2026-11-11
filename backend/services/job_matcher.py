@@ -1,30 +1,26 @@
-from __future__ import annotations
-from config.db import get_pg_session_factory
-from sqlalchemy import select, func, and_, or_, desc
-from models.tables import Job, Resume, CandidateApplication
 """
 Job Matcher Service — Skill & Role Recommendation Engine.
 
 Fast & Resilient Matching Pipeline:
 1. Stage 1 (Fast Role & Keyword Pre-Filter):
    - Extracts primary role, domain signals, and top technical skills from candidate resume.
-   - Performs a lightweight database query/regex pre-filter to narrow the open job pool
-     down to a relevant subset (~50-100 jobs), with graceful fallback to fresh jobs.
+   - Performs a lightweight PostgreSQL indexed query with ilike role pre-filter.
 2. Stage 2 (Skill Overlap & Role Bonus Match):
    - Computes deterministic skill overlap ratio and domain role relevance bonus.
-   - Fast, zero memory overhead, 100% cloud-safe (zero heavy model crashes).
 3. Non-Resume Candidates:
    - Automatically recommends Top Trending & Fresh open marketplace jobs.
 """
 
-
+from __future__ import annotations
 import re
 import time
 from typing import Any, Dict, List, Set
 
 import structlog
+from sqlalchemy import select, func, and_, or_, desc
 
-from utils.pagination import stream_cursor
+from config.db import get_pg_session_factory
+from models.tables import Job, Resume, CandidateApplication
 
 logger = structlog.get_logger(__name__)
 
@@ -119,66 +115,42 @@ async def _stage_1_prefilter_jobs(
     max_candidates: int = 100,
 ) -> List[Dict[str, Any]]:
     """
-    Stage 1: Fast Role & Keyword database Filter.
-    Filters the open job pool down to ~50-100 jobs using indexed fields ($or regex).
-    Falls back gracefully to the latest open jobs if the filter is too restrictive.
+    Stage 1: Fast Role & Keyword PostgreSQL Pre-Filter.
+    Filters open jobs down to ~50-100 jobs using indexed status and role ilike matching.
+    Falls back gracefully to the freshest open jobs if the filter is too restrictive.
     """
-    base_match: Dict[str, Any] = {"status": {"$in": ["open", "published"]}}
-    if not include_external:
-        base_match["is_external"] = {"$ne": True}
-
-    or_clauses: List[Dict[str, Any]] = []
-
-    # A. Match on primary role phrase or role tokens
     primary_role = role_signals.get("primary_role", "").strip()
+    filters = [Job.status.in_(["open", "active", "published", "Open", "Active", "Published"])]
+    if not include_external:
+        filters.append(or_(Job.is_external.is_(False), Job.is_external.is_(None)))
+
+    title_conditions = []
     if primary_role and len(primary_role) >= 3:
-        escaped_role = re.escape(primary_role)
-        or_clauses.append({"title": {"$regex": escaped_role, "$options": "i"}})
+        title_conditions.append(Job.title.ilike(f"%{primary_role}%"))
 
-    role_tokens = role_signals.get("role_tokens", [])
-    for token in role_tokens:
+    for token in role_signals.get("role_tokens", []):
         if len(token) >= 3:
-            or_clauses.append({"title": {"$regex": re.escape(token), "$options": "i"}})
-            or_clauses.append({"department": {"$regex": re.escape(token), "$options": "i"}})
+            title_conditions.append(Job.title.ilike(f"%{token}%"))
+            title_conditions.append(Job.department.ilike(f"%{token}%"))
 
-    # B. Match on top candidate technical skills in required_skills
-    top_skills = role_signals.get("top_skills", [])
-    for skill in top_skills[:5]:
+    for skill in role_signals.get("top_skills", [])[:5]:
         if len(skill) >= 2:
-            or_clauses.append({"required_skills": {"$regex": f"^{re.escape(skill)}$", "$options": "i"}})
-            or_clauses.append({"title": {"$regex": re.escape(skill), "$options": "i"}})
-
-    projection = {
-        "_id": 1,
-        "title": 1,
-        "company_name": 1,
-        "company_logo": 1,
-        "company_logo_url": 1,
-        "logo_url": 1,
-        "logo": 1,
-        "location": 1,
-        "work_mode": 1,
-        "salary_range": 1,
-        "required_skills": 1,
-        "min_years": 1,
-        "jd_text_raw": 1,
-        "department": 1,
-        "created_at": 1,
-        "is_external": 1,
-        "external_apply_url": 1,
-        "apply_url": 1,
-        "tenant_id": 1,
-    }
+            title_conditions.append(Job.title.ilike(f"%{skill}%"))
 
     filtered_jobs: List[Dict[str, Any]] = []
 
-    if or_clauses:
-        async with get_pg_session_factory()() as session:
-            stmt = select(Job).where(Job.status.in_(["open", "active", "published", "Open", "Active", "Published"])).order_by(desc(Job.created_at)).limit(max_candidates)
-            j_rows = (await session.execute(stmt)).scalars().all()
-            filtered_jobs = [{c.name: getattr(r, c.name) for c in Job.__table__.columns} for r in j_rows]
-            for j in filtered_jobs:
-                j["_id"] = j.get("id")
+    async with get_pg_session_factory()() as session:
+        query_filters = list(filters)
+        if title_conditions:
+            query_filters.append(or_(*title_conditions))
+
+        stmt = select(Job).where(and_(*query_filters)).order_by(desc(Job.created_at)).limit(max_candidates)
+        j_rows = (await session.execute(stmt)).scalars().all()
+        for r in j_rows:
+            d = {c.name: getattr(r, c.name) for c in Job.__table__.columns}
+            d["id"] = str(r.id)
+            d["_id"] = str(r.id)
+            filtered_jobs.append(d)
 
     # Graceful Fallback: If Stage 1 yields fewer than 10 jobs, backfill with the freshest open jobs
     if len(filtered_jobs) < 10:
@@ -189,13 +161,14 @@ async def _stage_1_prefilter_jobs(
         )
         remaining_limit = max_candidates - len(filtered_jobs)
         async with get_pg_session_factory()() as session:
-            stmt = select(Job).where(Job.status.in_(["open", "active", "published", "Open", "Active", "Published"])).order_by(desc(Job.created_at)).limit(remaining_limit)
+            stmt = select(Job).where(and_(*filters)).order_by(desc(Job.created_at)).limit(remaining_limit)
             j_rows = (await session.execute(stmt)).scalars().all()
-            existing_ids = {str(j["_id"]) for j in filtered_jobs}
+            existing_ids = {str(j["id"]) for j in filtered_jobs}
             for r in j_rows:
                 jid = str(r.id)
                 if jid not in existing_ids:
                     d = {c.name: getattr(r, c.name) for c in Job.__table__.columns}
+                    d["id"] = jid
                     d["_id"] = jid
                     filtered_jobs.append(d)
                     existing_ids.add(jid)
@@ -235,10 +208,6 @@ async def find_jobs_for_candidate(
     """
     t0 = time.perf_counter()
 
-    jobs_query = {"status": {"$in": ["open", "published"]}}
-    if not include_external:
-        jobs_query["is_external"] = {"$ne": True}
-
     # 1. Retrieve candidate's primary or latest parsed resume
     target_resume = None
     if resume_repo:
@@ -258,7 +227,7 @@ async def find_jobs_for_candidate(
             doc = {c.name: getattr(r_row, c.name) for c in Resume.__table__.columns} if r_row else None
             if doc: doc["_id"] = doc.get("id")
         if doc and doc.get("parsed_data"):
-            from models.resume_model import ResumeModel
+            from schemas.resume_schema import ResumeModel
             try:
                 target_resume = ResumeModel(**doc)
             except Exception:

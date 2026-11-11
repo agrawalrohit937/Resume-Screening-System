@@ -2,12 +2,285 @@
 Pydantic v2 Schemas — User Auth & Profile
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 
-from models.user_model import UserRole, UserStatus, AuthProvider
+
+# ─── User Enums & Roles ───────────────────────────────────────────────────────
+class UserRole(str, Enum):
+    PLATFORM_ADMIN = "platform_admin"
+    EXECUTIVE = "executive"
+    RECRUITER = "recruiter"
+    HIRING_MANAGER = "hiring_manager"
+    INTERVIEWER = "interviewer"
+    COORDINATOR = "coordinator"
+    CANDIDATE = "candidate"
+    ADMIN = "admin"  # Backward-compatibility alias for platform_admin
+    EXEC = "exec"    # Backward-compatibility alias for executive
+    EMPLOYER = "employer"  # Signup alias for company founder / executive
+
+
+ENTERPRISE_ROLES = {
+    UserRole.PLATFORM_ADMIN,
+    UserRole.ADMIN,
+    UserRole.EXECUTIVE,
+    UserRole.EXEC,
+    UserRole.EMPLOYER,
+    UserRole.RECRUITER,
+    UserRole.HIRING_MANAGER,
+    UserRole.INTERVIEWER,
+    UserRole.COORDINATOR,
+}
+
+
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+    PENDING_VERIFICATION = "pending_verification"
+
+
+class AuthProvider(str, Enum):
+    EMAIL = "email"
+    GOOGLE = "google"
+    LINKEDIN = "linkedin"
+    GITHUB = "github"
+
+
+class TrustedDevice(BaseModel):
+    """A previously-verified browser/device, so we don't ask for login OTP every time."""
+    device_hash: str
+    label: Optional[str] = None
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_used_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime
+
+
+class LinkedAccountProvider(BaseModel):
+    """Metadata stored per linked OAuth provider in linked_accounts.<provider>."""
+    provider_id: Optional[str] = None
+    email: Optional[str] = None
+    picture: Optional[str] = None
+    username: Optional[str] = None
+    linked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_login: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserModel(BaseModel):
+    """Domain DTO for User."""
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
+
+    id: Optional[str] = Field(default=None, alias="_id")
+    email: EmailStr
+    hashed_password: Optional[str] = None
+    full_name: str
+    role: UserRole = UserRole.CANDIDATE
+    roles: List[UserRole] = Field(default_factory=lambda: [UserRole.CANDIDATE])
+    status: UserStatus = UserStatus.ACTIVE
+    tenant_id: Optional[str] = Field(default=None, description="Multi-tenant organization identifier")
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, v):
+        if not v:
+            return UserStatus.ACTIVE
+        if isinstance(v, UserStatus):
+            return v
+        v_str = str(v).replace("UserStatus.", "").lower().strip()
+        try:
+            return UserStatus(v_str)
+        except ValueError:
+            return UserStatus.ACTIVE
+
+    @field_validator("provider", mode="before")
+    @classmethod
+    def normalize_provider(cls, v):
+        if not v:
+            return AuthProvider.EMAIL
+        if isinstance(v, AuthProvider):
+            return v
+        v_str = str(v).replace("AuthProvider.", "").lower().strip()
+        try:
+            return AuthProvider(v_str)
+        except ValueError:
+            return AuthProvider.EMAIL
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v):
+        if not v:
+            return UserRole.CANDIDATE
+        if isinstance(v, UserRole):
+            return v
+        v_str = str(v).replace("UserRole.", "").replace("userrole.", "").lower().strip()
+        try:
+            return UserRole(v_str)
+        except ValueError:
+            return UserRole.CANDIDATE
+
+    @field_validator("roles", mode="before")
+    @classmethod
+    def normalize_roles(cls, v):
+        if not v:
+            return [UserRole.CANDIDATE]
+        if not isinstance(v, list):
+            v = [v]
+        res = []
+        for r in v:
+            if isinstance(r, UserRole):
+                res.append(r)
+                continue
+            r_str = str(r).replace("UserRole.", "").replace("userrole.", "").lower().strip()
+            try:
+                res.append(UserRole(r_str))
+            except ValueError:
+                res.append(UserRole.CANDIDATE)
+        return res
+
+    is_invited_staff: bool = False
+    invited_by: Optional[str] = None
+    company_name: Optional[str] = None
+    plan: str = "free"
+    subscription_active: bool = False
+    subscription_status: str = "expired"
+    subscription_start_date: Optional[datetime] = None
+    subscription_end_date: Optional[datetime] = None
+    plan_updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    payment_history: List[Dict[str, Any]] = Field(default_factory=list)
+
+    profile_picture: Optional[str] = None
+    profile_picture_public_id: Optional[str] = None
+    phone: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_username: Optional[str] = None
+    total_resumes: int = 0
+    total_ats_checks: int = 0
+    last_login: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    refresh_token: Optional[str] = None
+
+    gmail_access_token: Optional[str] = None
+    gmail_refresh_token: Optional[str] = None
+    gmail_token_expiry: Optional[datetime] = None
+
+    auth_method: Optional[str] = None
+    provider: AuthProvider = AuthProvider.EMAIL
+    email_verified: bool = False
+    google_picture: Optional[str] = None
+
+    auth_methods: List[str] = Field(default_factory=list)
+    last_login_method: Optional[str] = None
+    linked_accounts: Dict[str, Any] = Field(default_factory=dict)
+
+    college: Optional[str] = None
+    degree: Optional[str] = None
+    graduation_year: Optional[int] = None
+    location: Optional[str] = None
+    bio: Optional[str] = None
+    github_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
+    portfolio_slug: Optional[str] = None
+    is_portfolio_published: bool = False
+    profile_resume_url: Optional[str] = None
+    profile_resume_name: Optional[str] = None
+
+    trusted_devices: List[TrustedDevice] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_roles(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            raw_roles = data.get("roles")
+            raw_role = data.get("role")
+
+            resolved_roles: List[str] = []
+            if raw_roles and isinstance(raw_roles, list):
+                for r in raw_roles:
+                    val = r.value if hasattr(r, "value") else str(r)
+                    resolved_roles.append(val.lower())
+            elif raw_role:
+                val = raw_role.value if hasattr(raw_role, "value") else str(raw_role)
+                resolved_roles.append(val.lower())
+            else:
+                resolved_roles.append("candidate")
+
+            seen = set()
+            unique_roles = []
+            for r in resolved_roles:
+                if r not in seen:
+                    seen.add(r)
+                    unique_roles.append(r)
+
+            data["roles"] = unique_roles
+            if raw_role:
+                r_val = raw_role.value if hasattr(raw_role, "value") else str(raw_role).lower()
+                data["role"] = r_val if r_val in unique_roles else unique_roles[0]
+            else:
+                data["role"] = unique_roles[0]
+        return data
+
+    @property
+    def user_roles(self) -> set:
+        roles = self.roles or [self.role]
+        result = set()
+        for r in roles:
+            if hasattr(r, "value"):
+                result.add(str(r.value).lower())
+            elif r:
+                result.add(str(r).lower())
+        return result
+
+    def has_role(self, *role_names: Any) -> bool:
+        roles_set = self.user_roles
+        if "platform_admin" in roles_set or "admin" in roles_set:
+            return True
+        targets = set()
+        for r in role_names:
+            if hasattr(r, "value"):
+                targets.add(str(r.value).lower())
+            elif r:
+                targets.add(str(r).lower())
+        return bool(roles_set.intersection(targets))
+
+    @property
+    def display_picture(self) -> Optional[str]:
+        if self.profile_picture and self.profile_picture_public_id:
+            return self.profile_picture
+        if self.profile_picture:
+            return self.profile_picture
+        if self.linked_accounts:
+            for provider_name in ["google", "linkedin", "github"]:
+                provider_data = self.linked_accounts.get(provider_name)
+                if isinstance(provider_data, dict) and provider_data.get("picture"):
+                    return provider_data["picture"]
+        if self.google_picture:
+            return self.google_picture
+        return None
+
+    @property
+    def provider_names(self) -> List[str]:
+        if self.auth_methods:
+            return self.auth_methods
+        if self.auth_method:
+            return [self.auth_method]
+        return []
+
+    @property
+    def profile_completion_percent(self) -> int:
+        fields = [
+            self.full_name, self.phone, self.college, self.degree,
+            self.graduation_year, self.location, self.bio,
+            self.linkedin_url, self.github_url, self.portfolio_url,
+            self.display_picture,
+        ]
+        filled = sum(1 for f in fields if f not in (None, "", 0))
+        return round((filled / len(fields)) * 100)
 
 
 # ─── Request Schemas ──────────────────────────────────────────────────────────

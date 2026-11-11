@@ -19,7 +19,7 @@ import structlog
 
 from langgraph.graph import StateGraph, END
 
-from models.revenue_recovery_model import (
+from schemas.revenue_recovery_schema import (
     RecoveryStatus,
     RecoveryStrategy,
     RecoveryChannel,

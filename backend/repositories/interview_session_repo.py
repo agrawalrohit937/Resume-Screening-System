@@ -21,7 +21,9 @@ def _session_to_dict(model: InterviewSessionModel) -> Optional[Dict[str, Any]]:
     if not model:
         return None
     d = {c.name: getattr(model, c.name) for c in InterviewSessionModel.__table__.columns}
-    d["_id"] = str(d.get("id"))
+    sess_id = str(d.get("id"))
+    d["id"] = sess_id
+    d["_id"] = sess_id
     # Format datetime fields if needed
     for dt_col in ("created_at", "updated_at", "started_at", "completed_at", "expires_at"):
         val = d.get(dt_col)
@@ -88,20 +90,22 @@ class InterviewSessionRepository:
                 if not obj:
                     return None
 
-                # Handle updates
-                set_vals = dict(updates.get("$set", updates) if isinstance(updates, dict) else updates)
-                push_vals = dict(updates.get("$push", {}) if isinstance(updates, dict) else {})
-                inc_vals = dict(updates.get("$inc", {}) if isinstance(updates, dict) else {})
+                # Handle updates cleanly with standard keyword dictionary
+                set_vals = dict(updates if isinstance(updates, dict) else {})
 
-                # If answers or cheating_events is in set_vals and value is a single dict, treat as append
+                # If answers or cheating_events is in set_vals and value is a single dict, append cleanly
                 for list_field in ("answers", "cheating_events"):
-                    if list_field in set_vals and isinstance(set_vals[list_field], dict):
-                        push_vals[list_field] = set_vals.pop(list_field)
+                    if list_field in set_vals:
+                        val = set_vals.pop(list_field)
+                        current = list(getattr(obj, list_field) or [])
+                        if isinstance(val, list):
+                            current.extend(val)
+                        elif isinstance(val, dict):
+                            current.append(val)
+                        setattr(obj, list_field, current)
 
-                # Apply set
+                # Apply attributes
                 for k, v in set_vals.items():
-                    if k.startswith("$"):
-                        continue
                     if hasattr(obj, k) and k != "id":
                         if k in ("completed_at", "started_at", "expires_at") and isinstance(v, str):
                             try:
@@ -109,22 +113,6 @@ class InterviewSessionRepository:
                             except Exception:
                                 pass
                         setattr(obj, k, v)
-
-                # Apply inc
-                for k, v in inc_vals.items():
-                    if hasattr(obj, k) and k != "id":
-                        current = getattr(obj, k) or 0
-                        setattr(obj, k, current + v)
-
-                # Apply push / append
-                for k, v in push_vals.items():
-                    if hasattr(obj, k):
-                        current = list(getattr(obj, k) or [])
-                        if isinstance(v, dict) and "$each" in v:
-                            current.extend(v["$each"])
-                        else:
-                            current.append(v)
-                        setattr(obj, k, current)
 
                 obj.updated_at = datetime.now(timezone.utc)
             await session.refresh(obj)

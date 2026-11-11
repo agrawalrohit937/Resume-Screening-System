@@ -1,19 +1,18 @@
-"""Structured Interview Kits, Scorecards & Calibration API Routes (Pure PostgreSQL).
+"""
+Structured Interview Kits, Scorecards & Calibration API Routes (Pure PostgreSQL).
 CareerShala ATS v2.0.0 - Enterprise ATS Workflows.
+Fully decoupled into repository architecture.
 """
 
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select, and_
 
-from config.db import get_pg_session_factory
-from models.tables import CandidateApplication, InterviewKit, Scorecard
 from api.deps import get_current_user, get_interview_kit_repo, get_job_repo
 from repositories.interview_kit_repo import InterviewKitRepository
 from repositories.job_repo import JobRepository
-from models.user_model import UserModel
-from models.interview_kit import (
+from schemas.user_schema import UserModel
+from schemas.interview_schema import (
     InterviewKitModel,
     ScorecardModel,
     CalibrationReport,
@@ -29,84 +28,78 @@ class CreateKitPayload(BaseModel):
     job_id: str
     stage_name: str
     competencies: List[Competency]
-    standard_questions: Optional[List[str]] = None
+    structured_questions: Optional[List[str]] = []
 
 
-class SubmitScorecardPayload(BaseModel):
-    application_id: str
-    candidate_id: str
-    stage_name: str
-    ratings: Dict[str, int]
-    recommendation: RecommendationEnum
-    notes: Optional[str] = None
-
-
-@router.post("", response_model=InterviewKitModel, status_code=status.HTTP_201_CREATED)
-async def create_interview_kit_route(
+@router.post("/", response_model=InterviewKitModel, status_code=status.HTTP_201_CREATED)
+async def create_or_update_kit_route(
     payload: CreateKitPayload,
     current_user: UserModel = Depends(get_current_user),
-    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
+    service: InterviewKitService = Depends(),
 ):
-    """Creates a structured interview kit with standardized competency rubrics."""
-    service = InterviewKitService(kit_repo=kit_repo)
+    """Creates or updates a structured interview kit for a job stage."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    return await service.create_interview_kit(
+    return await service.create_or_update_kit(
         job_id=payload.job_id,
         stage_name=payload.stage_name,
         competencies=payload.competencies,
-        standard_questions=payload.standard_questions,
+        structured_questions=payload.structured_questions or [],
         tenant_id=tenant_id,
+        creator_id=str(current_user.id),
     )
 
 
-@router.get("", response_model=List[InterviewKitModel])
-async def get_interview_kits_route(
-    job_id: Optional[str] = Query(None, description="Filter by job ID"),
+@router.get("/job/{job_id}", response_model=List[InterviewKitModel])
+async def list_kits_by_job_route(
+    job_id: str,
     current_user: UserModel = Depends(get_current_user),
-    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
+    service: InterviewKitService = Depends(),
 ):
-    """Lists structured interview kits for a job or organization."""
+    """Retrieves all interview kits configured for a job."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    docs = await kit_repo.list_kits_by_job(job_id or "", tenant_id)
-    return [InterviewKitModel(**d) for d in docs]
+    return await service.list_kits_by_job(job_id=job_id, tenant_id=tenant_id)
 
 
-@router.post("/scorecards", response_model=ScorecardModel, status_code=status.HTTP_201_CREATED)
+@router.get("/job/{job_id}/stage/{stage_name}", response_model=Optional[InterviewKitModel])
+async def get_kit_by_job_and_stage_route(
+    job_id: str,
+    stage_name: str,
+    current_user: UserModel = Depends(get_current_user),
+    service: InterviewKitService = Depends(),
+):
+    """Retrieves a specific interview kit for a job and stage."""
+    tenant_id = getattr(current_user, "tenant_id", "default")
+    return await service.get_kit_for_stage(
+        job_id=job_id, stage_name=stage_name, tenant_id=tenant_id
+    )
+
+
+@router.post("/scorecard", response_model=ScorecardModel, status_code=status.HTTP_201_CREATED)
 async def submit_scorecard_route(
-    payload: SubmitScorecardPayload,
+    payload: ScorecardModel,
     current_user: UserModel = Depends(get_current_user),
-    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
+    service: InterviewKitService = Depends(),
 ):
-    """Submits an interviewer scorecard with 1-5 ratings and recommendations."""
-    service = InterviewKitService(kit_repo=kit_repo)
+    """Submits or updates an interviewer scorecard with competency ratings and recommendation."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    interviewer_id_str = str(current_user.id) if current_user.id else "interviewer_user"
-    return await service.submit_scorecard(
-        application_id=payload.application_id,
-        candidate_id=payload.candidate_id,
-        interviewer_id=interviewer_id_str,
-        stage_name=payload.stage_name,
-        ratings=payload.ratings,
-        recommendation=payload.recommendation,
-        notes=payload.notes,
-        tenant_id=tenant_id,
-    )
+    # Ensure interviewer_id is populated from current user if missing
+    if not payload.interviewer_id:
+        payload.interviewer_id = str(current_user.id)
+    payload.tenant_id = tenant_id
+
+    return await service.submit_scorecard(payload)
 
 
-@router.get("/calibration", response_model=CalibrationReport)
-async def get_calibration_route(
-    application_id: str = Query(..., description="Application ID"),
-    stage_name: str = Query(..., description="Interview stage name"),
+@router.get("/calibration/{application_id}", response_model=CalibrationReport)
+async def compute_calibration_route(
+    application_id: str,
     current_user: UserModel = Depends(get_current_user),
-    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
+    service: InterviewKitService = Depends(),
 ):
-    """Calculates inter-rater agreement, score variance, and consensus recommendations."""
-    service = InterviewKitService(kit_repo=kit_repo)
+    """Computes a calibration report and inter-rater consensus across all interviewers for an application."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    return await service.calculate_calibration(
-        application_id=application_id,
-        stage_name=stage_name,
-        tenant_id=tenant_id,
+    return await service.compute_calibration(
+        application_id=application_id, tenant_id=tenant_id
     )
 
 
@@ -118,10 +111,7 @@ async def get_assigned_interviews_route(
 ):
     """Retrieves interviews scheduled/assigned for the current user and tenant."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    async with get_pg_session_factory()() as session:
-        stmt = select(CandidateApplication).where(CandidateApplication.tenant_id == tenant_id).limit(50)
-        app_rows = (await session.execute(stmt)).scalars().all()
-        apps = [{c.name: getattr(r, c.name) for c in CandidateApplication.__table__.columns} for r in app_rows]
+    apps = await job_repo.list_candidate_applications_by_tenant(tenant_id=tenant_id, limit=50)
     results: List[Dict[str, Any]] = []
 
     for app in apps:
@@ -131,10 +121,7 @@ async def get_assigned_interviews_route(
         if job_id:
             job = await job_repo.get_by_id(job_id)
 
-        async with get_pg_session_factory()() as session:
-            stmt = select(InterviewKit).where(and_(InterviewKit.job_id == str(job_id), InterviewKit.tenant_id == tenant_id))
-            kit_row = (await session.execute(stmt)).scalar_one_or_none()
-            kit = {c.name: getattr(kit_row, c.name) for c in InterviewKit.__table__.columns} if kit_row else None
+        kit = await kit_repo.get_kit_by_job(job_id, tenant_id) if job_id else None
         competencies = kit.get("competencies", []) if kit else [
             {"name": "Technical Problem Solving", "description": "Core engineering knowledge and architecture", "rubric": {1: "Sub-par", 3: "Solid", 5: "Mastery"}},
             {"name": "System Architecture", "description": "Scalability, fault-tolerance, data modeling", "rubric": {1: "Basic", 3: "Proficient", 5: "Expert"}},
@@ -184,13 +171,10 @@ async def get_assigned_interviews_route(
 async def get_scorecards_by_application_route(
     application_id: str,
     current_user: UserModel = Depends(get_current_user),
+    kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
 ):
     """Retrieves scorecards submitted for a specific application."""
-    tenant_id = getattr(current_user, "tenant_id", "default")
-    async with get_pg_session_factory()() as session:
-        stmt = select(Scorecard).where(and_(Scorecard.application_id == str(application_id), Scorecard.tenant_id == tenant_id)).limit(20)
-        sc_rows = (await session.execute(stmt)).scalars().all()
-        scorecards = [{c.name: getattr(r, c.name) for c in Scorecard.__table__.columns} for r in sc_rows]
+    scorecards = await kit_repo.get_scorecards_by_application(application_id)
     results = []
     for sc in scorecards:
         d = dict(sc)

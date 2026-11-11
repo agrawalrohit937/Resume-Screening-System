@@ -28,9 +28,6 @@ Base = declarative_base()
 _pg_engine: Optional[AsyncEngine] = None
 _pg_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
-AsyncDatabase = Any
-AsyncPostgresClient = Any
-
 
 # ─── 1. PostgreSQL Engine & Session Factory ───────────────────────────────────
 def get_pg_engine() -> AsyncEngine:
