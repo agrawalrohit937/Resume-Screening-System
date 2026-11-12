@@ -6,7 +6,10 @@ and transaction dependencies for FastAPI. 100% Native PostgreSQL.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+import json
 from typing import Any, AsyncGenerator, Dict, Optional
+from uuid import UUID
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -20,6 +23,16 @@ from sqlalchemy.orm import declarative_base
 from core.config import settings
 
 logger = structlog.get_logger(__name__)
+
+
+def _custom_json_serializer(obj: Any) -> str:
+    def _default(o: Any) -> Any:
+        if isinstance(o, (datetime, date)):
+            return o.isoformat()
+        if isinstance(o, UUID):
+            return str(o)
+        raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+    return json.dumps(obj, default=_default)
 
 # ─── Declarative Base for SQLAlchemy Models ────────────────────────────────────
 Base = declarative_base()
@@ -51,6 +64,7 @@ def get_pg_engine() -> AsyncEngine:
             pool_pre_ping=True,
             pool_recycle=300,
             connect_args=connect_args,
+            json_serializer=_custom_json_serializer,
         )
     return _pg_engine
 

@@ -72,36 +72,6 @@ RESPONSE_TIMES = {
     "premium": "2 Hours",
 }
 
-STATUS_LABELS = {
-    "open": "Open",
-    "in_progress": "In Progress",
-    "waiting_for_customer": "Waiting for Customer",
-    "resolved": "Resolved",
-    "closed": "Closed",
-}
-
-STATUS_COLORS = {
-    "open": "bg-blue-100 text-blue-700 border-blue-200",
-    "in_progress": "bg-amber-100 text-amber-700 border-amber-200",
-    "waiting_for_customer": "bg-purple-100 text-purple-700 border-purple-200",
-    "resolved": "bg-emerald-100 text-emerald-700 border-emerald-200",
-    "closed": "bg-slate-100 text-slate-600 border-slate-200",
-}
-
-PRIORITY_LABELS = {
-    "low": "Low",
-    "medium": "Medium",
-    "high": "High",
-    "critical": "Critical",
-}
-
-PRIORITY_COLORS = {
-    "low": "bg-slate-100 text-slate-600 border-slate-200",
-    "medium": "bg-blue-100 text-blue-700 border-blue-200",
-    "high": "bg-amber-100 text-amber-700 border-amber-200",
-    "critical": "bg-rose-100 text-rose-700 border-rose-200",
-}
-
 
 def generate_ticket_id() -> str:
     """Generate a human-readable ticket ID like CS-2026-001245."""
@@ -195,7 +165,7 @@ class SupportService:
                 "changed_by": user.id,
                 "changed_by_role": user.role,
                 "changed_by_name": user.full_name,
-                "created_at": datetime.now(timezone.utc),
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }],
             "attachments": attachments or [],
             "messages": [],
@@ -313,13 +283,6 @@ class SupportService:
                 pass
         return ticket
 
-    async def _resolve_ticket_doc_id(self, ticket_id: str) -> Optional[str]:
-        """Return the document _id (as string) for a given ticket identifier."""
-        ticket = await self._resolve_ticket_id(ticket_id)
-        if not ticket:
-            return None
-        return ticket.id
-
     async def add_reply(
         self,
         ticket_id: str,
@@ -333,19 +296,21 @@ class SupportService:
         if ticket.user_id != user.id and not self._is_admin(user):
             return None
 
+        is_admin = self._is_admin(user)
         message = TicketMessage(
-            role="user",
+            role="support" if is_admin else "user",
             body=body,
             attachments=attachments or [],
-            author_name=user.full_name,
+            author_name="CareerShala Support" if is_admin else user.full_name,
         )
 
         updated = await self.ticket_repo.add_message(ticket.id, message.model_dump())
         if not updated:
             return None
 
-        # If ticket was waiting_for_customer, set back to in_progress
-        if ticket.status == "waiting_for_customer":
+        # If user replied and ticket was waiting_for_customer, set back to in_progress
+        # If admin replied, set status to waiting_for_customer
+        if not is_admin and ticket.status == "waiting_for_customer":
             updated = await self.ticket_repo.update_status(
                 ticket.id,
                 "in_progress",
@@ -353,39 +318,13 @@ class SupportService:
                 changed_by_role=user.role,
                 changed_by_name=user.full_name,
             )
-
-        return updated.model_dump() if updated else None
-
-    async def add_support_reply(
-        self,
-        ticket_id: str,
-        body: str,
-        attachments: Optional[List[Dict[str, Any]]] = None,
-        author_name: str = "CareerShala Support",
-    ) -> Optional[Dict[str, Any]]:
-        ticket = await self._resolve_ticket_id(ticket_id)
-        if not ticket:
-            return None
-
-        message = TicketMessage(
-            role="support",
-            body=body,
-            attachments=attachments or [],
-            author_name=author_name,
-        )
-
-        updated = await self.ticket_repo.add_message(ticket.id, message.model_dump())
-        if not updated:
-            return None
-
-        # Set status to waiting_for_customer when support replies
-        if ticket.status not in ("resolved", "closed"):
+        elif is_admin and ticket.status not in ("resolved", "closed"):
             updated = await self.ticket_repo.update_status(
                 ticket.id,
                 "waiting_for_customer",
-                changed_by="support",
-                changed_by_role="support",
-                changed_by_name=author_name,
+                changed_by=user.id,
+                changed_by_role=user.role,
+                changed_by_name="CareerShala Support",
             )
 
         return updated.model_dump() if updated else None
@@ -427,32 +366,6 @@ class SupportService:
 
     async def get_ticket_stats(self) -> Dict[str, Any]:
         return await self.ticket_repo.get_ticket_stats()
-
-    def _render_ticket_email(self, user, ticket_id, category, subject, description, priority, metadata):
-        """Render HTML email for support ticket notification."""
-        cat_labels = {k: v["label"] for k, v in SUPPORT_CATEGORIES.items()}
-        meta = metadata or {}
-        return f"""<html><body style="font-family:Inter,sans-serif;background:#f8fafc;padding:24px;">
-<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;border:1px solid #e2e8f0;">
-<div style="width:48px;height:48px;background:#eef2ff;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
-  <span style="font-size:24px;">🎫</span>
-</div>
-<h2 style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 4px;">New Support Ticket</h2>
-<p style="font-size:13px;color:#64748b;margin:0 0 20px;">A new ticket has been created by <strong>{user.full_name}</strong></p>
-<table style="width:100%;border-collapse:collapse;font-size:13px;">
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Ticket ID</td><td style="padding:8px 12px;color:#0f172a;font-weight:700;border-bottom:1px solid #f1f5f9;font-family:monospace;">{ticket_id}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">User</td><td style="padding:8px 12px;color:#0f172a;border-bottom:1px solid #f1f5f9;">{user.full_name} ({user.email})</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Plan</td><td style="padding:8px 12px;color:#0f172a;border-bottom:1px solid #f1f5f9;text-transform:capitalize;">{user.plan or 'free'}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Category</td><td style="padding:8px 12px;color:#0f172a;border-bottom:1px solid #f1f5f9;">{cat_labels.get(category, category)}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Subject</td><td style="padding:8px 12px;color:#0f172a;font-weight:600;border-bottom:1px solid #f1f5f9;">{subject}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Priority</td><td style="padding:8px 12px;color:#0f172a;text-transform:capitalize;border-bottom:1px solid #f1f5f9;">{priority}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Description</td><td style="padding:8px 12px;color:#334155;border-bottom:1px solid #f1f5f9;white-space:pre-wrap;">{description[:500]}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Browser</td><td style="padding:8px 12px;color:#64748b;border-bottom:1px solid #f1f5f9;">{meta.get('browser', 'N/A')}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">OS</td><td style="padding:8px 12px;color:#64748b;border-bottom:1px solid #f1f5f9;">{meta.get('os', 'N/A')}</td></tr>
-<tr><td style="padding:8px 12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;">Page</td><td style="padding:8px 12px;color:#64748b;border-bottom:1px solid #f1f5f9;">{meta.get('current_url', 'N/A')}</td></tr>
-</table>
-<p style="font-size:12px;color:#94a3b8;margin-top:20px;text-align:center;">CareerShala Support System</p>
-</div></body></html>"""
 
     async def upload_attachment(
         self, file_bytes: bytes, filename: str, content_type: str

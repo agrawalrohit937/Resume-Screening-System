@@ -13,7 +13,7 @@ from sqlalchemy import select, update, delete, and_, or_
 from config.db import get_pg_session_factory
 from models.tables import (
     Company, Job, Resume, CandidateApplication, JobApplication,
-    InterviewKit, Scorecard, TalentPoolProfile, WebhookSubscription,
+    InterviewKit, Scorecard, WebhookSubscription,
     EeoResponse, User, TeamInvite, Requisition, AuditLog
 )
 

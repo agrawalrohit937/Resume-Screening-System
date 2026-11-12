@@ -1,62 +1,13 @@
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from api.deps import get_current_user, get_db
 from models.tables import CandidateApplication, User, Resume, AuditLog
 from schemas.user_schema import UserModel
-from services.fairness.impact_monitor import compute_adverse_impact_report
 
-router = APIRouter(prefix="/api/v1/compliance", tags=["Regulatory Compliance & Fairness"])
-
-
-class BiasAuditSummary(BaseModel):
-    audit_year: int
-    regulatory_standard: str = "NYC Local Law 144 & EEOC 4/5ths Rule"
-    gender_report: Dict[str, Any]
-    race_ethnicity_report: Dict[str, Any]
-    total_evaluated_applications: int
-    passed_audit: bool
-
-
-@router.get("/bias-audit", response_model=BiasAuditSummary)
-async def get_bias_audit_report(
-    current_user: UserModel = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
-):
-    """
-    Produces NYC Local Law 144 / EEOC annual independent bias audit data.
-    Aggregates voluntary EEO demographic self-identifications against stage transition outcomes.
-    """
-    if not current_user.has_role("admin", "platform_admin", "recruiter", "executive"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators and compliance auditors may access the bias audit.",
-        )
-
-    stmt = select(CandidateApplication.stage, CandidateApplication.status, CandidateApplication.job_id)
-    res = await session.execute(stmt)
-    records = [{"stage": r.stage or "applied", "status": r.status, "job_id": r.job_id} for r in res.all()]
-
-    # Transform records for impact calculation
-    gender_records = [{"gender": r.get("eeo_gender", "unspecified"), "stage": r.get("stage", "applied")} for r in records]
-    ethnicity_records = [{"ethnicity": r.get("eeo_ethnicity", "unspecified"), "stage": r.get("stage", "applied")} for r in records]
-
-    # Compute impact reports
-    gender_rep = compute_adverse_impact_report(gender_records, demographic_key="gender")
-    ethnicity_rep = compute_adverse_impact_report(ethnicity_records, demographic_key="ethnicity")
-
-    passed_audit = bool(not gender_rep.adverse_impact_detected and not ethnicity_rep.adverse_impact_detected)
-
-    return BiasAuditSummary(
-        audit_year=2026,
-        gender_report=gender_rep.to_dict(),
-        race_ethnicity_report=ethnicity_rep.to_dict(),
-        total_evaluated_applications=len(records),
-        passed_audit=passed_audit,
-    )
+router = APIRouter(prefix="/api/v1/compliance", tags=["Regulatory Compliance"])
 
 
 @router.get("/candidate-portal/{candidate_id}")

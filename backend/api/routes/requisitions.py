@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from api.deps import get_current_user
+from api.deps import get_current_user, get_requisition_service
 from schemas.user_schema import UserModel
 from schemas.requisition_schema import (
     RequisitionModel,
@@ -46,7 +46,7 @@ class HirePayload(BaseModel):
 async def create_requisition_route(
     payload: CreateRequisitionPayload,
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Creates a new headcount requisition in DRAFT status."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -66,7 +66,7 @@ async def create_requisition_route(
 @router.get("", response_model=List[RequisitionModel])
 async def list_requisitions_route(
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Lists all requisitions scoped to the user's active tenant."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -76,7 +76,7 @@ async def list_requisitions_route(
 @router.get("/pipeline/candidates", response_model=List[Dict[str, Any]])
 async def get_pipeline_candidates_route(
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Lists active candidates in the hiring pipeline for the active tenant with high-speed projections."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -87,7 +87,7 @@ async def get_pipeline_candidates_route(
 async def get_requisition_route(
     requisition_id: str,
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Retrieves a requisition by ID."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -101,7 +101,7 @@ async def get_requisition_route(
 async def submit_requisition_route(
     requisition_id: str,
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Submits a draft requisition for sequential approval."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -116,7 +116,7 @@ async def record_decision_route(
     requisition_id: str,
     payload: DecisionPayload,
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Records an approval or rejection step in the requisition approval chain."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -137,7 +137,7 @@ async def link_job_route(
     requisition_id: str,
     payload: LinkJobPayload,
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Links an approved requisition to a job posting and marks it open."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -155,7 +155,7 @@ async def record_hire_route(
     requisition_id: str,
     payload: HirePayload,
     current_user: UserModel = Depends(get_current_user),
-    service: RequisitionService = Depends(),
+    service: RequisitionService = Depends(get_requisition_service),
 ):
     """Increments the filled headcount count for a requisition."""
     tenant_id = getattr(current_user, "tenant_id", "default")

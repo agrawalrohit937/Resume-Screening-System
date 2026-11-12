@@ -1,17 +1,14 @@
 """
-Tests for Fairness, Bias Monitoring, PII Blinding, and Regulatory Compliance (Task 3.5).
+Tests for Fairness, PII Blinding, and Regulatory Compliance (Task 3.5).
 Verifies:
   1. Indian Context PII blinding (Caste, Category, Religion, Marital Status, DOB, Graduation Year).
-  2. Four-Fifths rule impact monitoring (EEOC / NYC LL144).
-  3. Immutable decision logging contract.
-  4. Blind scoring stability (score delta < 2.0 points).
+  2. Blind scoring stability (score delta < 2.0 points).
 """
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from services.security.pii_redactor import mask_pii_extended
-from services.fairness.impact_monitor import compute_impact_ratios, check_selection_rate_equity
 from services.scoring_engine import score_resume
 from core import feature_flags
 
@@ -49,33 +46,6 @@ def test_pii_masking_indian_context():
     assert "FastApi" in masked
     assert "Docker" in masked
     assert "PostgreSQL" in masked
-
-
-def test_impact_monitor_four_fifths_rule():
-    """Validates EEOC 4/5ths rule (0.80 threshold) calculation."""
-    # Benchmark group: 100 applied, 60 selected -> 60%
-    # Group A: 50 applied, 20 selected -> 40% (Ratio: 40/60 = 0.667 -> Adverse impact)
-    # Group B: 40 applied, 22 selected -> 55% (Ratio: 55/60 = 0.917 -> Compliant)
-    selections = {
-        "benchmark_group": {"total": 100, "selected": 60},
-        "group_a": {"total": 50, "selected": 20},
-        "group_b": {"total": 40, "selected": 22},
-    }
-
-    report = compute_impact_ratios(selections, benchmark_group="benchmark_group")
-
-    assert report["benchmark_group"]["selection_rate"] == 0.6
-    assert report["group_a"]["selection_rate"] == 0.4
-    assert report["group_a"]["adverse_impact"] is True
-    assert report["group_a"]["impact_ratio"] == pytest.approx(0.667, abs=0.01)
-
-    assert report["group_b"]["adverse_impact"] is False
-    assert report["group_b"]["impact_ratio"] == pytest.approx(0.917, abs=0.01)
-
-    equity_check = check_selection_rate_equity(selections, benchmark_group="benchmark_group")
-    assert equity_check["has_adverse_impact"] is True
-    assert "group_a" in equity_check["flagged_groups"]
-    assert "group_b" not in equity_check["flagged_groups"]
 
 
 def test_blind_scoring_stability():

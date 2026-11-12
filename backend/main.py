@@ -47,7 +47,6 @@ from api.routes import (
     copilot,
     eeo,
     enhance,
-    enterprise_auth,
     github,
     gmail_oauth,
     health,
@@ -303,7 +302,6 @@ def create_application() -> FastAPI:
     app.include_router(eeo.router, prefix=f"{p}/eeo", tags=["Enterprise ATS - EEO Vault"])
     app.include_router(webhooks.router, prefix=f"{p}/webhooks", tags=["Enterprise ATS - Outbound Webhooks"])
     app.include_router(integrations.router, prefix=f"{p}/integrations", tags=["Enterprise ATS - Ecosystem Integrations"])
-    app.include_router(enterprise_auth.router, prefix=f"{p}/enterprise-auth", tags=["Enterprise ATS - SSO & SCIM"])
     app.include_router(team.router, prefix=f"{p}/team", tags=["Enterprise ATS - Team Management"])
     app.include_router(company.router, prefix=f"{p}/company", tags=["Company Profile"])
 
