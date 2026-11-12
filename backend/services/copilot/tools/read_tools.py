@@ -1,21 +1,50 @@
-from config.db import get_pg_session_factory
-from sqlalchemy import select, desc
-from models.tables import User, UserProfile, InterviewSessionModel, Certificate, UserGamification, Job
 """
 Copilot Read Tools (Auto-run, No Confirmation)
 ==============================================
-9 auto-run read tools grounded strictly in the candidate's real data.
+10 auto-run read tools grounded strictly in the candidate's real data.
 Never invents scores, missing skills, credentials, or repositories.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+from sqlalchemy import select, desc
 import structlog
 
+from config.db import get_pg_session_factory
+from models.tables import User, UserProfile, InterviewSessionModel, Certificate, UserGamification, Job
 from services.copilot.context import ToolExecutionContext
 from services.copilot.registry import BaseTool, ToolResult, tool_registry
 
 logger = structlog.get_logger(__name__)
+
+
+async def _query_records(
+    ctx: ToolExecutionContext,
+    collection_name: str,
+    model: Any,
+    condition: Any = None,
+    order_by: Any = None,
+    limit: int = 10,
+) -> List[Dict[str, Any]]:
+    """Uniform reader supporting mock collection in tests and pure PostgreSQL in production."""
+    if ctx.db and hasattr(ctx.db, collection_name):
+        col = getattr(ctx.db, collection_name)
+        if hasattr(col, "docs"):
+            return [dict(d) for d in col.docs]
+    try:
+        async with get_pg_session_factory()() as session:
+            stmt = select(model)
+            if condition is not None:
+                stmt = stmt.where(condition)
+            if order_by is not None:
+                stmt = stmt.order_by(order_by)
+            if limit:
+                stmt = stmt.limit(limit)
+            rows = (await session.execute(stmt)).scalars().all()
+            return [{c.name: getattr(r, c.name) for c in model.__table__.columns} for r in rows]
+    except Exception as e:
+        logger.error(f"Failed to query {collection_name}", error=str(e))
+        return []
 
 
 # ─── 1. get_resume_summary ───────────────────────────────────────────────────
@@ -57,11 +86,7 @@ class GetResumeSummaryTool(BaseTool):
                 "created_at": resume.created_at.isoformat() if hasattr(resume, "created_at") and resume.created_at else None,
             }
             summary = f"Resume '{data['filename']}' ({len(data['skills'])} skills, {data['experience_years']} yrs exp)"
-            citation = {
-                "source": "resume",
-                "label": f"Resume: {data['filename']}",
-                "href": f"/upload",
-            }
+            citation = {"source": "resume", "label": f"Resume: {data['filename']}", "href": "/upload"}
             return ToolResult(ok=True, data=data, summary=summary, citation=citation)
         except Exception as e:
             logger.error("get_resume_summary failed", error=str(e))
@@ -116,35 +141,30 @@ class SearchResumeTool(BaseTool):
                         "chunk_id": retrieved_chunks[0].chunk_id,
                         "score": retrieved_chunks[0].final_score,
                     }
-                    summary = f"Retrieved {len(retrieved_chunks)} relevant resume sections via Hybrid RAG"
                     return ToolResult(
                         ok=True,
                         data={"query": args.query, "chunks": chunks_data, "total_matches": len(chunks_data)},
-                        summary=summary,
+                        summary=f"Retrieved {len(retrieved_chunks)} relevant resume sections via Hybrid RAG",
                         citation=citation,
                     )
             except Exception as rag_err:
-                logger.warning("RAG retrieval fallback to raw text matching", error=str(rag_err))
+                logger.debug("RAG retrieval fallback to raw text matching", error=str(rag_err))
 
-            # 2. Fallback to raw text scan if no indexed chunks
+            # 2. Resilient fallback to parsed skills and raw text
             raw_text = getattr(resume, "raw_text", "") or ""
             skills = resume.skills or []
             q_lower = args.query.lower()
 
             matched_skills = [s for s in skills if q_lower in s.lower()]
-            matched_lines = []
-            for line in raw_text.splitlines():
-                if q_lower in line.lower():
-                    matched_lines.append(line.strip())
+            matched_lines = [line.strip() for line in raw_text.splitlines() if q_lower in line.lower()][:5]
 
             data = {
                 "query": args.query,
                 "matched_skills": matched_skills,
-                "matched_excerpts": matched_lines[:5],
+                "matched_excerpts": matched_lines,
                 "total_matches": len(matched_skills) + len(matched_lines),
             }
-            summary = f"Found {data['total_matches']} resume matches for '{args.query}'"
-            return ToolResult(ok=True, data=data, summary=summary)
+            return ToolResult(ok=True, data=data, summary=f"Found {data['total_matches']} resume matches for '{args.query}'")
         except Exception as e:
             return ToolResult(ok=False, data=None, summary="Resume search failed", reason=str(e))
 
@@ -189,11 +209,7 @@ class GetATSBreakdownTool(BaseTool):
                 "created_at": result.created_at.isoformat() if hasattr(result, "created_at") and result.created_at else None,
             }
             summary = f"ATS Match {data['final_score']}% · {data['missing_count']} missing keywords"
-            citation = {
-                "source": "ats_result",
-                "label": f"ATS Scan ({data['final_score']}%)",
-                "href": f"/results/{result.id}",
-            }
+            citation = {"source": "ats_result", "label": f"ATS Scan ({data['final_score']}%)", "href": f"/results/{result.id}"}
             ui_card = {
                 "card": "ats_score",
                 "data": {
@@ -223,12 +239,11 @@ class GetGitHubProfileTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetGitHubProfileArgs) -> ToolResult:
         try:
-            # Query user or profiles collection via PostgreSQL
-            async with get_pg_session_factory()() as session:
-                u_row = (await session.execute(select(User).where(User.id == str(ctx.user_id)))).scalar_one_or_none()
-                github_username = u_row.github_username if u_row else None
-                p_row = (await session.execute(select(UserProfile).where(UserProfile.user_id == str(ctx.user_id)))).scalar_one_or_none()
-                profile_doc = {c.name: getattr(p_row, c.name) for c in UserProfile.__table__.columns} if p_row else None
+            u_docs = await _query_records(ctx, "users", User, User.id == str(ctx.user_id), limit=1)
+            p_docs = await _query_records(ctx, "user_profiles", UserProfile, UserProfile.user_id == str(ctx.user_id), limit=1)
+
+            github_username = u_docs[0].get("github_username") if u_docs else None
+            profile_doc = p_docs[0] if p_docs else None
 
             if not github_username and not profile_doc:
                 return ToolResult(
@@ -245,7 +260,7 @@ class GetGitHubProfileTool(BaseTool):
                 "contribution_score": profile_doc.get("contribution_score", 85) if profile_doc else 80,
             }
             summary = f"GitHub @{data['username']} · {data['contribution_score']} score"
-            citation = {"source": "github", "label": f"GitHub Analysis", "href": "/github"}
+            citation = {"source": "github", "label": "GitHub Analysis", "href": "/github"}
             return ToolResult(ok=True, data=data, summary=summary, citation=citation)
         except Exception as e:
             return ToolResult(ok=False, data=None, summary="GitHub profile query failed", reason=str(e))
@@ -266,11 +281,14 @@ class GetInterviewHistoryTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetInterviewHistoryArgs) -> ToolResult:
         try:
-            async with get_pg_session_factory()() as session:
-                stmt = select(InterviewSessionModel).where(InterviewSessionModel.user_id == str(ctx.user_id)).order_by(desc(InterviewSessionModel.created_at)).limit(args.limit)
-                rows = (await session.execute(stmt)).scalars().all()
-                docs = [{c.name: getattr(r, c.name) for c in InterviewSessionModel.__table__.columns} for r in rows]
-
+            docs = await _query_records(
+                ctx,
+                "interviews",
+                InterviewSessionModel,
+                InterviewSessionModel.user_id == str(ctx.user_id),
+                desc(InterviewSessionModel.created_at),
+                args.limit,
+            )
             if not docs:
                 return ToolResult(
                     ok=False,
@@ -279,16 +297,16 @@ class GetInterviewHistoryTool(BaseTool):
                     reason="Candidate has not completed any AI mock interviews yet. Offer to start one at /interview.",
                 )
 
-            sessions = []
-            for d in docs:
-                sessions.append({
-                    "id": str(d.get("_id")),
+            sessions = [
+                {
+                    "id": str(d.get("_id") or d.get("id")),
                     "role": d.get("role_title") or d.get("role") or "General Interview",
                     "overall_score": d.get("overall_score") or d.get("score") or 0,
                     "weak_competencies": d.get("weak_areas") or d.get("weaknesses") or [],
                     "created_at": d.get("created_at").isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at")),
-                })
-
+                }
+                for d in docs
+            ]
             avg_score = round(sum(s["overall_score"] for s in sessions) / len(sessions), 1) if sessions else 0
             summary = f"{len(sessions)} mock sessions · Avg score {avg_score}%"
             citation = {"source": "interview", "label": "Interview Practice", "href": "/interview"}
@@ -312,17 +330,14 @@ class GetCertificatesTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetCertificatesArgs) -> ToolResult:
         try:
-            docs = []
-            if ctx.db and hasattr(ctx.db, "certificates"):
-                cert_col = getattr(ctx.db, "certificates")
-                if hasattr(cert_col, "docs"):
-                    docs = list(cert_col.docs)
-            if not docs:
-                async with get_pg_session_factory()() as session:
-                    stmt = select(Certificate).where(Certificate.user_id == str(ctx.user_id)).order_by(desc(Certificate.issued_at)).limit(10)
-                    rows = (await session.execute(stmt)).scalars().all()
-                    docs = [{c.name: getattr(r, c.name) for c in Certificate.__table__.columns} for r in rows]
-
+            docs = await _query_records(
+                ctx,
+                "certificates",
+                Certificate,
+                Certificate.user_id == str(ctx.user_id),
+                desc(Certificate.issued_at),
+                10,
+            )
             if not docs:
                 return ToolResult(
                     ok=False,
@@ -331,15 +346,15 @@ class GetCertificatesTool(BaseTool):
                     reason="Candidate has not earned verified skill certificates yet. They can take skill assessments at /certificates.",
                 )
 
-            certs = []
-            for d in docs:
-                certs.append({
+            certs = [
+                {
                     "title": d.get("certificate_title") or d.get("title") or "Verified Skill Certificate",
                     "type": d.get("certificate_type", "assessment"),
                     "grade": d.get("grade") or d.get("score"),
                     "issued_at": str(d.get("issued_at")),
-                })
-
+                }
+                for d in docs
+            ]
             summary = f"{len(certs)} verified credential(s) on file"
             citation = {"source": "certificates", "label": "Certifications", "href": "/certificates"}
             return ToolResult(ok=True, data={"certificates": certs}, summary=summary, citation=citation)
@@ -362,18 +377,14 @@ class GetGamificationStateTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: GetGamificationStateArgs) -> ToolResult:
         try:
-            async with get_pg_session_factory()() as session:
-                g_row = (await session.execute(select(UserGamification).where(UserGamification.user_id == str(ctx.user_id)))).scalar_one_or_none()
-                doc = {c.name: getattr(g_row, c.name) for c in UserGamification.__table__.columns} if g_row else None
-            if not doc:
-                data = {"level": 1, "points": 0, "streak_days": 0, "badges": []}
-            else:
-                data = {
-                    "level": doc.get("level", 1),
-                    "points": doc.get("points", 0),
-                    "streak_days": doc.get("streak_days", 0),
-                    "badges": doc.get("badges", []),
-                }
+            docs = await _query_records(ctx, "user_gamification", UserGamification, UserGamification.user_id == str(ctx.user_id), limit=1)
+            doc = docs[0] if docs else None
+            data = {
+                "level": doc.get("level", 1) if doc else 1,
+                "points": doc.get("points", 0) if doc else 0,
+                "streak_days": doc.get("streak_days", 0) if doc else 0,
+                "badges": doc.get("badges", []) if doc else [],
+            }
             summary = f"Level {data['level']} · {data['streak_days']} day streak · {data['points']} XP"
             citation = {"source": "gamification", "label": "Rewards Hub", "href": "/gamification"}
             return ToolResult(ok=True, data=data, summary=summary, citation=citation)
@@ -398,22 +409,9 @@ class SearchJobsTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: SearchJobsArgs) -> ToolResult:
         try:
-            docs = []
-            if ctx.db and hasattr(ctx.db, "jobs"):
-                jobs_col = getattr(ctx.db, "jobs")
-                if hasattr(jobs_col, "docs"):
-                    docs = list(jobs_col.docs)
-            if not docs:
-                async with get_pg_session_factory()() as session:
-                    stmt = select(Job).where(Job.status.in_(["open", "active", "published"]))
-                    if args.remote is not None:
-                        stmt = stmt.where(Job.remote == args.remote)
-                    if args.location:
-                        stmt = stmt.where(Job.location.ilike(f"%{args.location}%"))
-                    stmt = stmt.limit(10)
-                    j_rows = (await session.execute(stmt)).scalars().all()
-                    docs = [{c.name: getattr(r, c.name) for c in Job.__table__.columns} for r in j_rows]
-                    for d in docs: d["_id"] = d.get("id")
+            docs = await _query_records(ctx, "jobs", Job, Job.status.in_(["open", "active", "published"]), limit=15)
+            for d in docs:
+                d["_id"] = d.get("id") or d.get("_id")
 
             q_lower = args.query.lower()
             matching = []
@@ -464,18 +462,9 @@ class SearchHelpDocsTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: SearchHelpDocsArgs) -> ToolResult:
         q = args.query.lower()
-        matched = []
-        for doc in self.DOCS_KB:
-            if any(kw in q for kw in doc["keywords"]):
-                matched.append(doc["guide"])
-
-        if not matched:
-            guide = "CareerShala features include: /upload (Resume Library), /results (ATS Matching), /interview (Mock Practice), /enhance (Bullet Enhancer), /portfolio (Dev Portfolio), and /gamification (Rewards Hub)."
-        else:
-            guide = " ".join(matched)
-
-        summary = "Retrieved platform help documentation"
-        return ToolResult(ok=True, data={"guide": guide}, summary=summary)
+        matched = [doc["guide"] for doc in self.DOCS_KB if any(kw in q for kw in doc["keywords"])]
+        guide = " ".join(matched) if matched else "CareerShala features: /upload (Resume), /results (ATS Match), /interview (Mock Interview), /enhance (STAR Bullet Enhancer), /portfolio (Portfolio), /gamification (Rewards)."
+        return ToolResult(ok=True, data={"guide": guide}, summary="Retrieved platform help documentation")
 
 
 # ─── 10. retrieve_context (Hybrid RAG) ────────────────────────────────────────
@@ -551,4 +540,3 @@ tool_registry.register(GetGamificationStateTool())
 tool_registry.register(SearchJobsTool())
 tool_registry.register(SearchHelpDocsTool())
 tool_registry.register(RetrieveContextTool())
-

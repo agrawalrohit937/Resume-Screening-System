@@ -22,9 +22,7 @@ INJECTION_PATTERNS = [
     re.compile(r"(?i)override\s+(all\s+)?(safety|system|guardrail)", re.IGNORECASE),
 ]
 
-# Regex patterns for PII detection
-EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
-PHONE_REGEX = re.compile(r"(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b")
+from services.security.pii_redactor import EMAIL_REGEX, PHONE_REGEX
 
 # Regex pattern for percentage or score claims (e.g., '85%', '92%')
 PERCENTAGE_REGEX = re.compile(r"\b(\d{1,3})%(?!\w)")
