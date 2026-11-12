@@ -17,7 +17,7 @@ import Step4Projects from '../components/portfolio/Step4Projects';
 import Step5Experience from '../components/portfolio/Step5Experience';
 import ThemeSelectionStep, { THEMES } from '../components/portfolio/ThemeSelectionStep';
 import Step6ReviewPublish from '../components/portfolio/Step6ReviewPublish';
-import PortfolioPaywallModal from '../components/portfolio/PortfolioPaywallModal';
+// import PortfolioPaywallModal from '../components/portfolio/PortfolioPaywallModal';
 import { 
   Sparkles, 
   ExternalLink, 
@@ -148,28 +148,28 @@ export default function PortfolioBuilder() {
 
   // Load existing or auto-synced data
   const loadPortfolioData = async (forceSync = false) => {
-    setLoading(true);
+    if (forceSync) {
+      setLoading(true);
+    }
     try {
-      let res = await getMyPortfolio(forceSync);
-      // Auto-fallback: if response has 0 projects, try forceSync to extract directly from candidate's resume
-      if (res.status === 'success' && res.data && (!res.data.projects || res.data.projects.length === 0) && !forceSync) {
-        const syncRes = await getMyPortfolio(true);
-        if (syncRes.status === 'success' && syncRes.data && syncRes.data.projects?.length > 0) {
-          res = syncRes;
-        }
-      }
+      const res = await getMyPortfolio(forceSync);
 
       if (res.status === 'success' && res.data) {
-        const cleanedProjects = (res.data.projects?.length ? res.data.projects : prev.projects || []).map((p, i) => {
+        try {
+          sessionStorage.setItem(`careershala_portfolio_cache:${userId}`, JSON.stringify(res.data));
+        } catch {
+          // ignore storage quota errors
+        }
+        const formatProjects = (list) => (list || []).map((p, i) => {
           const rawHighlights = (p.highlights || []).map((h) => {
             if (typeof h === 'string') return null;
             const v = (h.value || '').trim();
             return v.length <= 15 && h.label?.trim() ? h : null;
           }).filter(Boolean);
-          return { 
-            ...p, 
+          return {
+            ...p,
             id: p.id || p._id || `proj_loaded_${i}_${(p.title || 'case').replace(/\s+/g, '_').toLowerCase()}`,
-            highlights: rawHighlights 
+            highlights: rawHighlights,
           };
         });
 
@@ -178,12 +178,12 @@ export default function PortfolioBuilder() {
           ...res.data,
           avatar_url: res.data.avatar_url || user?.profile_picture || user?.avatar_url || user?.display_picture || prev.avatar_url,
           skills: cleanSkillsDict(res.data.skills || prev.skills),
-          projects: cleanedProjects,
+          projects: formatProjects(res.data.projects?.length ? res.data.projects : prev.projects),
           experience: res.data.experience?.length ? res.data.experience : prev.experience,
           education: res.data.education?.length ? res.data.education : prev.education
         }));
         if (forceSync) {
-          toast.success('Successfully extracted all projects & skills from your resume! 🔄');
+          toast.success('Successfully extracted all projects & skills from your resume!');
         }
       } else if (user) {
         setFormData((prev) => ({
@@ -192,19 +192,45 @@ export default function PortfolioBuilder() {
           full_name: prev.full_name || user.full_name || '',
           email: prev.email || user.email || ''
         }));
+        if (forceSync) {
+          toast.error('No parsed resume found to sync.');
+        }
       }
     } catch (err) {
       console.error('Failed to load portfolio:', err);
+      if (forceSync) {
+        toast.error(err?.response?.data?.detail || 'Failed to sync from resume. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const userId = user?.id || user?._id || null;
+
+  // Instant Stale-While-Revalidate: read cache immediately if available
   useEffect(() => {
-    if (userId) {
-      loadPortfolioData(false);
+    if (!userId) return;
+    try {
+      const cached = sessionStorage.getItem(`careershala_portfolio_cache:${userId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          setFormData((prev) => ({
+            ...prev,
+            ...parsed,
+            avatar_url: parsed.avatar_url || user?.profile_picture || user?.avatar_url || prev.avatar_url,
+            skills: cleanSkillsDict(parsed.skills || prev.skills),
+            projects: parsed.projects || prev.projects,
+            experience: parsed.experience || prev.experience,
+            education: parsed.education || prev.education,
+          }));
+        }
+      }
+    } catch {
+      // ignore
     }
+    loadPortfolioData(false);
   }, [userId]);
 
   // Handle Photo Upload (Updates both Portfolio & User Profile Tab)
@@ -381,9 +407,10 @@ export default function PortfolioBuilder() {
       return;
     }
 
-    // Strict Paywall Check
+    // Strict Paywall Check: Redirect to Premium with redirect back to portfolio
     if (!isPremium && !skipPaywall) {
-      setShowPaywallModal(true);
+      toast('Candidate Pro subscription required to publish live portfolio.', { icon: '👑' });
+      navigate('/premium?redirect=/portfolio-builder&action=publish');
       return;
     }
 
@@ -549,20 +576,7 @@ export default function PortfolioBuilder() {
     })
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[75vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 bg-white/90 backdrop-blur-2xl p-10 rounded-3xl border border-indigo-100 shadow-2xl">
-          <div className="relative w-14 h-14">
-            <div className="w-14 h-14 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin"></div>
-            <Sparkles size={18} className="absolute inset-0 m-auto text-indigo-600 animate-pulse" />
-          </div>
-          <p className="text-xs font-black uppercase tracking-widest text-slate-600">Initializing Executive Studio...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Removed full-screen blocking loader. Progressive loading renders form immediately.
   return (
     <div className="w-full space-y-8 font-sans text-slate-900 pb-16">
       
@@ -700,10 +714,11 @@ export default function PortfolioBuilder() {
 
                   <button
                     onClick={() => loadPortfolioData(true)}
-                    className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-4 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-xs transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                    disabled={loading}
+                    className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-4 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-xs transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <RefreshCw size={14} className="text-indigo-600" />
-                    Re-Sync from Resume
+                    <RefreshCw size={14} className={`text-indigo-600 ${loading ? 'animate-spin' : ''}`} />
+                    {loading ? 'Syncing...' : 'Re-Sync from Resume'}
                   </button>
                 </div>
 
@@ -1102,17 +1117,7 @@ export default function PortfolioBuilder() {
         </div>
       )}
 
-      {/* ── SUBSCRIPTION PAYWALL MODAL ── */}
-      <PortfolioPaywallModal
-        isOpen={showPaywallModal}
-        onClose={() => setShowPaywallModal(false)}
-        user={user}
-        refreshUser={refreshUser}
-        onPaymentSuccess={() => {
-          setShowPaywallModal(false);
-          handleSaveAndPublish(true);
-        }}
-      />
+      {/* ── SUBSCRIPTION PAYWALL MODAL (Removed: redirected directly to standard /premium page) ── */}
 
       {/* ── POST-LAUNCH CELEBRATION & PROFILE SYNC MODAL ── */}
       <AnimatePresence>

@@ -1,30 +1,14 @@
+"""Nightly & Mid-Day AI Job Alert Engine (Azure Logic App Webhook)."""
+
 from __future__ import annotations
 
-from repositories.company_repo import CompanyRepository
-_company_repo = CompanyRepository()
-from repositories.cron_repo import CronRepository
-_cron_repo = CronRepository()
-"""
-Nightly & Mid-Day AI Job Alert Engine — Retention Loop (Phase D).
-================================================================
-
-Serverless Webhook Execution Architecture:
-- Triggered externally via authenticated webhook (Azure Logic App):
-  POST /api/v1/jobs/admin/trigger-alerts (Header: X-Cron-Secret)
-- Deterministic slot-based idempotency (e.g., '2026-10-03_07:30', '2026-10-03_14:00').
-- Atomic per-user delivery claims with safe stale-claim recovery in `job_alert_deliveries`.
-- Structured audit execution tracking in `cron_job_runs`.
-- Bounded async concurrency (asyncio.Semaphore) optimized for Azure App Service.
-"""
-
-
 import asyncio
-import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
+from sqlalchemy import func, or_, select, update
 
 try:
     from zoneinfo import ZoneInfo
@@ -32,25 +16,18 @@ try:
 except Exception:
     IST = timezone(timedelta(hours=5, minutes=30))
 
-from schemas.cron_schema import CronRunStatus, DeliveryStatus, ensure_cron_indexes
-from schemas.user_schema import UserRole
+from config.db import get_pg_session_factory
+from models.tables import Job, Resume, User
 from services.email_service import send_job_alert_email
 from services.job_matcher import find_jobs_for_candidate
 from services.job_scraper import scrape_external_jobs
-from services.locking import distributed_lock
 
 logger = structlog.get_logger(__name__)
 
 
 def calculate_slot_id(now: Optional[datetime] = None, slot_type: Optional[str] = None) -> str:
-    """
-    Computes a deterministic slot identifier string in Asia/Kolkata timezone.
-    Examples: '2026-10-03_07:30', '2026-10-03_14:00'
-    """
-    if now is None:
-        now = datetime.now(timezone.utc)
-    
-    # Convert to IST
+    """Compute deterministic slot identifier in Asia/Kolkata timezone."""
+    now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     ist_now = now.astimezone(IST)
@@ -58,73 +35,20 @@ def calculate_slot_id(now: Optional[datetime] = None, slot_type: Optional[str] =
 
     if slot_type == "morning":
         return f"{date_str}_07:30"
-    elif slot_type == "afternoon":
+    if slot_type == "afternoon":
         return f"{date_str}_14:00"
-    elif slot_type == "manual":
+    if slot_type == "manual":
         return f"{date_str}_manual_{ist_now.strftime('%H%M%S')}"
+    return f"{date_str}_07:30" if ist_now.hour < 12 else f"{date_str}_14:00"
 
-    # Auto-infer based on hour if slot_type not provided
-    hour = ist_now.hour
-    if hour < 12:
-        return f"{date_str}_07:30"
-    else:
-        return f"{date_str}_14:00"
 
 async def run_external_job_scrape() -> Dict[str, int]:
-    """Run the JSearch import against the active PostgreSQL database connection."""
+    """Run JSearch external scrape + 5-day cleanup against PostgreSQL."""
     try:
         return await scrape_external_jobs()
     except Exception as exc:
         logger.error("External job scrape failed", error=str(exc))
-        return {"fetched": 0, "upserted": 0, "skipped": 0}
-
-
-async def _resolve_company_logo(job: Dict[str, Any], db: Any) -> Optional[str]:
-    """Helper to cleanly resolve company logo URL for job cards."""
-    logo = (
-        job.get("company_logo_url")
-        or job.get("company_logo")
-        or job.get("logo_url")
-        or job.get("logo")
-    )
-    if logo and not str(logo).startswith("data:image/"):
-        return str(logo).strip()
-
-    job_id = job.get("id") or job.get("_id")
-    tenant_id = job.get("tenant_id")
-    company_name = job.get("company_name") or job.get("company")
-
-    comp_doc = None
-    if tenant_id and tenant_id != "default":
-        try:
-            comp_doc = await _company_repo.get_by_tenant_id(tenant_id)
-        except Exception:
-            pass
-    if not comp_doc and company_name:
-        try:
-            comp_doc = await _company_repo.get_by_name(str(company_name).strip())
-        except Exception:
-            pass
-
-    resolved_logo = (
-        (comp_doc.get("logo_url") if comp_doc else None)
-        or logo
-    )
-
-    if resolved_logo:
-        logo_str = str(resolved_logo).strip()
-        if logo_str.startswith("data:image/"):
-            try:
-                from services.cloudinary_service import upload_base64_company_logo
-                c_id = tenant_id or (re.sub(r"[^a-zA-Z0-9_-]", "-", str(company_name).lower()) if company_name else "company")
-                uploaded = await upload_base64_company_logo(logo_str, company_id=c_id)
-                if uploaded:
-                    return uploaded
-            except Exception:
-                pass
-        return logo_str
-
-    return None
+        return {"fetched": 0, "upserted": 0, "skipped": 0, "deleted": 0}
 
 
 async def run_nightly_job_alerts(
@@ -135,76 +59,32 @@ async def run_nightly_job_alerts(
     triggered_by: str = "scheduler",
     force_replay: bool = False,
     concurrency_limit: int = 3,
-    cron_repo: Optional[CronRepository] = None,
+    session_factory: Any = None,
 ) -> Dict[str, Any]:
-    """
-    Executes the batch AI Job Alert retention pipeline:
-    1. Pre-Check: Verifies active open jobs exist before scanning candidates.
-    2. Deterministic Slot Idempotency & Mutex Locking: Prevents duplicate execution.
-    3. Per-Candidate Atomic Delivery Claims: Ensures exactly-once delivery per candidate.
-    4. Bounded Async Concurrency: Keeps Azure B1 CPU and memory within safe boundaries.
-    5. Persistent Run Logging: Records metrics in `cron_job_runs`.
-    """
+    """Scrape fresh jobs, match top open roles per candidate, and email alerts via Brevo."""
     t0 = time.perf_counter()
     now_utc = datetime.now(timezone.utc)
-
-    cron_repo = cron_repo or CronRepository(db=db)
-
-    # Ensure indexes on audit collections
-    await ensure_cron_indexes(db)
-
-    # 1. Deterministic slot assignment
-    if target_email:
-        effective_slot_id = slot_id or calculate_slot_id(now_utc, slot_type="manual")
-        effective_slot_type = "manual"
-    else:
-        effective_slot_id = slot_id or calculate_slot_id(now_utc, slot_type=slot_type)
-        effective_slot_type = slot_type or ("morning" if "07:30" in effective_slot_id else "afternoon")
-
-    logger.info(
-        "Starting AI Job Alerts execution",
-        slot_id=effective_slot_id,
-        slot_type=effective_slot_type,
-        triggered_by=triggered_by,
-        target_email=target_email,
-        timestamp=now_utc.isoformat(),
+    effective_slot_id = slot_id or calculate_slot_id(
+        now_utc, slot_type="manual" if target_email else slot_type
+    )
+    effective_slot_type = (
+        "manual"
+        if target_email
+        else (slot_type or ("morning" if "07:30" in effective_slot_id else "afternoon"))
     )
 
-    # 2. Clean up stale/closed external jobs older than 5 days before candidate matching
-    try:
-        from services.job_cleanup_service import cleanup_stale_external_jobs
-        await cleanup_stale_external_jobs(db, max_age_days=5)
-    except Exception as exc:
-        logger.warning("Pre-digest stale job cleanup encountered an issue", error=str(exc))
+    if not target_email:
+        await run_external_job_scrape()
 
-    # 3. Scheduled fresh external job ingestion (Upserts new Indian tech/fresher jobs, refreshes existing ones)
-    try:
-        open_jobs_count = await cron_repo.get_open_jobs_count()
-        if open_jobs_count == 0 and not target_email:
-            logger.info("Running scheduled external job scrape during alert retention cycle")
-            await run_external_job_scrape()
-            open_jobs_count = await cron_repo.get_open_jobs_count()
+    sf = session_factory or get_pg_session_factory()
+    async with sf() as session:
+        open_jobs_count = (
+            await session.execute(
+                select(func.count()).select_from(Job).where(Job.status.in_(["open", "published"]))
+            )
+        ).scalar() or 0
 
         if open_jobs_count == 0:
-            logger.info("No active open jobs in database; skipping job alerts retention loop.")
-            # Record skipped batch
-            if not target_email:
-                try:
-                    await cron_repo.upsert_cron_run(
-                        slot_id=effective_slot_id,
-                        job_name="job_alerts",
-                        slot_type=effective_slot_type,
-                        status=CronRunStatus.SKIPPED.value,
-                        completed_at=datetime.now(timezone.utc),
-                        duration_ms=int((time.perf_counter() - t0) * 1000),
-                        candidates_scanned=0,
-                        emails_delivered=0,
-                        error_summary="No active open jobs in database",
-                        triggered_by=triggered_by,
-                    )
-                except Exception:
-                    pass
-
             return {
                 "status": "completed",
                 "slot_id": effective_slot_id,
@@ -214,331 +94,131 @@ async def run_nightly_job_alerts(
                 "candidates_with_resume": 0,
                 "candidates_matched": 0,
                 "emails_delivered": 0,
-                "emails_sent": 0,
                 "emails_uncertain": 0,
                 "emails_failed": 0,
-                "errors": 0,
                 "elapsed_ms": int((time.perf_counter() - t0) * 1000),
                 "reason": "no_open_jobs",
             }
-    except Exception as exc:
-        logger.warning("Issue during scheduled job scrape or open jobs count", error=str(exc))
 
-    # 4. Distributed Lock Mutex for this specific scheduled slot (TTL: 30 minutes)
-    lock_key = f"cron:job_alerts:{effective_slot_id}:{target_email}" if target_email else f"cron:job_alerts:{effective_slot_id}"
-    async with distributed_lock(lock_key, ttl_seconds=1800, db=db) as acquired:
-        if not acquired:
-            logger.info("Another process/replica is executing this job alert slot, skipping.", slot_id=effective_slot_id)
-            return {
-                "status": "skipped",
-                "slot_id": effective_slot_id,
-                "reason": "lock_held_by_another_replica",
-                "sent": 0,
-            }
-
-        # Check existing run document in PostgreSQL
-        if not target_email and not force_replay:
-            existing_run = await cron_repo.get_cron_run(effective_slot_id)
-            if existing_run and existing_run.get("status") in (CronRunStatus.COMPLETED.value, CronRunStatus.EXPIRED.value):
-                logger.info("Job alert slot already completed or expired, skipping.", slot_id=effective_slot_id, status=existing_run.get("status"))
-                return {
-                    "status": "skipped",
-                    "slot_id": effective_slot_id,
-                    "reason": f"slot_already_{existing_run.get('status')}",
-                    "sent": 0,
-                }
-
-        # Initialize/Update batch run document to 'running'
-        if not target_email:
-            try:
-                await cron_repo.upsert_cron_run(
-                    slot_id=effective_slot_id,
-                    job_name="job_alerts",
-                    slot_type=effective_slot_type,
-                    status=CronRunStatus.RUNNING.value,
-                    triggered_by=triggered_by,
+        user_stmt = select(User).where(User.status != "deleted")
+        if target_email:
+            user_stmt = user_stmt.where(User.email == target_email.strip().lower())
+        else:
+            user_stmt = user_stmt.where(
+                or_(User.role == "candidate", User.role.is_(None)),
+                User.job_alerts_enabled.isnot(False),
+            )
+        users = (await session.execute(user_stmt)).scalars().all()
+        resume_user_ids = {
+            str(uid)
+            for uid in (
+                await session.execute(
+                    select(Resume.user_id)
+                    .where(Resume.status == "parsed", Resume.parsed_data.isnot(None))
+                    .distinct()
                 )
-            except Exception as e:
-                logger.warning("Could not record initial cron_job_runs entry", error=str(e))
-
-        # 5. Fetch active candidate accounts
-        candidates = []
-        try:
-            candidates = await cron_repo.get_active_candidates(target_email=target_email)
-        except Exception as exc:
-            logger.error("Failed to query candidates for job alert batch", error=str(exc))
-            # Mark the batch as FAILED so it doesn't remain stuck as RUNNING,
-            # which would otherwise permanently block startup recovery on the next restart.
-            if not target_email:
-                try:
-                    await cron_repo.upsert_cron_run(
-                        slot_id=effective_slot_id,
-                        job_name="job_alerts",
-                        status=CronRunStatus.FAILED.value,
-                        completed_at=datetime.now(timezone.utc),
-                        duration_ms=int((time.perf_counter() - t0) * 1000),
-                        error_summary=f"Candidate query failed: {str(exc)}",
-                    )
-                except Exception:
-                    pass
-            return {"error": str(exc), "sent": 0}
-
-        total_candidates = len(candidates)
-        candidates_with_resume = 0
-        candidates_matched = 0
-        emails_delivered = 0
-        emails_uncertain = 0
-        emails_failed = 0
-        delivery_details: List[Dict[str, Any]] = []
-
-        # 6. Bounded async worker pool to limit CPU/Memory spikes on Azure B1
-        semaphore = asyncio.Semaphore(concurrency_limit)
-
-        async def process_single_candidate(candidate: Dict[str, Any]) -> None:
-            nonlocal candidates_with_resume, candidates_matched, emails_delivered, emails_uncertain, emails_failed
-
-            candidate_id = str(candidate["_id"])
-            candidate_email = candidate.get("email")
-            candidate_name = candidate.get("full_name") or candidate.get("name") or "Candidate"
-
-            if not candidate_email or "@" not in candidate_email:
-                return
-
-            # Fast pre-check: Has this user already received an alert for this exact slot?
-            if not target_email and candidate.get("last_alert_slot") == effective_slot_id:
-                return
-
-            # Check existing candidate delivery record in `job_alert_deliveries`
-            existing_delivery = await cron_repo.get_candidate_delivery(candidate_id, effective_slot_id)
-
-            now_claim = datetime.now(timezone.utc)
-            should_process = False
-
-            if not existing_delivery:
-                # Atomically claim this candidate for this slot
-                claimed = await cron_repo.claim_candidate(candidate_id, effective_slot_id, candidate_email)
-                if claimed:
-                    should_process = True
-                else:
-                    return
-            else:
-                st = existing_delivery.get("status")
-                if st == DeliveryStatus.DELIVERED.value:
-                    # Already sent successfully
-                    return
-                elif st == DeliveryStatus.UNCERTAIN.value:
-                    # Quarantined due to timeout - do not blind-retry
-                    return
-                elif st == DeliveryStatus.FAILED_PERMANENT.value:
-                    return
-                elif st == DeliveryStatus.CLAIMED.value:
-                    # Check lease timeout (15 minutes) for safe crash recovery
-                    claimed_at = existing_delivery.get("claimed_at")
-                    if isinstance(claimed_at, datetime) and (now_claim - claimed_at).total_seconds() > 900:
-                        # Stale claim from a crashed worker - safely reclaim
-                        reclaimed = await cron_repo.reclaim_candidate(candidate_id, effective_slot_id, claimed_at)
-                        if reclaimed:
-                            should_process = True
-                    else:
-                        # Currently being processed by another worker
-                        return
-                elif st == DeliveryStatus.FAILED_TRANSIENT.value:
-                    # Retry transient failure
-                    should_process = True
-
-            if not should_process:
-                return
-
-            async with semaphore:
-                try:
-                    # 1. Check if candidate has a parsed primary resume
-                    resume_doc = await cron_repo.get_candidate_parsed_resume(candidate_id)
-
-                    has_resume = bool(resume_doc)
-                    if has_resume:
-                        candidates_with_resume += 1
-
-                    # 2. Fetch top candidate job matches
-                    match_res = await find_jobs_for_candidate(
-                        candidate_id=candidate_id,
-                        limit=6,
-                        db=db,
-                    )
-
-                    rec_jobs = match_res.get("recommended_jobs", [])
-                    qualifying_jobs = [j for j in rec_jobs if not j.get("is_applied", False)]
-
-                    if not qualifying_jobs:
-                        # No qualifying jobs found; release claim cleanly
-                        await cron_repo.update_delivery(candidate_id, effective_slot_id, status="NO_QUALIFYING_JOBS")
-                        return
-
-                    top_3_jobs = qualifying_jobs[:3]
-                    top_3_ids = [str(j.get("id") or j.get("_id")) for j in top_3_jobs if (j.get("id") or j.get("_id"))]
-
-                    candidates_matched += 1
-
-                    # 3. Clean company logo resolution
-                    for j in top_3_jobs:
-                        logo_url = await _resolve_company_logo(j, db)
-                        if logo_url:
-                            j["company_logo_url"] = logo_url
-                            j["company_logo"] = logo_url
-
-                    # 4. Dispatch Job Alert Email via Brevo
-                    dispatch_res = await send_job_alert_email(
-                        to_email=candidate_email,
-                        candidate_name=candidate_name,
-                        matched_jobs=top_3_jobs,
-                        has_resume=has_resume,
-                    )
-
-                    now_done = datetime.now(timezone.utc)
-
-                    if dispatch_res.get("sent"):
-                        emails_delivered += 1
-                        msg_id = dispatch_res.get("message_id")
-                        delivery_details.append({
-                            "candidate_id": candidate_id,
-                            "email": candidate_email,
-                            "matched_count": len(top_3_jobs),
-                            "message_id": msg_id,
-                        })
-
-                        # Mark delivery as DELIVERED in job_alert_deliveries
-                        await cron_repo.update_delivery(
-                            candidate_id,
-                            effective_slot_id,
-                            status=DeliveryStatus.DELIVERED.value,
-                            matched_job_ids=top_3_ids,
-                            brevo_message_id=msg_id,
-                            delivered_at=now_done,
-                        )
-
-                        # Update user document for fast pre-filtering & profile display
-                        try:
-                            await cron_repo.update_user_alert_slot(candidate_id, effective_slot_id, top_3_ids)
-                        except Exception:
-                            pass
-
-                    elif dispatch_res.get("uncertain"):
-                        # ReadTimeout after dispatch -> QUARANTINE to prevent duplicate email
-                        emails_uncertain += 1
-                        logger.warning("Job alert marked UNCERTAIN", candidate_id=candidate_id, email=candidate_email)
-                        await cron_repo.update_delivery(
-                            candidate_id,
-                            effective_slot_id,
-                            status=DeliveryStatus.UNCERTAIN.value,
-                            matched_job_ids=top_3_ids,
-                            error=str(dispatch_res.get("error")),
-                        )
-                    else:
-                        # Delivery failed
-                        emails_failed += 1
-                        err_msg = dispatch_res.get("error", "Unknown dispatch failure")
-                        await cron_repo.update_delivery(
-                            candidate_id,
-                            effective_slot_id,
-                            status=DeliveryStatus.FAILED_PERMANENT.value,
-                            error=str(err_msg),
-                        )
-
-                except Exception as exc:
-                    emails_failed += 1
-                    logger.error("Error processing candidate for job alert", candidate_id=candidate_id, error=str(exc))
-                    await cron_repo.update_delivery(
-                        candidate_id,
-                        effective_slot_id,
-                        status=DeliveryStatus.FAILED_PERMANENT.value,
-                        error=str(exc),
-                    )
-
-        # Run candidate processing concurrently bounded by Semaphore
-        await asyncio.gather(*[process_single_candidate(c) for c in candidates])
-
-        elapsed_ms = int((time.perf_counter() - t0) * 1000)
-        summary = {
-            "status": "completed",
-            "slot_id": effective_slot_id,
-            "slot_type": effective_slot_type,
-            "timestamp": now_utc.isoformat(),
-            "candidates_scanned": total_candidates,
-            "candidates_with_resume": candidates_with_resume,
-            "candidates_matched": candidates_matched,
-            "emails_delivered": emails_delivered,
-            "emails_uncertain": emails_uncertain,
-            "emails_failed": emails_failed,
-            "elapsed_ms": elapsed_ms,
-            "sample_deliveries": delivery_details[:5],
+            ).scalars().all()
         }
 
-        # 7. Persist final batch execution summary in `cron_job_runs`
-        if not target_email:
+    candidates_with_resume = 0
+    candidates_matched = 0
+    emails_delivered = 0
+    emails_uncertain = 0
+    emails_failed = 0
+    delivery_details: List[Dict[str, Any]] = []
+    semaphore = asyncio.Semaphore(concurrency_limit)
+
+    async def process_candidate(user: Any) -> None:
+        nonlocal candidates_with_resume, candidates_matched, emails_delivered, emails_uncertain, emails_failed
+
+        candidate_id = str(user.id)
+        candidate_email = getattr(user, "email", None)
+        candidate_name = getattr(user, "full_name", None) or getattr(user, "name", None) or "Candidate"
+        if not candidate_email or "@" not in candidate_email:
+            return
+        if not target_email and not force_replay and getattr(user, "last_alert_slot", None) == effective_slot_id:
+            return
+
+        async with semaphore:
             try:
-                await cron_repo.upsert_cron_run(
-                    slot_id=effective_slot_id,
-                    job_name="job_alerts",
-                    status=CronRunStatus.COMPLETED.value,
-                    completed_at=datetime.now(timezone.utc),
-                    duration_ms=elapsed_ms,
-                    candidates_scanned=total_candidates,
-                    candidates_claimed=candidates_matched,
-                    emails_delivered=emails_delivered,
-                    emails_uncertain=emails_uncertain,
-                    emails_failed_permanent=emails_failed,
-                    sample_deliveries=delivery_details[:5],
+                has_resume = candidate_id in resume_user_ids
+                if has_resume:
+                    candidates_with_resume += 1
+
+                match_res = await find_jobs_for_candidate(candidate_id=candidate_id, limit=6, db=db)
+                top_3_jobs = [
+                    j for j in match_res.get("recommended_jobs", []) if not j.get("is_applied", False)
+                ][:3]
+                if not top_3_jobs:
+                    return
+
+                candidates_matched += 1
+                for j in top_3_jobs:
+                    logo = j.get("company_logo_url") or j.get("company_logo")
+                    if logo and not str(logo).startswith("data:image/"):
+                        clean_logo = str(logo).strip()
+                        j["company_logo_url"] = clean_logo
+                        j["company_logo"] = clean_logo
+
+                dispatch_res = await send_job_alert_email(
+                    to_email=candidate_email,
+                    candidate_name=candidate_name,
+                    matched_jobs=top_3_jobs,
+                    has_resume=has_resume,
                 )
-            except Exception as e:
-                logger.warning("Could not persist final cron_job_runs entry", error=str(e))
 
-        logger.info(
-            "AI Job Alerts batch completed",
-            slot_id=effective_slot_id,
-            scanned=total_candidates,
-            matched=candidates_matched,
-            delivered=emails_delivered,
-            uncertain=emails_uncertain,
-            failed=emails_failed,
-            elapsed_ms=elapsed_ms,
-        )
-        return summary
+                if dispatch_res.get("sent"):
+                    emails_delivered += 1
+                    delivery_details.append({
+                        "candidate_id": candidate_id,
+                        "email": candidate_email,
+                        "matched_count": len(top_3_jobs),
+                        "message_id": dispatch_res.get("message_id"),
+                    })
+                    try:
+                        async with sf() as update_session:
+                            async with update_session.begin():
+                                await update_session.execute(
+                                    update(User)
+                                    .where(User.id == candidate_id)
+                                    .values(last_alert_slot=effective_slot_id)
+                                )
+                    except Exception:
+                        pass
+                elif dispatch_res.get("uncertain"):
+                    emails_uncertain += 1
+                    logger.warning("Job alert marked UNCERTAIN", candidate_id=candidate_id, email=candidate_email)
+                else:
+                    emails_failed += 1
+            except Exception as exc:
+                emails_failed += 1
+                logger.error("Error processing candidate for job alert", candidate_id=candidate_id, error=str(exc))
 
+    await asyncio.gather(*[process_candidate(u) for u in users])
 
-async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any]:
-    """
-    Finds resumes stuck in 'pending' or 'processing' older than 10 minutes,
-    and updates them to 'failed' with actionable retry error messages.
-    """
-    now = datetime.now(timezone.utc)
-    threshold = now - timedelta(minutes=10)
-
-    async with distributed_lock("cron:sweep_stuck_pending_resumes", ttl_seconds=300) as acquired:
-        if not acquired:
-            logger.info("Another replica is sweeping stuck resumes, skipping.")
-            return {"status": "skipped", "reason": "lock_held_by_another_replica", "swept": 0}
-
-        from config.db import get_pg_session_factory
-        from models import Resume
-        from sqlalchemy import update
-
-        session_factory = get_pg_session_factory()
-        async with session_factory() as session:
-            async with session.begin():
-                stmt = (
-                    update(Resume)
-                    .where(
-                        Resume.status.in_(["pending", "processing"]),
-                        Resume.created_at < threshold,
-                    )
-                    .values(
-                        status="failed",
-                        error_message="Resume parsing timed out. Please retry parsing or re-upload your document.",
-                        updated_at=now,
-                    )
-                )
-                res = await session.execute(stmt)
-                swept_count = getattr(res, "rowcount", 0) or 0
-
-    if swept_count > 0:
-        logger.info("Completed stuck pending resume sweep via PostgreSQL", swept_count=swept_count)
-    return {"swept": swept_count}
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    logger.info(
+        "AI Job Alerts batch completed",
+        slot_id=effective_slot_id,
+        triggered_by=triggered_by,
+        scanned=len(users),
+        matched=candidates_matched,
+        delivered=emails_delivered,
+        uncertain=emails_uncertain,
+        failed=emails_failed,
+        elapsed_ms=elapsed_ms,
+    )
+    return {
+        "status": "completed",
+        "slot_id": effective_slot_id,
+        "slot_type": effective_slot_type,
+        "timestamp": now_utc.isoformat(),
+        "candidates_scanned": len(users),
+        "candidates_with_resume": candidates_with_resume,
+        "candidates_matched": candidates_matched,
+        "emails_delivered": emails_delivered,
+        "emails_uncertain": emails_uncertain,
+        "emails_failed": emails_failed,
+        "elapsed_ms": elapsed_ms,
+        "sample_deliveries": delivery_details[:5],
+    }

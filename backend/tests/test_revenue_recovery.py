@@ -22,7 +22,6 @@ from schemas.revenue_recovery_schema import (
     RecoveryChannel,
 )
 from services.risk_scoring_service import risk_scoring_service
-from services.voice_recovery_service import voice_recovery_service
 from services.razorpay_service import razorpay_service
 from workflows.revenue_recovery_graph import (
     revenue_recovery_pipeline,
@@ -258,49 +257,8 @@ def test_razorpay_webhook_signature_verification():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 6. CONVERSATIONAL HINGLISH VOICE RECOVERY SERVICE
+# 6. CONVERSATIONAL HINGLISH VOICE RECOVERY (Discontinued)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-@pytest.mark.asyncio
-async def test_voice_recovery_dialogue():
-    greeting = voice_recovery_service.generate_initial_greeting(
-        user_name="Rahul Sharma",
-        plan_name="pro",
-        amount=999.0,
-        failure_reason="Insufficient balance"
-    )
-    assert "Rahul" in greeting
-    assert "CareerShala" in greeting
-    assert "₹999" in greeting
-
-    # User agrees to retry
-    turn_agree = await voice_recovery_service.process_voice_turn(
-        user_id="u_rahul",
-        user_name="Rahul Sharma",
-        plan_name="pro",
-        amount=999.0,
-        user_utterance="Haan, main payment retry karna chahta hoon.",
-        conversation_history=[{"role": "agent", "text": greeting}],
-    )
-    assert turn_agree["intent"] == "AGREE_RETRY"
-    assert turn_agree["should_retry_payment"] is True
-    assert turn_agree["call_ended"] is True
-    assert "link" in turn_agree["agent_reply"].lower() or "razorpay" in turn_agree["agent_reply"].lower()
-
-    # User asks for discount
-    turn_discount = await voice_recovery_service.process_voice_turn(
-        user_id="u_rahul",
-        user_name="Rahul Sharma",
-        plan_name="pro",
-        amount=999.0,
-        user_utterance="Kuch discount mil sakta hai kya? Mehenga hai.",
-        conversation_history=[{"role": "agent", "text": greeting}],
-        discount_eligible=True,
-        max_discount_pct=20,
-    )
-    assert turn_discount["intent"] == "REQUEST_DISCOUNT"
-    assert turn_discount["offer_discount_pct"] <= 20
-    assert "discount" in turn_discount["agent_reply"].lower() or "20%" in turn_discount["agent_reply"].lower()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

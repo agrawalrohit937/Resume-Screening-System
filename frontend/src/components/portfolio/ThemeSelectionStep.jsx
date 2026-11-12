@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { 
   Palette, 
   Sparkles, 
@@ -14,17 +14,18 @@ import {
   Smartphone,
   ExternalLink,
   Globe,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-import GlassmorphicTheme from './themes/GlassmorphicTheme';
-import CyberpunkTheme from './themes/CyberpunkTheme';
-import MinimalEleganceTheme from './themes/MinimalEleganceTheme';
-import NeonDeveloperTheme from './themes/NeonDeveloperTheme';
-import ThreeDInteractiveTheme from './themes/ThreeDInteractiveTheme';
-import BentoGridTheme from './themes/BentoGridTheme';
+const GlassmorphicTheme = lazy(() => import('./themes/GlassmorphicTheme'));
+const CyberpunkTheme = lazy(() => import('./themes/CyberpunkTheme'));
+const MinimalEleganceTheme = lazy(() => import('./themes/MinimalEleganceTheme'));
+const NeonDeveloperTheme = lazy(() => import('./themes/NeonDeveloperTheme'));
+const ThreeDInteractiveTheme = lazy(() => import('./themes/ThreeDInteractiveTheme'));
+const BentoGridTheme = lazy(() => import('./themes/BentoGridTheme'));
 
 export const THEMES = [
   {
@@ -119,7 +120,6 @@ export default function ThemeSelectionStep({
   goToStep
 }) {
   const [previewTheme, setPreviewTheme] = useState(null);
-  const [deviceView, setDeviceView] = useState('desktop'); // 'desktop' | 'tablet' | 'mobile'
   const selectedThemeId = formData.theme_id || 'glassmorphic_pro';
 
   const handleSelectTheme = (themeId) => {
@@ -150,21 +150,36 @@ export default function ThemeSelectionStep({
       sending: false
     };
 
-    switch (previewTheme.id) {
-      case 'cyberpunk_dark':
-        return <CyberpunkTheme {...commonProps} />;
-      case 'minimal_elegance':
-        return <MinimalEleganceTheme {...commonProps} />;
-      case 'neon_developer':
-        return <NeonDeveloperTheme {...commonProps} />;
-      case '3d_interactive':
-        return <ThreeDInteractiveTheme {...commonProps} />;
-      case 'bento_grid_ux':
-        return <BentoGridTheme {...commonProps} />;
-      case 'glassmorphic_pro':
-      default:
-        return <GlassmorphicTheme {...commonProps} />;
-    }
+    const renderThemeComponent = () => {
+      switch (previewTheme.id) {
+        case 'cyberpunk_dark':
+          return <CyberpunkTheme {...commonProps} />;
+        case 'minimal_elegance':
+          return <MinimalEleganceTheme {...commonProps} />;
+        case 'neon_developer':
+          return <NeonDeveloperTheme {...commonProps} />;
+        case '3d_interactive':
+          return <ThreeDInteractiveTheme {...commonProps} />;
+        case 'bento_grid_ux':
+          return <BentoGridTheme {...commonProps} />;
+        case 'glassmorphic_pro':
+        default:
+          return <GlassmorphicTheme {...commonProps} />;
+      }
+    };
+
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 bg-slate-900 text-white">
+            <Loader2 size={24} className="animate-spin text-indigo-400" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Loading Theme Preview...</p>
+          </div>
+        }
+      >
+        {renderThemeComponent()}
+      </Suspense>
+    );
   };
 
   return (
@@ -341,61 +356,31 @@ export default function ThemeSelectionStep({
         </button>
       </div>
 
-      {/* ── CRYSTAL-CLEAR FULL-WEBSITE LIVE SIMULATOR MODAL (CENTERED TO CONTENT AREA) ── */}
+      {/* ── CLEAN FULL-WEBSITE LIVE PREVIEW MODAL ── */}
       <AnimatePresence>
         {previewTheme && (
-          <div className="fixed top-0 bottom-0 right-0 left-0 lg:left-64 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 animate-in fade-in duration-100">
-            <div className="relative w-full max-w-5xl h-[90vh] sm:h-[86vh] bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-100">
+            <div className="relative w-full max-w-5xl h-[90vh] bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col">
               
               {/* Browser Window Chrome (Top Header) */}
-              <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+              <div className="px-5 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-4 shrink-0">
                 
-                {/* Left: macOS dots + Current Theme Name */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
+                {/* Left: macOS dots + Current Theme Name + Vanity URL */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
                     <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
                     <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
                   </div>
-                  <div className="hidden sm:flex items-center gap-2">
-                    <span className="text-xs font-black text-white">{previewTheme.name}</span>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800/60">Live Full Website</span>
+                  <span className="text-xs font-black text-white shrink-0">{previewTheme.name}</span>
+                  <div className="hidden sm:flex items-center gap-1.5 text-slate-400 font-mono text-[11px] truncate bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+                    <Globe size={12} className="text-indigo-400 shrink-0" />
+                    <span className="truncate">careershala.tech/portfolio/{formData.username || 'developer'}</span>
                   </div>
                 </div>
 
-                {/* Middle: Interactive Device Viewport Switcher */}
-                <div className="flex items-center bg-slate-900 border border-slate-700 rounded-xl p-1 gap-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setDeviceView('desktop')}
-                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer font-bold ${
-                      deviceView === 'desktop' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Laptop size={14} /> <span className="hidden sm:inline">Desktop</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeviceView('tablet')}
-                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer font-bold ${
-                      deviceView === 'tablet' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Tablet size={14} /> <span className="hidden sm:inline">Tablet</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeviceView('mobile')}
-                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer font-bold ${
-                      deviceView === 'mobile' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Smartphone size={14} /> <span className="hidden sm:inline">Mobile</span>
-                  </button>
-                </div>
-
                 {/* Right: Apply Theme & Close */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -417,43 +402,10 @@ export default function ThemeSelectionStep({
 
               </div>
 
-              {/* Sub-Bar: Quick Switcher Tabs & URL */}
-              <div className="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-4 text-xs shrink-0 overflow-x-auto">
-                <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px] truncate max-w-xs">
-                  <Globe size={13} className="text-indigo-400 shrink-0" />
-                  <span className="truncate">https://careershala.tech/portfolio/{formData.username || 'developer'}</span>
-                </div>
-
-                {/* Quick Theme Switch Pills */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold mr-1">Switch:</span>
-                  {THEMES.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setPreviewTheme(t)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
-                        previewTheme.id === t.id
-                          ? 'bg-indigo-600 text-white font-black'
-                          : 'bg-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {t.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Live Render Viewport (Device frame scaled, crystal-sharp scrollable) */}
+              {/* Live Render Viewport (Clean, full desktop view) */}
               <div className="flex-1 min-h-0 bg-slate-950 flex justify-center p-2 sm:p-3 overflow-hidden">
                 <div
-                  className={`w-full h-full transition-all duration-200 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-2xl relative ${
-                    deviceView === 'desktop'
-                      ? 'max-w-full'
-                      : deviceView === 'tablet'
-                      ? 'max-w-2xl border-4 border-slate-700'
-                      : 'max-w-sm border-8 border-slate-700 rounded-[32px]'
-                  }`}
+                  className="w-full h-full transition-all duration-200 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-2xl relative max-w-full"
                   style={{ isolation: 'isolate' }}
                 >
                   {renderThemePreview()}

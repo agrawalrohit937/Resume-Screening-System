@@ -1,254 +1,174 @@
-from __future__ import annotations
-import uuid
-from sqlalchemy import select
-from config.db import get_pg_session_factory
-from models.tables import Job
-"""JSearch RapidAPI integration for candidate-only external job listings with LinkedIn & Naukri priority."""
+"""JSearch RapidAPI integration & 5-day external job cleanup (PostgreSQL)."""
 
+from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import structlog
+from sqlalchemy import delete, select
+
+import core.config  # noqa: F401 - ensures .env is loaded for CLI & worker runs
+from config.db import get_pg_session_factory
+from models.tables import Job
 
 logger = structlog.get_logger(__name__)
 
 JSEARCH_URL = "https://jsearch.p.rapidapi.com/search-v2"
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
-
-# Target search queries for high-demand tech roles across India, heavily prioritizing Freshers & Entry-Level candidates
 SEARCH_QUERIES = [
-    # Dedicated Fresher & Entry-Level Tech Queries
     "Fresher Software Engineer in India",
-    "Junior Frontend Developer React Fresher in India",
-    "Graduate Trainee Engineer Software in India",
-    "Entry Level Python Backend Developer Fresher in India",
-    "AI Machine Learning Intern Fresher in India",
-    "Junior Web Developer Fresher in India",
-    # Core Tech Roles
-    "Software Engineer in India",
-    "Frontend Developer React in India",
-    "Backend Developer Python Node Java in India",
-    "Data Scientist Machine Learning AI in India",
+    "Junior Full Stack Developer in India",
+    "Python Developer in India",
 ]
 
 
+# Picks the highest-priority apply link from RapidAPI options (LinkedIn > Naukri > Direct > fallback).
 def resolve_best_apply_url(external_job: Dict[str, Any]) -> Tuple[str, str]:
-    """
-    Prioritizes LinkedIn first, then Naukri, then direct employer portals,
-    avoiding dead third-party aggregates.
-    """
+    """Prioritize LinkedIn, Naukri, then non-Internshala direct portals."""
     options = external_job.get("apply_options") or []
-
-    # Priority 1: LinkedIn
+    ranked: Dict[int, Tuple[str, str]] = {}
     for opt in options:
-        pub = (opt.get("publisher") or "").lower()
-        link = opt.get("apply_link") or ""
+        pub, link = (opt.get("publisher") or "").lower(), opt.get("apply_link") or ""
+        if not link:
+            continue
         if "linkedin" in pub or "linkedin.com" in link:
-            return link, "LinkedIn"
+            ranked.setdefault(0, (link, "LinkedIn"))
+        elif "naukri" in pub or "naukri.com" in link:
+            ranked.setdefault(1, (link, "Naukri"))
+        elif "internshala" not in pub and "internshala.com" not in link:
+            ranked.setdefault(2, (link, opt.get("publisher") or "Company Portal"))
+        else:
+            ranked.setdefault(3, (link, opt.get("publisher") or "Direct"))
 
-    # Priority 2: Naukri
-    for opt in options:
-        pub = (opt.get("publisher") or "").lower()
-        link = opt.get("apply_link") or ""
-        if "naukri" in pub or "naukri.com" in link:
-            return link, "Naukri"
-
-    # Priority 3: Direct employer portals / Workday / Greenhouse / Lever / Indeed
-    for opt in options:
-        pub = (opt.get("publisher") or "").lower()
-        link = opt.get("apply_link") or ""
-        if not any(b in pub or b in link for b in ["internshala.com", "internshala"]):
-            if link:
-                return link, opt.get("publisher") or "Company Portal"
-
-    # Fallback to first available option
-    if options and options[0].get("apply_link"):
-        return options[0].get("apply_link"), options[0].get("publisher") or "Direct"
-
-    fallback_link = external_job.get("job_apply_link") or ""
-    fallback_pub = external_job.get("job_publisher") or "External"
-    return fallback_link, fallback_pub
+    if ranked:
+        return ranked[min(ranked)]
+    return external_job.get("job_apply_link") or "", external_job.get("job_publisher") or "External"
 
 
-async def scrape_external_jobs(db: Any = None, queries: List[str] | None = None) -> Dict[str, int]:
-    """Fetch fresh JSearch results (LinkedIn & Naukri prioritized) and upsert them by provider job_id."""
+# Converts RapidAPI required_experience_in_months into years without guessing if missing.
+def _extract_real_min_years(external_job: Dict[str, Any]) -> Optional[float]:
+    """Return real required experience in years only when explicitly provided by RapidAPI."""
+    exp = external_job.get("job_required_experience") or {}
+    min_months = exp.get("required_experience_in_months")
+    if min_months is not None:
+        return round(float(min_months) / 12.0, 1)
+    return None
+
+
+# Formats min/max salary and currency from RapidAPI into a readable string (or None).
+def _format_salary(external_job: Dict[str, Any]) -> Optional[str]:
+    min_sal, max_sal = external_job.get("job_min_salary"), external_job.get("job_max_salary")
+    currency = external_job.get("job_salary_currency") or "INR"
+    if min_sal and max_sal:
+        return f"{currency} {min_sal:,.0f} - {max_sal:,.0f}"
+    return f"{currency} {min_sal:,.0f}+" if min_sal else None
+
+
+# Deletes external scraped jobs older than max_age_days (5 days) from PostgreSQL.
+async def cleanup_stale_external_jobs(max_age_days: int = 5, session_factory: Any = None) -> Dict[str, Any]:
+    """Delete any external job (`is_external == True`) older than `max_age_days`."""
+    session_factory = session_factory or get_pg_session_factory()
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    try:
+        async with session_factory() as session:
+            async with session.begin():
+                stmt = delete(Job).where(Job.is_external == True, Job.created_at < cutoff_dt)  # noqa: E712
+                deleted_count = getattr(await session.execute(stmt), "rowcount", 0) or 0
+        logger.info("External job cleanup completed", deleted_count=deleted_count, max_age_days=max_age_days)
+        return {"success": True, "deleted_count": deleted_count, "cutoff": cutoff_dt.isoformat(), "max_age_days": max_age_days}
+    except Exception as exc:
+        logger.error("Failed to cleanup external jobs", error=str(exc), max_age_days=max_age_days)
+        return {"success": False, "deleted_count": 0, "error": str(exc), "max_age_days": max_age_days}
+
+
+# Cleans stale external jobs, fetches fresh India fresher listings via JSearch, and inserts new ones into DB.
+async def scrape_external_jobs(queries: List[str] | None = None) -> Dict[str, int]:
+    """Clean up 5-day-old external jobs, then fetch & insert new JSearch listings."""
+    cleanup_res = await cleanup_stale_external_jobs(max_age_days=5)
     api_key = os.getenv("RAPIDAPI_KEY", "").strip()
     if not api_key:
         logger.warning("Skipping external job scrape because RAPIDAPI_KEY is not configured")
-        return {"fetched": 0, "upserted": 0, "skipped": 0}
+        return {"fetched": 0, "upserted": 0, "skipped": 0, "deleted": cleanup_res.get("deleted_count", 0)}
 
-    headers = {
-        "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": JSEARCH_HOST,
-    }
-
+    headers = {"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": JSEARCH_HOST}
     now = datetime.now(timezone.utc)
-    total_fetched = 0
-    total_upserted = 0
-    total_skipped = 0
-
-    queries_to_run = queries or SEARCH_QUERIES
+    total_fetched, total_skipped = 0, 0
+    parsed_jobs: Dict[str, Dict[str, Any]] = {}
 
     async with httpx.AsyncClient(timeout=45.0) as client:
-        for q in queries_to_run:
-            is_fresher_query = any(k in q.lower() for k in ["fresher", "junior", "trainee", "entry", "intern", "0-1"])
-            params = {
+        for q in (queries or SEARCH_QUERIES):
+            params: Dict[str, Any] = {
                 "query": q,
-                "date_posted": "week",  # Fetch actively open listings posted within the last 7 days
+                "date_posted": "week",
                 "employment_types": "FULLTIME,INTERN",
+                "job_requirements": "under_3_years_experience",
                 "page": 1,
                 "num_pages": 1,
             }
-            if is_fresher_query:
-                params["job_requirements"] = "under_3_years_experience"
 
             try:
-                response = await client.get(JSEARCH_URL, headers=headers, params=params)
-                response.raise_for_status()
-                payload = response.json()
+                resp = await client.get(JSEARCH_URL, headers=headers, params=params)
+                resp.raise_for_status()
+                data_node = resp.json().get("data", [])
+                items = data_node.get("jobs", []) if isinstance(data_node, dict) else data_node
             except Exception as exc:
                 logger.error("JSearch query failed", query=q, error=str(exc))
                 continue
 
-            # Extract data safely (Handling JSearch v2 nested structure)
-            if not isinstance(payload, dict):
+            if not isinstance(items, list):
                 continue
-
-            data_node = payload.get("data", [])
-            if isinstance(data_node, dict):
-                data_list = data_node.get("jobs", [])
-            else:
-                data_list = data_node
-
-            if not isinstance(data_list, list):
-                continue
-
-            total_fetched += len(data_list)
-
-            for external_job in data_list:
-                if not isinstance(external_job, dict):
+            total_fetched += len(items)
+            for ext in items:
+                if not isinstance(ext, dict):
                     continue
-
-                external_job_id = str(external_job.get("job_id", "")).strip()
-                if not external_job_id:
+                ext_id = str(ext.get("job_id", "")).strip()
+                apply_url, _ = resolve_best_apply_url(ext)
+                if not ext_id or not apply_url:
                     total_skipped += 1
                     continue
 
-                apply_url, publisher_source = resolve_best_apply_url(external_job)
-                if not apply_url:
-                    total_skipped += 1
-                    continue
-
-                # Parse experience requirements accurately
-                title = external_job.get("job_title") or "Software Engineer"
-                jd_text = external_job.get("job_description") or ""
-                title_lower = title.lower()
-
-                exp_data = external_job.get("job_required_experience") or {}
-                min_months = exp_data.get("required_experience_in_months")
-
-                if any(k in title_lower for k in ["lead", "principal", "architect", "staff", "manager", "director", "head"]):
-                    min_years = 7.0
-                elif any(k in title_lower for k in ["senior", "sr.", "sr ", "iii", "iv", "tech lead"]):
-                    min_years = 5.0
-                elif any(k in title_lower for k in ["junior", "jr.", "jr ", "entry", "intern", "trainee", "fresher", "graduate"]):
-                    min_years = 0.0
-                elif min_months:
-                    min_years = round(min_months / 12.0, 1)
-                else:
-                    from utils.nlp_utils import extract_years_of_experience
-                    extracted_exp = extract_years_of_experience(jd_text)
-                    if extracted_exp > 0:
-                        min_years = extracted_exp
-                    elif any(k in jd_text.lower() for k in ["no experience", "freshers welcome", "0-1 year", "fresher", "entry level", "college graduate"]):
-                        min_years = 0.0
-                    elif is_fresher_query:
-                        min_years = 0.0
-                    else:
-                        min_years = 2.0
-
-                # Parse salary if available
-                min_sal = external_job.get("job_min_salary")
-                max_sal = external_job.get("job_max_salary")
-                currency = external_job.get("job_salary_currency") or "INR"
-                salary_str = None
-                if min_sal and max_sal:
-                    salary_str = f"{currency} {min_sal:,.0f} - {max_sal:,.0f}"
-                elif min_sal:
-                    salary_str = f"{currency} {min_sal:,.0f}+"
-
-                # Parse required skills
-                raw_skills = external_job.get("job_required_skills") or []
-                skills_list = [str(s).strip() for s in raw_skills if str(s).strip()] if isinstance(raw_skills, list) else []
-
-                city = external_job.get("job_city") or ""
-                state = external_job.get("job_state") or ""
-                country = external_job.get("job_country") or "India"
-                loc_parts = [p for p in [city, state, country] if p]
-                location_str = ", ".join(loc_parts) if loc_parts else "India"
-
-                jd_text = external_job.get("job_description") or ""
-
-                # Note: External jobs use fast skill/role matching; dense embeddings are computed on-demand if deep-scanned
-                jd_embedding_vec = []
-
-                job_doc = {
-                    "company_name": external_job.get("employer_name") or "Leading Tech Employer",
-                    "title": external_job.get("job_title") or "Software Engineer",
-                    "jd_text_raw": jd_text,
-                    "jd_text": jd_text,
-                    "jd_embedding_bge": jd_embedding_vec,
-                    "jd_embedding": jd_embedding_vec,
-                    "company_logo": external_job.get("employer_logo"),
-                    "company_website": external_job.get("employer_website"),
-                    "location": location_str,
-                    "work_mode": "Remote" if external_job.get("job_is_remote") else "Hybrid" if "hybrid" in str(external_job.get("job_title", "")).lower() else "Onsite",
+                title = ext.get("job_title") or "Software Engineer"
+                raw_skills = ext.get("job_required_skills") or []
+                loc_parts = [p for p in (ext.get("job_city") or "", ext.get("job_state") or "", ext.get("job_country") or "India") if p]
+                parsed_jobs[ext_id] = {
+                    "company_name": ext.get("employer_name") or "Leading Tech Employer",
+                    "title": title,
+                    "jd_text_raw": ext.get("job_description") or "",
+                    "jd_embedding": [],
+                    "company_logo": ext.get("employer_logo"),
+                    "company_website": ext.get("employer_website"),
+                    "location": ", ".join(loc_parts) if loc_parts else "India",
+                    "work_mode": "Remote" if ext.get("job_is_remote") else ("Hybrid" if "hybrid" in title.lower() else "Onsite"),
                     "status": "open",
                     "is_external": True,
-                    "publisher_source": publisher_source,
                     "external_apply_url": apply_url,
-                    "external_job_id": external_job_id,
-                    "min_years": min_years,
-                    "salary_range": salary_str,
-                    "required_skills": skills_list,
+                    "external_job_id": ext_id,
+                    "min_years": _extract_real_min_years(ext),
+                    "salary_range": _format_salary(ext),
+                    "required_skills": [str(s).strip() for s in raw_skills if str(s).strip()] if isinstance(raw_skills, list) else [],
                     "updated_at": now,
                 }
 
-                async with get_pg_session_factory()() as session:
-                    stmt = select(Job).where(Job.external_job_id == str(external_job_id))
-                    existing = (await session.execute(stmt)).scalar_one_or_none()
-                    if existing:
-                        for k, v in job_doc.items():
-                            if hasattr(existing, k):
-                                setattr(existing, k, v)
-                    else:
-                        valid_cols = {c.name for c in Job.__table__.columns}
-                        filtered = {k: v for k, v in job_doc.items() if k in valid_cols}
-                        new_job = Job(
-                            id=str(uuid.uuid4()),
-                            tenant_id="default",
-                            applicant_count=0,
-                            created_at=now,
-                            **filtered
-                        )
-                        session.add(new_job)
-                    await session.commit()
-                total_upserted += 1
+    total_upserted = 0
+    if parsed_jobs:
+        async with get_pg_session_factory()() as session:
+            existing_ids = {
+                str(r)
+                for r in (await session.execute(select(Job.external_job_id).where(Job.external_job_id.in_(list(parsed_jobs))))).scalars().all()
+            }
+            for ext_id, doc in parsed_jobs.items():
+                if ext_id not in existing_ids:
+                    session.add(Job(id=str(uuid.uuid4()), tenant_id="default", applicant_count=0, created_at=now, **doc))
+                    total_upserted += 1
+            await session.commit()
 
-    logger.info("External job scrape completed", fetched=total_fetched, upserted=total_upserted, skipped=total_skipped)
-
-    # Safely clean up truly stale external jobs (older than 5 days) ONLY AFTER fresh jobs are upserted
-    if total_upserted > 0:
-        try:
-            from services.job_cleanup_service import cleanup_stale_external_jobs
-            await cleanup_stale_external_jobs(db, max_age_days=5)
-        except Exception as exc:
-            logger.warning("Post-scrape stale job cleanup encountered an issue", error=str(exc))
-
-    return {"fetched": total_fetched, "upserted": total_upserted, "skipped": total_skipped}
+    deleted = cleanup_res.get("deleted_count", 0)
+    logger.info("External job scrape completed", fetched=total_fetched, upserted=total_upserted, skipped=total_skipped, deleted=deleted)
+    return {"fetched": total_fetched, "upserted": total_upserted, "skipped": total_skipped, "deleted": deleted}
 
 
 if __name__ == "__main__":
@@ -259,15 +179,11 @@ if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from config.db import connect_db, disconnect_db
 
-    async def _run_manual_scrape() -> None:
+    async def _run() -> None:
         try:
             await connect_db()
-            result = await scrape_external_jobs()
-            print(f"Job scrape completed successfully: {result}")
-        except Exception as exc:
-            print(f"Job scrape failed: {exc}")
-            sys.exit(1)
+            print(f"Job scrape completed: {await scrape_external_jobs()}")
         finally:
             await disconnect_db()
 
-    asyncio.run(_run_manual_scrape())
+    asyncio.run(_run())

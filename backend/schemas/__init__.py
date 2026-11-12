@@ -146,12 +146,6 @@ from schemas.requisition_schema import (
     RequisitionModel,
 )
 
-from schemas.talent_pool_schema import (
-    VisibilityTier,
-    TalentPoolProfile,
-    TalentPoolViewAudit,
-)
-
 from schemas.eeo_schema import (
     EEOGender,
     EEORaceEthnicity,

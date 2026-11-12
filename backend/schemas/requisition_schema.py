@@ -48,6 +48,7 @@ class RequisitionModel(BaseModel):
     budget_max: float = 0.0
     hiring_manager_id: str
     recruiter_id: Optional[str] = None
+    linked_job_id: Optional[str] = None
     approval_chain: List[ApprovalStep] = Field(default_factory=list)
     status: RequisitionStatus = RequisitionStatus.DRAFT
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

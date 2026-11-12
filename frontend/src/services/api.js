@@ -323,14 +323,6 @@ export const getScorecardsByApplication = (applicationId) => api.get(`/interview
 export const getCalibrationReport = (applicationId, stageName) =>
   api.get(`/interview-kits/calibration`, { params: { application_id: applicationId, stage_name: stageName } })
 
-// Consented Talent Pool (Candidate / Recruiter)
-export const getTalentPoolProfile = () => api.get('/talent-pool/profile')
-export const updateTalentPoolProfile = (payload) => api.post('/talent-pool/profile', payload)
-export const grantTalentPoolConsent = (tier) => api.post('/talent-pool/consent', { visibility_tier: tier })
-export const revokeTalentPoolConsent = () => api.post('/talent-pool/revoke')
-export const getTalentPoolViewHistory = () => api.get('/talent-pool/views')
-export const searchTalentPool = (params) => api.get('/talent-pool/search', { params })
-
 // Exec Analytics (Exec / Admin read-only)
 export const getExecAnalytics = () => api.get('/analytics/enterprise')
 

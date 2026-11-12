@@ -8,7 +8,6 @@ from schemas.requisition_schema import RequisitionStatus, ApprovalDecision, Appr
 from services.requisition_service import RequisitionService
 from schemas.interview_schema import Competency, RecommendationEnum
 from services.interview_kit_service import InterviewKitService
-from services.talent_crm_service import TalentCRMService
 from services.multi_tenancy.tenant_context import tenant_context
 
 
@@ -202,43 +201,3 @@ async def test_scorecard_submission_upsert_prevents_duplicates():
         assert saved_scorecards2[0]["ratings"]["Architecture"] == 5
         assert saved_scorecards2[0]["notes"] == "Revised assessment after deep dive."
 
-
-@pytest.mark.asyncio
-async def test_talent_crm_silver_medalist_reengagement():
-    crm_service = TalentCRMService()
-
-    # 1. Register silver medalist under tenant_a
-    with tenant_context("tenant_a"):
-        cand = await crm_service.register_silver_medalist(
-            candidate_id="cand_silver_1",
-            candidate_name="Jane Developer",
-            candidate_email="jane@example.com",
-            original_application_id="app_old_55",
-            original_job_id="job_old_10",
-            original_job_title="Mid Software Engineer",
-            final_stage_reached="Executive Review",
-            ats_score=88.5,
-            skills=["Python", "FastAPI", "Docker", "PostgreSQL", "Kafka"]
-        )
-        assert "silver_medalist" in cand.tags
-
-        # 2. Match candidate against a new Senior Backend Engineer job in tenant_a
-        matches = await crm_service.find_reengagement_matches(
-            target_job_id="job_new_77",
-            target_job_title="Senior Backend Engineer",
-            required_skills=["Python", "Docker", "Kafka", "Kubernetes"],
-            min_score=0.4
-        )
-        assert len(matches) == 1
-        assert matches[0].candidate_id == "cand_silver_1"
-        assert set(matches[0].overlapping_skills) == {"python", "docker", "kafka"}
-        assert matches[0].match_score > 0.6
-
-    # 3. Strict tenant isolation proof: tenant_b cannot view or match tenant_a's silver medalists
-    with tenant_context("tenant_b"):
-        tenant_b_matches = await crm_service.find_reengagement_matches(
-            target_job_id="job_tenant_b_1",
-            target_job_title="Senior Backend Engineer",
-            required_skills=["Python", "Docker", "Kafka"]
-        )
-        assert len(tenant_b_matches) == 0

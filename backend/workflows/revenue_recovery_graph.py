@@ -27,7 +27,6 @@ from schemas.revenue_recovery_schema import (
 )
 from services.risk_scoring_service import risk_scoring_service
 from services.email_service import EmailService
-from services.voice_recovery_service import voice_recovery_service
 
 logger = structlog.get_logger(__name__)
 
@@ -327,18 +326,11 @@ async def message_generator_node(state: RevenueRecoveryState) -> Dict[str, Any]:
         f"Please update your payment method to keep uninterrupted access to unlimited mock interviews and ATS resume reviews."
     )
 
-    # Voice script in natural Hinglish
-    voice_script = voice_recovery_service.generate_initial_greeting(
-        user_name=user_name,
-        plan_name=plan,
-        amount=amount,
-        failure_reason=reason,
-    )
-
+    # Standard recovery message
     return {
         "generated_message_subject": subject,
         "generated_message_body": body,
-        "voice_script": voice_script,
+        "voice_script": None,
     }
 
 

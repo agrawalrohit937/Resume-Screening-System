@@ -59,40 +59,10 @@ def test_local_bge_job_embedding_generation():
     assert all(isinstance(val, float) for val in embedding)
 
 
-def test_job_matcher_cosine_and_calibration():
-    """Verify cosine similarity calculation and calibration in job_matcher."""
-    from services.job_matcher import _calculate_cosine_similarity, _calibrate_match_score
-
-    vec_a = [0.5, 0.5, 0.5, 0.5]
-    vec_b = [0.5, 0.5, 0.5, 0.5]
-    sim = _calculate_cosine_similarity(vec_a, vec_b)
-    assert round(sim, 2) == 1.0
-
-    # Calibrated match score
-    score = _calibrate_match_score(0.70)
-    assert 70.0 <= score <= 95.0
-    assert _calibrate_match_score(0.0) == 0.0
-
-
 @pytest.mark.asyncio
 async def test_two_stage_job_matcher_pipeline():
-    """Verify two-stage job matching: candidate role/skill signals extraction & find_jobs_for_candidate."""
-    from services.job_matcher import _extract_candidate_role_signals, find_jobs_for_candidate
-    from unittest.mock import AsyncMock, MagicMock
-
-    # 1. Test role signals extraction
-    parsed_resume = {
-        "targeted_role": "Senior Python Developer",
-        "technical_skills": ["Python", "FastAPI", "PostgreSQL", "Docker", "Redis"],
-        "summary": "Experienced backend engineer building microservices.",
-        "work_experience": [{"title": "Senior Python Developer", "company": "Acme"}],
-    }
-    signals = _extract_candidate_role_signals(parsed_resume)
-    assert signals["primary_role"] == "Senior Python Developer"
-    assert "python" in signals["role_tokens"]
-    assert "FastAPI" in signals["top_skills"]
-
-    # 2. Test find_jobs_for_candidate with PostgreSQL mock session and resume_repo
+    """Verify simplified random job recommendation pipeline in find_jobs_for_candidate."""
+    from services.job_matcher import find_jobs_for_candidate
     from models.tables import Job as JobT
     from tests.conftest import MockAsyncSession
     from unittest.mock import patch
@@ -107,29 +77,17 @@ async def test_two_stage_job_matcher_pipeline():
         is_external=False,
     )
 
-    mock_resume = MagicMock()
-    mock_resume.id = "660000000000000000000001"
-    mock_resume.user_id = "cand_123"
-    mock_resume.status = "parsed"
-    mock_resume.parsed_data = parsed_resume
-
-    mock_resume_repo = MagicMock()
-    mock_resume_repo.get_primary_by_user = AsyncMock(return_value=mock_resume)
-    mock_resume_repo.get_by_user = AsyncMock(return_value=([mock_resume], 1))
-
     with patch("services.job_matcher.get_pg_session_factory") as mock_factory:
         mock_factory.return_value = lambda: MockAsyncSession(items=[job_row])
         res = await find_jobs_for_candidate(
             candidate_id="cand_123",
             limit=3,
-            resume_repo=mock_resume_repo,
         )
 
-        assert res["has_resume"] is True
         assert len(res["recommended_jobs"]) == 1
         assert res["recommended_jobs"][0]["title"] == "Python Backend Engineer"
-        assert res["recommended_jobs"][0]["match_score"] >= 50.0
-        assert "stage1_candidates_count" in res
+        assert res["recommended_jobs"][0]["match_score"] == 0.0
+        assert res["total_open_jobs"] == 1
 
 
 
@@ -319,7 +277,7 @@ async def test_recruiter_can_view_all_jobs_in_same_tenant():
     )
 
     mock_session = MockAsyncSession([test_job])
-    with patch("api.routes.jobs.get_pg_session_factory", return_value=lambda: mock_session):
+    with patch("api.routes.jobs_recruiter.get_pg_session_factory", return_value=lambda: mock_session):
         res = await get_my_posted_jobs(current_user=recruiter_alice)
 
     # 1. Result must return the job posted under the tenant organization
