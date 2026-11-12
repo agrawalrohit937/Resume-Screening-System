@@ -51,28 +51,41 @@ class RunATSMatchTool(BaseTool):
                     reason="Please upload a resume first under /upload before running an ATS match.",
                 )
 
-            resume_skills = [s.lower() for s in (resume.skills or [])]
-            jd_text = args.job_description.lower()
+            resume_skills = list(resume.skills or [])
+            resume_text = getattr(resume, "raw_text", "") or (" ".join(resume_skills) if resume_skills else resume.filename)
+            jd_text = args.job_description
 
-            # Extract basic technical skills from JD using standard dictionary or word match
-            # Compare against candidate resume skills
-            matched = [s for s in resume.skills if s.lower() in jd_text]
-            # Simple keyword extraction from JD
-            potential_terms = re.findall(r"\b[A-Za-z+#.]{2,20}\b", args.job_description)
-            tech_keywords = {
-                "python", "fastapi", "react", "docker", "kubernetes", "aws", "gcp", "azure",
-                "sql", "postgresql", "mongodb", "redis", "graphql", "rest", "ci/cd", "git",
-                "typescript", "javascript", "golang", "java", "node", "linux", "html", "css"
-            }
-            jd_skills_found = [term.title() for term in set(potential_terms) if term.lower() in tech_keywords]
-            if not jd_skills_found:
-                jd_skills_found = ["Python", "FastAPI", "MongoDB", "Docker", "AWS"]
+            calculated_score = None
+            matched_skills = []
+            missing_skills = []
+            recommendation = "Needs skill optimization"
 
-            matched_skills = [s for s in jd_skills_found if any(rs.lower() == s.lower() for rs in resume_skills)]
-            missing_skills = [s for s in jd_skills_found if s not in matched_skills]
+            # 1. Use the real ATS Scoring Engine whenever available
+            try:
+                from services.scoring_engine import score_resume
+                scoring_result = score_resume(resume_text, jd_text)
+                if scoring_result:
+                    raw_score = scoring_result.get("final_score") or scoring_result.get("quality_score") or scoring_result.get("recruiter_score")
+                    if raw_score is not None:
+                        calculated_score = round(float(raw_score), 1)
+                    matched_skills = list(scoring_result.get("matched_skills") or [])
+                    missing_skills = list(scoring_result.get("missing_skills") or [])
+                    recommendation = scoring_result.get("recommendation") or ("Good match" if (calculated_score or 0) >= 70 else "Needs skill optimization")
+            except Exception as score_err:
+                logger.debug("Scoring engine fallback engaged", error=str(score_err))
 
-            total = len(jd_skills_found) or 1
-            calculated_score = round(min(100.0, max(25.0, (len(matched_skills) / total) * 100)), 1)
+            # 2. Resilient fallback: dynamic skill overlap without static hardcoded lists
+            if calculated_score is None:
+                jd_lower = jd_text.lower()
+                matched_skills = [s for s in resume_skills if s.lower() in jd_lower]
+                # Extract potential terms from JD matching title/word patterns
+                jd_terms = [t.title() for t in set(re.findall(r"\b[A-Za-z][A-Za-z0-9+#.]{1,20}\b", jd_text)) if len(t) > 2]
+                candidate_lower = {s.lower() for s in resume_skills}
+                missing_skills = [t for t in jd_terms[:8] if t.lower() not in candidate_lower and t.lower() in jd_lower][:5]
+
+                total_evaluated = max(len(matched_skills) + len(missing_skills), 1)
+                calculated_score = round(min(100.0, max(25.0, (len(matched_skills) / total_evaluated) * 100)), 1)
+                recommendation = "Good match" if calculated_score >= 70 else "Needs skill optimization"
 
             data = {
                 "final_score": calculated_score,
@@ -87,7 +100,7 @@ class RunATSMatchTool(BaseTool):
                     "score": calculated_score,
                     "matched_skills": matched_skills,
                     "missing_skills": missing_skills,
-                    "recommendation": "Good match" if calculated_score >= 70 else "Needs skill optimization",
+                    "recommendation": recommendation,
                 }
             }
             citation = {"source": "ats_eval", "label": f"Live ATS Evaluation ({calculated_score}%)", "href": "/results"}
@@ -149,28 +162,28 @@ class GenerateInterviewQuestionsTool(BaseTool):
     requires = ["interview"]
 
     async def execute(self, ctx: ToolExecutionContext, args: GenerateInterviewQuestionsArgs) -> ToolResult:
-        focus = args.focus_area or "Core Engineering & Architecture"
+        focus = args.focus_area or f"{args.role} Architecture & Problem Solving"
         questions = [
             {
                 "id": "q1",
-                "question": f"How do you design a high-throughput API gateway for a distributed {args.role} system?",
+                "question": f"How do you design a resilient, high-throughput service for a {args.role} system under peak loads?",
                 "category": focus,
                 "difficulty": args.difficulty.title(),
-                "eval_criteria": "Scalability, caching strategies, rate-limiting, and fault tolerance.",
+                "eval_criteria": "Scalability, caching strategies, rate-limiting, and graceful degradation.",
             },
             {
                 "id": "q2",
-                "question": "Describe a complex production incident you resolved. What was your debugging methodology?",
+                "question": f"Describe a complex production incident you resolved in a {args.role} role. What was your root cause analysis methodology?",
                 "category": "Behavioral / Incident Response",
                 "difficulty": args.difficulty.title(),
-                "eval_criteria": "Structured root cause analysis, communication under pressure, blameless post-mortem.",
+                "eval_criteria": "Structured debugging, post-mortem rigor, team communication under pressure.",
             },
             {
                 "id": "q3",
-                "question": "How do you design high-concurrency PostgreSQL connection pooling and JSONB indexing?",
-                "category": "Data Modeling",
+                "question": f"What are the critical data modeling, reliability, and security trade-offs you prioritize when building {args.role} solutions?",
+                "category": "System Design & Data Architecture",
                 "difficulty": args.difficulty.title(),
-                "eval_criteria": "ACID compliance vs flexible schema, index strategies, sharding vs replication.",
+                "eval_criteria": "ACID compliance vs eventual consistency, index strategies, API contract security.",
             }
         ]
         summary = f"Generated {len(questions)} {args.difficulty} interview questions for {args.role}"
@@ -205,12 +218,22 @@ class BuildLearningRoadmapTool(BaseTool):
         milestones = []
         skills_count = len(args.gap_skills)
 
+        deliverable_templates = [
+            "Master core concepts, syntax, and foundational patterns for {skill}.",
+            "Build a hands-on functional prototype or service integrating {skill}.",
+            "Implement automated unit and integration tests with CI/CD for {skill}.",
+            "Optimize latency, memory efficiency, and concurrency with {skill}.",
+            "Deploy to cloud staging with structured observability and monitoring.",
+            "Complete an end-to-end portfolio-grade capstone project utilizing {skill}."
+        ]
+
         for week in range(1, args.weeks + 1):
             skill = args.gap_skills[(week - 1) % skills_count]
+            template = deliverable_templates[(week - 1) % len(deliverable_templates)]
             milestones.append({
                 "week": week,
                 "focus": skill,
-                "deliverable": f"Build a production microservice implementing {skill} with tests and CI/CD.",
+                "deliverable": template.format(skill=skill),
                 "verified": False,
             })
 
@@ -243,18 +266,19 @@ class DraftOutreachEmailTool(BaseTool):
 
     async def execute(self, ctx: ToolExecutionContext, args: DraftOutreachEmailArgs) -> ToolResult:
         company = args.company_name or "the engineering team"
-        subject = f"Application: {ctx.user_name} — High-Impact Contribution"
+        role_label = f"{args.job_id} role" if args.job_id else "engineering opening"
+        subject = f"Application: {ctx.user_name} — Impactful Contribution to {company}"
         body = (
             f"Dear Hiring Team at {company},\n\n"
-            f"I came across your opening and was energized by your engineering trajectory. "
-            f"With extensive hands-on experience designing reliable systems, optimizing latency, and shipping customer-focused software, "
-            f"I am confident I can immediately contribute to your product goals.\n\n"
-            f"I've attached my verified resume and portfolio for your review. Would you be open to a brief 10-minute introductory conversation this week?\n\n"
+            f"I came across the {role_label} at {company} and was energized by your team's technical vision. "
+            f"With proven hands-on experience designing reliable systems, optimizing latency, and shipping customer-focused software, "
+            f"I am confident I can immediately contribute to your engineering objectives.\n\n"
+            f"I have attached my verified resume and portfolio for your review. Would you be open to a brief 10-minute introductory conversation this week?\n\n"
             f"Best regards,\n{ctx.user_name}"
         )
 
-        data = {"subject": subject, "body": body, "company": company}
-        summary = f"Drafted recruiter outreach message for {company}"
+        data = {"subject": subject, "body": body, "company": company, "role_context": role_label}
+        summary = f"Drafted tailored recruiter outreach message for {company}"
         return ToolResult(ok=True, data=data, summary=summary)
 
 
