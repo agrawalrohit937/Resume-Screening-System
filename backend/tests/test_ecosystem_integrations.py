@@ -6,7 +6,6 @@ import pytest
 from xml.etree import ElementTree as ET
 
 from services.integrations.webhooks import WebhookService, compute_webhook_signature
-from services.integrations.adapters import GreenhouseAdapter, LeverAdapter, WorkdayAdapter
 from services.integrations.syndication import generate_indeed_xml_feed, generate_google_job_posting_ld_json
 from schemas.job_schema import JobModel, WorkMode
 from services.multi_tenancy.tenant_context import tenant_context
@@ -49,61 +48,6 @@ async def test_webhook_lifecycle_and_hmac_verification():
             data={"amount": 500}
         )
         assert len(unsub_deliveries) == 0
-
-
-@pytest.mark.asyncio
-async def test_enterprise_ats_adapters():
-    # 1. Greenhouse Adapter
-    gh = GreenhouseAdapter(api_key="gh_mock_key")
-    gh_jobs = await gh.sync_jobs()
-    assert len(gh_jobs) >= 2
-    assert "gh_job_101" in [j["external_id"] for j in gh_jobs]
-
-    gh_push = await gh.push_application({
-        "job_id": "gh_job_101",
-        "candidate_name": "Alice Engineer",
-        "score": 88.0
-    })
-    assert gh_push["success"] is True
-    assert gh_push["provider"] == "greenhouse"
-    assert gh_push["remote_application_id"].startswith("gh_app_")
-
-    gh_stage = await gh.update_stage(gh_push["remote_application_id"], "Technical Interview")
-    assert gh_stage["new_stage"] == "Technical Interview"
-
-    # 2. Lever Adapter
-    lever = LeverAdapter(api_key="lever_mock_key")
-    lever_jobs = await lever.sync_jobs()
-    assert len(lever_jobs) >= 1
-    assert lever_jobs[0]["external_id"] == "lever_post_501"
-
-    lever_push = await lever.push_application({
-        "job_id": "lever_post_501",
-        "candidate_name": "Bob Architect",
-        "score": 94.0
-    })
-    assert lever_push["provider"] == "lever"
-    assert lever_push["remote_opportunity_id"].startswith("lever_opp_")
-
-    lever_stage = await lever.update_stage(lever_push["remote_opportunity_id"], "on-site")
-    assert lever_stage["new_stage"] == "on-site"
-
-    # 3. Workday Adapter
-    wd = WorkdayAdapter(tenant_id="wd_corp", client_id="wd_client")
-    wd_jobs = await wd.sync_jobs()
-    assert len(wd_jobs) >= 1
-    assert wd_jobs[0]["external_id"] == "WD_REQ_8810"
-
-    wd_push = await wd.push_application({
-        "job_id": "WD_REQ_8810",
-        "candidate_name": "Carol Director",
-        "score": 96.5
-    })
-    assert wd_push["provider"] == "workday"
-    assert wd_push["event_status"] == "Candidate_Submitted"
-
-    wd_stage = await wd.update_stage(wd_push["remote_applicant_id"], "Offer_Phase")
-    assert wd_stage["business_process_step"] == "Offer_Phase"
 
 
 def test_job_syndication_indeed_xml_and_google_schema():

@@ -3,7 +3,7 @@ Support Ticket Repository — Dual Engine (PostgreSQL via SQLAlchemy 2.0 / Postg
 CRUD and conversation management for support tickets.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 import re
 import structlog
@@ -16,6 +16,16 @@ from schemas.support_schema import SupportTicketModel
 from repositories.base_repo import BaseRepository
 
 logger = structlog.get_logger(__name__)
+
+
+def _make_json_safe(val: Any) -> Any:
+    if isinstance(val, (datetime, date)):
+        return val.isoformat()
+    if isinstance(val, dict):
+        return {k: _make_json_safe(v) for k, v in val.items()}
+    if isinstance(val, (list, tuple, set)):
+        return [_make_json_safe(item) for item in val]
+    return val
 
 
 def _ticket_row_to_model(row: SupportTicket) -> SupportTicketModel:
@@ -80,9 +90,11 @@ class SupportTicketRepository(BaseRepository):
         status_history = data.get("status_history") or []
         thread = []
         for m in messages:
-            thread.append(dict(m) if isinstance(m, dict) else m.model_dump())
+            dumped = m.model_dump(mode="json") if hasattr(m, "model_dump") else (dict(m) if isinstance(m, dict) else m)
+            thread.append(_make_json_safe(dumped))
         for h in status_history:
-            thread.append(dict(h) if isinstance(h, dict) else h.model_dump())
+            dumped = h.model_dump(mode="json") if hasattr(h, "model_dump") else (dict(h) if isinstance(h, dict) else h)
+            thread.append(_make_json_safe(dumped))
 
         meta = {
             "attachments": data.get("attachments") or [],
@@ -96,6 +108,7 @@ class SupportTicketRepository(BaseRepository):
             "plan": data.get("plan"),
             "subscription_active": data.get("subscription_active"),
         }
+        meta = _make_json_safe(meta)
 
         async with self.session_factory() as session:
             row = SupportTicket(
@@ -249,6 +262,7 @@ class SupportTicketRepository(BaseRepository):
         now = datetime.now(timezone.utc)
         msg_dict = dict(message)
         msg_dict.setdefault("created_at", now.isoformat())
+        msg_dict = _make_json_safe(msg_dict)
 
         async with self.session_factory() as session:
             stmt = select(SupportTicket).where(
@@ -271,7 +285,7 @@ class SupportTicketRepository(BaseRepository):
         self, ticket_id: str, attachment: dict
     ) -> Optional[SupportTicketModel]:
         now = datetime.now(timezone.utc)
-        att_dict = dict(attachment)
+        att_dict = _make_json_safe(dict(attachment))
 
         async with self.session_factory() as session:
             stmt = select(SupportTicket).where(

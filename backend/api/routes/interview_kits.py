@@ -8,7 +8,12 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 
-from api.deps import get_current_user, get_interview_kit_repo, get_job_repo
+from api.deps import (
+    get_current_user,
+    get_interview_kit_repo,
+    get_job_repo,
+    get_interview_kit_service,
+)
 from repositories.interview_kit_repo import InterviewKitRepository
 from repositories.job_repo import JobRepository
 from schemas.user_schema import UserModel
@@ -35,7 +40,7 @@ class CreateKitPayload(BaseModel):
 async def create_or_update_kit_route(
     payload: CreateKitPayload,
     current_user: UserModel = Depends(get_current_user),
-    service: InterviewKitService = Depends(),
+    service: InterviewKitService = Depends(get_interview_kit_service),
 ):
     """Creates or updates a structured interview kit for a job stage."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -53,7 +58,7 @@ async def create_or_update_kit_route(
 async def list_kits_by_job_route(
     job_id: str,
     current_user: UserModel = Depends(get_current_user),
-    service: InterviewKitService = Depends(),
+    service: InterviewKitService = Depends(get_interview_kit_service),
 ):
     """Retrieves all interview kits configured for a job."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -65,7 +70,7 @@ async def get_kit_by_job_and_stage_route(
     job_id: str,
     stage_name: str,
     current_user: UserModel = Depends(get_current_user),
-    service: InterviewKitService = Depends(),
+    service: InterviewKitService = Depends(get_interview_kit_service),
 ):
     """Retrieves a specific interview kit for a job and stage."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -78,7 +83,7 @@ async def get_kit_by_job_and_stage_route(
 async def submit_scorecard_route(
     payload: ScorecardModel,
     current_user: UserModel = Depends(get_current_user),
-    service: InterviewKitService = Depends(),
+    service: InterviewKitService = Depends(get_interview_kit_service),
 ):
     """Submits or updates an interviewer scorecard with competency ratings and recommendation."""
     tenant_id = getattr(current_user, "tenant_id", "default")
@@ -94,7 +99,7 @@ async def submit_scorecard_route(
 async def compute_calibration_route(
     application_id: str,
     current_user: UserModel = Depends(get_current_user),
-    service: InterviewKitService = Depends(),
+    service: InterviewKitService = Depends(get_interview_kit_service),
 ):
     """Computes a calibration report and inter-rater consensus across all interviewers for an application."""
     tenant_id = getattr(current_user, "tenant_id", "default")
