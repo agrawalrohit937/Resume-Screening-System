@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
@@ -135,6 +135,8 @@ function PricingCard({
 
 export default function Premium() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirectUrl = searchParams.get('redirect')
   const { user, refreshUser } = useAuth()
   const [processingPlan, setProcessingPlan] = useState(null)
 
@@ -245,7 +247,7 @@ export default function Premium() {
 
             toast.success(`Account successfully upgraded to ${displayName || planKey}! 🎉 (3 Months Active)`)
             if (refreshUser) await refreshUser()
-            navigate('/billing')
+            navigate(redirectUrl || '/billing')
           } catch (verifyErr) {
             const msg = verifyErr.response?.data?.detail || verifyErr.message || 'Verification failed. Please contact support.'
             toast.error(msg)
@@ -308,7 +310,13 @@ export default function Premium() {
         </div>
         
         <button
-          onClick={() => navigate(isExecutiveRole ? '/exec/dashboard' : isCompanyRole ? '/recruiter/dashboard' : '/dashboard')}
+          onClick={() => {
+            if (redirectUrl) {
+              navigate(redirectUrl)
+            } else {
+              navigate(isExecutiveRole ? '/exec/dashboard' : isCompanyRole ? '/recruiter/dashboard' : '/dashboard')
+            }
+          }}
           className="self-start md:self-center px-5 py-2.5 rounded-xl font-bold text-xs bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50 transition-all duration-200 flex items-center gap-2 active:scale-95 cursor-pointer"
         >
           ← Back to Dashboard

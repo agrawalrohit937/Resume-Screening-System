@@ -311,10 +311,6 @@ class MockAsyncSession:
                 elif "id" in k:
                     app_matches = [it for it in app_matches if str(getattr(it, "id", "")) == str(v)]
             return MockResult(app_matches)
-        if "from talent_pool_profiles" in s_str or " talent_pool_profiles " in s_str:
-            from models.tables import TalentPoolProfile as TPP
-            pool_matches = [it for it in self._items if isinstance(it, TPP) or getattr(it, "__tablename__", "") == "talent_pool_profiles"]
-            return MockResult(pool_matches)
         # Match any added model instances by table name
         matching = [it for it in self._items if getattr(it, "__tablename__", "") and (getattr(it, "__tablename__", "") in s_str or getattr(it, "__tablename__", "").rstrip("s") in s_str)]
         if matching:

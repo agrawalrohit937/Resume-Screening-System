@@ -1,80 +1,55 @@
 """
-Job Marketplace API Routes — Job Postings, Feed Retrieval & Application Pipeline.
-
-Phase B:
-- POST /: Recruiters post a job; calculates 768-dim BGE vector via local SentenceTransformer.
-- GET /: Candidates browse and filter open jobs (zero dummy seeding; clean empty feed when no jobs).
-- GET /{id}: Job detail view.
-- POST /{id}/match: Instant ATS match calculation.
-- POST /{id}/apply: Candidate applies with resume; scores match and saves to `applications` collection.
-- GET /applications/my: Candidate retrieves their submitted applications with stage status.
+Candidate Explore Jobs, Recommendations, ATS Match & Application Routes (/api/v1/jobs).
+Recruiter, applicant pipeline & employer branding routes live in `jobs_recruiter.py`.
 """
 
 from __future__ import annotations
 
-import os
-import re
-import time
+import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-
-from utils.validators import DocumentId
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, BackgroundTasks, status
-from fastapi.responses import FileResponse, RedirectResponse
-from pydantic import BaseModel, Field
-from sqlalchemy.exc import IntegrityError as DuplicateKeyError
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse as _JSONResponse
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
-from core.config import settings
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from api.deps import (
-    get_current_user,
-    get_optional_current_user,
-    get_recruiter_or_admin,
-    get_resume_repo,
-    get_job_repo,
-    get_app_repo,
     get_company_repo,
+    get_current_user,
     get_db,
+    get_job_repo,
+    get_optional_current_user,
+    get_resume_repo,
 )
+from api.routes.jobs_recruiter import (  # noqa: F401
+    create_job,
+    get_my_posted_jobs,
+    router as recruiter_router,
+)
+from config.db import get_pg_session_factory
+from core.config import settings
+from models.tables import Company, Job
 from repositories.company_repo import CompanyRepository
 from repositories.job_repo import JobRepository
-from repositories.application_repo import ApplicationRepository
-from repositories.resume_repo import ResumeRepository
-from repositories.user_repo import UserRepository
-from models.tables import Job, JobApplication, CandidateApplication, Resume, User, Company, AuditLog
-from config.db import get_pg_session_factory
-from sqlalchemy import select, update, delete, func, or_, and_, desc
 from schemas.application_schema import ApplicationResponse, ApplicationStage
-from schemas.job_schema import (
-    CompanyProfilePayload,
-    JobCreateRequest,
-    JobResponse,
-    JobStatus,
-    JobUpdateRequest,
-)
+from schemas.job_schema import JobResponse
 from schemas.user_schema import UserModel, UserRole
-from services.cloudinary_service import generate_signed_resume_url, extract_public_id_from_url
+from services.cloudinary_service import extract_public_id_from_url
 from services.job_matcher import find_jobs_for_candidate
 from services.scoring_engine import score_resume, score_resume_dual
-from services.skill_ontology import canonicalize_skills
-from services.jd_parser_service import (
-    parse_jd_with_groq,
-    map_job_title_to_occupation,
-)
+from utils.validators import DocumentId
 
 logger = structlog.get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter()
 
 job_repo = JobRepository()
-app_repo = ApplicationRepository()
-resume_repo = ResumeRepository()
 company_repo = CompanyRepository()
-user_repo = UserRepository()
 
 
 class JobApplyPayload(BaseModel):
@@ -82,268 +57,111 @@ class JobApplyPayload(BaseModel):
     notes: Optional[str] = None
 
 
-class ApplicationStageUpdatePayload(BaseModel):
-    stage: str = Field(description="Applied, Under Review, Shortlisted, Interview, Rejected")
+def _parse_skills(raw_skills: Any) -> List[str]:
+    if isinstance(raw_skills, list):
+        return [str(s).strip() for s in raw_skills if s is not None and str(s).strip()]
+    if isinstance(raw_skills, str) and raw_skills.strip():
+        return [s.strip() for s in raw_skills.split(",") if s.strip()]
+    return []
 
 
-class EligibilityOverridePayload(BaseModel):
-    new_status: str = Field(description="eligible, ineligible, or unverified")
-    reason_code: str = Field(description="Audit reason code, e.g. manual_verification, equivalent_experience, recruiter_discretion")
-    note: Optional[str] = Field(default=None, description="Optional note or explanation")
+def _resolve_publisher_source(is_external: bool, apply_url: Optional[str], existing: Optional[str] = None) -> str:
+    if not is_external:
+        return "Direct Employer"
+    if existing:
+        return existing
+    url_lower = str(apply_url or "").lower()
+    if "linkedin.com" in url_lower:
+        return "LinkedIn"
+    if "naukri.com" in url_lower:
+        return "Naukri"
+    return "External"
 
 
-
-
-
-def derive_fallback_skills(title: str, department: Optional[str] = None, jd_text: Optional[str] = None) -> List[str]:
-    """
-    Backend heuristic to derive foundational required skills from job title, department, and description.
-    Ensures that jobs without explicit required_skills still have high-quality skill tags,
-    keeping client-side Frontend code lightweight and dumb.
-    """
-    derived: List[str] = []
-    lt = (title or "").lower()
-    
-    if "react" in lt:
-        derived.append("React")
-    if "frontend" in lt or "front-end" in lt or "front end" in lt:
-        if "Frontend" not in derived:
-            derived.append("Frontend")
-        if "JavaScript" not in derived:
-            derived.append("JavaScript")
-    if "python" in lt or "django" in lt or "fastapi" in lt or "flask" in lt:
-        if "Python" not in derived:
-            derived.append("Python")
-        if "Backend" not in derived:
-            derived.append("Backend")
-    if "node" in lt or "express" in lt or "backend" in lt or "back-end" in lt:
-        if "Node.js" not in derived and "node" in lt:
-            derived.append("Node.js")
-        if "Backend" not in derived:
-            derived.append("Backend")
-    if "full stack" in lt or "fullstack" in lt or "full-stack" in lt:
-        if "Full Stack" not in derived:
-            derived.append("Full Stack")
-        if "Web Development" not in derived:
-            derived.append("Web Development")
-    if "data" in lt or "analytics" in lt or "sql" in lt:
-        if "Data Analysis" not in derived:
-            derived.append("Data Analysis")
-        if "SQL" not in derived:
-            derived.append("SQL")
-    if "machine learning" in lt or "ml" in lt or "ai " in lt or "ai/" in lt or "deep learning" in lt:
-        if "Machine Learning" not in derived:
-            derived.append("Machine Learning")
-        if "Python" not in derived:
-            derived.append("Python")
-    if "ui" in lt or "ux" in lt or "design" in lt or "product designer" in lt:
-        if "UI/UX" not in derived:
-            derived.append("UI/UX")
-        if "Figma" not in derived:
-            derived.append("Figma")
-    if "devops" in lt or "cloud" in lt or "aws" in lt or "sre" in lt or "kubernetes" in lt:
-        if "DevOps" not in derived:
-            derived.append("DevOps")
-        if "Cloud" not in derived:
-            derived.append("Cloud")
-
-    if not derived and department and str(department).strip():
-        derived.append(str(department).strip())
-
-    if not derived:
-        derived.extend(["Software Engineering", "Problem Solving"])
-
-    return canonicalize_skills(derived)
-
-
-def extract_or_synthesize_jd(d: Dict[str, Any]) -> str:
-    """
-    Extracts the job description across raw fields (jd_text_raw, jd_text, description, job_description).
-    If missing or too short, generates a comprehensive, professional Markdown Job Description
-    matching the role title, company, skills, and department so no job ever has an empty JD.
-    """
-    jd = (
-        d.get("jd_text_raw")
-        or d.get("jd_text")
-        or d.get("description")
-        or d.get("job_description")
-        or ""
+def _serialize_job_item(
+    d: Dict[str, Any],
+    *,
+    applied_ids: Optional[set] = None,
+    company_profile: Optional[Dict[str, Any]] = None,
+    fallback_company: str = "Unknown Company",
+) -> Dict[str, Any]:
+    """Serialize a job dict/ORM payload into a clean, consistent feed/detail response."""
+    job_id_str = str(d.get("id") or d.get("_id") or "")
+    is_ext = bool(d.get("is_external") in [True, "true", "True", 1])
+    apply_url = d.get("external_apply_url") or d.get("apply_url") or None
+    comp_logo = (
+        d.get("company_logo")
+        or d.get("company_logo_url")
+        or d.get("logo_url")
+        or d.get("logo")
+        or (company_profile.get("logo_url") if company_profile else None)
     )
-    if isinstance(jd, str) and len(jd.strip()) > 30:
-        return jd.strip()
-
-    title = d.get("title") or "Software Engineering Specialist"
-    company = d.get("company_name") or d.get("company") or "CareerShala Hiring Partner"
-    location = d.get("location") or "Remote"
-    work_mode = d.get("work_mode") or "Flexible"
-    min_years = d.get("min_years") or 0
-    skills = d.get("required_skills") or d.get("skills")
-    if isinstance(skills, list):
-        skill_str = ", ".join(str(s) for s in skills if s)
-    elif isinstance(skills, str) and skills.strip():
-        skill_str = skills.strip()
-    else:
-        skill_str = "Modern software development, system architecture, and API integration"
-
-    snippet = jd.strip() if isinstance(jd, str) and jd.strip() else ""
-
-    return (
-        f"{snippet + chr(10) + chr(10) if snippet else ''}"
-        f"### About the Role\n"
-        f"{company} is hiring a **{title}** ({work_mode}, {location}) to build next-generation platform features and services. "
-        f"As part of our high-performing team, you will contribute across the engineering lifecycle from design to production delivery.\n\n"
-        f"### Key Responsibilities\n"
-        f"- Design, implement, and maintain scalable, robust features aligned with product roadmaps.\n"
-        f"- Partner closely with engineering peers, designers, and product leaders in an agile environment.\n"
-        f"- Write high-quality, testable, and well-documented code following modern development standards.\n"
-        f"- Actively participate in architecture discussions, code reviews, and ongoing system optimizations.\n\n"
-        f"### Requirements & Preferred Qualifications\n"
-        f"- Background or hands-on project experience in **{title}** or related areas (~{min_years}+ years preferred).\n"
-        f"- Working proficiency with: {skill_str}.\n"
-        f"- Strong analytical troubleshooting, clear communication, and collaborative team mindset."
+    comp_site = (
+        d.get("company_website")
+        or d.get("website")
+        or (company_profile.get("website") if company_profile else None)
     )
+    created_at = d.get("created_at") or datetime.now(timezone.utc)
+    created_iso = created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 1. POST / — POST A NEW JOB (LOCAL BGE-BASE EMBEDDING)
-# ══════════════════════════════════════════════════════════════════════════════
-
-@router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
-@router.post("/", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
-async def create_job(
-    payload: JobCreateRequest,
-    current_user: UserModel = Depends(get_current_user),
-):
-    """
-    Recruiters / Admins post a new job.
-    Uses local SentenceTransformer (BAAI/bge-base-en-v1.5) on CPU
-    to generate a 768-dimensional normalized embedding for 'jd_text_raw'.
-    Zero OpenAI dependencies.
-    """
-    user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE}
-    if not any(r in allowed_roles for r in user_roles):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only recruiters and administrators can post jobs.",
-        )
-
-    t0 = time.perf_counter()
-    raw_text = payload.jd_text_raw.strip()
-    company_clean = payload.company_name.strip()
-
-    # Fast company profile lookup
-    company_profile_doc = await company_repo.get_by_name(company_clean)
-    jd_embedding: List[float] = []
-    company_profile = company_profile_doc or {}
-
-    now = datetime.now(timezone.utc)
-
-    company_logo = (payload.company_logo or "").strip() or company_profile.get("logo_url") or None
-    company_website = (payload.company_website or "").strip() or company_profile.get("website") or None
-    company_about = (payload.company_about or "").strip() or company_profile.get("about") or None
-    company_size = (payload.company_size or "").strip() or company_profile.get("team_size") or None
-    company_industry = (payload.company_industry or "").strip() or company_profile.get("industry") or None
-
-    # Resolve occupation code if not provided
-    occ_code = payload.occupation_code or map_job_title_to_occupation(payload.title)
-
-    # Resolve structured requirements via Groq LLM if not provided
-    reqs_structured = payload.requirements_structured
-    if not reqs_structured:
-        try:
-            groq_specs = await parse_jd_with_groq(raw_text)
-            if groq_specs and groq_specs.get("required_skills"):
-                reqs_structured = [
-                    {
-                        "text": f"Proficiency in {s}",
-                        "criticality": "must_have",
-                        "years": groq_specs.get("candidate_min_experience_years"),
-                        "is_must_have": True,
-                    }
-                    for s in groq_specs["required_skills"]
-                ]
-                if not payload.required_skills and groq_specs.get("required_skills"):
-                    payload.required_skills = groq_specs["required_skills"]
-        except Exception as ge:
-            logger.warning("Groq structured requirements extraction skipped", error=str(ge))
-            reqs_structured = []
-
-    initial_skills = canonicalize_skills(payload.required_skills) if payload.required_skills else []
-    if not initial_skills:
-        initial_skills = derive_fallback_skills(payload.title, payload.department, raw_text)
-
-    job_doc = {
-        "company_name": company_clean,
-        "title": payload.title.strip(),
-        "jd_text_raw": raw_text,
-        "required_skills": initial_skills,
-        "min_years": payload.min_years,
-        "location": payload.location.strip() or "Remote",
-        "work_mode": payload.work_mode,
-        "salary_range": payload.salary_range.strip() if payload.salary_range else None,
-        "department": payload.department.strip() if payload.department else None,
-        "company_logo": company_logo,
-        "company_website": company_website,
-        "company_about": company_about,
-        "company_size": company_size,
-        "is_external": False,
-        "external_apply_url": None,
-        "external_job_id": None,
-        "company_industry": company_industry,
-        "education_requirement_mode": payload.education_requirement_mode,
-        "required_credentials": payload.required_credentials,
-        "occupation_code": occ_code,
-        "requirements_structured": reqs_structured,
-        "status": JobStatus.OPEN.value,
-        "jd_embedding": jd_embedding,
-        "created_by": str(current_user.id),
-        "tenant_id": getattr(current_user, "tenant_id", "default") or "default",
-        "applicant_count": 0,
-        "created_at": now,
-        "updated_at": now,
+    return {
+        "id": job_id_str,
+        "company_name": d.get("company_name") or d.get("company") or fallback_company,
+        "title": d.get("title") or "Untitled Role",
+        "jd_text_raw": (d.get("jd_text_raw") or d.get("jd_text") or d.get("description") or "").strip(),
+        "required_skills": _parse_skills(d.get("required_skills") or d.get("skills")),
+        "min_years": float(d["min_years"]) if d.get("min_years") is not None else None,
+        "location": d.get("location") or "Remote",
+        "work_mode": d.get("work_mode") or "Remote",
+        "salary_range": d.get("salary_range") or None,
+        "status": d.get("status") or "open",
+        "department": d.get("department") or None,
+        "company_logo": comp_logo or None,
+        "company_logo_url": comp_logo or None,
+        "logo_url": comp_logo or None,
+        "company_website": comp_site or None,
+        "company_about": d.get("company_about") or (company_profile.get("about") if company_profile else None),
+        "company_size": d.get("company_size") or (company_profile.get("team_size") if company_profile else None),
+        "is_external": is_ext,
+        "publisher_source": _resolve_publisher_source(is_ext, apply_url, d.get("publisher_source")),
+        "external_apply_url": apply_url,
+        "external_job_id": d.get("external_job_id") or None,
+        "company_industry": d.get("company_industry") or (company_profile.get("industry") if company_profile else None),
+        "applicant_count": int(d.get("applicant_count") or 0),
+        "created_at": created_iso,
+        "has_applied": bool(applied_ids and job_id_str in applied_ids),
+        "tenant_id": d.get("tenant_id") or "default",
     }
 
-    created = await job_repo.create(job_doc)
-    job_id = str(created.get("id") or created.get("_id"))
 
-    logger.info("Job posted successfully", job_id=job_id, company=job_doc["company_name"], occupation_code=occ_code)
-
-    return JobResponse(
-        id=job_id,
-        company_name=job_doc["company_name"],
-        title=job_doc["title"],
-        jd_text_raw=job_doc["jd_text_raw"],
-        required_skills=job_doc["required_skills"],
-        min_years=job_doc["min_years"],
-        location=job_doc["location"],
-        work_mode=job_doc["work_mode"],
-        salary_range=job_doc["salary_range"],
-        status=job_doc["status"],
-        department=job_doc["department"],
-        company_logo=job_doc.get("company_logo"),
-        company_website=job_doc.get("company_website"),
-        company_about=job_doc.get("company_about"),
-        company_size=job_doc.get("company_size"),
-        company_industry=job_doc.get("company_industry"),
-        created_by=job_doc["created_by"],
-        applicant_count=0,
-        education_requirement_mode=job_doc["education_requirement_mode"],
-        required_credentials=job_doc["required_credentials"],
-        occupation_code=job_doc["occupation_code"],
-        requirements_structured=job_doc["requirements_structured"],
-        created_at=job_doc["created_at"],
-        has_embedding=True,
-    )
+def _extract_resume_payload(raw_parsed: Any) -> Dict[str, Any]:
+    if hasattr(raw_parsed, "model_dump"):
+        payload = raw_parsed.model_dump()
+    elif isinstance(raw_parsed, dict):
+        payload = dict(raw_parsed)
+    else:
+        payload = {}
+    if not payload.get("raw_text"):
+        if hasattr(raw_parsed, "raw_text"):
+            payload["raw_text"] = raw_parsed.raw_text or ""
+        elif isinstance(raw_parsed, dict):
+            payload["raw_text"] = raw_parsed.get("raw_text", "")
+    return payload
 
 
+async def _resolve_candidate_resume(resume_repo: Any, user_id: str, resume_id: Optional[str] = None) -> Any:
+    if isinstance(resume_id, str) and resume_id.strip():
+        return await resume_repo.get_by_id_and_user(resume_id.strip(), user_id)
+    target = None
+    try:
+        target = await resume_repo.get_primary_by_user(user_id)
+    except Exception:
+        target = None
+    if not target:
+        resumes, _ = await resume_repo.get_by_user(user_id, limit=1)
+        target = resumes[0] if resumes else None
+    return target
 
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. GET / — CANDIDATE FEED OF OPEN JOBS (ZERO DUMMY SEEDING)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("")
 @router.get("/")
@@ -360,119 +178,32 @@ async def list_jobs(
 ):
     if not hasattr(job_repo, "list_jobs"):
         job_repo = get_job_repo()
-    # Pure SQLAlchemy ORM job listing & user applied check
     docs, total = await job_repo.list_jobs(
-        search=search,
-        work_mode=work_mode,
-        location=location,
-        min_years=min_years,
-        skill=skill,
-        skip=skip,
-        limit=limit,
+        search=search, work_mode=work_mode, location=location, min_years=min_years, skill=skill, skip=skip, limit=limit
     )
+    applied_job_ids = await job_repo.get_user_applied_job_ids(str(current_user.id)) if current_user else set()
+    jobs = [_serialize_job_item(d, applied_ids=applied_job_ids, fallback_company="Leading Employer") for d in docs]
+    return {"jobs": jobs, "total": total, "limit": limit, "skip": skip}
 
-    applied_job_ids = set()
-    if current_user:
-        applied_job_ids = await job_repo.get_user_applied_job_ids(str(current_user.id))
-
-    jobs = []
-    for d in docs:
-        job_id_str = str(d["_id"])
-        has_applied = job_id_str in applied_job_ids
-        is_ext = bool(d.get("is_external") in [True, "true", "True", 1])
-
-        # Safe handling of required_skills
-        raw_skills = d.get("required_skills") or d.get("skills")
-        if isinstance(raw_skills, list):
-            safe_skills = [str(s).strip() for s in raw_skills if s is not None and str(s).strip()]
-        elif isinstance(raw_skills, str) and raw_skills.strip():
-            safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
-        else:
-            safe_skills = []
-
-        if not safe_skills:
-            safe_skills = derive_fallback_skills(d.get("title") or "", d.get("department"), d.get("jd_text_raw") or d.get("jd_text") or d.get("description"))
-
-        comp_name = d.get("company_name") or d.get("company") or "Leading Employer"
-        comp_logo = d.get("company_logo") or d.get("company_logo_url") or d.get("logo_url") or d.get("logo")
-        comp_site = d.get("company_website") or d.get("website")
-
-        jobs.append({
-            "id": job_id_str,
-            "company_name": comp_name,
-            "title": d.get("title") or "Software Engineer",
-            "jd_text_raw": extract_or_synthesize_jd(d),
-            "required_skills": safe_skills,
-            "min_years": float(d.get("min_years") or 0.0),
-            "location": d.get("location") or "Remote",
-            "work_mode": d.get("work_mode") or "Remote",
-            "salary_range": d.get("salary_range") or None,
-            "status": d.get("status") or "open",
-            "department": d.get("department") or None,
-            "company_logo": comp_logo or None,
-            "company_logo_url": comp_logo or None,
-            "logo_url": comp_logo or None,
-            "company_website": comp_site or None,
-            "company_about": d.get("company_about") or None,
-            "company_size": d.get("company_size") or None,
-            "is_external": is_ext,
-            "publisher_source": d.get("publisher_source") or ("Direct Employer" if not is_ext else "Corporate"),
-            "external_apply_url": d.get("external_apply_url") or d.get("apply_url") or None,
-            "external_job_id": d.get("external_job_id") or None,
-            "company_industry": d.get("company_industry") or None,
-            "applicant_count": int(d.get("applicant_count") or 0),
-            "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at") or ""),
-            "has_applied": has_applied,
-            "tenant_id": d.get("tenant_id") or "default",
-        })
-
-    return {
-        "jobs": jobs,
-        "total": total,
-        "limit": limit,
-        "skip": skip,
-    }
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 3. GET /applications/my — CANDIDATE APPLICATION TRACKER FEED
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/applications/my")
-async def get_my_applications(
-    current_user: UserModel = Depends(get_current_user),
-):
-    """
-    Fetches all jobs applied for by the current candidate from the `applications` collection.
-    Joins job details (title, company, work mode, salary) and current pipeline stage.
-    """
-    # Pure PostgreSQL query: candidate applications
+async def get_my_applications(current_user: UserModel = Depends(get_current_user)):
+    """Fetch all jobs applied for by the current candidate with current pipeline stage."""
     app_docs = await job_repo.list_applications_by_candidate(str(current_user.id))
-
     job_ids_set = {str(app.get("job_id")) for app in app_docs if app.get("job_id")}
-    jobs_map = {}
+    jobs_map: Dict[str, Dict[str, Any]] = {}
+    company_map: Dict[str, Dict[str, Any]] = {}
+
     if job_ids_set:
         async with get_pg_session_factory()() as session:
-            stmt = select(Job).where(Job.id.in_(list(job_ids_set)))
-            res = await session.execute(stmt)
-            for j in res.scalars().all():
+            for j in (await session.execute(select(Job).where(Job.id.in_(list(job_ids_set))))).scalars().all():
                 d = {c.name: getattr(j, c.name) for c in Job.__table__.columns}
                 d["_id"] = d.get("id")
                 jobs_map[str(j.id)] = d
-
-    # Batch fetch company profiles for logos
-    company_map = {}
-    company_names = {j.get("company_name", "").strip() for j in jobs_map.values() if j.get("company_name")}
-    if company_names:
-        async with get_pg_session_factory()() as session:
-            stmt = select(Company).where(Company.company_name.in_(list(company_names)))
-            res = await session.execute(stmt)
-            for c in res.scalars().all():
-                company_map[c.company_name.strip().lower()] = {
-                    "logo_url": c.logo_url,
-                    "website": c.website,
-                }
+            company_names = {j.get("company_name", "").strip() for j in jobs_map.values() if j.get("company_name")}
+            if company_names:
+                for c in (await session.execute(select(Company).where(Company.company_name.in_(list(company_names))))).scalars().all():
+                    company_map[c.company_name.strip().lower()] = {"logo_url": c.logo_url, "website": c.website}
 
     results = []
     for app in app_docs:
@@ -481,15 +212,7 @@ async def get_my_applications(
         if job_id and job_id in jobs_map:
             job_doc = jobs_map[job_id]
             comp_name = job_doc.get("company_name", "Unknown Company")
-            logo = job_doc.get("company_logo")
-            website = job_doc.get("company_website")
-            if not logo and comp_name and comp_name != "Unknown Company":
-                comp_doc = company_map.get(comp_name.strip().lower())
-                if comp_doc:
-                    logo = comp_doc.get("logo_url")
-                    if not website:
-                        website = comp_doc.get("website")
-
+            comp_doc = company_map.get(comp_name.strip().lower()) if comp_name else None
             job_info = {
                 "id": str(job_doc["_id"]),
                 "title": job_doc.get("title", "Unknown Role"),
@@ -498,11 +221,10 @@ async def get_my_applications(
                 "work_mode": job_doc.get("work_mode", "Remote"),
                 "salary_range": job_doc.get("salary_range"),
                 "status": job_doc.get("status", "open"),
-                "company_logo": logo,
-                "company_website": website,
+                "company_logo": job_doc.get("company_logo") or (comp_doc.get("logo_url") if comp_doc else None),
+                "company_website": job_doc.get("company_website") or (comp_doc.get("website") if comp_doc else None),
                 "department": job_doc.get("department"),
             }
-
         results.append({
             "id": str(app["_id"]),
             "job_id": job_id,
@@ -510,7 +232,9 @@ async def get_my_applications(
             "match_score": app.get("match_score"),
             "stage": app.get("stage", ApplicationStage.APPLIED.value),
             "notes": app.get("notes"),
-            "created_at": app.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(app.get("created_at"), "isoformat") else str(app.get("created_at", "")),
+            "created_at": app.get("created_at", datetime.now(timezone.utc)).isoformat()
+            if hasattr(app.get("created_at"), "isoformat")
+            else str(app.get("created_at", "")),
             "job": job_info or {
                 "id": job_id,
                 "title": "Role Listing",
@@ -521,1074 +245,49 @@ async def get_my_applications(
                 "status": "closed",
             },
         })
+    return {"applications": results, "total": len(results)}
 
-    return {
-        "applications": results,
-        "total": len(results),
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 4. GET /recommended — "JOBS FOR YOU" AI RECOMMENDATIONS (PHASE C)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/recommended")
 async def get_recommended_jobs(
     limit: int = Query(default=5, ge=1, le=20),
     current_user: UserModel = Depends(get_current_user),
-    resume_repo = Depends(get_resume_repo),
+    resume_repo=Depends(get_resume_repo),
     job_repo: JobRepository = Depends(get_job_repo),
 ):
-    """
-    On-demand bidirectional AI recommendation engine.
-    
-    IMPORTANT: This endpoint MUST NOT be called on initial page load.
-    It runs the local 768-dim BGE embedding model (CPU) and performs
-    cosine similarity scoring — triggered only when the user explicitly
-    clicks 'Find My Matches'.
-
-    Response is cached for 5 minutes (private, per-user) so repeat clicks
-    within the same session do not re-run the embedding model.
-    """
-    from fastapi.responses import JSONResponse as _JSONResponse
-
+    """On-demand job recommendation engine cached privately per user for 5 minutes."""
     user_role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
-
     result = await find_jobs_for_candidate(
         candidate_id=str(current_user.id),
         limit=limit,
-        db=db,
+        db=None,
         resume_repo=resume_repo,
         include_external=str(user_role or "").lower() == UserRole.CANDIDATE.value,
     )
-
     response = _JSONResponse(content=result)
-    # Cache per-user for 5 minutes — avoids re-running BGE on rapid re-clicks
     response.headers["Cache-Control"] = "private, max-age=300"
     return response
 
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 5. GET /me — RECRUITER'S OWN JOB POSTINGS
-# ══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/me")
-@router.get("/my-jobs")
-async def get_my_posted_jobs(
-    current_user: UserModel = Depends(get_current_user),
-    session: Optional[AsyncSession] = Depends(get_db),
-):
-    """
-    Fetches all jobs created by the authenticated recruiter / interviewer / admin.
-    Used by the Recruiter Job Management Dashboard & Live Interview Scheduler.
-    """
-    user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {
-        UserRole.RECRUITER,
-        UserRole.ADMIN,
-        UserRole.PLATFORM_ADMIN,
-        UserRole.EXECUTIVE,
-        UserRole.HIRING_MANAGER,
-        UserRole.INTERVIEWER,
-    }
-    if not any(r in allowed_roles for r in user_roles):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter, Interviewer, or Administrator access required.",
-        )
-
-    current_tenant = getattr(current_user, "tenant_id", "default") or "default"
-    is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN} for r in user_roles)
-
-    # Multi-tenant visibility: Anyone within the same tenant organization can view all jobs
-    # posted under that tenant, regardless of who created them.
-    # Platform Admins at root level can view across all tenants if tenant_id is "default".
-    # Pure SQLAlchemy ORM recruiter jobs query
-    async def _fetch_jobs(sess: AsyncSession):
-        stmt = select(Job).where(Job.is_external == False).order_by(Job.created_at.desc())
-        if not (is_platform_admin_user or current_tenant == "default"):
-            stmt = stmt.where(or_(Job.tenant_id == current_tenant, Job.tenant_id == "default", Job.tenant_id == None))
-        res = await sess.execute(stmt)
-        docs = []
-        for j in res.scalars().all():
-            d = {c.name: getattr(j, c.name) for c in Job.__table__.columns}
-            d["_id"] = d.get("id")
-            docs.append(d)
-
-        job_ids = [str(d["_id"]) for d in docs]
-        app_counts = {}
-        if job_ids:
-            counts_stmt = (
-                select(CandidateApplication.job_id, func.count(CandidateApplication.id))
-                .where(CandidateApplication.job_id.in_(job_ids))
-                .group_by(CandidateApplication.job_id)
-            )
-            counts_res = await sess.execute(counts_stmt)
-            for row in counts_res.all():
-                app_counts[str(row[0])] = int(row[1])
-        return docs, app_counts
-
-    active_sess = session if hasattr(session, "execute") else None
-    if active_sess:
-        docs, app_counts = await _fetch_jobs(active_sess)
-    else:
-        async with get_pg_session_factory()() as sess:
-            docs, app_counts = await _fetch_jobs(sess)
-
-    jobs = [
-        {
-            "id": str(d["_id"]),
-            "company_name": d.get("company_name", ""),
-            "title": d.get("title", ""),
-            "jd_text_raw": d.get("jd_text_raw", ""),
-            "required_skills": d.get("required_skills", []),
-            "min_years": float(d.get("min_years", 0.0)),
-            "location": d.get("location", "Remote"),
-            "work_mode": d.get("work_mode", "Remote"),
-            "salary_range": d.get("salary_range"),
-            "status": d.get("status", "open"),
-            "department": d.get("department"),
-            "tenant_id": d.get("tenant_id"),
-            "applicant_count": app_counts.get(str(d["_id"]), int(d.get("applicant_count", 0))),
-            "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at", "")),
-        }
-        for d in docs
-    ]
-
-    return {"jobs": jobs, "total": len(jobs)}
-
-
-@router.get("/recruiter/stats")
-async def get_recruiter_pipeline_stats(
-    current_user: UserModel = Depends(get_current_user),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Returns live pipeline statistics for the authenticated recruiter.
-    Calculates exact counts per stage and real action-required volume.
-    Zero fake or hardcoded data.
-    """
-    user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER}
-    if not any(r in allowed_roles for r in user_roles):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter or Administrator access required.",
-        )
-
-    # 1. Fetch organization jobs under active tenant via pure SQLAlchemy
-    current_tenant = getattr(current_user, "tenant_id", "default") or "default"
-    is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN} for r in user_roles)
-    
-    async with get_pg_session_factory()() as session:
-        stmt = select(Job.id, Job.status).where(Job.is_external == False)
-        if not (is_platform_admin_user or current_tenant == "default"):
-            stmt = stmt.where(
-                or_(
-                    Job.tenant_id == current_tenant,
-                    Job.tenant_id == "default",
-                    Job.tenant_id == None,
-                    Job.created_by == str(current_user.id),
-                )
-            )
-        jobs_res = await session.execute(stmt)
-        jobs_rows = jobs_res.all()
-        job_ids = [str(r[0]) for r in jobs_rows]
-        active_openings = sum(1 for r in jobs_rows if str(r[1] or "").lower() in ("open", "active"))
-
-        if not job_ids:
-            return {
-                "active_openings": 0,
-                "total_candidates": 0,
-                "action_required": 0,
-                "time_to_screen": None,
-                "funnel": {
-                    "applied": 0,
-                    "under_review": 0,
-                    "shortlisted": 0,
-                    "interview": 0,
-                    "rejected": 0,
-                }
-            }
-
-        # 2. Fetch all applications for these jobs
-        apps_res = await session.execute(
-            select(CandidateApplication).where(CandidateApplication.job_id.in_(job_ids))
-        )
-        apps_list = []
-        for app_row in apps_res.scalars().all():
-            ad = {c.name: getattr(app_row, c.name) for c in CandidateApplication.__table__.columns}
-            if app_row.details:
-                ad.update(app_row.details)
-            ad["_id"] = ad.get("id")
-            apps_list.append(ad)
-
-    total_candidates = len(apps_list)
-
-    funnel = {
-        "applied": 0,
-        "under_review": 0,
-        "shortlisted": 0,
-        "interview": 0,
-        "rejected": 0,
-    }
-
-    action_required = 0
-    for app in apps_list:
-        raw_stage = (app.get("stage") or "Applied").lower().replace(" ", "_")
-        if raw_stage in funnel:
-            funnel[raw_stage] += 1
-        elif raw_stage == "under_review":
-            funnel["under_review"] += 1
-
-        # Candidates in 'applied' or 'under_review' require recruiter action
-        if raw_stage in ("applied", "under_review"):
-            action_required += 1
-
-    return {
-        "active_openings": active_openings,
-        "total_candidates": total_candidates,
-        "action_required": action_required,
-        "time_to_screen": "1.2d",
-        "funnel": funnel,
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. GET /{job_id}/applications — CANDIDATE APPLICATION PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/{job_id}/applications")
-@router.get("/{job_id}/applicants")
-async def get_job_applications(
-    job_id: str,
-    stage: Optional[str] = Query(default=None, description="Filter by stage: Applied, Under Review, Shortlisted, Interview, Rejected"),
-    current_user: UserModel = Depends(get_current_user),
-    job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Returns all applicants for a specific job, enriched with their parsed resume data.
-    Restricted to Recruiters, Interviewers, Hiring Managers, and Admins.
-    Sorted by match_score descending.
-    """
-    user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER, UserRole.INTERVIEWER}
-    if not any(r in allowed_roles for r in user_roles):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter, Interviewer, or Administrator access required.",
-        )
-
-    
-    if not DocumentId.is_valid(job_id):
-        raise HTTPException(status_code=400, detail="Invalid job ID format.")
-
-    job_doc = await job_repo.get_by_id(job_id)
-    if not job_doc:
-        raise HTTPException(status_code=404, detail="Job posting not found.")
-
-    # Organization tenant check: Recruiters/Hiring Managers/Interviewers can view applicants for jobs in their tenant or unassigned/default
-    is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE} for r in user_roles)
-    if not is_platform_admin_user:
-        job_tenant = job_doc.get("tenant_id") or "default"
-        user_tenant = getattr(current_user, "tenant_id", "default") or "default"
-        created_by = job_doc.get("created_by")
-        if (
-            str(created_by) != str(current_user.id)
-            and job_tenant != user_tenant
-            and user_tenant != "default"
-            and job_tenant != "default"
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only view applicants for your organization's job postings.",
-            )
-
-    # Pure repository call for candidate applications
-    app_docs = await job_repo.list_candidate_applications(job_id, stage=stage if stage and stage.lower() != "all" else None)
-
-    # Pre-fetch fallback resumes
-    missing_resume_ids = {str(app.get("resume_id")) for app in app_docs if app.get("resume_id")}
-    fallback_resumes_map = {}
-    if missing_resume_ids:
-        fallback_resumes_map = await resume_repo.get_multiple_by_ids(list(missing_resume_ids))
-
-    enriched_applications = []
-    for app in app_docs:
-        resume_id = app.get("resume_id")
-        resume_snapshot = app.get("resume_snapshot") or {}
-
-        parsed_data: Dict[str, Any] = {}
-        file_url = None
-
-        # 1. Prefer resume_snapshot when present
-        if resume_snapshot and isinstance(resume_snapshot, dict) and (resume_snapshot.get("parsed_data") or resume_snapshot.get("file_url")):
-            file_url = resume_snapshot.get("file_url")
-            raw_parsed = resume_snapshot.get("parsed_data", {})
-            if hasattr(raw_parsed, "model_dump"):
-                parsed_data = raw_parsed.model_dump()
-            elif isinstance(raw_parsed, dict):
-                parsed_data = raw_parsed
-        else:
-            # 2. Fallback to batched live db.resumes lookup for older applications
-            resume_doc = fallback_resumes_map.get(str(resume_id)) if resume_id else None
-
-            if resume_doc:
-                file_url = resume_doc.get("file_url")
-                raw_parsed = resume_doc.get("parsed_data", {})
-                if hasattr(raw_parsed, "model_dump"):
-                    parsed_data = raw_parsed.model_dump()
-                elif isinstance(raw_parsed, dict):
-                    parsed_data = raw_parsed
-
-        contact = parsed_data.get("contact_info") or {}
-        skills = (
-            parsed_data.get("skills")
-            or parsed_data.get("technical_skills")
-            or []
-        )
-        experience_years = float(parsed_data.get("total_experience_years") or 0.0)
-        work_experience = parsed_data.get("work_experience") or []
-        education = parsed_data.get("education") or []
-        summary = parsed_data.get("summary") or ""
-
-        candidate_name = (
-            app.get("candidate_name")
-            or parsed_data.get("full_name")
-            or contact.get("name")
-            or "Applicant"
-        )
-        candidate_email = (
-            app.get("candidate_email")
-            or contact.get("email")
-            or ""
-        )
-
-        app_id_str = str(app["_id"])
-        raw_match_score = app.get("match_score")
-        raw_recruiter_score = app.get("recruiter_score")
-
-        # Self-healing fallback if score is missing or 0.0
-        if (raw_recruiter_score is None or raw_recruiter_score <= 0.0) and (skills or summary):
-            job_reqs = set(str(s).lower().strip() for s in (job_doc.get("required_skills") or []))
-            cand_s = set(str(s).lower().strip() for s in skills)
-            if job_reqs:
-                matched_cnt = len(cand_s.intersection(job_reqs))
-                calc_val = round(max(35.0, min(95.0, (matched_cnt / len(job_reqs)) * 100.0)), 1)
-            else:
-                calc_val = 65.0
-            raw_match_score = raw_match_score if (raw_match_score and raw_match_score > 0) else calc_val
-            raw_recruiter_score = raw_recruiter_score if (raw_recruiter_score and raw_recruiter_score > 0) else calc_val
-
-        enriched_applications.append({
-            "id": app_id_str,
-            "_id": app_id_str,
-            "job_id": job_id,
-            "candidate_id": str(app.get("candidate_id", "")),
-            "resume_id": str(resume_id) if resume_id else None,
-            "resume_snapshot": resume_snapshot,
-            "match_score": raw_match_score,
-            "recruiter_score": (
-                raw_recruiter_score
-                if raw_recruiter_score is not None
-                else raw_match_score
-            ),
-            "knockout_status": app.get("knockout_status") or {
-                "passed": not bool(app.get("is_knockout", False)),
-                "reasons": app.get("knockout_reasons") or [],
-            },
-            "stage": app.get("stage", ApplicationStage.APPLIED.value),
-            "candidate_name": candidate_name,
-            "candidate_email": candidate_email,
-            "notes": app.get("notes"),
-            "created_at": (
-                app.get("created_at").isoformat()
-                if hasattr(app.get("created_at"), "isoformat")
-                else str(app.get("created_at", ""))
-            ),
-            "candidate": {
-                "name": candidate_name,
-                "email": candidate_email,
-                "phone": contact.get("phone"),
-                "location": contact.get("location") or "Remote",
-                "linkedin": contact.get("linkedin"),
-                "github": contact.get("github"),
-                "portfolio": contact.get("portfolio"),
-                "skills": skills,
-                "experience_years": experience_years,
-                "summary": summary,
-                "work_experience": work_experience[:4],
-                "education": education[:3],
-                "file_url": file_url,
-                "resume_download_url": f"/api/v1/jobs/resume/{resume_id}/download" if resume_id else None,
-            },
-        })
-
-    job_info = {
-        "id": str(job_doc["_id"]),
-        "title": job_doc.get("title", "Untitled Role"),
-        "company_name": job_doc.get("company_name", "Company"),
-        "location": job_doc.get("location", "Remote"),
-        "work_mode": job_doc.get("work_mode", "Remote"),
-        "salary_range": job_doc.get("salary_range"),
-        "status": job_doc.get("status", "open"),
-        "department": job_doc.get("department"),
-        "required_skills": job_doc.get("required_skills", []),
-        "applicant_count": len(enriched_applications),
-        "created_at": (
-            job_doc.get("created_at").isoformat()
-            if hasattr(job_doc.get("created_at"), "isoformat")
-            else str(job_doc.get("created_at", ""))
-        ),
-    }
-
-    return {
-        "job": job_info,
-        "applications": enriched_applications,
-        "applicants": enriched_applications,
-        "total": len(enriched_applications),
-    }
-
-
-@router.get("/resume/{resume_id}/download")
-async def download_applicant_resume(
-    resume_id: str,
-    current_user: UserModel = Depends(get_current_user),
-    resume_repo: ResumeRepository = Depends(get_resume_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Secure applicant resume download.
-    Verifies requester is either:
-    (a) The candidate who owns the resume
-    (b) A recruiter or admin who owns the job the application belongs to
-    Generates a fresh signed time-limited Cloudinary URL rather than exposing raw URLs.
-    """
-    user_id_str = str(current_user.id)
-    is_admin = current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
-
-    # 1. Lookup resume in resumes table via repository
-    doc = await resume_repo.get_by_id(str(resume_id))
-
-    # 2. Lookup application document via repository
-    app_doc = await job_repo.get_candidate_application(job_id, str(resume_id))
-
-    # 3. Ownership verification
-    is_candidate_owner = (doc and str(doc.get("user_id")) == user_id_str) or (
-        app_doc and str(app_doc.get("candidate_id")) == user_id_str
-    )
-
-    is_job_owner = False
-    if is_admin:
-        is_job_owner = True
-    elif app_doc:
-        try:
-            job_doc = await job_repo.get_by_id(job_id)
-            if job_doc and str(job_doc.get("created_by")) == user_id_str:
-                is_job_owner = True
-        except Exception:
-            pass
-
-    if not is_candidate_owner and not is_job_owner:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access or download this resume.",
-        )
-
-    # 4. Resolve Cloudinary public_id and generate signed URL
-    cloudinary_pid = None
-    if app_doc and app_doc.get("resume_snapshot", {}).get("cloudinary_public_id"):
-        cloudinary_pid = app_doc["resume_snapshot"]["cloudinary_public_id"]
-    elif doc and doc.get("cloudinary_public_id"):
-        cloudinary_pid = doc["cloudinary_public_id"]
-
-    raw_file_url = None
-    if app_doc and app_doc.get("resume_snapshot", {}).get("file_url"):
-        raw_file_url = app_doc["resume_snapshot"]["file_url"]
-    elif doc and doc.get("file_url"):
-        raw_file_url = doc.get("file_url")
-
-    if not cloudinary_pid and raw_file_url:
-        cloudinary_pid = extract_public_id_from_url(raw_file_url)
-
-    if cloudinary_pid:
-        signed_url = generate_signed_resume_url(cloudinary_pid, expires_in=300)
-        if signed_url:
-            return RedirectResponse(url=signed_url)
-
-    if raw_file_url:
-        return RedirectResponse(url=raw_file_url)
-
-    # 5. Fallback to local storage path
-    original_path = doc.get("storage_path") if doc else None
-    if original_path:
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        file_path = os.path.join(base_dir, original_path)
-        if os.path.exists(file_path):
-            return FileResponse(
-                path=file_path,
-                filename=doc.get("original_filename", "resume.pdf"),
-                media_type="application/octet-stream",
-            )
-
-    raise HTTPException(status_code=404, detail="No resume available")
-
-
-@router.patch("/applications/{app_id}/stage")
-async def update_application_stage(
-    app_id: str,
-    payload: ApplicationStageUpdatePayload,
-    background_tasks: BackgroundTasks,
-    current_user: UserModel = Depends(get_current_user),
-    app_repo: ApplicationRepository = Depends(get_app_repo),
-    job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Updates the hiring pipeline stage for an applicant.
-    Restricted to Recruiters and Admins.
-    Valid stages: Applied, Under Review, Shortlisted, Interview, Rejected.
-    """
-    if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter or Administrator access required.",
-        )
-
-    app_doc = await app_repo.get_by_id_only(app_id)
-    if not app_doc:
-        raise HTTPException(status_code=404, detail="Application record not found.")
-
-    # Canonicalize valid stages
-    valid_stages_map = {e.value.lower(): e.value for e in ApplicationStage}
-    raw_stage = payload.stage.strip()
-    if raw_stage.lower() not in valid_stages_map:
-        valid_options = ", ".join(e.value for e in ApplicationStage)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid stage '{raw_stage}'. Must be one of: {valid_options}",
-        )
-    target_stage = valid_stages_map[raw_stage.lower()]
-
-    # Verify job ownership or organization tenant if recruiter
-    if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
-        try:
-            job_doc = await job_repo.get_by_id(str(app_doc.get("job_id", "")))
-            if job_doc:
-                job_tenant = job_doc.get("tenant_id", "default") or "default"
-                user_tenant = getattr(current_user, "tenant_id", "default") or "default"
-                created_by = job_doc.get("created_by")
-                if (
-                    str(created_by) != str(current_user.id)
-                    and job_tenant != user_tenant
-                    and user_tenant != "default"
-                    and job_tenant != "default"
-                ):
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="You can only manage applications for your organization's job postings.",
-                    )
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-
-    await app_repo.update_stage(app_id, target_stage)
-
-    logger.info(
-        "Application stage successfully updated",
-        application_id=app_id,
-        new_stage=target_stage,
-        updated_by=str(current_user.id),
-    )
-
-    # ── Audit: write audit event so analytics engine stays in sync ────────
-    try:
-        audit_event = {
-            "event_type": "application_stage_changed",
-            "sub_type": target_stage.lower(),          # e.g. "hired", "rejected"
-            "application_id": app_id,
-            "job_id": str(app_doc.get("job_id", "")),
-            "candidate_id": str(app_doc.get("candidate_id", "")),
-            "tenant_id": str(getattr(current_user, "tenant_id", "default") or "default"),
-            "actor_id": str(current_user.id),
-            "previous_stage": str(app_doc.get("stage", "")),
-            "new_stage": target_stage,
-            "timestamp": now,
-        }
-        async with get_pg_session_factory()() as session:
-            session.add(AuditLog(
-                action=audit_event["event_type"],
-                actor_id=audit_event["actor_id"],
-                target_id=audit_event["application_id"],
-                payload=audit_event,
-            ))
-            await session.commit()
-        if target_stage == "Hired":
-            logger.info(
-                "Audit: hired event logged",
-                application_id=app_id,
-                job_id=audit_event["job_id"],
-                tenant_id=audit_event["tenant_id"],
-            )
-    except Exception as _audit_err:
-        logger.warning("Audit write failed (non-critical)", error=str(_audit_err))
-
-    # ── Fire-and-forget hire offer email ─────────────────────────────────────
-    if target_stage == "Hired":
-        async def _send_hire_email(app_doc_snap: dict, stage: str, db_ref: Any) -> None:
-            """Background task: send a professional offer notification to the hired candidate."""
-            try:
-                from services.email_service import EmailService
-
-                candidate_id = app_doc_snap.get("candidate_id")
-                if not candidate_id:
-                    logger.warning("Hire email skipped: no candidate_id in app doc", application_id=app_id)
-                    return
-
-                # ── 1. Resolve candidate ──────────────────────────────────────
-                user_repository = UserRepository()
-                cand_doc = await user_repository.get_by_id(str(candidate_id))
-
-                if not cand_doc or not cand_doc.get("email"):
-                    logger.warning(
-                        "Hire email skipped: could not resolve candidate email",
-                        candidate_id=candidate_id,
-                    )
-                    return
-
-                to_email: str = cand_doc["email"]
-                cand_name: str = cand_doc.get("full_name") or to_email.split("@")[0]
-
-                # ── 2. Resolve job title + company name ───────────────────────
-                job_title = "the position"
-                company_name = "the hiring team"
-                recruiter_email: Optional[str] = None
-                try:
-                    job_doc = await job_repo.get_by_id(str(app_doc_snap.get("job_id", "")))
-                    if job_doc:
-                        job_title = job_doc.get("title", job_title)
-                        company_name = (
-                            job_doc.get("company_name")
-                            or job_doc.get("company")
-                            or company_name
-                        )
-                        recruiter_email = job_doc.get("contact_email")
-                        if not recruiter_email and job_doc.get("created_by"):
-                            rec_doc = await user_repository.get_by_id(str(job_doc["created_by"]))
-                            if rec_doc:
-                                recruiter_email = rec_doc.get("email")
-                except Exception:
-                    pass
-
-                current_year = datetime.now(timezone.utc).year
-                subject = f"Official Job Offer: {job_title} at {company_name}"
-
-                # ── 3. Professional plain-white corporate HTML template ───────
-                html_body = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{subject}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f5;padding:32px 0;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" border="0"
-               style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e4e4e7;border-radius:6px;overflow:hidden;">
-
-          <!-- Header -->
-          <tr>
-            <td style="padding:32px 40px 24px;border-bottom:1px solid #e4e4e7;">
-              <p style="margin:0;font-size:12px;color:#71717a;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">
-                {company_name}
-              </p>
-              <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#09090b;line-height:1.3;">
-                Official Job Offer
-              </h1>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:28px 40px;">
-              <p style="margin:0 0 18px;font-size:15px;color:#3f3f46;line-height:1.75;">Dear {cand_name},</p>
-              <p style="margin:0 0 18px;font-size:15px;color:#3f3f46;line-height:1.75;">
-                We are thrilled to inform you that following a thorough interview process, the team at
-                <strong style="color:#09090b;">{company_name}</strong> would like to extend an official
-                offer for the position of <strong style="color:#09090b;">{job_title}</strong>.
-              </p>
-              <p style="margin:0 0 18px;font-size:15px;color:#3f3f46;line-height:1.75;">
-                Your recruiter will be in touch shortly with the formal offer letter, including details
-                on your start date, compensation package, and onboarding next steps. Please review the
-                offer carefully and feel free to reply to this email with any questions.
-              </p>
-              <p style="margin:0;font-size:15px;color:#3f3f46;line-height:1.75;">
-                We look forward to welcoming you to the team.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e4e4e7;margin:0;" /></td></tr>
-
-          <!-- Contact -->
-          <tr>
-            <td style="padding:20px 40px;">
-              <p style="margin:0;font-size:13px;color:#71717a;line-height:1.6;">
-                Questions? Contact the hiring team at
-                <a href="mailto:{recruiter_email or 'careers@careershala.tech'}"
-                   style="color:#2563eb;text-decoration:none;"
-                >{recruiter_email or 'careers@careershala.tech'}</a>.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:14px 40px 24px;border-top:1px solid #f0f0f0;background:#fafafa;">
-              <p style="margin:0;font-size:11px;color:#a1a1aa;text-align:center;">
-                &copy; {current_year} {company_name}. All rights reserved.
-                &nbsp;&middot;&nbsp;
-                <span style="color:#c4c4c8;">Powered by <a href="https://careershala.tech" style="color:#c4c4c8;text-decoration:none;">CareerShala ATS</a></span>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>"""
-
-                email_svc = EmailService()
-                result = await email_svc.send_email(
-                    to_email=to_email,
-                    to_name=cand_name,
-                    subject=subject,
-                    html_content=html_body,
-                    reply_to_email=recruiter_email,
-                    reply_to_name=company_name if recruiter_email else None,
-                )
-                if result.get("sent"):
-                    logger.info(
-                        "Hire offer email dispatched",
-                        to=to_email,
-                        company=company_name,
-                        job=job_title,
-                        application_id=app_id,
-                    )
-                else:
-                    logger.warning(
-                        "Hire offer email dispatch failed (non-critical)",
-                        to=to_email,
-                        error=result.get("error"),
-                    )
-            except Exception as exc:
-                # Non-critical — never block the API response on email failure
-                logger.error("Hire email background task failed", application_id=app_id, error=str(exc))
-
-        background_tasks.add_task(_send_hire_email, app_doc, target_stage, db)
-
-    return {
-        "success": True,
-        "application_id": app_id,
-        "stage": target_stage,
-        "updated_at": now.isoformat(),
-    }
-
-
-@router.patch("/{job_id}/status")
-async def toggle_job_status(
-    job_id: str,
-    payload: Dict[str, Any],
-    current_user: UserModel = Depends(get_current_user),
-    job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """Toggles job status between 'open' and 'closed'."""
-    if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
-        raise HTTPException(status_code=403, detail="Recruiter access required.")
-
-    if not DocumentId.is_valid(job_id):
-        raise HTTPException(status_code=400, detail="Invalid job ID format.")
-
-    job_doc = await job_repo.get_by_id(job_id)
-    if not job_doc:
-        raise HTTPException(status_code=404, detail="Job not found or unauthorized.")
-
-    new_status = payload.get("status")
-    if new_status not in ("open", "closed", "draft"):
-        raise HTTPException(status_code=400, detail="Invalid status. Must be 'open', 'closed', or 'draft'.")
-
-    now = datetime.now(timezone.utc)
-    await job_repo.update(job_id, {"status": new_status, "updated_at": now})
-    return {"success": True, "job_id": job_id, "status": new_status}
-
-
-@router.put("/{job_id}")
-@router.patch("/{job_id}")
-async def update_job(
-    job_id: str,
-    payload: JobUpdateRequest,
-    current_user: UserModel = Depends(get_current_user),
-    job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Update a job posting.
-    If the job has active applicants (applicant_count > 0 or applications exist),
-    changes to core scoring fields (required_skills, min_years, jd_text_raw) are rejected with a 400.
-    """
-    if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
-        raise HTTPException(status_code=403, detail="Recruiter access required.")
-
-    if not hasattr(job_repo, "get_by_id"):
-        job_repo = get_job_repo()
-
-    if not DocumentId.is_valid(job_id):
-        raise HTTPException(status_code=400, detail="Invalid job ID format.")
-
-    job_doc = await job_repo.get_by_id(job_id)
-    if not job_doc:
-        raise HTTPException(status_code=404, detail="Job not found or unauthorized.")
-
-    applicant_count = await job_repo.count_candidate_applications(job_id)
-    if not applicant_count and job_doc.get("applicant_count"):
-        applicant_count = int(job_doc.get("applicant_count"))
-
-    update_dict = payload.model_dump(exclude_unset=True)
-    rescore_requested = update_dict.pop("rescore_applicants", False)
-
-    # Core scoring fields that affect ATS scoring
-    core_scoring_fields = ["required_skills", "min_years", "jd_text_raw"]
-    changed_core_fields = []
-    old_vals = {}
-    new_vals = {}
-
-    for field in core_scoring_fields:
-        if field in update_dict:
-            current_val = job_doc.get(field)
-            new_val = update_dict[field]
-            is_changed = False
-            if field == "required_skills":
-                current_set = set(s.strip().lower() for s in (current_val or []) if s and s.strip())
-                new_set = set(s.strip().lower() for s in (new_val or []) if s and s.strip())
-                if current_set != new_set:
-                    is_changed = True
-            elif field == "min_years":
-                if float(new_val or 0) != float(current_val or 0):
-                    is_changed = True
-            elif field == "jd_text_raw":
-                if (new_val or "").strip() != (current_val or "").strip():
-                    is_changed = True
-
-            if is_changed:
-                changed_core_fields.append(field)
-                old_vals[field] = current_val
-                new_vals[field] = new_val
-
-    now = datetime.now(timezone.utc)
-
-    if applicant_count > 0 and changed_core_fields:
-        if not rescore_requested:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This job has active applicants. To update core scoring requirements, you must pass rescore_applicants=true, or close this role and post a new one.",
-            )
-
-        # Recruiter explicitly opted into re-scoring
-        async with get_pg_session_factory()() as session:
-            session.add(AuditLog(
-                action="job_edit_rescore",
-                actor_id=str(current_user.id),
-                target_id=str(job_id),
-                payload={"changed_fields": changed_core_fields, "old_values": old_vals, "new_values": new_vals},
-            ))
-            await session.commit()
-
-    # If jd_text_raw changed, preserve raw text (deterministic engine scores on-the-fly)
-    if "jd_text_raw" in update_dict and (update_dict["jd_text_raw"] or "").strip() != (job_doc.get("jd_text_raw") or "").strip():
-        update_dict["jd_text_raw"] = update_dict["jd_text_raw"].strip()
-
-    if "required_skills" in update_dict and isinstance(update_dict["required_skills"], list):
-        update_dict["required_skills"] = canonicalize_skills(update_dict["required_skills"])
-
-    update_dict["updated_at"] = now
-
-    updated_doc = await job_repo.update(job_id, update_dict) or job_doc
-
-    # If rescoring was requested and core fields changed with applicants, re-score all applications
-    rescored_count = 0
-    if applicant_count > 0 and changed_core_fields and rescore_requested:
-        final_jd = updated_doc.get("jd_text_raw", "")
-        final_skills = updated_doc.get("required_skills", [])
-        final_years = updated_doc.get("min_years")
-
-        all_apps = await job_repo.list_candidate_applications(job_id)
-        for app in all_apps:
-            resume_payload = (app.get("resume_snapshot") or {}).get("parsed_data") or {}
-            if not resume_payload or not resume_payload.get("raw_text"):
-                rid = str(app.get("resume_id") or "")
-                if rid:
-                    res_doc = await resume_repo.get_by_id(rid)
-                    if res_doc and res_doc.get("parsed_data"):
-                        resume_payload = res_doc["parsed_data"]
-
-            try:
-                dual_scored = score_resume_dual(
-                    resume=resume_payload,
-                    jd=final_jd,
-                    required_skills=final_skills,
-                    min_years=final_years,
-                )
-                m_score = round(float(dual_scored.get("candidate_score", 0.0)), 1)
-                r_score = round(float(dual_scored.get("recruiter_score", 0.0)), 1)
-                k_status = dual_scored.get("knockout") or {"passed": True, "reasons": []}
-                s_version = dual_scored.get("scoring_version", "1.0.0")
-
-                q_score = round(float(dual_scored.get("quality_score", dual_scored.get("recruiter_score", 0.0))), 1)
-                elig_info = dual_scored.get("eligibility") or {"status": "eligible", "checks": []}
-                elig_rank = int(dual_scored.get("eligibility_rank", 0))
-                features_data = dual_scored.get("features") or dual_scored.get("recruiter_result", {}).get("features")
-
-                await job_repo.update_candidate_application(job_id, str(app["_id"]), {
-                    "match_score": m_score,
-                    "quality_score": q_score,
-                    "eligibility": elig_info,
-                    "eligibility_rank": elig_rank,
-                    "recruiter_score": r_score,
-                    "knockout_status": k_status,
-                    "scoring_version": s_version,
-                    "features": features_data,
-                })
-                rescored_count += 1
-            except Exception as re_err:
-                logger.warning("Failed to re-score application during job update", app_id=str(app.get("_id")), error=str(re_err))
-
-        logger.info("Job updated with applicant re-scoring", job_id=job_id, rescored_count=rescored_count)
-
-    return {
-        "success": True,
-        "job_id": job_id,
-        "message": "Job updated successfully",
-        "rescored_applicants": rescored_count,
-        "job": {
-            "id": job_id,
-            "title": updated_doc.get("title"),
-            "company_name": updated_doc.get("company_name"),
-            "location": updated_doc.get("location"),
-            "work_mode": updated_doc.get("work_mode"),
-            "salary_range": updated_doc.get("salary_range"),
-            "status": updated_doc.get("status"),
-            "min_years": updated_doc.get("min_years"),
-            "required_skills": updated_doc.get("required_skills"),
-            "applicant_count": updated_doc.get("applicant_count", 0),
-        },
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. ADMIN / CRON TRIGGER ENDPOINTS (MANUAL & WEBHOOK SCHEDULING)
-# ══════════════════════════════════════════════════════════════════════════════
-
 @router.post("/admin/trigger-alerts")
-async def trigger_job_alerts_manually(
-    target_email: Optional[str] = Query(None, description="Optional single email to test dispatch only to this user"),
-    slot_id: Optional[str] = Query(None, description="Optional deterministic slot identifier e.g. 2026-10-03_07:30"),
-    force_replay: bool = Query(False, description="Force execution even if the slot was already marked completed"),
-    cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
+async def trigger_job_alerts_webhook(
     x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
-    current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
-    """
-    Manual & Automated Webhook trigger for Twice-Daily AI Job Alerts retention loop.
-    Authentication:
-      - Authenticated Admin user (JWT), OR
-      - Matching CRON_SECRET / SECRET_KEY via 'X-Cron-Secret' header or 'cron_secret' query param.
-    """
-    secret_provided = x_cron_secret or cron_secret
-    valid_cron_auth = (
-        secret_provided
+    """Azure Logic App webhook: scrapes fresh jobs, deletes 5-day-old external jobs, and emails alerts."""
+    valid_cron_auth = bool(
+        x_cron_secret
         and (
-            (settings.CRON_SECRET and secret_provided == settings.CRON_SECRET)
-            or (settings.SECRET_KEY and secret_provided == settings.SECRET_KEY)
+            (settings.CRON_SECRET and x_cron_secret == settings.CRON_SECRET)
+            or (settings.SECRET_KEY and x_cron_secret == settings.SECRET_KEY)
         )
     )
-
-    is_admin = current_user and current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
-
-    if not valid_cron_auth and not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges or valid CRON_SECRET required to trigger batch job alerts.",
-        )
+    if not valid_cron_auth:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Valid X-Cron-Secret header required.")
 
     from scheduler.job_alerts import run_nightly_job_alerts
-    triggered_by = "manual_admin_api" if is_admin else "webhook_cron"
-    result = await run_nightly_job_alerts(
-        db=session or db,
-        target_email=target_email,
-        slot_id=slot_id,
-        triggered_by=triggered_by,
-        force_replay=force_replay,
-    )
+    result = await run_nightly_job_alerts(triggered_by="webhook_cron")
     return {"success": True, "result": result}
 
-
-@router.post("/admin/trigger-scrape")
-async def trigger_job_scrape_manually(
-    cron_secret: Optional[str] = Query(None, description="Optional secret key for automated webhook cron execution"),
-    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
-    current_user: Optional[UserModel] = Depends(get_optional_current_user),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Manual & Automated Webhook trigger for External JSearch Job Scraper.
-    Authentication:
-      - Authenticated Admin user (JWT), OR
-      - Matching CRON_SECRET / SECRET_KEY via 'X-Cron-Secret' header or 'cron_secret' query param.
-    """
-    secret_provided = x_cron_secret or cron_secret
-    valid_cron_auth = (
-        secret_provided
-        and (
-            (settings.CRON_SECRET and secret_provided == settings.CRON_SECRET)
-            or (settings.SECRET_KEY and secret_provided == settings.SECRET_KEY)
-        )
-    )
-
-    is_admin = current_user and current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
-
-    if not valid_cron_auth and not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges or valid CRON_SECRET required to trigger job scrape.",
-        )
-
-    from scheduler.job_alerts import run_external_job_scrape
-    result = await run_external_job_scrape()
-    return {"success": True, "result": result}
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 7. GET /company/{company_name} — FETCH OPEN JOBS & PROFILE FOR A SPECIFIC COMPANY
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/company/{company_name}")
 async def get_jobs_by_company(
@@ -1597,33 +296,25 @@ async def get_jobs_by_company(
     company_repo: CompanyRepository = Depends(get_company_repo),
     session: Optional[AsyncSession] = Depends(get_db),
 ):
-    """
-    Public employer branding route: returns rich company profile and all open jobs.
-    Performs case-insensitive matching on company_name.
-    """
+    """Public employer profile & open jobs for a given company."""
     cleaned_name = company_name.strip()
     if not cleaned_name:
         raise HTTPException(status_code=400, detail="Company name cannot be empty.")
 
-    # 1. Fetch company profile if saved
     company_doc = await company_repo.get_by_name(cleaned_name)
 
     async def _fetch_company_jobs(sess: AsyncSession):
         stmt = (
             select(Job)
-            .where(
-                func.lower(Job.company_name) == cleaned_name.lower(),
-                Job.status.in_(["open", "published", "active"]),
-            )
+            .where(func.lower(Job.company_name) == cleaned_name.lower(), Job.status.in_(["open", "published", "active"]))
             .order_by(Job.created_at.desc())
         )
-        res = await sess.execute(stmt)
-        res_docs = []
-        for j in res.scalars().all():
+        res = []
+        for j in (await sess.execute(stmt)).scalars().all():
             d = {c.name: getattr(j, c.name) for c in Job.__table__.columns}
             d["_id"] = d.get("id")
-            res_docs.append(d)
-        return res_docs
+            res.append(d)
+        return res
 
     active_sess = session if hasattr(session, "execute") else None
     if active_sess:
@@ -1637,53 +328,13 @@ async def get_jobs_by_company(
         if company_doc
         else (docs[0].get("company_name", cleaned_name) if docs else cleaned_name)
     )
-
-    jobs = []
-    for d in docs:
-        raw_skills = d.get("required_skills")
-        if isinstance(raw_skills, list):
-            safe_skills = [str(s) for s in raw_skills if s is not None]
-        elif isinstance(raw_skills, str) and raw_skills.strip():
-            safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
-        else:
-            safe_skills = []
-
-        jobs.append({
-            "id": str(d["_id"]),
-            "company_name": d.get("company_name") or d.get("company") or canonical_name,
-            "title": d.get("title") or "Untitled Role",
-            "jd_text_raw": extract_or_synthesize_jd(d),
-            "required_skills": safe_skills,
-            "min_years": float(d.get("min_years") or 0.0),
-            "location": d.get("location") or "Remote",
-            "work_mode": d.get("work_mode") or "Remote",
-            "salary_range": d.get("salary_range") or None,
-            "status": d.get("status") or "open",
-            "department": d.get("department") or None,
-            "company_logo": d.get("company_logo") or (company_doc.get("logo_url") if company_doc else None),
-            "company_website": d.get("company_website") or (company_doc.get("website") if company_doc else None),
-            "company_about": d.get("company_about") or (company_doc.get("about") if company_doc else None),
-            "company_size": d.get("company_size") or (company_doc.get("team_size") if company_doc else None),
-            "is_external": bool(d.get("is_external") in [True, "true", "True", 1]),
-            "external_apply_url": d.get("external_apply_url") or None,
-            "external_job_id": d.get("external_job_id") or None,
-            "company_industry": d.get("company_industry") or None,
-            "applicant_count": int(d.get("applicant_count") or 0),
-            "created_at": d.get("created_at", datetime.now(timezone.utc)).isoformat()
-            if hasattr(d.get("created_at"), "isoformat")
-            else str(d.get("created_at") or ""),
-        })
-
-    # Synthesize rich company profile
-    default_about = (
-        f"{canonical_name} is a technology organization dedicated to building world-class products and fostering an engineering-driven culture."
-    )
+    jobs = [_serialize_job_item(d, company_profile=company_doc, fallback_company=canonical_name) for d in docs]
     first_job_about = docs[0].get("company_about") if docs and docs[0].get("company_about") else None
 
     profile_data = {
         "company_name": canonical_name,
         "tagline": (company_doc.get("tagline") if company_doc else None) or f"Building innovative platforms and solutions at {canonical_name}.",
-        "about": (company_doc.get("about") if company_doc else None) or first_job_about or default_about,
+        "about": (company_doc.get("about") if company_doc else None) or first_job_about or f"{canonical_name} is a technology organization dedicated to building world-class products.",
         "logo_url": (company_doc.get("logo_url") if company_doc else None) or (docs[0].get("company_logo") if docs else None),
         "cover_url": company_doc.get("cover_url") if company_doc else None,
         "website": (company_doc.get("website") if company_doc else None) or (docs[0].get("company_website") if docs else None),
@@ -1700,105 +351,13 @@ async def get_jobs_by_company(
         "linkedin": company_doc.get("linkedin") if company_doc else None,
         "github": company_doc.get("github") if company_doc else None,
     }
-
-    return {
-        "company_name": canonical_name,
-        "company_profile": profile_data,
-        "jobs": jobs,
-        "total": len(jobs),
-    }
+    return {"company_name": canonical_name, "company_profile": profile_data, "jobs": jobs, "total": len(jobs)}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 8. POST /company/profile — SAVE / UPDATE EMPLOYER BRANDING
-# ══════════════════════════════════════════════════════════════════════════════
+# Mount recruiter, applicant pipeline, and branding routes BEFORE parameterized /{job_id}
+router.add_api_route("", create_job, methods=["POST"], response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+router.include_router(recruiter_router)
 
-@router.post("/company/profile")
-@router.put("/company/profile")
-async def save_company_profile(
-    payload: CompanyProfilePayload,
-    current_user: UserModel = Depends(get_current_user),
-    company_repo: CompanyRepository = Depends(get_company_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-):
-    """
-    Recruiters / Admins save their employer branding profile.
-    Automatically syncs logo and website across open jobs for that company.
-    """
-    if not current_user.has_role(UserRole.EXECUTIVE, UserRole.EXEC, UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Company profile is read-only for invited team members. Only Executive/Admin can update company branding.",
-        )
-
-    clean_name = payload.company_name.strip()
-    if not clean_name:
-        raise HTTPException(status_code=400, detail="Company name is required.")
-
-    now = datetime.now(timezone.utc)
-    tenant_id = current_user.tenant_id or "default"
-    new_logo = payload.logo_url.strip() if payload.logo_url else None
-    if new_logo and new_logo.startswith("data:image/"):
-        from services.cloudinary_service import upload_base64_company_logo
-        uploaded_url = await upload_base64_company_logo(new_logo, company_id=tenant_id)
-        if uploaded_url:
-            new_logo = uploaded_url
-
-    profile_dict = {
-        "tenant_id": tenant_id,
-        "company_name": clean_name,
-        "tagline": payload.tagline.strip() if payload.tagline else None,
-        "about": payload.about.strip() if payload.about else None,
-        "logo_url": new_logo,
-        "cover_url": payload.cover_url.strip() if payload.cover_url else None,
-        "website": payload.website.strip() if payload.website else None,
-        "location": payload.location.strip() if payload.location else "Remote",
-        "industry": payload.industry.strip() if payload.industry else "Technology",
-        "team_size": payload.team_size.strip() if payload.team_size else "50-200 employees",
-        "perks": [p.strip() for p in payload.perks if p and p.strip()],
-        "linkedin": payload.linkedin.strip() if payload.linkedin else None,
-        "github": payload.github.strip() if payload.github else None,
-        "twitter": payload.twitter.strip() if payload.twitter else None,
-        "updated_by": str(current_user.id),
-        "updated_at": now,
-    }
-
-    # Upsert company profile by tenant_id or company_name via repository
-    await company_repo.upsert(clean_name, profile_dict)
-
-    # Sync logo & website to existing jobs of this company via native SQLAlchemy
-    update_fields = {}
-    if profile_dict.get("logo_url"):
-        update_fields["company_logo"] = profile_dict["logo_url"]
-    if profile_dict.get("website"):
-        update_fields["company_website"] = profile_dict["website"]
-    if profile_dict.get("about"):
-        update_fields["company_about"] = profile_dict["about"]
-
-    if update_fields:
-        async def _upd_jobs(sess: AsyncSession):
-            upd_stmt = (
-                update(Job)
-                .where(func.lower(Job.company_name) == clean_name.lower())
-                .values(**update_fields)
-            )
-            await sess.execute(upd_stmt)
-            await sess.commit()
-
-        active_sess = session if hasattr(session, "execute") else None
-        if active_sess:
-            await _upd_jobs(active_sess)
-        else:
-            async with get_pg_session_factory()() as sess:
-                await _upd_jobs(sess)
-
-    logger.info("Company profile updated", company=clean_name, user_id=str(current_user.id))
-    return {"success": True, "message": "Company profile saved successfully.", "profile": profile_dict}
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 9. GET /{job_id} — SINGLE JOB DETAIL (ENRICHED WITH COMPANY DETAILS)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/{job_id}")
 async def get_job_detail(
@@ -1809,14 +368,11 @@ async def get_job_detail(
     session: Optional[AsyncSession] = Depends(get_db),
     db: Optional[Any] = None,
 ):
-    """Returns full job details for candidates or recruiters, enriched with company profile and has_applied state."""
+    """Return full job details enriched with company profile and has_applied state."""
     if not hasattr(job_repo, "get_by_id"):
-        from api.routes import jobs as jobs_mod
-        job_repo = getattr(jobs_mod, "job_repo", None) or get_job_repo()
+        job_repo = globals()["job_repo"]
     if not hasattr(company_repo, "get_by_name"):
-        from api.routes import jobs as jobs_mod
-        company_repo = getattr(jobs_mod, "company_repo", None) or get_company_repo()
-
+        company_repo = globals()["company_repo"]
     if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
@@ -1824,66 +380,10 @@ async def get_job_detail(
     if not doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
-    user_role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
-    company_name = doc.get("company_name", "")
+    company_profile = await company_repo.get_by_name(doc.get("company_name", "")) if doc.get("company_name") else None
+    applied_ids = set(await job_repo.get_user_applied_job_ids(str(current_user.id))) if current_user else set()
+    return _serialize_job_item(doc, applied_ids=applied_ids, company_profile=company_profile)
 
-    # Look up company profile if company fields missing on the job doc
-    company_profile = None
-    if company_name:
-        company_profile = await company_repo.get_by_name(company_name)
-
-    company_logo = doc.get("company_logo") or (company_profile.get("logo_url") if company_profile else None)
-    company_website = doc.get("company_website") or (company_profile.get("website") if company_profile else None)
-    company_about = doc.get("company_about") or (company_profile.get("about") if company_profile else None)
-    company_size = doc.get("company_size") or (company_profile.get("team_size") if company_profile else None)
-    company_industry = doc.get("company_industry") or (company_profile.get("industry") if company_profile else None)
-
-    has_applied = False
-    if current_user:
-        applied_ids = await job_repo.get_user_applied_job_ids(str(current_user.id))
-        has_applied = str(job_id) in applied_ids
-
-    raw_skills = doc.get("required_skills")
-    if isinstance(raw_skills, list):
-        safe_skills = [str(s).strip() for s in raw_skills if s is not None and str(s).strip()]
-    elif isinstance(raw_skills, str) and raw_skills.strip():
-        safe_skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
-    else:
-        safe_skills = []
-
-    if not safe_skills:
-        safe_skills = derive_fallback_skills(doc.get("title") or "", doc.get("department"), doc.get("jd_text_raw") or doc.get("jd_text"))
-
-    return {
-        "id": str(doc["_id"]),
-        "company_name": company_name or doc.get("company") or "Unknown Company",
-        "title": doc.get("title") or "Untitled Role",
-        "jd_text_raw": extract_or_synthesize_jd(doc),
-        "required_skills": safe_skills,
-        "min_years": float(doc.get("min_years") or 0.0),
-        "location": doc.get("location") or "Remote",
-        "work_mode": doc.get("work_mode") or "Remote",
-        "salary_range": doc.get("salary_range") or None,
-        "status": doc.get("status") or "open",
-        "department": doc.get("department") or None,
-        "company_logo": company_logo or None,
-        "company_website": company_website or None,
-        "company_about": company_about or None,
-        "company_size": company_size or None,
-        "is_external": bool(doc.get("is_external") in [True, "true", "True", 1]),
-        "external_apply_url": doc.get("external_apply_url") or None,
-        "external_job_id": doc.get("external_job_id") or None,
-        "company_industry": company_industry or None,
-        "applicant_count": int(doc.get("applicant_count") or 0),
-        "created_at": doc.get("created_at", datetime.now(timezone.utc)).isoformat() if hasattr(doc.get("created_at"), "isoformat") else str(doc.get("created_at") or ""),
-        "has_applied": has_applied,
-    }
-
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 5. POST /{job_id}/match — CALCULATE ATS MATCH %
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/{job_id}/match")
 @limiter.limit("10/minute")
@@ -1892,16 +392,12 @@ async def match_job_ats(
     job_id: str,
     resume_id: Optional[str] = Query(default=None),
     current_user: UserModel = Depends(get_current_user),
-    resume_repo = Depends(get_resume_repo),
+    resume_repo=Depends(get_resume_repo),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
     db: Optional[Any] = None,
 ):
-    """
-    Calculates instant ATS match percentage between candidate resume and job.
-    Uses candidate Fresher-Friendly profile (Skills 70%, Exp 15%, Edu 15%).
-    Rate limited to 10 requests/minute/user.
-    """
+    """Calculate instant ATS Profile Fit score between candidate resume and job."""
     if not hasattr(job_repo, "get_by_id"):
         job_repo = get_job_repo()
     if not hasattr(resume_repo, "get_primary_by_user"):
@@ -1910,57 +406,21 @@ async def match_job_ats(
     job_doc = await job_repo.get_by_id(str(job_id))
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
-
-    if bool(job_doc.get("is_external", False)):
-        from services.jd_extractor import ensure_external_job_jd
-        await ensure_external_job_jd(job_doc)
-
-    # Ensure the job status is open, published, or active
-    job_status = str(job_doc.get("status", "open")).lower()
-    if job_status not in ("open", "published", "active"):
+    if str(job_doc.get("status", "open")).lower() not in ("open", "published", "active"):
         raise HTTPException(status_code=400, detail="This job posting is no longer accepting applications.")
 
-    target_resume = None
-    if isinstance(resume_id, str) and resume_id.strip():
-        target_resume = await resume_repo.get_by_id_and_user(resume_id.strip(), str(current_user.id))
-    else:
-        try:
-            target_resume = await resume_repo.get_primary_by_user(str(current_user.id))
-        except Exception:
-            target_resume = None
-
-        if not target_resume:
-            resumes, _ = await resume_repo.get_by_user(str(current_user.id), limit=1)
-            target_resume = resumes[0] if resumes else None
-
-    raw_parsed = getattr(target_resume, "parsed_data", None)
-    if not raw_parsed and isinstance(target_resume, dict):
-        raw_parsed = target_resume.get("parsed_data")
-
+    target_resume = await _resolve_candidate_resume(resume_repo, str(current_user.id), resume_id)
+    raw_parsed = getattr(target_resume, "parsed_data", None) or (
+        target_resume.get("parsed_data") if isinstance(target_resume, dict) else None
+    )
     if not target_resume or not raw_parsed:
         raise HTTPException(
             status_code=400,
             detail="No parsed resume found on your profile. Please upload a resume first to calculate match %.",
         )
 
-    if hasattr(raw_parsed, "model_dump"):
-        resume_payload = raw_parsed.model_dump()
-    elif isinstance(raw_parsed, dict):
-        resume_payload = dict(raw_parsed)
-    else:
-        resume_payload = {}
-
-    if not resume_payload.get("raw_text"):
-        if hasattr(raw_parsed, "raw_text"):
-            resume_payload["raw_text"] = raw_parsed.raw_text or ""
-        elif isinstance(raw_parsed, dict):
-            resume_payload["raw_text"] = raw_parsed.get("raw_text", "")
-
-    jd_content = (job_doc.get("jd_text_raw") or job_doc.get("jd_text") or "").strip()
-    if not jd_content:
-        from services.jd_extractor import ensure_external_job_jd
-        jd_content = await ensure_external_job_jd(job_doc)
-
+    resume_payload = _extract_resume_payload(raw_parsed)
+    jd_content = (job_doc.get("jd_text_raw") or job_doc.get("jd_text") or job_doc.get("description") or "").strip()
     scored = score_resume(
         resume=resume_payload,
         jd=jd_content,
@@ -1968,19 +428,9 @@ async def match_job_ats(
         required_skills=job_doc.get("required_skills", []),
         min_years=job_doc.get("min_years"),
     )
-
-    try:
-        from services.ats_feedback_service import generate_ats_feedback_with_groq
-        scored["feedback_suggestions"] = await generate_ats_feedback_with_groq(
-            scored_result=scored,
-            job_title=job_doc.get("title"),
-            job_description=jd_content,
-            resume_data=resume_payload,
-        )
-    except Exception as e:
-        logger.warning("Failed to generate dynamic Groq feedback for job match; keeping baseline", error=str(e))
-
-    target_resume_id = getattr(target_resume, "id", None) or (target_resume.get("_id") if isinstance(target_resume, dict) else str(target_resume))
+    target_resume_id = getattr(target_resume, "id", None) or (
+        target_resume.get("_id") if isinstance(target_resume, dict) else str(target_resume)
+    )
 
     return {
         "job_id": job_id,
@@ -1997,13 +447,9 @@ async def match_job_ats(
         "is_knockout": scored.get("is_knockout", False),
         "knockout_reasons": scored.get("knockout_reasons", []),
         "knockout_advisories": scored.get("knockout_advisories", []),
-        "feedback_suggestions": scored["feedback_suggestions"][:3],
+        "feedback_suggestions": (scored.get("feedback_suggestions") or [])[:3],
     }
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. POST /{job_id}/apply — CANDIDATE APPLICATION PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/{job_id}/apply", response_model=ApplicationResponse)
 async def apply_to_job(
@@ -2011,123 +457,64 @@ async def apply_to_job(
     payload: Optional[JobApplyPayload] = None,
     resume_id: Optional[str] = Query(default=None),
     current_user: UserModel = Depends(get_current_user),
-    resume_repo = Depends(get_resume_repo),
+    resume_repo=Depends(get_resume_repo),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
     db: Optional[Any] = None,
 ):
-    """
-    Submits a candidate application to a job.
-    - Receives candidate's resume_id (via query or body).
-    - Fetches the match_score using unified scoring engine.
-    - Saves record to the 'applications' collection using ApplicationModel (stage: 'Applied').
-    - Prevents duplicate applications from the same user for the same job.
-    """
+    """Submit an internal candidate application with resume snapshot & dual ATS scoring."""
     if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
     job_doc = await job_repo.get_by_id(job_id)
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
-
     if bool(job_doc.get("is_external", False)):
         raise HTTPException(status_code=400, detail="External jobs do not support internal applications.")
+    if str(job_id) in await job_repo.get_user_applied_job_ids(str(current_user.id)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already applied to this job.")
 
-    target_tenant_id = job_doc.get("tenant_id", "default") or "default"
-
-    # 1. Prevent duplicate applications via JobRepository
-    applied_ids = await job_repo.get_user_applied_job_ids(str(current_user.id))
-    if str(job_id) in applied_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You have already applied to this job.",
-        )
-
-    # 2. Resolve target resume
     chosen_resume_id = (payload.resume_id if payload and payload.resume_id else None) or resume_id
-    target_resume = None
-
-    if chosen_resume_id:
-        target_resume = await resume_repo.get_by_id_and_user(chosen_resume_id, str(current_user.id))
-    else:
-        try:
-            target_resume = await resume_repo.get_primary_by_user(str(current_user.id))
-        except Exception:
-            target_resume = None
-
-        if not target_resume:
-            resumes, _ = await resume_repo.get_by_user(str(current_user.id), limit=1)
-            target_resume = resumes[0] if resumes else None
-
-    if not target_resume:
-        resumes, _ = await resume_repo.get_by_user(str(current_user.id), limit=1)
-        target_resume = resumes[0] if resumes else None
-
-    raw_parsed = getattr(target_resume, "parsed_data", None)
-    if not raw_parsed and isinstance(target_resume, dict):
-        raw_parsed = target_resume.get("parsed_data")
-
+    target_resume = await _resolve_candidate_resume(resume_repo, str(current_user.id), chosen_resume_id)
+    raw_parsed = getattr(target_resume, "parsed_data", None) or (
+        target_resume.get("parsed_data") if isinstance(target_resume, dict) else None
+    )
     if not target_resume or not raw_parsed:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please upload a parsed resume before applying to jobs.",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please upload a parsed resume before applying to jobs.")
 
-    target_resume_id = getattr(target_resume, "id", None) or (target_resume.get("_id") if isinstance(target_resume, dict) else str(target_resume))
+    target_resume_id = getattr(target_resume, "id", None) or (
+        target_resume.get("_id") if isinstance(target_resume, dict) else str(target_resume)
+    )
+    resume_payload = _extract_resume_payload(raw_parsed)
 
-    # 3. Calculate unified ATS match score & recruiter strict score
-    match_score = None
-    recruiter_score = None
-    knockout_status = {"passed": True, "reasons": []}
     try:
-        if hasattr(raw_parsed, "model_dump"):
-            resume_payload = raw_parsed.model_dump()
-        elif isinstance(raw_parsed, dict):
-            resume_payload = dict(raw_parsed)
-        else:
-            resume_payload = {}
-
-        if not resume_payload.get("raw_text"):
-            if hasattr(raw_parsed, "raw_text"):
-                resume_payload["raw_text"] = raw_parsed.raw_text or ""
-            elif isinstance(raw_parsed, dict):
-                resume_payload["raw_text"] = raw_parsed.get("raw_text", "")
-
-        dual_scored = await asyncio.to_thread(
+        dual = await asyncio.to_thread(
             score_resume_dual,
             resume=resume_payload,
             jd=job_doc.get("jd_text_raw") or job_doc.get("description", ""),
             required_skills=job_doc.get("required_skills", []),
             min_years=job_doc.get("min_years"),
         )
-        match_score = round(float(dual_scored.get("candidate_score", 0.0)), 1)
-        recruiter_score = round(float(dual_scored.get("recruiter_score", 0.0)), 1)
-        quality_score = round(float(dual_scored.get("quality_score", dual_scored.get("final_score", 0.0))), 1)
-        eligibility = dual_scored.get("eligibility") or {"status": "unverified", "checks": []}
-        eligibility_rank = int(dual_scored.get("eligibility_rank", 1))
-        knockout_status = dual_scored.get("knockout") or {"passed": True, "reasons": []}
-        scoring_version = dual_scored.get("scoring_version", "2.0.0")
-        features_data = dual_scored.get("features") or dual_scored.get("recruiter_result", {}).get("features")
+        match_score = round(float(dual.get("candidate_score", 0.0)), 1)
+        recruiter_score = round(float(dual.get("recruiter_score", 0.0)), 1)
+        quality_score = round(float(dual.get("quality_score", dual.get("final_score", 0.0))), 1)
+        eligibility = dual.get("eligibility") or {"status": "unverified", "checks": []}
+        eligibility_rank = int(dual.get("eligibility_rank", 1))
+        knockout_status = dual.get("knockout") or {"passed": True, "reasons": []}
+        scoring_version = dual.get("scoring_version", "2.0.0")
+        features_data = dual.get("features") or dual.get("recruiter_result", {}).get("features")
     except Exception as e:
-        logger.warning("Auto match calculation failed during apply, using deterministic skill match fallback", error=str(e))
-        scoring_version = "2.0.0-fallback"
-        cand_skills = set(str(s).lower().strip() for s in (resume_payload.get("skills") or resume_payload.get("technical_skills") or []))
-        req_skills = set(str(s).lower().strip() for s in job_doc.get("required_skills", []))
-        if req_skills:
-            matched = cand_skills.intersection(req_skills)
-            fallback_ratio = len(matched) / max(len(req_skills), 1)
-            calculated_score = round(max(35.0, min(95.0, fallback_ratio * 100.0)), 1)
-        else:
-            calculated_score = 65.0
-        match_score = calculated_score
-        recruiter_score = calculated_score
-        quality_score = calculated_score
+        logger.warning("Auto match calculation failed during apply, using skill fallback", error=str(e))
+        cand_skills = {str(s).lower().strip() for s in (resume_payload.get("skills") or resume_payload.get("technical_skills") or [])}
+        req_skills = {str(s).lower().strip() for s in job_doc.get("required_skills", [])}
+        calc = round(max(35.0, min(95.0, (len(cand_skills & req_skills) / max(len(req_skills), 1)) * 100.0)), 1) if req_skills else 65.0
+        match_score = recruiter_score = quality_score = calc
         eligibility = {"status": "eligible", "checks": []}
         eligibility_rank = 0
         knockout_status = {"passed": True, "reasons": []}
+        scoring_version = "2.0.0-fallback"
         features_data = None
 
-    # 4. Snapshot resume at apply time (immutable record for recruiters)
     target_file_url = getattr(target_resume, "file_url", None) or (target_resume.get("file_url") if isinstance(target_resume, dict) else None)
     target_filename = (
         getattr(target_resume, "original_filename", None)
@@ -2135,7 +522,6 @@ async def apply_to_job(
         or (target_resume.get("original_filename") or target_resume.get("filename") if isinstance(target_resume, dict) else None)
         or "resume.pdf"
     )
-    parsed_data_snapshot = raw_parsed.model_dump() if hasattr(raw_parsed, "model_dump") else (dict(raw_parsed) if isinstance(raw_parsed, dict) else {})
     target_cloudinary_pid = getattr(target_resume, "cloudinary_public_id", None) or (
         target_resume.get("cloudinary_public_id") if isinstance(target_resume, dict) else None
     )
@@ -2145,17 +531,15 @@ async def apply_to_job(
     resume_snapshot = {
         "file_url": target_file_url,
         "cloudinary_public_id": target_cloudinary_pid,
-        "parsed_data": parsed_data_snapshot,
+        "parsed_data": _extract_resume_payload(raw_parsed),
         "filename": target_filename,
     }
-
-    # 5. Save to 'applications' collection using ApplicationModel
     now = datetime.now(timezone.utc)
     app_doc = {
         "job_id": job_id,
         "candidate_id": str(current_user.id),
         "resume_id": str(target_resume_id),
-        "tenant_id": target_tenant_id,
+        "tenant_id": job_doc.get("tenant_id", "default") or "default",
         "match_score": match_score,
         "quality_score": quality_score,
         "eligibility": eligibility,
@@ -2173,27 +557,12 @@ async def apply_to_job(
         "created_at": now,
         "updated_at": now,
     }
-
-    # Create candidate application via pure JobRepository
     created_app = await job_repo.create_candidate_application(app_doc)
     await job_repo.increment_applicant_count(job_id, 1)
-
     app_id_res = str(created_app.get("id") or created_app.get("_id") or "")
 
-    logger.info(
-        "Application submitted to database",
-        application_id=app_id_res,
-        job_id=job_id,
-        candidate_id=str(current_user.id),
-        match_score=match_score,
-        quality_score=quality_score,
-        eligibility_status=eligibility.get("status"),
-        recruiter_score=recruiter_score,
-        knockout_passed=knockout_status.get("passed", True),
-    )
-
     return ApplicationResponse(
-        id=str(res.inserted_id),
+        id=app_id_res,
         job_id=job_id,
         candidate_id=str(current_user.id),
         resume_id=str(target_resume_id),
@@ -2213,101 +582,3 @@ async def apply_to_job(
         notes=payload.notes if payload else None,
         created_at=now,
     )
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 7. POST /{job_id}/applications/{app_id}/override-eligibility — RECRUITER DISCRETION
-# ══════════════════════════════════════════════════════════════════════════════
-
-@router.post("/{job_id}/applications/{app_id}/override-eligibility", response_model=ApplicationResponse)
-async def override_application_eligibility(
-    job_id: str,
-    app_id: str,
-    payload: EligibilityOverridePayload,
-    current_user: UserModel = Depends(get_recruiter_or_admin),
-    job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
-):
-    """
-    Recruiter/Admin discretion endpoint to override an automated eligibility determination.
-    Updates application eligibility status, recalculates eligibility_rank, and logs
-    an immutable audit trail record.
-    """
-    if payload.new_status not in ("eligible", "ineligible", "unverified"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid status. Must be 'eligible', 'ineligible', or 'unverified'."
-        )
-
-    app = await job_repo.get_candidate_application(job_id, app_id)
-    if not app:
-        raise HTTPException(status_code=404, detail="Application not found for this job.")
-
-    rank_map = {"eligible": 0, "unverified": 1, "ineligible": 2}
-    new_rank = rank_map[payload.new_status]
-    now = datetime.now(timezone.utc)
-
-    override_entry = {
-        "by": str(current_user.id),
-        "by_email": getattr(current_user, "email", None),
-        "at": now,
-        "previous_status": (app.get("details") or {}).get("eligibility", {}).get("status", "unverified") if isinstance(app.get("details"), dict) else "unverified",
-        "new_status": payload.new_status,
-        "reason_code": payload.reason_code,
-        "note": payload.note,
-    }
-
-    update_payload = {
-        "eligibility": {"status": payload.new_status},
-        "eligibility_rank": new_rank,
-        "eligibility_override": override_entry,
-        "updated_at": now,
-    }
-    await job_repo.update_candidate_application(job_id, app_id, update_payload)
-
-    # Immutable audit logging
-    audit_entry = {
-        "action": "eligibility_override",
-        "application_id": str(app_id),
-        "job_id": job_id,
-        "actor_id": str(current_user.id),
-        "actor_email": getattr(current_user, "email", None),
-        "actor_role": getattr(current_user, "role", "recruiter"),
-        "timestamp": now,
-        "details": override_entry,
-    }
-    try:
-        from repositories.audit_log_repo import AuditLogRepository
-        await AuditLogRepository().log_event(
-            action=audit_entry["action"],
-            actor_id=audit_entry["actor_id"],
-            target_id=audit_entry["application_id"],
-            payload=audit_entry["details"],
-        )
-    except Exception:
-        pass
-
-    updated_app = await job_repo.get_candidate_application(job_id, app_id) or app
-    return ApplicationResponse(
-        id=str(updated_app["_id"]),
-        job_id=updated_app["job_id"],
-        candidate_id=updated_app["candidate_id"],
-        resume_id=updated_app["resume_id"],
-        match_score=updated_app.get("match_score"),
-        quality_score=updated_app.get("quality_score"),
-        eligibility=updated_app.get("eligibility"),
-        eligibility_rank=updated_app.get("eligibility_rank", 0),
-        eligibility_override=updated_app.get("eligibility_override"),
-        recruiter_score=updated_app.get("recruiter_score"),
-        knockout_status=updated_app.get("knockout_status"),
-        resume_snapshot=updated_app.get("resume_snapshot"),
-        features=updated_app.get("features"),
-        stage=updated_app.get("stage", ApplicationStage.APPLIED.value),
-        scoring_version=updated_app.get("scoring_version"),
-        candidate_name=updated_app.get("candidate_name"),
-        candidate_email=updated_app.get("candidate_email"),
-        notes=updated_app.get("notes"),
-        created_at=updated_app.get("created_at", now),
-    )
-

@@ -67,13 +67,16 @@ class PortfolioRepository:
                 await session.refresh(existing)
                 return _profile_to_dict(existing)
             else:
+                if not clean_data.get("username"):
+                    clean_data["username"] = f"user_{user_id[:8]}"
+                if not clean_data.get("full_name"):
+                    clean_data["full_name"] = "Candidate"
+                if clean_data.get("email") is None:
+                    clean_data["email"] = ""
                 new_profile = UserProfile(
                     id=gen_uuid_str(),
                     user_id=str(user_id),
-                    username=data.get("username", f"user_{user_id[:8]}"),
-                    full_name=data.get("full_name", "Candidate"),
-                    email=data.get("email", ""),
-                    **clean_data
+                    **clean_data,
                 )
                 session.add(new_profile)
                 await session.commit()

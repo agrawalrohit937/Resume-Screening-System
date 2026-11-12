@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from services.nlp_extractor import extract_skills_deterministic
-from services.title_normalizer import normalize_title, calculate_title_match
 from services.ontology.graph import get_ontology_graph
 import core.feature_flags as ff
 
@@ -64,32 +63,6 @@ def test_spacy_dep_negation_flag(monkeypatch):
     assert "Python" in skills
     assert "Java" in skills
     assert "Docker" not in skills
-
-
-def test_title_and_seniority_normalization():
-    # 1. SDE-2 -> mid, software_engineer
-    t1 = normalize_title("SDE-2")
-    assert t1["level"] == "mid"
-    assert t1["family"] == "software_engineer"
-    assert t1["rank"] == 2
-
-    # 2. Backend Engineer II -> mid, backend_engineer
-    t2 = normalize_title("Backend Engineer II")
-    assert t2["level"] == "mid"
-    assert t2["family"] == "backend_engineer"
-    assert t2["rank"] == 2
-
-    # 3. Sr. Software Developer -> senior, software_engineer
-    t3 = normalize_title("Sr. Software Developer")
-    assert t3["level"] == "senior"
-    assert t3["family"] == "software_engineer"
-    assert t3["rank"] == 3
-
-    # Title Match & Seniority Delta
-    match = calculate_title_match(cand_title="Backend Engineer II", jd_title="Senior Backend Engineer")
-    assert match["family_match"] is True
-    assert match["seniority_delta"] == -1  # Candidate is 1 level below (mid vs senior)
-    assert 0.70 <= match["match_score"] <= 0.90
 
 
 def test_fuzzy_and_embedding_skill_matching():

@@ -336,6 +336,8 @@ async def check_slug_availability(
 async def save_portfolio(
     profile: PortfolioProfileModel,
     current_user=Depends(require_plan("pro")),
+    user_repo: UserRepository = Depends(get_user_repo),
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
 ):
     clean_username = profile.username.strip().lower()
     clean_username = re.sub(r'[^a-z0-9_-]', '', clean_username)
@@ -427,6 +429,7 @@ async def unpublish_portfolio(
 async def get_my_portfolio(
     sync_from_resume: bool = False,
     user_id: Optional[str] = Depends(get_optional_user),
+    portfolio_repo: PortfolioRepository = Depends(get_portfolio_repo),
 ):
     if not user_id:
         return {"status": "empty", "data": None}
@@ -441,9 +444,18 @@ async def get_my_portfolio(
             user_doc["_id"] = u_row.id
 
         r_res = await session.execute(
-            select(Resume).where(Resume.user_id == str(user_id)).order_by(Resume.created_at.desc()).limit(1)
+            select(Resume)
+            .where(Resume.user_id == str(user_id), Resume.status == "parsed")
+            .order_by(Resume.is_primary.desc(), Resume.created_at.desc())
+            .limit(1)
         )
         r_row = r_res.scalar_one_or_none()
+        if not r_row:
+            r_row = (
+                await session.execute(
+                    select(Resume).where(Resume.user_id == str(user_id)).order_by(Resume.created_at.desc()).limit(1)
+                )
+            ).scalar_one_or_none()
         if r_row:
             resume_doc = {c.name: getattr(r_row, c.name) for c in Resume.__table__.columns}
             resume_doc["_id"] = r_row.id
@@ -504,8 +516,8 @@ async def get_my_portfolio(
         if doc.get("skills"):
             doc["skills"] = sanitize_portfolio_skills(doc["skills"])
 
-        # If existing document has genuine projects, return it directly
-        if len(cleaned_projects) >= 3:
+        # If existing document has genuine projects, return it directly without overwriting
+        if len(cleaned_projects) >= 1:
             doc["_id"] = str(doc["_id"])
             return {"status": "success", "data": doc}
 
@@ -532,9 +544,14 @@ async def get_my_portfolio(
     contact_info = parsed.get("contact_info", {}) if isinstance(parsed, dict) else {}
 
     # High-precision AI extraction using existing Enhancer Graph
+    # OPTIMIZATION: Only call Gemini LLM if user explicitly requested forced sync (sync_from_resume=True)
+    # OR if database has zero structured parsed projects. Otherwise use fast DB parsed_data.
     ai_data = {}
     ai_used = False
-    if raw_text:
+    has_parsed_projects = bool(parsed and parsed.get("projects") and len(parsed.get("projects")) > 0)
+    should_call_ai = bool(sync_from_resume or not has_parsed_projects)
+
+    if raw_text and should_call_ai:
         try:
             ai_data = await ai_extract_portfolio_from_resume(raw_text, original_parsed=parsed if isinstance(parsed, dict) else None)
             if ai_data and ai_data.get("projects") and len(ai_data.get("projects", [])) > 0:
@@ -737,26 +754,27 @@ async def get_my_portfolio(
     if len(all_skills) > 0:
         dyn_metrics.append({"value": f"{len(all_skills)}+", "label": "Technical Skills"})
 
+    existing_social = (doc.get("social_links") or {}) if doc else {}
     auto_data = {
         "user_id": str(user_id),
-        "username": slug,
+        "username": (doc.get("username") if doc else None) or slug,
         "full_name": candidate_name,
         "headline": headline,
         "bio": resolved_bio,
         "email": ai_data.get("email") or contact_info.get("email") or (user_doc.get("email") if user_doc else "") or "",
         "phone": ai_data.get("phone") or contact_info.get("phone") or (user_doc.get("phone") if user_doc else "") or "",
         "location": resolved_location,
-        "avatar_url": (user_doc.get("profile_picture") if user_doc else "") or (user_doc.get("avatar_url") if user_doc else "") or "",
+        "avatar_url": (doc.get("avatar_url") if doc else None) or (user_doc.get("profile_picture") if user_doc else "") or (user_doc.get("avatar_url") if user_doc else "") or "",
         "resume_file_url": stored_resume_url,
-        "hero_badge": "✨ Open to Opportunities",
+        "hero_badge": (doc.get("hero_badge") if doc else None) or "✨ Open to Opportunities",
         "typing_roles": dyn_typing_roles,
         "hero_metrics": dyn_metrics,
         "social_links": {
-            "github": github_link,
-            "linkedin": linkedin_link,
-            "twitter": "",
-            "website": website_link,
-            "medium": ""
+            "github": github_link or existing_social.get("github", ""),
+            "linkedin": linkedin_link or existing_social.get("linkedin", ""),
+            "twitter": existing_social.get("twitter", ""),
+            "website": website_link or existing_social.get("website", ""),
+            "medium": existing_social.get("medium", "")
         },
         "skills": sanitize_portfolio_skills(categorized),
         "projects": projects_list,

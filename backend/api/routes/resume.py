@@ -9,8 +9,8 @@ Resume Routes — Upload, Parse, List, Delete
 import hashlib
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, Query, UploadFile, status
@@ -36,7 +36,6 @@ from services.parser_service import ParserService
 from services.cloudinary_service import upload_resume, delete_file as cloudinary_delete, generate_signed_resume_url, extract_public_id_from_url
 from utils.file_utils import validate_and_save_file, delete_file, sanitize_filename
 from utils.validators import validate_object_id
-from scheduler.job_alerts import sweep_stuck_pending_resumes
 
 
 logger = structlog.get_logger(__name__)
@@ -454,6 +453,33 @@ def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
         created_at=resume.created_at,
         updated_at=resume.updated_at,
     )
+
+
+async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any]:
+    """Mark resumes stuck in pending/processing for >10 minutes as failed."""
+    now = datetime.now(timezone.utc)
+    threshold = now - timedelta(minutes=10)
+    session_factory = get_pg_session_factory()
+    async with session_factory() as session:
+        async with session.begin():
+            stmt = (
+                update(Resume)
+                .where(
+                    Resume.status.in_(["pending", "processing"]),
+                    Resume.created_at < threshold,
+                )
+                .values(
+                    status="failed",
+                    error_message="Resume parsing timed out. Please retry parsing or re-upload your document.",
+                    updated_at=now,
+                )
+            )
+            res = await session.execute(stmt)
+            swept_count = getattr(res, "rowcount", 0) or 0
+
+    if swept_count > 0:
+        logger.info("Completed stuck pending resume sweep via PostgreSQL", swept_count=swept_count)
+    return {"swept": swept_count}
 
 
 @router.post("/admin/sweep-stuck")

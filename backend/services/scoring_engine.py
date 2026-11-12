@@ -450,18 +450,6 @@ def _compute_experience(
                     elif roles and isinstance(roles[0], dict):
                         cand_latest_title = str(roles[0].get("title") or roles[0].get("role") or "").strip()
 
-            if jd_title and cand_latest_title and required_exp > 0:
-                try:
-                    from services.title_normalizer import calculate_title_match
-                    t_match = calculate_title_match(cand_latest_title, jd_title)
-                    # 85% effective tenure, 15% title/seniority alignment
-                    alignment_mult = 0.85 + (0.15 * float(t_match.get("match_score", 1.0)))
-                    normalized = min(1.0, max(0.0, normalized * alignment_mult))
-                    if hasattr(profile, "__dict__"):
-                        profile.title_match = t_match
-                except Exception:
-                    pass
-
             return normalized, profile
         except Exception as e:
             logger.debug("calculate_effective_experience failed, using baseline", error=str(e))

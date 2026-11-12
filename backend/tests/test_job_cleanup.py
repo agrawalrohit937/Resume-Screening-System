@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from tests.conftest import MockAsyncSession
-from services.job_cleanup_service import cleanup_stale_external_jobs
+from services.job_scraper import cleanup_stale_external_jobs
 
 
 @pytest.mark.asyncio
@@ -35,6 +35,8 @@ async def test_cleanup_stale_external_jobs_success():
     stmt = str(executed_stmts[0]).lower()
     assert "delete from jobs" in stmt
     assert "is_external" in stmt
+    assert "created_at" in stmt
+    assert "updated_at" not in stmt
 
 
 @pytest.mark.asyncio

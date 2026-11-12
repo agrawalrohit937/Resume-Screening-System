@@ -155,13 +155,14 @@ class JobRepository(BaseRepository):
             valid_statuses = status_list or ["open", "published", "active", "Open", "Published", "Active"]
             filters.append(Job.status.in_(valid_statuses))
 
-            # Search filter (title, company, description, skills)
+            # Search filter (title, company, location, description, skills)
             if search and search.strip():
                 s = f"%{search.strip().lower()}%"
                 filters.append(
                     or_(
                         func.lower(Job.title).like(s),
                         func.lower(Job.company_name).like(s),
+                        func.lower(Job.location).like(s),
                         func.lower(Job.jd_text_raw).like(s),
                         Job.required_skills.cast(Text).ilike(s),
                     )

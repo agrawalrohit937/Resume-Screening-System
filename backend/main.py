@@ -64,7 +64,6 @@ from api.routes import (
     resume,
     revenue_recovery,
     support,
-    talent_pools,
     team,
     users,
     webhooks,
@@ -301,7 +300,6 @@ def create_application() -> FastAPI:
     # Phase 5 Enterprise Surface (B2B SaaS)
     app.include_router(requisitions.router, prefix=f"{p}/requisitions", tags=["Enterprise ATS - Requisitions"])
     app.include_router(interview_kits.router, prefix=f"{p}/interview-kits", tags=["Enterprise ATS - Interview Kits & Scorecards"])
-    app.include_router(talent_pools.router, prefix=f"{p}/talent-pool", tags=["Enterprise ATS - Consented Talent Pools"])
     app.include_router(eeo.router, prefix=f"{p}/eeo", tags=["Enterprise ATS - EEO Vault"])
     app.include_router(webhooks.router, prefix=f"{p}/webhooks", tags=["Enterprise ATS - Outbound Webhooks"])
     app.include_router(integrations.router, prefix=f"{p}/integrations", tags=["Enterprise ATS - Ecosystem Integrations"])

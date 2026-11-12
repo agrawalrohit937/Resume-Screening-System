@@ -5,7 +5,7 @@ Resume Repository — Dual Engine (PostgreSQL via SQLAlchemy 2.0 / PostgreSQL Pr
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 import structlog
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, and_
 from sqlalchemy.orm import selectinload, joinedload
 
 from core.config import settings

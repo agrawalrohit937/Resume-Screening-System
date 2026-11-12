@@ -34,7 +34,7 @@ const PAGE_TITLES = {
   '/jobs': { title: 'Job Marketplace', sub: 'Explore opportunities with AI vector matching' },
   '/applications': { title: 'Application Tracker', sub: 'Track your hiring stages and match feedback' },
   '/profile': { title: 'Profile & Assets', sub: 'Personal identity, portfolio & resume' },
-  '/settings': { title: 'Account Settings', sub: 'Security, privacy & talent pool preferences' },
+  '/settings': { title: 'Account Settings', sub: 'Security, password & privacy settings' },
 }
 
 function MobileHeader({ onMenuToggle }) {

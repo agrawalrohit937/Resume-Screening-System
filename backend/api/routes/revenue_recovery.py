@@ -17,7 +17,6 @@ from schemas.revenue_recovery_schema import (
 )
 from repositories.revenue_recovery_repo import RevenueRecoveryRepository
 from repositories.user_repo import UserRepository
-from services.voice_recovery_service import voice_recovery_service
 from services.email_service import EmailService
 from workflows.revenue_recovery_graph import revenue_recovery_pipeline
 
@@ -64,54 +63,15 @@ async def process_voice_turn(
     db=Depends(get_db),
 ):
     """
-    Stateful Hinglish voice recovery conversational turn.
-    Processes user speech and returns contextual AI Hinglish dialogue.
+    (Deprecated) Voice simulation endpoint — voice agent feature removed.
     """
-    recovery_repo = RevenueRecoveryRepository(db)
-    user_name = current_user.full_name if current_user else payload.user_name
-    user_id = str(current_user.id) if current_user else (payload.case_id or "anonymous")
-
-    turn_res = await voice_recovery_service.process_voice_turn(
-        user_id=user_id,
-        user_name=user_name,
-        plan_name=payload.plan,
-        amount=payload.amount,
-        user_utterance=payload.user_utterance,
-        conversation_history=payload.conversation_history,
-        discount_eligible=True,
-        max_discount_pct=20,
-    )
-
-    # If case_id provided, append voice interaction transcript
-    if payload.case_id:
-        try:
-            case = await recovery_repo.get_by_id(payload.case_id)
-            if case:
-                v_data = case.voice_data.model_dump() if hasattr(case.voice_data, "model_dump") else case.voice_data.dict()
-                v_data["voice_attempted"] = True
-                v_data["timestamp"] = datetime.now(timezone.utc)
-                v_data.setdefault("transcript", [])
-                v_data["transcript"].append({"role": "user", "text": payload.user_utterance, "timestamp": datetime.now(timezone.utc)})
-                v_data["transcript"].append({"role": "agent", "text": turn_res["agent_reply"], "timestamp": datetime.now(timezone.utc)})
-                v_data["user_response"] = turn_res["intent"]
-
-                updates = {
-                    "voice_data": v_data,
-                    "status": RecoveryStatus.CONTACTED.value if not turn_res.get("should_retry_payment") else RecoveryStatus.RETRY_SCHEDULED.value,
-                }
-                await recovery_repo.update_case(payload.case_id, updates)
-                await recovery_repo.add_audit_log(
-                    case_id=payload.case_id,
-                    action="VOICE_DIALOGUE_TURN",
-                    actor=ActorType.USER,
-                    actor_name=user_name,
-                    details={"utterance": payload.user_utterance, "intent": turn_res["intent"], "reply": turn_res["agent_reply"]},
-                    reasoning=f"User responded: '{payload.user_utterance}'. AI recognized intent: {turn_res['intent']}."
-                )
-        except Exception as e:
-            logger.warning("Failed to record voice turn to case", error=str(e))
-
-    return turn_res
+    return {
+        "agent_reply": "Voice agent has been removed. Support is handled via email and portal tickets.",
+        "intent": "CANCEL",
+        "should_retry_payment": False,
+        "offer_discount_pct": 0,
+        "call_ended": True,
+    }
 
 
 @router.post("/pay-recovered")
