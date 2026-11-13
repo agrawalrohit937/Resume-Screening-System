@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy, useEffect } from 'react'
-import { Toaster } from 'react-hot-toast'
+import toast, { Toaster, ToastBar } from 'react-hot-toast'
+import { Check, AlertCircle, AlertTriangle, Info, Loader2, X } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { TenantProvider } from './context/TenantContext'
 
@@ -176,48 +177,87 @@ export default function App() {
           <ThemeInit />
           <BootLoaderGate>
             <Toaster
-            position="top-right"
-            containerStyle={{
-              top: 84,
-              right: 28,
-            }}
-            gutter={10}
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: 'rgba(255, 255, 255, 0.96)',
-                color: '#0F172A',
-                border: '1px solid rgba(226, 232, 240, 0.9)',
-                borderRadius: '18px',
-                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                fontSize: '13.5px',
-                fontWeight: '700',
-                letterSpacing: '-0.01em',
-                boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
-                padding: '12px 18px',
-                backdropFilter: 'blur(16px)',
-                maxWidth: '420px',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10B981',
-                  secondary: '#ECFDF5',
+              position="top-right"
+              containerStyle={{
+                top: 76,
+                right: 24,
+                zIndex: 999999,
+              }}
+              gutter={10}
+              toastOptions={{
+                duration: 3500,
+                style: {
+                  background: '#FFFFFF',
+                  color: '#0F172A',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '16px',
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  letterSpacing: '-0.01em',
+                  boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 14px -2px rgba(15, 23, 42, 0.08)',
+                  padding: '10px 14px',
+                  maxWidth: '420px',
                 },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#F43F5E',
-                  secondary: '#FFF1F2',
+                success: {
+                  duration: 3000,
                 },
-              },
-              loading: {
-                iconTheme: {
-                  primary: '#6366F1',
-                  secondary: '#EEF2FF',
+                error: {
+                  duration: 7000,
                 },
-              },
-            }}
-          />
+              }}
+            >
+              {(t) => {
+                const isSuccess = t.type === 'success';
+                const isError = t.type === 'error';
+                const isLoading = t.type === 'loading';
+
+                const badgeBg = isSuccess
+                  ? 'bg-emerald-50 border-emerald-200/90 text-emerald-600'
+                  : isError
+                  ? 'bg-rose-50 border-rose-200/90 text-rose-600'
+                  : isLoading
+                  ? 'bg-indigo-50 border-indigo-200/90 text-indigo-600'
+                  : 'bg-sky-50 border-sky-200/90 text-sky-600';
+
+                return (
+                  <ToastBar toast={t} style={{ ...t.style, padding: '10px 14px' }}>
+                    {({ message }) => (
+                      <div className="flex items-center gap-3 w-full">
+                        {/* Soft Rounded Icon Tile (Stripe Dashboard Style) */}
+                        <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs ${badgeBg}`}>
+                          {isSuccess && <Check size={16} strokeWidth={2.6} />}
+                          {isError && <AlertCircle size={16} strokeWidth={2.2} />}
+                          {isLoading && <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />}
+                          {!isSuccess && !isError && !isLoading && <Info size={16} strokeWidth={2.2} />}
+                        </div>
+
+                        {/* Crisp Typography */}
+                        <div className="flex-1 text-[13px] font-semibold text-slate-800 leading-snug break-words">
+                          {message}
+                        </div>
+
+                        {/* Internal Dismiss Button */}
+                        {t.type !== 'loading' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toast.dismiss(t.id);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100/90 active:scale-95 transition-all cursor-pointer shrink-0 ml-1"
+                            aria-label="Dismiss notification"
+                            title="Dismiss"
+                          >
+                            <X size={14} strokeWidth={2.2} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </ToastBar>
+                );
+              }}
+            </Toaster>
 
           <Suspense fallback={<Loader />}>
             <Routes>
