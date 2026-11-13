@@ -167,15 +167,23 @@ class AnalyticsRepository(BaseRepository):
         is_admin_or_exec: bool,
         user_id: str,
     ) -> Dict[str, Any]:
-        """Fetches raw job, application, and EEO records for enterprise aggregation."""
+        """Fetches authentic internal job requisitions, confirmed applications, and EEO records for enterprise aggregation."""
         async with self._get_session() as session:
-            stmt = select(Job).order_by(Job.created_at.desc())
-            if not (is_admin_or_exec or tenant_id == "default"):
-                stmt = stmt.where(or_(Job.tenant_id == tenant_id, Job.tenant_id == "default", Job.tenant_id.is_(None), Job.created_by == str(user_id)))
+            # Exclude public external job board scrapes (is_external == True).
+            # Only count actual authorized internal requisitions created by this enterprise/recruiter.
+            stmt = select(Job).where(
+                or_(Job.is_external.is_(False), Job.is_external == False),
+                Job.created_by.isnot(None),
+            ).order_by(Job.created_at.desc())
+
+            if tenant_id and tenant_id != "default":
+                stmt = stmt.where(Job.tenant_id == tenant_id)
+            elif not is_admin_or_exec:
+                stmt = stmt.where(Job.created_by == str(user_id))
 
             jobs_res = await session.execute(stmt)
             raw_jobs = jobs_res.scalars().all()
-            jobs_list = [{"id": str(j.id), "_id": str(j.id), "title": j.title, "department": j.department, "status": j.status, "openings": 1} for j in raw_jobs]
+            jobs_list = [{"id": str(j.id), "_id": str(j.id), "title": j.title, "department": j.department, "status": j.status, "openings": getattr(j, "openings", 1) or 1} for j in raw_jobs]
             job_ids = [str(j["id"]) for j in jobs_list]
 
             hired_app_rows = []
@@ -189,7 +197,10 @@ class AnalyticsRepository(BaseRepository):
                     select(func.count(CandidateApplication.id)).where(CandidateApplication.job_id.in_(job_ids), CandidateApplication.stage.in_(["offer", "Offer", "hired", "Hired"]))
                 )).scalar() or 0
 
-            eeo_res = await session.execute(select(EeoResponse).limit(1000))
+            eeo_stmt = select(EeoResponse).order_by(EeoResponse.submitted_at.desc())
+            if tenant_id and tenant_id != "default":
+                eeo_stmt = eeo_stmt.where(EeoResponse.tenant_id == tenant_id)
+            eeo_res = await session.execute(eeo_stmt.limit(1000))
             eeo_responses = [{"race_ethnicity": r.race_ethnicity, "gender": r.gender} for r in eeo_res.scalars().all()]
 
             return {

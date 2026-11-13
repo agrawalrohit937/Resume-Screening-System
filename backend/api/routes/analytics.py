@@ -181,16 +181,16 @@ async def get_enterprise_analytics(
     # 3. Department breakdown
     dept_map: dict = {}
     for j in jobs_list:
-        dept = j.get("department") or "Engineering"
+        dept = j.get("department") or "General"
         if dept not in dept_map:
             dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
         if str(j.get("status", "open")).lower() in ("open", "active"):
             dept_map[dept]["approved"] += int(j.get("openings", 1) or 1)
 
     if hired_apps:
-        job_dept_map = {str(j["id"]): (j.get("department") or "Engineering") for j in jobs_list}
+        job_dept_map = {str(j["id"]): (j.get("department") or "General") for j in jobs_list}
         for ha in hired_apps:
-            dept = job_dept_map.get(str(ha.get("job_id")), "Engineering")
+            dept = job_dept_map.get(str(ha.get("job_id")), "General")
             if dept not in dept_map:
                 dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
             dept_map[dept]["filled"] += 1

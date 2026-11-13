@@ -16,7 +16,7 @@ import Leaderboard from '../components/gamification/Leaderboard'
 
 export default function CareerQuest() {
   const { user } = useAuth()
-  const cacheKey = `careershala_gamification_cache:${user?.id || user?._id || user?.email || 'anonymous'}`
+  const cacheKey = `careershala_gamification_v2:${user?.id || user?._id || user?.email || 'anonymous'}`
   const [activeTab, setActiveTab] = useState(0) // 0 Path · 1 Achievements · 2 Leaderboard
 
   const [profile, setProfile] = useState(null)
@@ -25,55 +25,88 @@ export default function CareerQuest() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+
+    // 1. Instant Cache Hydration (0ms load via Stale-While-Revalidate)
     try {
-      const cached = sessionStorage.getItem(cacheKey)
+      const cached = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey)
       if (cached) {
         const data = JSON.parse(cached)
         if (data && data.profile) {
           setProfile(data.profile)
-          setLeaderboard(data.leaderboard || [])
+          if (data.leaderboard?.length) setLeaderboard(data.leaderboard)
           if (data.catalog?.length) setCatalog(data.catalog)
           setLoading(false)
         }
       }
     } catch {
-      sessionStorage.removeItem(cacheKey)
+      localStorage.removeItem(cacheKey)
     }
 
-    const loadGamification = async () => {
-      const [p, b, l] = await Promise.all([
-        getGamificationProfile().catch((err) => {
-          console.warn('Gamification profile fetch failed:', err)
-          return { data: null }
-        }),
-        getBadgeCatalog().catch(() => ({ data: { badges: [] } })),
-        getLeaderboard(30).catch((err) => {
-          console.warn('Leaderboard fetch failed:', err)
-          return { data: { leaderboard: [] } }
-        }),
-      ])
-
-      if (p?.data) setProfile(p.data)
-      if (l.data?.leaderboard) setLeaderboard(l.data.leaderboard)
-
-      const remoteBadges = b.data?.badges || []
-      if (remoteBadges.length && remoteBadges.every((x) => x.id && x.tier)) setCatalog(remoteBadges)
-
-      if (p?.data || (l.data?.leaderboard && l.data.leaderboard.length > 0)) {
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify({
-            profile: p?.data || null,
-            leaderboard: l.data?.leaderboard || [],
-            catalog: remoteBadges.length ? remoteBadges : BADGE_CATALOG_FALLBACK,
-          }))
-        } catch {
-          // Session storage is an optional performance cache.
+    // 2. Fast User Profile Fetch (Decoupled, non-blocking)
+    getGamificationProfile()
+      .then((p) => {
+        if (!isMounted) return
+        if (p?.data) {
+          setProfile(p.data)
+          setLoading(false)
+          try {
+            const existing = JSON.parse(localStorage.getItem(cacheKey) || '{}')
+            localStorage.setItem(cacheKey, JSON.stringify({
+              ...existing,
+              profile: p.data,
+              catalog: existing.catalog || BADGE_CATALOG_FALLBACK,
+            }))
+          } catch (_) {}
         }
-      }
+      })
+      .catch((err) => {
+        console.warn('Gamification profile fetch failed:', err)
+        if (isMounted) setLoading(false)
+      })
+
+    // 3. Non-blocking Background Leaderboard Sync
+    const syncLeaderboard = () => {
+      getLeaderboard(30)
+        .then((l) => {
+          if (!isMounted) return
+          const board = l.data?.leaderboard || []
+          if (board.length) {
+            setLeaderboard(board)
+            try {
+              const existing = JSON.parse(localStorage.getItem(cacheKey) || '{}')
+              localStorage.setItem(cacheKey, JSON.stringify({
+                ...existing,
+                leaderboard: board,
+              }))
+            } catch (_) {}
+          }
+        })
+        .catch((err) => console.warn('Leaderboard background sync failed:', err))
     }
 
-    loadGamification().finally(() => setLoading(false))
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(syncLeaderboard, { timeout: 1500 })
+    } else {
+      setTimeout(syncLeaderboard, 100)
+    }
+
+    return () => {
+      isMounted = false
+    }
   }, [cacheKey])
+
+  // Instant fetch for leaderboard if user clicks Tab 2 and it hasn't loaded yet
+  useEffect(() => {
+    if (activeTab === 2 && (!leaderboard || leaderboard.length === 0)) {
+      getLeaderboard(30)
+        .then((l) => {
+          const board = l.data?.leaderboard || []
+          if (board.length) setLeaderboard(board)
+        })
+        .catch(() => {})
+    }
+  }, [activeTab, leaderboard])
 
   const earnedBadges = profile?.badges || []
   const currentUserId = user?.id || user?._id
@@ -88,7 +121,7 @@ export default function CareerQuest() {
       const nextLeaderboard = updatedLeaderboard.data?.leaderboard || []
       setProfile(nextProfile)
       setLeaderboard(nextLeaderboard)
-      sessionStorage.setItem(cacheKey, JSON.stringify({
+      localStorage.setItem(cacheKey, JSON.stringify({
         profile: nextProfile,
         leaderboard: nextLeaderboard,
         catalog,

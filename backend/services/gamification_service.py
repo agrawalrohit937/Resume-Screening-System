@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 
 # ─── Simple in-memory cache with TTL ─────────────────────────────────────────
 _leaderboard_cache: Dict[str, Any] = {"data": None, "ts": 0.0}
-_LEADERBOARD_CACHE_TTL = 30  # seconds
+_LEADERBOARD_CACHE_TTL = 120  # 2 minutes (auto-busted on point updates)
 
 # ─── Badge Definitions ────────────────────────────────────────────────────────
 BADGES = {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -111,6 +112,17 @@ export default function PortfolioBuilder() {
   const [newSkillText, setNewSkillText] = useState({ category: 'machine_learning', text: '' });
   const [newTypingRole, setNewTypingRole] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Lock background scrolling when post-launch modal is open
+  useEffect(() => {
+    if (showPostLaunchModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showPostLaunchModal]);
 
   // Live preview typing animation in Card 2
   const [previewRoleIdx, setPreviewRoleIdx] = useState(0);
@@ -1119,209 +1131,145 @@ export default function PortfolioBuilder() {
 
       {/* ── SUBSCRIPTION PAYWALL MODAL (Removed: redirected directly to standard /premium page) ── */}
 
-      {/* ── POST-LAUNCH CELEBRATION & PROFILE SYNC MODAL ── */}
-      <AnimatePresence>
-        {showPostLaunchModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Soft Ambient Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/45 backdrop-blur-md"
-              onClick={() => {
-                setShowPostLaunchModal(false);
-                setViewMode('overview');
-              }}
-            />
-
-            {/* Modal Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 24 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 24 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              className="relative w-full max-w-xl bg-white/95 backdrop-blur-2xl rounded-[32px] p-6 sm:p-9 border border-indigo-100/90 shadow-[0_25px_80px_-15px_rgba(79,70,229,0.25)] overflow-hidden space-y-6 text-center z-10"
-            >
-              {/* Background ambient decorative light */}
-              <div className="absolute -top-20 -right-20 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-20 -left-20 w-56 h-56 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-
-              {/* Close Button */}
-              <button
+      {/* ── POST-LAUNCH CELEBRATION & PROFILE SYNC MODAL (PORTALED TO BODY FOR TRUE CENTER & FULL COVERAGE) ── */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showPostLaunchModal && (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-y-auto">
+              {/* Full Viewport Dimmed Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-950/50"
                 onClick={() => {
                   setShowPostLaunchModal(false);
                   setViewMode('overview');
                 }}
-                className="absolute top-5 right-5 p-2.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100/80 transition-colors cursor-pointer"
-                aria-label="Close"
+              />
+
+              {/* Modal Card - Perfectly Centered in Viewport */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-7 border border-slate-100 shadow-2xl space-y-5 text-center z-10 m-auto"
               >
-                <X size={20} />
-              </button>
-
-              {/* Celebration Icon with Animated Ring */}
-              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                <motion.div 
-                  animate={{ scale: [1, 1.06, 1] }} 
-                  transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                  className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-indigo-600 text-white flex items-center justify-center shadow-xl shadow-emerald-500/25 ring-8 ring-emerald-50/90"
-                >
-                  <Rocket size={38} className="-rotate-12" />
-                </motion.div>
-                <motion.div 
-                  animate={{ y: [-2, 2, -2] }} 
-                  transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                  className="absolute -top-1 -right-1 w-7 h-7 bg-amber-400 text-amber-950 rounded-full flex items-center justify-center font-bold text-xs shadow-md border-2 border-white"
-                >
-                  ✨
-                </motion.div>
-              </div>
-
-              {/* Headline & Subtitle */}
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-black uppercase tracking-wider shadow-2xs">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  Portfolio Website Published Live!
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  Congratulations, <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">{formData.full_name?.split(' ')[0] || 'Developer'}</span>! 🎉
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-                  Your personal developer website is officially live and ready to showcase your projects to recruiters, hiring managers, and clients worldwide.
-                </p>
-              </div>
-
-              {/* Live URL Pill with 1-click actions */}
-              <div className="relative p-1 rounded-2xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 shadow-xs">
-                <div className="flex items-center justify-between gap-3 bg-white/95 backdrop-blur-xl px-4 py-3 rounded-[14px] border border-white">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                      <Globe size={16} strokeWidth={2.5} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Public Live URL</p>
-                      <p className="text-xs sm:text-sm font-mono font-bold text-slate-800 truncate select-all">{publicUrl}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={copyPublicLink}
-                      className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
-                    >
-                      {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      <span>{copied ? 'Copied!' : 'Copy'}</span>
-                    </button>
-                    <a
-                      href={publicUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-indigo-600 text-xs font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer active:scale-95"
-                      title="Open in new tab"
-                    >
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Executive Profile Integration VIP Card */}
-              <div className="p-4 sm:p-5 bg-gradient-to-br from-indigo-50/90 via-slate-50/70 to-purple-50/80 border border-indigo-100 rounded-2xl text-left space-y-3 shadow-xs">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20 mt-0.5">
-                    <Sparkles size={18} />
-                  </div>
-                  <div className="space-y-1 flex-1">
-                    <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
-                      Connect to Candidate Profile & System Settings
-                    </h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      To ensure verified hiring managers, recruiters, and ATS screeners review your work on your candidate profile, keep your <strong>Profile Settings</strong> linked with this live URL!
-                    </p>
-                  </div>
-                </div>
-
-                {/* Profile Sync Button / Success State */}
-                <div className="pt-1">
-                  {isProfileSynced ? (
-                    <div className="flex items-center justify-between p-3 bg-emerald-50/90 border border-emerald-200/90 rounded-xl shadow-2xs">
-                      <div className="flex items-center gap-2 text-emerald-800 text-xs font-black">
-                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                          <Check size={14} strokeWidth={3} />
-                        </div>
-                        <span>Successfully Linked to Profile & System Settings</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setShowPostLaunchModal(false);
-                          navigate('/profile');
-                        }}
-                        className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1 cursor-pointer"
-                      >
-                        View in Profile <ArrowRight size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <button
-                        onClick={() => handleSyncToProfile(publicUrl)}
-                        disabled={syncingProfile}
-                        className="flex-1 py-3 px-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white text-xs font-black rounded-xl shadow-md shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                      >
-                        {syncingProfile ? (
-                          <>
-                            <RefreshCw size={14} className="animate-spin text-white" />
-                            <span>Saving Link to Settings...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap size={14} className="text-amber-300" />
-                            <span>⚡ 1-Click Sync to Profile Settings</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowPostLaunchModal(false);
-                          navigate('/profile');
-                        }}
-                        className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                      >
-                        <Settings size={13} className="text-slate-500" />
-                        <span>Settings</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
-                <a
-                  href={publicUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white text-xs sm:text-sm font-black rounded-2xl shadow-xl shadow-indigo-600/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer group"
-                >
-                  <Eye size={16} />
-                  <span>Visit Live Portfolio Website</span>
-                  <ExternalLink size={14} className="group-hover:translate-x-0.5 -translate-y-0.5 transition-transform" />
-                </a>
-
+                {/* Close Button */}
                 <button
                   onClick={() => {
                     setShowPostLaunchModal(false);
                     setViewMode('overview');
                   }}
-                  className="w-full sm:w-auto px-6 py-3.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold rounded-2xl transition-all cursor-pointer active:scale-95"
+                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Close"
                 >
-                  Return to Studio Overview
+                  <X size={18} />
                 </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+
+                {/* Celebration Icon */}
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+                  <Rocket size={26} className="-rotate-12" />
+                </div>
+
+                {/* Title & Subtitle */}
+                <div className="space-y-1.5">
+                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    Congratulations, {formData.full_name?.split(' ')[0] || 'Developer'}! 🎉
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Your portfolio website is published and ready to share with recruiters and clients.
+                  </p>
+                </div>
+
+                {/* URL Display (Single-line input, never breaks in the middle of words) */}
+                <div className="text-left space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                      Public Live URL
+                    </label>
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Now
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-xl p-1.5 pl-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <Globe size={15} className="text-indigo-600 shrink-0" />
+                    <input
+                      type="text"
+                      readOnly
+                      value={publicUrl}
+                      className="w-full bg-transparent text-xs sm:text-sm font-mono font-medium text-slate-800 outline-none select-all"
+                    />
+                    <button
+                      onClick={copyPublicLink}
+                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-xs active:scale-95"
+                    >
+                      {copied ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
+                      <span>{copied ? 'Copied!' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Candidate Profile Link Status */}
+                <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border border-slate-100 rounded-xl text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isProfileSynced ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                    <span className="text-slate-600 font-medium">Candidate Profile:</span>
+                    <span className={`font-semibold ${isProfileSynced ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {isProfileSynced ? 'Linked' : 'Not linked yet'}
+                    </span>
+                  </div>
+                  {isProfileSynced ? (
+                    <button
+                      onClick={() => {
+                        setShowPostLaunchModal(false);
+                        navigate('/profile');
+                      }}
+                      className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 underline cursor-pointer"
+                    >
+                      Settings
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleSyncToProfile(publicUrl)}
+                      disabled={syncingProfile}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      {syncingProfile ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
+                      <span>Link to Profile</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <a
+                    href={publicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer"
+                  >
+                    <span>Visit Website</span>
+                    <ExternalLink size={13} />
+                  </a>
+
+                  <button
+                    onClick={() => {
+                      setShowPostLaunchModal(false);
+                      setViewMode('overview');
+                    }}
+                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer active:scale-95"
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
     </div>
   );

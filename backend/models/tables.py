@@ -636,7 +636,7 @@ class UserGamification(Base):
 
     id = Column(String(64), primary_key=True, default=gen_uuid_str)
     user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
-    total_points = Column(Integer, default=0)
+    total_points = Column(Integer, default=0, index=True)
     current_streak = Column(Integer, default=0)
     longest_streak = Column(Integer, default=0)
     interviews_completed = Column(Integer, default=0)

@@ -40,8 +40,15 @@ export const claimDailyVisitReward = () =>
 
 
 
-export const getLeaderboard = (limit = 20) =>
-  api.get(`/interview/ai/gamification/leaderboard?limit=${limit}`)
+let _leaderboardInFlight = null
+export const getLeaderboard = (limit = 20) => {
+  if (_leaderboardInFlight) return _leaderboardInFlight
+  _leaderboardInFlight = api.get(`/interview/ai/gamification/leaderboard?limit=${limit}`)
+    .finally(() => {
+      setTimeout(() => { _leaderboardInFlight = null }, 3000)
+    })
+  return _leaderboardInFlight
+}
 
 export const getBadgeCatalog = () =>
   api.get('/interview/ai/badges/catalog')

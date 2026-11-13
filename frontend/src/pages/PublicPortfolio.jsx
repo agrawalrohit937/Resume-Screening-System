@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   getPublicPortfolio,
   trackPortfolioEvent,
@@ -18,6 +18,7 @@ import { cleanSkillsDict } from '../components/portfolio/Step3Skills';
 
 export default function PublicPortfolio() {
   const { username } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -158,7 +159,8 @@ export default function PublicPortfolio() {
     sending
   };
 
-  const selectedTheme = profile.theme_id || 'glassmorphic_pro';
+  const themeOverride = searchParams.get('theme');
+  const selectedTheme = themeOverride || profile.theme_id || 'glassmorphic_pro';
 
   const renderTheme = () => {
     switch (selectedTheme) {
@@ -181,8 +183,7 @@ export default function PublicPortfolio() {
   return (
     <div 
       id="portfolio-scroll-container" 
-      className="w-full h-screen overflow-y-auto overflow-x-hidden relative"
-      style={{ WebkitOverflowScrolling: 'touch' }}
+      className="w-full min-h-screen relative"
     >
       {renderTheme()}
     </div>
