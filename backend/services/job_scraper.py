@@ -19,11 +19,40 @@ logger = structlog.get_logger(__name__)
 
 JSEARCH_URL = "https://jsearch.p.rapidapi.com/search-v2"
 JSEARCH_HOST = "jsearch.p.rapidapi.com"
-SEARCH_QUERIES = [
+
+# Morning slot queries (07:30 AM IST) - Core software, Full Stack, Python & AI
+MORNING_QUERIES = [
     "Fresher Software Engineer in India",
     "Junior Full Stack Developer in India",
     "Python Developer in India",
+    "AI Engineer in India",
 ]
+
+# Afternoon slot queries (02:00 PM IST) - Frontend, Backend Java, Data & ML
+AFTERNOON_QUERIES = [
+    "Frontend Developer React in India",
+    "Junior Backend Developer Java in India",
+    "Data Analyst Fresher in India",
+    "Machine Learning Engineer in India",
+]
+
+SEARCH_QUERIES = MORNING_QUERIES
+
+
+def resolve_queries_for_slot(slot_type: Optional[str] = None) -> List[str]:
+    """Return distinct targeted queries based on scheduler slot (morning vs afternoon)."""
+    s = (slot_type or "").lower()
+    if "morning" in s or "07:30" in s:
+        return MORNING_QUERIES
+    if "afternoon" in s or "14:00" in s:
+        return AFTERNOON_QUERIES
+    try:
+        from zoneinfo import ZoneInfo
+        ist = ZoneInfo("Asia/Kolkata")
+    except Exception:
+        ist = timezone(timedelta(hours=5, minutes=30))
+    now_ist = datetime.now(timezone.utc).astimezone(ist)
+    return MORNING_QUERIES if now_ist.hour < 12 else AFTERNOON_QUERIES
 
 
 # Picks the highest-priority apply link from RapidAPI options (LinkedIn > Naukri > Direct > fallback).
@@ -68,8 +97,8 @@ def _format_salary(external_job: Dict[str, Any]) -> Optional[str]:
     return f"{currency} {min_sal:,.0f}+" if min_sal else None
 
 
-# Deletes external scraped jobs older than max_age_days (5 days) from PostgreSQL.
-async def cleanup_stale_external_jobs(max_age_days: int = 5, session_factory: Any = None) -> Dict[str, Any]:
+# Deletes external scraped jobs older than max_age_days (default 7 days) from PostgreSQL.
+async def cleanup_stale_external_jobs(max_age_days: int = 7, session_factory: Any = None) -> Dict[str, Any]:
     """Delete any external job (`is_external == True`) older than `max_age_days`."""
     session_factory = session_factory or get_pg_session_factory()
     cutoff_dt = datetime.now(timezone.utc) - timedelta(days=max_age_days)
@@ -85,10 +114,15 @@ async def cleanup_stale_external_jobs(max_age_days: int = 5, session_factory: An
         return {"success": False, "deleted_count": 0, "error": str(exc), "max_age_days": max_age_days}
 
 
-# Cleans stale external jobs, fetches fresh India fresher listings via JSearch, and inserts new ones into DB.
-async def scrape_external_jobs(queries: List[str] | None = None) -> Dict[str, int]:
-    """Clean up 5-day-old external jobs, then fetch & insert new JSearch listings."""
-    cleanup_res = await cleanup_stale_external_jobs(max_age_days=5)
+# Cleans stale external jobs, fetches fresh India listings via JSearch, and inserts new ones into DB.
+async def scrape_external_jobs(
+    queries: List[str] | None = None,
+    slot_type: Optional[str] = None,
+    num_pages: int = 2,
+    max_age_days: int = 7,
+) -> Dict[str, int]:
+    """Clean up 7-day-old external jobs, then fetch & insert new JSearch listings."""
+    cleanup_res = await cleanup_stale_external_jobs(max_age_days=max_age_days)
     api_key = os.getenv("RAPIDAPI_KEY", "").strip()
     if not api_key:
         logger.warning("Skipping external job scrape because RAPIDAPI_KEY is not configured")
@@ -98,16 +132,18 @@ async def scrape_external_jobs(queries: List[str] | None = None) -> Dict[str, in
     now = datetime.now(timezone.utc)
     total_fetched, total_skipped = 0, 0
     parsed_jobs: Dict[str, Dict[str, Any]] = {}
+    target_queries = queries or resolve_queries_for_slot(slot_type)
+    pages_to_fetch = max(1, min(int(num_pages), 2))
 
     async with httpx.AsyncClient(timeout=45.0) as client:
-        for q in (queries or SEARCH_QUERIES):
+        for q in target_queries:
             params: Dict[str, Any] = {
                 "query": q,
                 "date_posted": "week",
                 "employment_types": "FULLTIME,INTERN",
                 "job_requirements": "under_3_years_experience",
                 "page": 1,
-                "num_pages": 1,
+                "num_pages": pages_to_fetch,
             }
 
             try:
