@@ -156,8 +156,8 @@ export default function RecruiterDashboard() {
       {/* ── 1. Page Header (Clean, Breathable & ATS-Grade) ────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 pb-6 border-b border-slate-200/80">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold tracking-wide uppercase border border-indigo-100 mb-2">
-            <Sparkles size={13} className="text-indigo-600" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold tracking-wide uppercase border border-blue-100 mb-2">
+            <Sparkles size={13} className="text-blue-600" />
             Talent Acquisition Suite
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -171,7 +171,7 @@ export default function RecruiterDashboard() {
         <div className="flex items-center gap-3 shrink-0 flex-wrap">
           <button
             onClick={() => navigate('/recruiter/jobs')}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transform active:scale-98"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-2 cursor-pointer transform active:scale-98"
           >
             <PlusCircle size={15} />
             <span>Post a Job</span>
@@ -201,13 +201,13 @@ export default function RecruiterDashboard() {
         <div className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Candidates</span>
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100/60 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/60 flex items-center justify-center">
               <Users size={18} />
             </div>
           </div>
           <p className="text-3xl font-black text-slate-900 mt-3">{stats.total_candidates}</p>
           <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[11px] font-semibold text-slate-500">
-            <Users size={13} className="text-indigo-500" />
+            <Users size={13} className="text-blue-500" />
             <span>{stats.total_candidates === 1 ? '1 total applicant' : `${stats.total_candidates} total applicants`}</span>
           </div>
         </div>
@@ -272,7 +272,7 @@ export default function RecruiterDashboard() {
             </div>
             <Link
               to="/recruiter/jobs"
-              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition"
             >
               <span>View All Postings</span>
               <ChevronRight size={14} />
@@ -296,7 +296,7 @@ export default function RecruiterDashboard() {
                   {/* Left: Title + Badges + Metadata */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="text-base font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                      <span className="text-base font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
                         {job.title}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -335,9 +335,9 @@ export default function RecruiterDashboard() {
                     </span>
                     <button
                       type="button"
-                      className="bg-white border border-slate-200 text-indigo-600 px-3 py-1.5 rounded-lg shadow-sm hover:border-indigo-300 transition-colors text-xs font-bold inline-flex items-center gap-1.5 group-hover:border-indigo-300"
+                      className="bg-white border border-slate-200 text-blue-600 px-3 py-1.5 rounded-lg shadow-xs hover:border-blue-300 transition-colors text-xs font-bold inline-flex items-center gap-1.5 group-hover:border-blue-300"
                     >
-                      <Users size={12} className="text-indigo-500" />
+                      <Users size={12} className="text-blue-500" />
                       <span>{job.applicant_count || 0} Applicants</span>
                     </button>
                   </div>
@@ -351,7 +351,7 @@ export default function RecruiterDashboard() {
               <p className="text-xs text-slate-400 mt-0.5 mb-4">Post your first opening to start receiving candidates</p>
               <button
                 onClick={() => navigate('/recruiter/jobs')}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
               >
                 Post a Job Opening
               </button>
@@ -391,7 +391,7 @@ export default function RecruiterDashboard() {
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                      className="h-full bg-blue-600 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.round((stats.funnel.applied / (stats.total_candidates || 1)) * 100))}%` }}
                     />
                   </div>
@@ -410,7 +410,7 @@ export default function RecruiterDashboard() {
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.round((stats.funnel.under_review / (stats.total_candidates || 1)) * 100))}%` }}
                     />
                   </div>
@@ -429,7 +429,7 @@ export default function RecruiterDashboard() {
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-indigo-400 rounded-full transition-all duration-500"
+                      className="h-full bg-blue-400 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.round((stats.funnel.shortlisted / (stats.total_candidates || 1)) * 100))}%` }}
                     />
                   </div>
@@ -448,7 +448,7 @@ export default function RecruiterDashboard() {
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-indigo-300 rounded-full transition-all duration-500"
+                      className="h-full bg-blue-300 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.round((stats.funnel.interview / (stats.total_candidates || 1)) * 100))}%` }}
                     />
                   </div>
@@ -458,8 +458,8 @@ export default function RecruiterDashboard() {
           </div>
 
           {/* Employer Brand Profile (Soft brand background CTA) */}
-          <div className="bg-gradient-to-br from-indigo-50/90 via-blue-50/60 to-indigo-50/40 rounded-2xl sm:rounded-3xl border border-indigo-100 p-6 shadow-xs">
-            <div className="w-9 h-9 rounded-xl bg-indigo-100/80 text-indigo-700 flex items-center justify-center mb-3">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-6 shadow-xs relative overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/60 flex items-center justify-center mb-3">
               <Building2 size={18} />
             </div>
             <h3 className="text-sm font-extrabold text-slate-900 mb-1">Employer Brand Profile</h3>
@@ -468,7 +468,7 @@ export default function RecruiterDashboard() {
             </p>
             <button
               onClick={() => navigate('/recruiter/company')}
-              className="w-full py-2.5 bg-white hover:bg-indigo-50 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-xl border border-indigo-200/80 shadow-2xs transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Edit Company Profile</span>
               <ArrowUpRight size={14} />

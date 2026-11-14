@@ -1,4 +1,5 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Palette, 
   Sparkles, 
@@ -9,12 +10,8 @@ import {
   X, 
   Crown,
   Layers,
-  Laptop,
-  Tablet,
-  Smartphone,
   ExternalLink,
   Globe,
-  RefreshCw,
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,87 +27,87 @@ const BentoGridTheme = lazy(() => import('./themes/BentoGridTheme'));
 export const THEMES = [
   {
     id: 'glassmorphic_pro',
-    name: 'Glassmorphic Pro',
-    tagline: 'Modern Silicon Valley SaaS',
+    name: 'Lumina Glass',
+    tagline: 'Silicon Valley SaaS & Aurora Mesh',
     badge: 'Popular Choice',
     badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    description: 'Frosted acrylic glass cards, multi-layered mesh gradients, dynamic glowing particle background, and macOS window chrome.',
+    description: 'Frosted acrylic glass cards, multi-layered aurora mesh gradients, dynamic glowing particle background, and macOS window chrome.',
     previewBg: 'from-slate-900 via-indigo-950 to-slate-900',
     accentColor: '#6366f1',
-    tags: ['Frosted Glass', 'Mesh Particles', 'macOS Chrome', 'Glow Accents'],
+    tags: ['Frosted Glass', 'macOS Chrome', 'Aurora Mesh', 'Spotlight Glow'],
     palette: ['#6366f1', '#a855f7', '#06b6d4', '#0f172a'],
     mockCard: 'bg-white/10 backdrop-blur-md border-white/20 text-white shadow-xl',
     mockHeroBadge: 'bg-indigo-500/20 border-indigo-400/30 text-cyan-300'
   },
   {
     id: 'cyberpunk_dark',
-    name: 'Cyberpunk Dark',
-    tagline: 'Futuristic High-Tech Matrix',
+    name: 'Neo-Tokyo Matrix 2077',
+    tagline: 'Tactical Cybernetic HUD Interface',
     badge: 'High Impact',
     badgeColor: 'bg-cyan-950 text-cyan-400 border-cyan-500/40',
-    description: 'Deep obsidian backdrop with neon cyan and electric yellow accents, terminal prompt ribbons, and high-contrast HUD cards.',
+    description: 'Deep obsidian backdrop with neon cyan and electric yellow accents, tactical HUD telemetry, classified dossiers, and matrix grid.',
     previewBg: 'from-black via-[#090d16] to-[#040711]',
     accentColor: '#00f0ff',
-    tags: ['Neon Cyan', 'Terminal HUD', 'Matrix Grid', 'Dark Mode'],
+    tags: ['Neon Cyan', 'Tactical HUD', 'Matrix Grid', 'Classified Files'],
     palette: ['#00f0ff', '#fcee0a', '#ff0055', '#090d16'],
     mockCard: 'bg-[#090d16]/90 border-cyan-500/30 text-slate-100 shadow-[0_0_20px_rgba(0,240,255,0.15)]',
     mockHeroBadge: 'bg-cyan-950/80 border-cyan-400 text-cyan-300'
   },
   {
     id: 'minimal_elegance',
-    name: 'Minimal Elegance',
-    tagline: 'Swiss Editorial & Executive',
+    name: 'Atelier Executive',
+    tagline: 'Swiss Luxury & Editorial Typography',
     badge: 'Clean & Timeless',
     badgeColor: 'bg-slate-100 text-slate-800 border-slate-300',
     description: 'Distraction-free pure typography, generous whitespace, razor-thin borders, and monochrome sophistication designed for executive scrutiny.',
-    previewBg: 'from-slate-100 via-white to-slate-50',
-    accentColor: '#0f172a',
-    tags: ['Editorial Serif', 'Monochrome', 'Zero Noise', 'Clean Layout'],
-    palette: ['#0f172a', '#334155', '#64748b', '#ffffff'],
-    mockCard: 'bg-white border-slate-200 text-slate-900 shadow-sm',
-    mockHeroBadge: 'bg-slate-100 border-slate-300 text-slate-800'
+    previewBg: 'from-[#FDFBF7] via-white to-[#F4F1EA]',
+    accentColor: '#141413',
+    tags: ['Editorial Serif', 'Swiss Minimal', 'Executive Dossier', 'MacBook Bezel'],
+    palette: ['#141413', '#54524C', '#D9532F', '#FDFBF7'],
+    mockCard: 'bg-white border-[#E8E6DF] text-[#141413] shadow-sm',
+    mockHeroBadge: 'bg-white border-[#DDD9CE] text-[#54524C]'
   },
   {
     id: 'neon_developer',
-    name: 'Neon Developer',
-    tagline: 'IDE & Code Syntax Aesthetic',
+    name: 'DevEngine Studio',
+    tagline: 'Silicon Valley IDE & Live Terminal',
     badge: 'Engineer Favorite',
     badgeColor: 'bg-emerald-950 text-emerald-400 border-emerald-500/40',
-    description: 'Engineered like a state-of-the-art IDE. Monospace code headers, git commit badges, syntax highlighted project blocks, and dark mode.',
-    previewBg: 'from-[#0d1117] via-[#161b22] to-[#0d1117]',
-    accentColor: '#39d353',
-    tags: ['IDE Theme', 'Fira Code', 'Git Badges', 'Dark Carbon'],
-    palette: ['#39d353', '#58a6ff', '#f78166', '#0d1117'],
-    mockCard: 'bg-[#0d1117]/90 border-slate-700 text-slate-200 shadow-lg',
+    description: 'Engineered like a state-of-the-art IDE. VS Code tab bar, interactive in-browser zsh shell, git commit badges, and dark carbon mode.',
+    previewBg: 'from-[#0B0E14] via-[#161B22] to-[#0D1117]',
+    accentColor: '#22c55e',
+    tags: ['VS Code IDE', 'Interactive Shell', 'Git Timeline', 'Dark Carbon'],
+    palette: ['#22c55e', '#38bdf8', '#a371f7', '#0b0e14'],
+    mockCard: 'bg-[#161B22] border-[#30363D] text-slate-200 shadow-lg',
     mockHeroBadge: 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
   },
   {
     id: '3d_interactive',
-    name: '3D Interactive Space',
-    tagline: 'Cosmic Halos & Parallax Depth',
+    name: 'Cosmic Nebula 3D',
+    tagline: 'Spatial Depth & Interactive 3D Tilt',
     badge: 'Immersive Experience',
     badgeColor: 'bg-violet-950 text-violet-300 border-violet-500/40',
-    description: 'Deep cosmic space navy with floating orb glows, 3D perspective cards, stellar aura gradients, and interactive hover dynamics.',
-    previewBg: 'from-[#0b0f19] via-[#1a103c] to-[#0b0f19]',
+    description: 'Deep cosmic space navy with interactive 3D perspective tilt cards, warp-drive starfield, stellar nebula auras, and constellation skills.',
+    previewBg: 'from-[#05070e] via-[#0f1426] to-[#05070e]',
     accentColor: '#8b5cf6',
-    tags: ['Cosmic Halos', '3D Tilt', 'Parallax Orbs', 'Deep Space'],
-    palette: ['#8b5cf6', '#38bdf8', '#ec4899', '#0b0f19'],
-    mockCard: 'bg-[#121829]/90 border-violet-500/25 text-slate-100 shadow-[0_0_25px_rgba(139,92,246,0.2)]',
+    tags: ['3D Tilt Cards', 'Starfield Canvas', 'Spatial Depth', 'Cosmic Aura'],
+    palette: ['#8b5cf6', '#38bdf8', '#ec4899', '#05070e'],
+    mockCard: 'bg-[#0f1426]/90 border-violet-500/25 text-slate-100 shadow-[0_0_25px_rgba(139,92,246,0.2)]',
     mockHeroBadge: 'bg-violet-950/80 border-violet-400/40 text-violet-200'
   },
   {
     id: 'bento_grid_ux',
-    name: 'Bento Grid UX',
-    tagline: 'Apple-Inspired Modular Cards',
+    name: 'Apple Bento Pro',
+    tagline: 'Modern Apple-Inspired Modular OS',
     badge: 'Trendsetting 2026',
-    badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
-    description: 'Modern modular asymmetric bento grid boxes. Smooth rounded 3xl cards, subtle warm lighting, and organized visual hierarchy.',
-    previewBg: 'from-slate-50 via-slate-100 to-amber-50/30',
-    accentColor: '#f59e0b',
-    tags: ['Bento Grid', 'Asymmetric Tiles', 'Apple Design', 'Warm Minimal'],
-    palette: ['#f59e0b', '#3b82f6', '#10b981', '#1e293b'],
+    badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    description: 'Modern modular asymmetric bento grid boxes. Porcelain white rounded 3xl cards, live productivity clock, tech radar, and subtle warm lighting.',
+    previewBg: 'from-slate-50 via-slate-100 to-indigo-50/30',
+    accentColor: '#4f46e5',
+    tags: ['Bento Grid', 'Apple Modular OS', 'Live Widgets', 'Porcelain Cards'],
+    palette: ['#4f46e5', '#0ea5e9', '#10b981', '#1e293b'],
     mockCard: 'bg-white border-slate-200/90 text-slate-800 shadow-md',
-    mockHeroBadge: 'bg-amber-50 border-amber-200 text-amber-800'
+    mockHeroBadge: 'bg-indigo-50 border-indigo-200 text-indigo-800'
   }
 ];
 
@@ -120,7 +117,36 @@ export default function ThemeSelectionStep({
   goToStep
 }) {
   const [previewTheme, setPreviewTheme] = useState(null);
+  const previewScrollRef = useRef(null);
   const selectedThemeId = formData.theme_id || 'glassmorphic_pro';
+
+  // Prevent parent window scroll and isolate preview anchor clicks
+  useEffect(() => {
+    if (previewTheme) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      // Clean hash to avoid parent page jumping to #contact or similar
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      return () => {
+        document.body.style.overflow = prevOverflow || '';
+      };
+    }
+  }, [previewTheme]);
+
+  // Intercept in-preview anchor clicks to smoothly scroll inside preview container only
+  const handlePreviewContainerClick = (e) => {
+    const anchor = e.target.closest('a[href^="#"]');
+    if (anchor) {
+      e.preventDefault();
+      const targetId = anchor.getAttribute('href').slice(1);
+      const targetEl = previewScrollRef.current?.querySelector(`#${targetId}`);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
 
   const handleSelectTheme = (themeId) => {
     setFormData({
@@ -356,66 +382,80 @@ export default function ThemeSelectionStep({
         </button>
       </div>
 
-      {/* ── CLEAN FULL-WEBSITE LIVE PREVIEW MODAL ── */}
-      <AnimatePresence>
-        {previewTheme && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-100">
-            <div className="relative w-full max-w-5xl h-[90vh] bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col">
-              
-              {/* Browser Window Chrome (Top Header) */}
-              <div className="px-5 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-4 shrink-0">
+      {/* ── CLEAN FULL-WEBSITE LIVE PREVIEW MODAL & DEVICE SIMULATOR (PORTAL) ── */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {previewTheme && (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 animate-in fade-in duration-100">
+              <div className="relative w-[96vw] max-w-7xl h-[94vh] bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col">
                 
-                {/* Left: macOS dots + Current Theme Name + Vanity URL */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
-                    <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
-                    <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                {/* Browser Window Chrome (Top Header) */}
+                <div className="px-4 sm:px-6 py-3 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                  
+                  {/* Left: macOS dots + Current Theme Name + Vanity URL */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                      <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                      <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                    </div>
+                    <span className="text-xs font-black text-white shrink-0 hidden sm:inline">{previewTheme.name}</span>
+                    <div className="hidden lg:flex items-center gap-1.5 text-slate-400 font-mono text-[11px] truncate bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
+                      <Globe size={12} className="text-indigo-400 shrink-0" />
+                      <span className="truncate">careershala.tech/portfolio/{formData.username || 'developer'}</span>
+                    </div>
                   </div>
-                  <span className="text-xs font-black text-white shrink-0">{previewTheme.name}</span>
-                  <div className="hidden sm:flex items-center gap-1.5 text-slate-400 font-mono text-[11px] truncate bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">
-                    <Globe size={12} className="text-indigo-400 shrink-0" />
-                    <span className="truncate">careershala.tech/portfolio/{formData.username || 'developer'}</span>
+
+                  {/* Right: New Tab, Apply Theme & Close */}
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <a
+                      href={`/portfolio/${formData.username || 'developer'}?theme=${previewTheme.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hidden sm:flex px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl items-center gap-1.5 transition-colors border border-slate-700 shadow-xs"
+                      title="Open full portfolio in separate browser tab"
+                    >
+                      <ExternalLink size={13} /> Open in New Tab ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSelectTheme(previewTheme.id);
+                        setPreviewTheme(null);
+                      }}
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+                    >
+                      <Check size={14} strokeWidth={3} /> Apply Theme
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTheme(null)}
+                      className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
                   </div>
+
                 </div>
 
-                {/* Right: Apply Theme & Close */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleSelectTheme(previewTheme.id);
-                      setPreviewTheme(null);
-                    }}
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+                {/* Live Render Viewport */}
+                <div className="flex-1 min-h-0 bg-slate-950 flex justify-center p-2 sm:p-4 overflow-hidden relative">
+                  <div
+                    ref={previewScrollRef}
+                    onClick={handlePreviewContainerClick}
+                    className="w-full h-full transition-all duration-300 overflow-y-auto overscroll-contain custom-scrollbar bg-white rounded-xl shadow-2xl relative"
+                    style={{ isolation: 'isolate' }}
                   >
-                    <Check size={14} strokeWidth={3} /> Apply Theme
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTheme(null)}
-                    className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 cursor-pointer"
-                  >
-                    <X size={18} />
-                  </button>
+                    {renderThemePreview()}
+                  </div>
                 </div>
 
               </div>
-
-              {/* Live Render Viewport (Clean, full desktop view) */}
-              <div className="flex-1 min-h-0 bg-slate-950 flex justify-center p-2 sm:p-3 overflow-hidden">
-                <div
-                  className="w-full h-full transition-all duration-200 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-2xl relative max-w-full"
-                  style={{ isolation: 'isolate' }}
-                >
-                  {renderThemePreview()}
-                </div>
-              </div>
-
             </div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
     </div>
   );

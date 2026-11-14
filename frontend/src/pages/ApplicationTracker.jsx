@@ -55,8 +55,8 @@ const STAGE_CONFIG = {
   },
   'Interview': {
     label: 'Interview',
-    badgeClass: 'bg-purple-50 text-purple-800 border-purple-200',
-    dotClass: 'bg-purple-500',
+    badgeClass: 'bg-blue-50 text-blue-800 border-blue-200',
+    dotClass: 'bg-blue-600',
     icon: Sparkles,
     description: 'Interview rounds scheduled with the engineering team.',
   },
@@ -148,8 +148,8 @@ export default function ApplicationTracker() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
-                <Briefcase size={12} className="text-indigo-600" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
+                <Briefcase size={12} className="text-blue-600" />
                 Candidate Dashboard
               </span>
               <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -177,7 +177,7 @@ export default function ApplicationTracker() {
 
             <Link
               to="/jobs"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow transition cursor-pointer"
             >
               Explore More Jobs
               <ArrowRight size={15} />
@@ -196,29 +196,29 @@ export default function ApplicationTracker() {
             </p>
           </div>
 
-          <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/70">
-            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
+          <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider block">
               Under Review
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-amber-700 mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
               {stats.underReview}
             </p>
           </div>
 
-          <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/70">
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+          <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+            <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">
               Shortlisted
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-700 mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
               {stats.shortlisted}
             </p>
           </div>
 
-          <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-200/70">
-            <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider block">
+          <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">
               Interviews
             </span>
-            <p className="text-2xl sm:text-3xl font-black text-purple-700 mt-1">
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
               {stats.interview}
             </p>
           </div>
@@ -360,10 +360,10 @@ export default function ApplicationTracker() {
                           </span>
                           <button
                             onClick={() => setSelectedEeoApp(app)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:text-indigo-700 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-md transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:text-blue-700 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-md transition cursor-pointer"
                             title="Voluntary Equal Employment Opportunity Self-Identification"
                           >
-                            <ShieldCheck size={10} className="text-indigo-600" />
+                            <ShieldCheck size={10} className="text-blue-600" />
                             <span>EEO Survey</span>
                           </button>
                         </div>
@@ -371,7 +371,7 @@ export default function ApplicationTracker() {
                         {/* View Job Link */}
                         <Link
                           to={`/jobs`}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition"
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-xl transition"
                           title="View in Job Feed"
                         >
                           <ChevronRight size={18} />
@@ -385,7 +385,7 @@ export default function ApplicationTracker() {
           ) : (
             /* Empty State */
             <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm max-w-md mx-auto my-8">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mx-auto mb-4">
                 <Briefcase size={28} />
               </div>
               <h3 className="text-lg font-extrabold text-slate-900 mb-1">
@@ -396,7 +396,7 @@ export default function ApplicationTracker() {
               </p>
               <Link
                 to="/jobs"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-xs hover:shadow"
               >
                 Browse Open Jobs
                 <ArrowRight size={14} />

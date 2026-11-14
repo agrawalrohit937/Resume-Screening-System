@@ -537,10 +537,11 @@ export default function TicketDetail() {
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/30 p-5 sm:p-6 shadow-xs"
+              className="rounded-3xl border border-blue-100 bg-white p-5 sm:p-6 shadow-xs relative overflow-hidden"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex items-start gap-4">
+                <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
                   <Sparkles size={20} />
                 </div>
                 <div className="space-y-1.5">
@@ -552,7 +553,7 @@ export default function TicketDetail() {
                     You will receive instant notifications here and at <span className="font-bold text-slate-800">{ticket.email}</span> when an engineer responds.
                   </p>
                   <div className="pt-2 flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
                       <Clock size={12} strokeWidth={2.5} />
                       Target First Response: {slaResponseTime}
                     </span>
@@ -595,17 +596,17 @@ export default function TicketDetail() {
                     transition={{ delay: idx * 0.04 }}
                     className={`rounded-3xl border shadow-xs overflow-hidden ${
                       isSupport
-                        ? 'bg-gradient-to-b from-indigo-50/40 to-white border-indigo-200/90'
+                        ? 'bg-blue-50/20 border-blue-200/70'
                         : 'bg-white border-slate-200/90'
                     }`}
                   >
                     {/* Message Header */}
                     <div className={`px-5 sm:px-6 py-3.5 border-b flex items-center justify-between gap-3 ${
-                      isSupport ? 'bg-indigo-50/70 border-indigo-100' : 'bg-slate-50/60 border-slate-100'
+                      isSupport ? 'bg-blue-50/50 border-blue-100/70' : 'bg-slate-50/60 border-slate-100'
                     }`}>
                       <div className="flex items-center gap-3 min-w-0">
                         {isSupport ? (
-                          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                             <Bot size={15} />
                           </div>
                         ) : (
@@ -619,7 +620,7 @@ export default function TicketDetail() {
                               {msg.author_name || (isSupport ? 'CareerShala Support Specialist' : 'User')}
                             </p>
                             {isSupport ? (
-                              <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded-md flex items-center gap-1">
                                 <ShieldCheck size={10} />
                                 Staff
                               </span>
@@ -897,15 +898,16 @@ export default function TicketDetail() {
           </div>
 
           {/* Card B: SLA & Priority Support Guarantee */}
-          <div className="bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/40 rounded-3xl border border-indigo-100 p-5 shadow-xs space-y-3.5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-indigo-600" />
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-3.5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="relative z-10 flex items-center gap-2">
+              <ShieldCheck size={18} className="text-blue-600" />
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
                 SLA Guarantee
               </h3>
             </div>
 
-            <div className="space-y-2">
+            <div className="relative z-10 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-500">Service Plan</span>
                 <span className="font-black text-slate-900 uppercase">
@@ -914,7 +916,7 @@ export default function TicketDetail() {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-500">Response SLA</span>
-                <span className="font-black text-indigo-600">{slaResponseTime}</span>
+                <span className="font-black text-blue-600">{slaResponseTime}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-500">Support Queue</span>
@@ -925,7 +927,7 @@ export default function TicketDetail() {
               </div>
             </div>
 
-            <p className="text-[11px] font-medium text-slate-500 leading-relaxed pt-2 border-t border-indigo-100/80">
+            <p className="relative z-10 text-[11px] font-medium text-slate-500 leading-relaxed pt-2 border-t border-slate-100">
               {isEnterprise
                 ? 'Your request is prioritized with dedicated 24/7 senior technical escalation.'
                 : 'Need immediate response? Upgrade to Enterprise for guaranteed sub-30 minute SLA.'}

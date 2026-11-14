@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import { issueCertificate, resendCertificate, checkCertificateStatus } from '../services/certificateApi'
+import { completeInterviewSession } from '../services/interviewApi'
 
 // ─── Color Helpers ───────────────────────────────────────────────────────────
 const DIFF_COLOR = {
@@ -53,16 +55,16 @@ function MCQCard({ question, questionIndex, totalQuestions, onNext, isLast }) {
     const optionCls = (opt) => {
         if (!submitted)
             return selected === opt
-                ? 'border-[#2E9BDA] bg-[#2E9BDA]/10 text-slate-900 font-semibold shadow-sm ring-2 ring-[#2E9BDA]/20'
-                : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#2E9BDA]/50 hover:bg-slate-50/80'
-        if (opt === question.correctAnswer) return 'border-emerald-500 bg-emerald-50 text-emerald-900 font-semibold shadow-sm'
+                ? 'border-blue-600 bg-blue-50/60 text-slate-900 font-semibold shadow-xs ring-2 ring-blue-500/20'
+                : 'border-slate-200/90 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50/80'
+        if (opt === question.correctAnswer) return 'border-emerald-500 bg-emerald-50 text-emerald-900 font-semibold shadow-xs'
         if (opt === selected) return 'border-rose-400 bg-rose-50 text-rose-800 opacity-90'
         return 'border-slate-200 bg-slate-50/60 text-slate-400 opacity-50'
     }
 
     const optionIcon = (opt) => {
         if (!submitted) return selected === opt
-            ? <span className="w-5 h-5 rounded-full bg-[#2E9BDA] flex items-center justify-center flex-shrink-0"><span className="w-2 h-2 rounded-full bg-white" /></span>
+            ? <span className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0"><span className="w-2 h-2 rounded-full bg-white" /></span>
             : <span className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0" />
         if (opt === question.correctAnswer)
             return <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 text-white"><Check className="h-3 w-3" strokeWidth={3} /></span>
@@ -79,10 +81,10 @@ function MCQCard({ question, questionIndex, totalQuestions, onNext, isLast }) {
             <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs font-semibold">
                     <span className="text-slate-500 uppercase tracking-wider">Question {questionIndex + 1} of {totalQuestions}</span>
-                    <span className="text-[#2E9BDA] font-bold">{Math.round(((questionIndex + 1) / totalQuestions) * 100)}% Complete</span>
+                    <span className="text-blue-600 font-bold">{Math.round(((questionIndex + 1) / totalQuestions) * 100)}% Complete</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                    <motion.div className="h-full rounded-full bg-gradient-to-r from-[#2E9BDA] to-indigo-600"
+                    <motion.div className="h-full rounded-full bg-blue-600"
                         initial={{ width: `${(questionIndex / totalQuestions) * 100}%` }}
                         animate={{ width: `${((questionIndex + 1) / totalQuestions) * 100}%` }}
                         transition={{ duration: 0.5, ease: 'easeOut' }} />
@@ -90,7 +92,7 @@ function MCQCard({ question, questionIndex, totalQuestions, onNext, isLast }) {
             </div>
 
             {/* Question Text Card */}
-            <div className="rounded-2xl bg-gradient-to-br from-blue-50/90 via-indigo-50/60 to-white p-5 sm:p-6 text-slate-900 border border-blue-100 shadow-sm">
+            <div className="rounded-2xl bg-white p-5 sm:p-6 text-slate-900 border border-slate-200/90 shadow-xs">
                 <p className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">{question.question}</p>
             </div>
 
@@ -135,7 +137,7 @@ function MCQCard({ question, questionIndex, totalQuestions, onNext, isLast }) {
             {!submitted ? (
                 <button onClick={() => { if (!selected) { toast.error('Please select an option first'); return } setSubmitted(true) }}
                     disabled={!selected}
-                    className="w-full rounded-xl bg-[#2E9BDA] hover:bg-[#2585bd] py-3.5 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
+                    className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 py-3.5 text-sm font-bold text-white shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed">
                     Submit Answer
                 </button>
             ) : (
@@ -352,13 +354,16 @@ export function QuizSummary({ score, total, topic, difficulty, onRetry }) {
             </AnimatePresence>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3 w-full pt-2">
-                <button onClick={onRetry} className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full pt-2">
+                <button onClick={onRetry} className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">
                     <RotateCcw className="h-4 w-4" /> Try Again
                 </button>
-                <button onClick={onRetry} className="flex-1 py-3 rounded-xl bg-slate-900 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 transition-all cursor-pointer">
+                <button onClick={onRetry} className="w-full sm:flex-1 py-3 rounded-xl bg-slate-900 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 transition-all cursor-pointer">
                     New Topic
                 </button>
+                <Link to="/gamification" className="w-full sm:flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-700 hover:bg-blue-100 text-xs sm:text-sm font-bold transition-all cursor-pointer">
+                    <Trophy className="h-4 w-4 text-blue-600" /> Vault Badges
+                </Link>
             </div>
         </motion.div>
     )
@@ -412,10 +417,39 @@ export default function Interview() {
         finally { setLoading(false) }
     }
 
+    const recordGamificationProgress = async (finalScore, totalQ) => {
+        try {
+            const ratio = totalQ > 0 ? Number((finalScore / totalQ).toFixed(2)) : 0
+            const res = await completeInterviewSession({
+                session_id: `mock_${Date.now()}`,
+                interview_score: ratio,
+                questions_answered: totalQ
+            })
+            const gami = res?.data?.gamification
+            if (gami?.points_awarded) {
+                toast.success(`+${gami.points_awarded} XP Earned! Streak: ${gami.streak || 1} days 🔥`, { duration: 4000 })
+            }
+            if (gami?.new_badges?.length > 0) {
+                gami.new_badges.forEach(b => {
+                    toast.success(`🏆 Achievement Unlocked: ${b.name}! (+${b.points} XP)`, { duration: 5500 })
+                })
+            }
+        } catch (err) {
+            console.warn('Non-critical gamification sync failed:', err)
+        }
+    }
+
     const handleNext = (wasCorrect) => {
         const ns = wasCorrect ? score + 1 : score
-        if (currentIdx >= questions.length - 1) { setScore(ns); setFinished(true) }
-        else { setScore(ns); setCurrentIdx(i => i + 1) }
+        if (currentIdx >= questions.length - 1) { 
+            setScore(ns)
+            setFinished(true)
+            recordGamificationProgress(ns, questions.length)
+        }
+        else { 
+            setScore(ns)
+            setCurrentIdx(i => i + 1) 
+        }
     }
 
     const reset = () => { setQuestions(null); setCurrentIdx(0); setScore(0); setFinished(false) }
@@ -428,19 +462,18 @@ export default function Interview() {
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-white p-5 sm:p-7 shadow-sm border border-blue-100/80"
+                    className="relative overflow-hidden rounded-3xl bg-white p-5 sm:p-7 shadow-xs border border-slate-200/90"
                 >
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#2E9BDA]/10 blur-3xl" />
-                    <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl" />
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-blue-500/5 blur-3xl" />
 
                     <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-5">
                         <div className="flex items-start sm:items-center gap-4">
-                            <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#2E9BDA] to-indigo-600 text-white shadow-lg shadow-blue-500/25 shrink-0">
+                            <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xs shrink-0">
                                 <Brain className="h-7 w-7" />
                             </div>
                             <div>
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2E9BDA]/10 text-[#2E9BDA] border border-[#2E9BDA]/20 text-xs font-bold tracking-wide uppercase">
-                                    <Sparkles className="w-3.5 h-3.5 text-[#2E9BDA]" /> AI Mock Interview Studio
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 text-xs font-bold tracking-wide uppercase">
+                                    <Sparkles className="w-3.5 h-3.5 text-blue-600" /> AI Mock Interview Studio
                                 </div>
                                 <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 mt-1.5">
                                     Adaptive Skill Assessment

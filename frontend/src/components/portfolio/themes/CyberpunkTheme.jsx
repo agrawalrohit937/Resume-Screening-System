@@ -17,8 +17,15 @@ import {
   Activity,
   Radio,
   Lock,
-  Code
+  Code,
+  Clock,
+  Check,
+  Copy,
+  Maximize2,
+  Mail,
+  ShieldAlert
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CyberpunkTheme({
   profile,
@@ -36,6 +43,9 @@ export default function CyberpunkTheme({
   const [glitchActive, setGlitchActive] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [activeProjectModal, setActiveProjectModal] = useState(null);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [currentTime, setCurrentTime] = useState('');
 
   const typingWords = (profile.typing_roles && profile.typing_roles.length > 0)
     ? profile.typing_roles
@@ -65,9 +75,28 @@ export default function CyberpunkTheme({
     const interval = setInterval(() => {
       setGlitchActive(true);
       setTimeout(() => setGlitchActive(false), 200);
-    }, 6000);
+    }, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  // Clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleCopyEmail = () => {
+    if (profile.email) {
+      navigator.clipboard.writeText(profile.email);
+      setCopiedEmail(true);
+      setTimeout(() => setCopiedEmail(false), 2200);
+    }
+  };
 
   const allProjects = profile.projects || [];
   const projectCategories = ['ALL', ...Array.from(new Set(allProjects.map(p => (p.category || 'SYSTEM').toUpperCase()).filter(Boolean)))];
@@ -77,40 +106,41 @@ export default function CyberpunkTheme({
     : allProjects.filter(p => (p.category || '').toUpperCase() === activeTab);
 
   return (
-    <div className="min-h-screen bg-[#03060c] text-cyan-400 font-mono relative selection:bg-cyan-500 selection:text-black overflow-x-hidden">
+    <div className="min-h-screen bg-[#05070D] text-slate-200 font-mono relative selection:bg-cyan-400 selection:text-black antialiased">
       
+      {/* ── Holographic Grid Matrix Background ── */}
       <div 
-        className="fixed inset-0 pointer-events-none opacity-25 z-0"
+        className="absolute inset-0 pointer-events-none opacity-20 z-0"
         style={{
           backgroundImage: 'linear-gradient(to right, #00f0ff 1px, transparent 1px), linear-gradient(to bottom, #00f0ff 1px, transparent 1px)',
-          backgroundSize: '48px 48px'
+          backgroundSize: '40px 40px'
         }}
       />
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(3,6,12,0.85)_100%)] z-1" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(5,7,13,0.9)_100%)] z-1" />
 
-      <header className="sticky top-0 left-0 w-full z-40 bg-[#03060c]/90 backdrop-blur-xl border-b border-cyan-500/40 shadow-[0_0_20px_rgba(0,240,255,0.15)]">
+      {/* ── TOP TACTICAL HUD HEADER ── */}
+      <header className="sticky top-0 left-0 w-full z-40 bg-[#05070D]/90 backdrop-blur-xl border-b border-cyan-500/30 shadow-[0_0_20px_rgba(0,240,255,0.12)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 bg-cyan-400 animate-ping rounded-full inline-block" />
-            <span className="text-white font-black tracking-widest text-sm uppercase flex items-center gap-1.5">
-              <span className="text-cyan-400">[NODE]</span> {profile.full_name || 'NEURAL_UNIT'}
+            <span className="text-white font-black tracking-widest text-sm uppercase flex items-center gap-2">
+              <span className="text-cyan-400 font-bold">[SYS_NODE]</span> {profile.full_name || 'NEURAL_UNIT'}
             </span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-[11px] font-black tracking-widest text-cyan-300">
-            <a href="#about" className="hover:text-yellow-400 hover:shadow-[0_0_10px_rgba(255,230,0,0.5)] transition-all">01_ARCHIVE</a>
-            <a href="#skills" className="hover:text-yellow-400 hover:shadow-[0_0_10px_rgba(255,230,0,0.5)] transition-all">02_MATRIX</a>
-            <a href="#projects" className="hover:text-yellow-400 hover:shadow-[0_0_10px_rgba(255,230,0,0.5)] transition-all">03_PROJECTS</a>
-            <a href="#experience" className="hover:text-yellow-400 hover:shadow-[0_0_10px_rgba(255,230,0,0.5)] transition-all">04_TIMELINE</a>
-            <a href="#education" className="hover:text-yellow-400 hover:shadow-[0_0_10px_rgba(255,230,0,0.5)] transition-all">05_EDUCATION</a>
-            <a href="#contact" className="hover:text-yellow-400 hover:shadow-[0_0_10px_rgba(255,230,0,0.5)] transition-all">06_DISPATCH</a>
+            <a href="#about" className="hover:text-yellow-400 transition-colors">01_ARCHIVE</a>
+            <a href="#skills" className="hover:text-yellow-400 transition-colors">02_MATRIX</a>
+            <a href="#projects" className="hover:text-yellow-400 transition-colors">03_PROJECTS</a>
+            <a href="#experience" className="hover:text-yellow-400 transition-colors">04_TIMELINE</a>
+            <a href="#contact" className="hover:text-yellow-400 transition-colors">05_DISPATCH</a>
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
             <button
               type="button"
               onClick={handleResumeDownload}
-              className="px-4 py-2 bg-cyan-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all cursor-pointer"
+              className="px-4 py-2 bg-cyan-400 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all cursor-pointer"
             >
               <Download size={13} /> DUMP_RESUME.DAT
             </button>
@@ -119,20 +149,20 @@ export default function CyberpunkTheme({
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-cyan-400"
+            className="md:hidden p-2 text-cyan-400 cursor-pointer"
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden bg-[#03060c] border-b border-cyan-500/40 px-6 py-4 space-y-3">
+          <div className="md:hidden bg-[#05070D] border-b border-cyan-500/40 px-6 py-4 space-y-3">
             {['About', 'Skills', 'Projects', 'Experience', 'Education', 'Contact'].map((item, idx) => (
-              <a 
+              <a
                 key={item}
                 href={`#${item.toLowerCase()}`}
                 onClick={() => setMobileMenuOpen(false)}
-                className="block text-xs font-black uppercase tracking-widest text-cyan-300 hover:text-yellow-400"
+                className="block text-xs font-bold text-cyan-300 hover:text-yellow-400 uppercase tracking-widest"
               >
                 0{idx + 1}_{item.toUpperCase()}
               </a>
@@ -141,145 +171,141 @@ export default function CyberpunkTheme({
         )}
       </header>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-16 pb-32 space-y-36">
+      {/* ── MAIN HUD INTERFACE ── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 sm:pt-10 pb-32 space-y-16 sm:space-y-24 md:space-y-32 relative z-10">
         
-        <section className="min-h-[78vh] pt-10 sm:pt-20 pb-10 flex flex-col-reverse lg:flex-row items-center justify-between gap-16 border-b border-cyan-500/20 pb-20">
-          <div className="space-y-6 max-w-2xl text-center lg:text-left">
-            
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-500/50 text-[11px] text-cyan-300 font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(0,240,255,0.2)]">
-              <Activity size={13} className="text-yellow-400 animate-pulse" />
-              STATUS // ACTIVE_DEPLOYED • {profile.hero_badge || 'CLEARANCE_ALPHA'}
+        {/* ── SECTION 1: HERO HUD TELEMETRY ── */}
+        <section id="about" className="min-h-[70vh] flex flex-col justify-center border-b border-cyan-500/20 pb-14 sm:pb-20">
+          
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-6 text-xs text-cyan-400 border-b border-cyan-500/20 mb-6 sm:mb-8">
+            <div className="flex items-center gap-2">
+              <Activity size={14} className="text-yellow-400 animate-pulse" />
+              <span>CORE_DIAGNOSTICS: OPTIMAL</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="hidden sm:inline">SECURITY_CLEARANCE: LEVEL_4</span>
             </div>
 
-            <div className="space-y-2">
-              <h1 className={`text-5xl sm:text-7xl lg:text-8xl font-black tracking-[-0.06em] leading-none text-white uppercase ${glitchActive ? 'translate-x-1 text-yellow-400' : ''} transition-all`}>
+            <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs">
+              <Clock size={13} className="text-cyan-400" />
+              <span>LOCAL_TIME: {currentTime || '07:30:00 UTC'}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center">
+            
+            <div className="lg:col-span-8 space-y-5 sm:space-y-6">
+              <div className="inline-block px-3 py-1 bg-cyan-950/80 border border-cyan-400 text-cyan-300 text-[11px] sm:text-xs font-bold uppercase tracking-widest shadow-[0_0_10px_rgba(0,240,255,0.2)]">
+                OPERATIVE: {profile.hero_badge || 'ACTIVE_CANDIDATE'}
+              </div>
+
+              <h1 className={`text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tighter uppercase leading-tight break-words ${glitchActive ? 'skew-x-2 text-yellow-300' : ''}`}>
                 {profile.full_name}
               </h1>
-              <div className="text-lg sm:text-xl font-bold text-yellow-400 flex items-center justify-center lg:justify-start gap-2">
-                <span className="text-cyan-600">ROLE_SPEC //</span>
-                <span className="bg-black px-2 py-0.5 border border-yellow-400/40 text-yellow-300">{typedText}_</span>
+
+              <div className="text-base sm:text-xl font-bold text-cyan-300 flex items-center gap-2">
+                <span className="text-yellow-400">❯</span>
+                <span className="break-words">{typedText}</span>
+                <span className="w-2.5 h-5 bg-cyan-400 inline-block animate-pulse shrink-0" />
+              </div>
+
+              <p className="text-xs sm:text-base text-slate-300 leading-relaxed max-w-2xl font-sans">
+                {profile.bio || profile.headline || 'High-performance engineering operative specializing in fault-tolerant infrastructure and neural network architectures.'}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-2 sm:pt-4">
+                <a
+                  href="#contact"
+                  className="w-full sm:w-auto px-6 sm:px-8 py-3.5 bg-cyan-400 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  TRANSMIT_DISPATCH()
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopyEmail}
+                  className="w-full sm:w-auto px-5 sm:px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-cyan-500/40 text-cyan-300 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  {copiedEmail ? <Check size={14} className="text-yellow-400" /> : <Copy size={14} />}
+                  <span>{copiedEmail ? 'COPIED' : 'COPY_COMM_ADDR'}</span>
+                </button>
               </div>
             </div>
 
-            <p className="text-xs sm:text-sm text-cyan-200/80 leading-relaxed font-mono max-w-xl">
-              {profile.headline || 'OPERATING DISTRIBUTED INTELLIGENCE PLATFORMS & HIGH-PERFORMANCE PRODUCTION APPARATUS.'}
-            </p>
+            {/* Tactical Portrait Frame */}
+            <div className="lg:col-span-4 flex justify-center lg:justify-end">
+              <div className="relative p-2 border-2 border-cyan-500/40 bg-[#090D17] shadow-[0_0_30px_rgba(0,240,255,0.2)]">
+                <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-yellow-400" />
+                <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-yellow-400" />
+                <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-yellow-400" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-yellow-400" />
 
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
-              <a 
-                href="#projects" 
-                className="px-6 py-3 bg-cyan-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all cursor-pointer"
-              >
-                EXECUTE_PROJECTS <Zap size={14} />
-              </a>
-              <a 
-                href="#contact" 
-                className="px-6 py-3 bg-black hover:bg-cyan-950/80 border border-cyan-500 text-cyan-300 text-xs font-black uppercase tracking-widest transition-all"
-              >
-                TRANSMIT_SIGNAL
-              </a>
-            </div>
-
-            <div className="flex items-center justify-center lg:justify-start gap-3 pt-3">
-              {profile.social_links?.github && (
-                <a href={profile.social_links.github} target="_blank" rel="noreferrer" className="p-2.5 bg-black border border-cyan-500/40 text-cyan-400 hover:text-yellow-400 hover:border-yellow-400 transition-all">
-                  <Github size={16} />
-                </a>
-              )}
-              {profile.social_links?.linkedin && (
-                <a href={profile.social_links.linkedin} target="_blank" rel="noreferrer" className="p-2.5 bg-black border border-cyan-500/40 text-cyan-400 hover:text-yellow-400 hover:border-yellow-400 transition-all">
-                  <Linkedin size={16} />
-                </a>
-              )}
-              {profile.location && (
-                <div className="flex items-center gap-1.5 text-xs text-cyan-400 bg-black px-3 py-2 border border-cyan-500/40">
-                  <MapPin size={13} className="text-yellow-400" />
-                  <span>GEO_LOC // {profile.location}</span>
+                <div className="w-64 h-80 overflow-hidden bg-slate-900 flex items-center justify-center">
+                  {profile.avatar_url && !avatarFailed ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name}
+                      onError={() => setAvatarFailed(true)}
+                      className="w-full h-full object-cover grayscale contrast-125 hover:grayscale-0 transition-all duration-500"
+                    />
+                  ) : (
+                    <span className="text-6xl font-black text-cyan-400 font-mono">
+                      {(profile.full_name || 'C')[0]}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
 
-          <div className="relative group shrink-0">
-            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-yellow-400 opacity-40 blur-md group-hover:opacity-100 transition-opacity" />
-            <div className="relative w-64 h-64 sm:w-72 sm:h-72 bg-black border-2 border-cyan-400 p-2 shadow-[0_0_25px_rgba(0,240,255,0.3)] overflow-hidden">
-              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-yellow-400 z-10" />
-              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-yellow-400 z-10" />
-              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-yellow-400 z-10" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-yellow-400 z-10" />
-
-              {profile.avatar_url && !avatarFailed ? (
-                <img 
-                  src={profile.avatar_url} 
-                  alt={profile.full_name} 
-                  onError={() => setAvatarFailed(true)}
-                  className="w-full h-full object-cover grayscale contrast-125 hover:grayscale-0 transition-all duration-500"
-                />
-              ) : (
-                <div className="w-full h-full bg-cyan-950/40 flex items-center justify-center text-cyan-400 text-6xl font-black">
-                  {(profile.full_name || 'C')[0]}
+                <div className="text-[10px] text-cyan-400 uppercase pt-2 flex items-center justify-between font-bold">
+                  <span>SECTOR: {profile.location || 'GLOBAL'}</span>
+                  <span className="text-emerald-400">STATUS: READY</span>
                 </div>
-              )}
-              <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 text-[9px] text-cyan-400 border border-cyan-500/40 font-mono">
-                BIO_SCAN // VERIFIED
               </div>
             </div>
+
           </div>
+
+          {/* Metric Telemetry Strip */}
+          {profile.hero_metrics && profile.hero_metrics.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-12 mt-12 border-t border-cyan-500/20">
+              {profile.hero_metrics.map((m, idx) => (
+                <div key={idx} className="p-4 bg-[#090D17] border border-cyan-500/30">
+                  <div className="text-2xl sm:text-3xl font-black text-cyan-300 font-mono">
+                    {m.value}
+                  </div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-widest pt-1">
+                    {m.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
         </section>
 
-        {profile.hero_metrics && profile.hero_metrics.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {profile.hero_metrics.map((m, idx) => (
-              <div key={idx} className="p-5 bg-black border border-cyan-500/40 text-center space-y-1 shadow-[0_0_15px_rgba(0,240,255,0.08)]">
-                <div className="text-3xl font-black text-yellow-400">{m.value}</div>
-                <div className="text-[10px] font-bold text-cyan-300 uppercase tracking-widest">{m.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {profile.bio && (
-          <section id="about" className="space-y-4">
-            <div className="border border-cyan-500/40 bg-black/80 p-6 sm:p-8 space-y-3 relative shadow-[0_0_20px_rgba(0,240,255,0.1)]">
-              <div className="flex items-center justify-between border-b border-cyan-500/30 pb-2">
-                <span className="text-xs font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Terminal size={14} /> 01 // ARCHIVAL_SUMMARY
-                </span>
-                <span className="text-[10px] text-cyan-600">ENCRYPTION: AES-256</span>
-              </div>
-              <p className="text-xs sm:text-sm text-cyan-200/90 leading-relaxed font-mono whitespace-pre-line">
-                {profile.bio}
-              </p>
-            </div>
-          </section>
-        )}
-
+        {/* ── SECTION 2: MATRIX SKILLS ── */}
         <section id="skills" className="space-y-8">
-          <div className="flex items-center justify-between border-b border-cyan-500/40 pb-3">
-            <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
-              <Cpu size={18} className="text-cyan-400" /> 02 // NEURAL_MATRIX
-            </h2>
-            <span className="text-xs text-yellow-400 font-bold">SYNAPSE_LOAD: 100%</span>
+          <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4">
+            <div>
+              <span className="text-xs text-yellow-400 uppercase font-bold">// 02_CYBER_MATRIX</span>
+              <h2 className="text-2xl sm:text-3xl font-black text-white uppercase">Operational Skills Matrix</h2>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Object.entries(profile.skills || {}).map(([cat, list], idx) => {
-              const skillArray = Array.isArray(list) ? list : [];
+              const skillList = Array.isArray(list) ? list : [];
               return (
-                <div key={idx} className="bg-black border border-cyan-500/40 p-6 space-y-4 shadow-[0_0_15px_rgba(0,240,255,0.06)] hover:border-yellow-400 transition-colors group">
-                  <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-cyan-300 group-hover:text-yellow-400 transition-colors">
-                      {cat}
-                    </h3>
-                    <span className="text-[10px] font-bold text-yellow-400 bg-yellow-400/10 px-2 py-0.5 border border-yellow-400/30">
-                      [{skillArray.length}]
-                    </span>
+                <div key={idx} className="p-6 bg-[#090D17] border border-cyan-500/30 hover:border-cyan-400 transition-colors space-y-4">
+                  <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
+                    <span className="text-xs font-bold uppercase text-yellow-400">{cat}</span>
+                    <span className="text-[11px] text-cyan-400 font-bold">[{skillList.length}]</span>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {skillArray.map((s, sIdx) => (
-                      <span key={sIdx} className="px-2.5 py-1 bg-cyan-950/40 border border-cyan-500/30 text-cyan-200 text-xs hover:border-yellow-400 hover:text-yellow-300 transition-all cursor-default">
-                        {s}
+                    {skillList.map((skill, sIdx) => (
+                      <span
+                        key={sIdx}
+                        className="px-3 py-1 bg-cyan-950/60 border border-cyan-500/40 text-xs text-cyan-300 hover:bg-cyan-400 hover:text-black transition-colors"
+                      >
+                        {skill}
                       </span>
                     ))}
                   </div>
@@ -289,11 +315,13 @@ export default function CyberpunkTheme({
           </div>
         </section>
 
+        {/* ── SECTION 3: CLASSIFIED PROJECTS ── */}
         <section id="projects" className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-cyan-500/40 pb-3">
-            <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
-              <Zap size={18} className="text-yellow-400" /> 03 // DEPLOYED_SYSTEMS ({filteredProjects.length})
-            </h2>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-cyan-500/20 pb-4">
+            <div>
+              <span className="text-xs text-yellow-400 uppercase font-bold">// 03_CLASSIFIED_FILES</span>
+              <h2 className="text-2xl sm:text-4xl font-black text-white uppercase">Engineered Operations</h2>
+            </div>
 
             <div className="flex flex-wrap gap-2">
               {projectCategories.map((c) => (
@@ -301,10 +329,10 @@ export default function CyberpunkTheme({
                   key={c}
                   type="button"
                   onClick={() => setActiveTab(c)}
-                  className={`px-3 py-1 text-xs font-bold uppercase transition-all cursor-pointer ${
+                  className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     activeTab === c
-                      ? 'bg-cyan-500 text-black shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-                      : 'bg-black text-cyan-400 border border-cyan-500/40 hover:border-yellow-400 hover:text-yellow-400'
+                      ? 'bg-cyan-400 text-black'
+                      : 'bg-[#090D17] text-cyan-400 border border-cyan-500/30 hover:border-cyan-400'
                   }`}
                 >
                   {c}
@@ -313,172 +341,272 @@ export default function CyberpunkTheme({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {filteredProjects.map((proj, idx) => (
-              <div key={idx} className="bg-black border-2 border-cyan-500/40 flex flex-col justify-between overflow-hidden shadow-[0_0_20px_rgba(0,240,255,0.1)] hover:border-yellow-400 transition-colors group">
-                
-                <div className="px-4 py-2 bg-cyan-950/60 border-b border-cyan-500/40 flex items-center justify-between text-[10px] text-cyan-300">
-                  <span className="font-bold uppercase tracking-wider text-yellow-400">{proj.category || 'PROJECT'}</span>
-                  <span>BUILD_TIMESTAMP // {proj.year || '2026'}</span>
+              <div 
+                key={idx}
+                className="bg-[#090D17] border border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_25px_rgba(0,240,255,0.15)] transition-all space-y-0"
+              >
+                {/* HUD Header */}
+                <div className="px-5 py-3 bg-[#05070D] border-b border-cyan-500/30 flex items-center justify-between text-xs">
+                  <span className="text-yellow-400 font-bold uppercase">FILE: {proj.title}</span>
+                  <span className="text-slate-400">{proj.year || '2026'}</span>
                 </div>
 
                 {proj.image_url && (
-                  <div className="relative h-48 overflow-hidden bg-black border-b border-cyan-500/40">
+                  <div className="h-60 overflow-hidden bg-black relative group/img border-b border-cyan-500/20">
                     <img 
                       src={proj.image_url} 
                       alt={proj.title} 
-                      className="w-full h-full object-cover grayscale contrast-125 group-hover:grayscale-0 transition-all duration-500"
-                      loading="lazy"
+                      className="w-full h-full object-cover grayscale contrast-125 group-hover/img:grayscale-0 transition-all duration-500"
                     />
+                    <button
+                      onClick={() => setActiveProjectModal(proj)}
+                      className="absolute bottom-3 right-3 px-3 py-1 bg-black/90 text-cyan-300 border border-cyan-400 text-xs flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer"
+                    >
+                      <Maximize2 size={12} /> DECRYPT_DETAILS
+                    </button>
                   </div>
                 )}
 
-                <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-black text-white group-hover:text-yellow-400 transition-colors">{proj.title}</h3>
-                    <p className="text-xs text-cyan-200/80 leading-relaxed font-mono">{proj.description}</p>
-                  </div>
+                <div className="p-6 space-y-4">
+                  <h3 className="text-xl font-black text-white">{proj.title}</h3>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans">{proj.description}</p>
 
                   {proj.highlights && proj.highlights.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      {proj.highlights.map((hl, hIdx) => (
-                        <div key={hIdx} className="p-2 bg-cyan-950/30 border border-cyan-500/30">
-                          <div className="text-xs font-black text-yellow-400">{hl.value}</div>
-                          <div className="text-[9px] font-bold text-cyan-400 uppercase">{hl.label}</div>
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      {proj.highlights.map((h, i) => (
+                        <div key={i} className="p-2.5 bg-[#05070D] border border-cyan-500/20">
+                          <div className="text-sm font-bold text-cyan-300">{h.value}</div>
+                          <div className="text-[10px] text-slate-400 uppercase">{h.label}</div>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {(proj.technologies || []).map((t, tIdx) => (
-                      <span key={tIdx} className="px-2 py-0.5 bg-black border border-cyan-500/40 text-[10px] text-cyan-300">
+                  <div className="flex flex-wrap gap-1.5 pt-2">
+                    {(proj.technologies || []).map((t, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-[#05070D] border border-cyan-500/30 text-cyan-300 text-xs">
                         {t}
                       </span>
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-3 pt-4 border-t border-cyan-500/30">
+                  <div className="flex items-center gap-3 pt-4 border-t border-cyan-500/20">
                     {proj.live_url && (
-                      <a href={proj.live_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-cyan-500 hover:bg-yellow-400 text-black text-xs font-black uppercase flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,240,255,0.4)]">
-                        <ExternalLink size={12} /> LIVE_SYSTEM
+                      <a
+                        href={proj.live_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 py-2.5 bg-cyan-400 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wider text-center flex items-center justify-center gap-1.5"
+                      >
+                        <ExternalLink size={13} /> LAUNCH_SYS
                       </a>
                     )}
                     {proj.github_url && (
-                      <a href={proj.github_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-black hover:bg-cyan-950/80 border border-cyan-500 text-cyan-300 text-xs font-black uppercase flex items-center gap-1.5">
-                        <Github size={12} /> REPOSITORY
+                      <a
+                        href={proj.github_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="py-2.5 px-4 bg-[#05070D] hover:bg-cyan-950 text-cyan-300 border border-cyan-500/30 text-xs font-bold uppercase flex items-center gap-1.5"
+                      >
+                        <Github size={13} /> REPO
                       </a>
                     )}
+                    <button
+                      onClick={() => setActiveProjectModal(proj)}
+                      className="p-2 text-cyan-400 hover:text-yellow-400 cursor-pointer ml-auto"
+                    >
+                      <Maximize2 size={16} />
+                    </button>
                   </div>
                 </div>
+
               </div>
             ))}
           </div>
         </section>
 
+        {/* ── SECTION 4: MISSION TIMELINE ── */}
         {profile.experience && profile.experience.length > 0 && (
-          <section id="experience" className="space-y-8">
-            <div className="flex items-center justify-between border-b border-cyan-500/40 pb-3">
-              <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
-                <Briefcase size={18} className="text-cyan-400" /> 04 // MISSION_TIMELINE
-              </h2>
+          <section id="experience" className="space-y-6">
+            <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4">
+              <div>
+                <span className="text-xs text-yellow-400 uppercase font-bold">// 04_MISSION_LOGS</span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white uppercase">Operational Trajectory</h2>
+              </div>
             </div>
 
             <div className="space-y-4">
               {profile.experience.map((exp, idx) => (
-                <div key={idx} className="p-6 bg-black border border-cyan-500/40 space-y-3 hover:border-yellow-400 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-cyan-500/20 pb-2">
-                    <h3 className="text-base font-black text-white uppercase">{exp.role}</h3>
-                    <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-0.5 border border-yellow-400/30">
-                      {exp.start_date || 'INIT'} – {exp.end_date || 'ACTIVE'}
+                <div key={idx} className="p-6 bg-[#090D17] border border-cyan-500/30 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-cyan-500/20 pb-3">
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Briefcase size={16} className="text-cyan-400" />
+                      {exp.role} // <span className="text-yellow-400">{exp.company}</span>
+                    </h3>
+                    <span className="text-xs text-slate-400">
+                      {exp.start_date || 'PAST'} – {exp.end_date || 'PRESENT'}
                     </span>
                   </div>
-                  <div className="text-xs font-bold text-cyan-400">ORG // {exp.company} {exp.location ? `• [${exp.location}]` : ''}</div>
-                  <p className="text-xs text-cyan-200/80 leading-relaxed whitespace-pre-line">{exp.description}</p>
+                  <p className="text-xs text-slate-300 font-sans leading-relaxed whitespace-pre-line">
+                    {exp.description}
+                  </p>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {profile.education && profile.education.length > 0 && (
-          <section id="education" className="space-y-8">
-            <div className="flex items-center justify-between border-b border-cyan-500/40 pb-3">
-              <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
-                <GraduationCap size={18} className="text-yellow-400" /> 05 // ACADEMIC_CREDENTIALS
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {profile.education.map((edu, idx) => (
-                <div key={idx} className="p-6 bg-black border border-cyan-500/40 space-y-2 hover:border-yellow-400 transition-colors">
-                  <div className="flex justify-between items-start text-xs text-yellow-400">
-                    <span className="uppercase">INSTITUTE_RECORD</span>
-                    <span>{edu.graduation_year}</span>
-                  </div>
-                  <h3 className="text-base font-black text-white uppercase">{edu.degree}</h3>
-                  <div className="text-xs text-cyan-400">{edu.institution}</div>
-                  {edu.grade && (
-                    <div className="text-xs text-yellow-300 font-bold pt-1">SCORE_GRADE // {edu.grade}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section id="contact" className="space-y-8 max-w-xl mx-auto text-center">
+        {/* ── SECTION 5: DISPATCH TRANSMISSION ── */}
+        <section id="contact" className="max-w-xl mx-auto space-y-6 text-center pt-8">
           <div className="space-y-2">
-            <span className="text-xs font-black uppercase tracking-widest text-yellow-400">06 // INBOUND_COMMUNICATION</span>
-            <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-widest">DISPATCH PACKET</h2>
+            <span className="text-xs text-yellow-400 uppercase font-bold">// 05_UPLINK</span>
+            <h2 className="text-3xl font-black text-white uppercase">Direct Signal Transmission</h2>
+            <p className="text-xs text-slate-400 font-sans">Dispatch encrypted opportunities, engineering missions, or inquiries.</p>
           </div>
 
-          <form onSubmit={handleContactSubmit} className="p-6 sm:p-8 bg-black border-2 border-cyan-500 text-left space-y-4 shadow-[0_0_30px_rgba(0,240,255,0.15)]">
+          <form onSubmit={handleContactSubmit} className="p-8 bg-[#090D17] border border-cyan-500/40 text-left space-y-4 shadow-[0_0_30px_rgba(0,240,255,0.1)]">
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-cyan-300 uppercase">TRANSMITTER_ID (NAME)</label>
+              <label className="text-xs text-cyan-400 font-bold uppercase">IDENTIFIER:</label>
               <input
                 type="text"
                 required
                 value={contactForm.name}
                 onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                className="w-full px-4 py-2.5 bg-[#03060c] border border-cyan-500/60 text-white text-xs font-mono outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400"
+                className="w-full px-4 py-3 bg-[#05070D] border border-cyan-500/30 text-xs text-white outline-none focus:border-cyan-400"
+                placeholder="OPERATIVE_NAME"
               />
             </div>
+
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-cyan-300 uppercase">FREQUENCY_LINK (EMAIL)</label>
+              <label className="text-xs text-cyan-400 font-bold uppercase">SIGNAL_EMAIL:</label>
               <input
                 type="email"
                 required
                 value={contactForm.email}
                 onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                className="w-full px-4 py-2.5 bg-[#03060c] border border-cyan-500/60 text-white text-xs font-mono outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400"
+                className="w-full px-4 py-3 bg-[#05070D] border border-cyan-500/30 text-xs text-white outline-none focus:border-cyan-400"
+                placeholder="signal@neural.io"
               />
             </div>
+
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-cyan-300 uppercase">PAYLOAD_STREAM (MESSAGE)</label>
+              <label className="text-xs text-cyan-400 font-bold uppercase">MISSION_BRIEF:</label>
               <textarea
                 rows={4}
                 required
                 value={contactForm.message}
                 onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                className="w-full px-4 py-2.5 bg-[#03060c] border border-cyan-500/60 text-white text-xs font-mono outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 leading-relaxed"
+                className="w-full px-4 py-3 bg-[#05070D] border border-cyan-500/30 text-xs text-white outline-none focus:border-cyan-400 leading-relaxed font-sans"
+                placeholder="Mission specifications..."
               />
             </div>
+
             <button
               type="submit"
               disabled={sending}
-              className="w-full py-3.5 bg-cyan-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.4)] disabled:opacity-50 transition-all"
+              className="w-full py-4 mt-2 bg-cyan-400 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(0,240,255,0.3)]"
             >
-              <Send size={14} /> {sending ? 'TRANSMITTING...' : 'TRANSMIT_SIGNAL'}
+              <Send size={14} /> {sending ? 'TRANSMITTING_PACKETS...' : 'DISPATCH_SIGNAL'}
             </button>
           </form>
         </section>
 
-        <footer className="pt-8 border-t border-cyan-500/30 text-center text-xs text-cyan-700">
-          SYS_LOG // {new Date().getFullYear()} {profile.full_name} • CYBERNETIC HUD MATRIX ARCHITECTURE
+        {/* Footer */}
+        <footer className="pt-10 border-t border-cyan-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div>© {new Date().getFullYear()} {profile.full_name} • Neo-Matrix 2077 HUD</div>
+          <div className="flex items-center gap-4 text-cyan-400">
+            {profile.social_links?.linkedin && (
+              <a href={profile.social_links.linkedin} target="_blank" rel="noreferrer" className="hover:text-yellow-400">LINKEDIN</a>
+            )}
+            {profile.social_links?.github && (
+              <a href={profile.social_links.github} target="_blank" rel="noreferrer" className="hover:text-yellow-400">GITHUB</a>
+            )}
+            <a href="#about" className="hover:text-yellow-400">TOP_SIGNAL ↑</a>
+          </div>
         </footer>
 
       </main>
+
+      {/* ── CASE STUDY DECRYPTION MODAL ── */}
+      <AnimatePresence>
+        {activeProjectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#090D17] border-2 border-cyan-400 shadow-[0_0_35px_rgba(0,240,255,0.3)] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-5 relative text-white"
+            >
+              <button
+                onClick={() => setActiveProjectModal(null)}
+                className="absolute top-5 right-5 w-8 h-8 bg-cyan-400 text-black flex items-center justify-center hover:bg-yellow-400 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="space-y-1">
+                <span className="text-xs text-yellow-400 uppercase font-bold">// DECLASSIFIED_RECORD</span>
+                <h3 className="text-2xl font-black text-white uppercase">{activeProjectModal.title}</h3>
+              </div>
+
+              {activeProjectModal.image_url && (
+                <div className="overflow-hidden border border-cyan-500/40 h-56 bg-black">
+                  <img src={activeProjectModal.image_url} alt={activeProjectModal.title} className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                {activeProjectModal.description}
+              </p>
+
+              {activeProjectModal.highlights && activeProjectModal.highlights.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {activeProjectModal.highlights.map((h, i) => (
+                    <div key={i} className="p-3 bg-[#05070D] border border-cyan-500/30">
+                      <div className="text-sm font-bold text-cyan-400">{h.value}</div>
+                      <div className="text-[10px] text-slate-400 uppercase">{h.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {(activeProjectModal.technologies || []).map((t, i) => (
+                  <span key={i} className="px-2 py-0.5 bg-[#05070D] border border-cyan-500/30 text-cyan-300 text-xs">
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 border-t border-cyan-500/20">
+                {activeProjectModal.live_url && (
+                  <a
+                    href={activeProjectModal.live_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 py-2.5 bg-cyan-400 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wider text-center flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink size={14} /> LAUNCH_SYSTEM
+                  </a>
+                )}
+                {activeProjectModal.github_url && (
+                  <a
+                    href={activeProjectModal.github_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 py-2.5 bg-[#05070D] border border-cyan-500/40 text-cyan-300 text-xs font-bold uppercase tracking-wider text-center flex items-center justify-center gap-2 hover:bg-cyan-950"
+                  >
+                    <Github size={14} /> REPO
+                  </a>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

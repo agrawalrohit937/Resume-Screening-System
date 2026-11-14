@@ -24,7 +24,8 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.24.0",
     "recharts": "^2.12.7",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "sonner": "^2.0.8"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

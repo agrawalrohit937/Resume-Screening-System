@@ -751,7 +751,7 @@ export default function JobApplicants() {
               <button
                 type="button"
                 onClick={() => handleBulkScheduleStage('Interview')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs shadow-sm shadow-indigo-500/20 transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
                 title="Bulk schedule Live AI interviews for Interview stage candidates"
               >
                 <Sparkles size={14} />
@@ -1244,9 +1244,9 @@ export default function JobApplicants() {
                           })
                           setIsScheduleModalOpen(true)
                         }}
-                        className="flex-1 min-w-[140px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer truncate group"
+                        className="flex-1 min-w-[140px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer truncate group"
                       >
-                        <Sparkles size={14} className="text-indigo-200 group-hover:rotate-12 transition-transform shrink-0" />
+                        <Sparkles size={14} className="text-blue-100 group-hover:rotate-12 transition-transform shrink-0" />
                         <span className="truncate">Schedule AI Interview</span>
                       </button>
                     ) : (
@@ -1376,9 +1376,9 @@ export default function JobApplicants() {
                     </div>
                   ) : (
                     /* Live Interview Invite Banner */
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 flex items-center justify-between gap-3">
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3">
                       <div>
-                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
                           AI Assessment Pipeline
                         </span>
                         <p className="text-xs font-bold text-slate-800 mt-0.5">
@@ -1401,7 +1401,7 @@ export default function JobApplicants() {
                             })
                             setIsScheduleModalOpen(true)
                           }}
-                          className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0 transition cursor-pointer"
+                          className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shrink-0 transition cursor-pointer shadow-xs"
                         >
                           Schedule Link →
                         </button>

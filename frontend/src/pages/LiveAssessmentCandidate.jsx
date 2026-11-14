@@ -468,7 +468,7 @@ export default function LiveAssessmentCandidate() {
   if (phase === CANDIDATE_PHASE.LOADING) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-200 flex items-center justify-center text-indigo-600 mb-4 animate-pulse">
+        <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-4 animate-pulse">
           <Sparkles className="h-6 w-6" />
         </div>
         <h2 className="text-base font-extrabold text-slate-900">
@@ -550,15 +550,15 @@ export default function LiveAssessmentCandidate() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-xl w-full bg-white rounded-3xl border border-slate-200 shadow-[0_25px_70px_-15px_rgba(15,23,42,0.1)] p-8 sm:p-10 relative overflow-hidden"
         >
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-600 via-[#2E9BDA] to-violet-600" />
+          <div className="absolute top-0 left-0 right-0 h-2 bg-blue-600" />
 
           {/* Invitation Banner */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-indigo-600/20 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-xs shrink-0">
               <Building2 size={22} />
             </div>
             <div>
-              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+              <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full px-2.5 py-0.5 uppercase tracking-wider">
                 Official Interview Invitation
               </span>
               <p className="text-xs text-slate-400 mt-0.5">Enterprise AI Screening Portal</p>
@@ -566,7 +566,7 @@ export default function LiveAssessmentCandidate() {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug">
-            You have been invited by <span className="text-indigo-600">{company}</span> for the{' '}
+            You have been invited by <span className="text-blue-600">{company}</span> for the{' '}
             <span className="text-slate-900">{role}</span> interview.
           </h1>
 
@@ -583,7 +583,7 @@ export default function LiveAssessmentCandidate() {
 
             <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Format</span>
-              <span className="text-xs font-bold text-indigo-700 mt-1 block capitalize">{sessionData?.interview_type || 'Mixed'}</span>
+              <span className="text-xs font-bold text-blue-700 mt-1 block capitalize">{sessionData?.interview_type || 'Mixed'}</span>
             </div>
 
             <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-center col-span-2 sm:col-span-1">
@@ -609,7 +609,7 @@ export default function LiveAssessmentCandidate() {
           <button
             type="button"
             onClick={() => setPhase(CANDIDATE_PHASE.SYSTEM_CHECK)}
-            className="w-full h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition cursor-pointer"
+            className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
           >
             <span>Proceed to System & Camera Check</span>
             <ArrowRight size={16} />
@@ -735,7 +735,7 @@ export default function LiveAssessmentCandidate() {
         {/* Top Header */}
         <div className="h-16 bg-white border-b border-blue-100 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-black text-sm flex items-center justify-center shadow-md shadow-indigo-600/30">
+            <div className="h-9 w-9 rounded-xl bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-xs">
               {sessionData?.company_name?.[0] || 'C'}
             </div>
             <div>
@@ -767,7 +767,7 @@ export default function LiveAssessmentCandidate() {
             </button>
 
             <div className="flex items-center gap-2 bg-slate-50 border border-blue-100 rounded-full px-3.5 py-1.5">
-              <span className={`h-2 w-2 rounded-full ${aiSpeaking ? 'bg-violet-500' : 'bg-emerald-500'}`} />
+              <span className={`h-2 w-2 rounded-full ${aiSpeaking ? 'bg-blue-500' : 'bg-emerald-500'}`} />
               <span className="font-mono text-xs font-bold text-blue-900/70 tabular-nums">
                 {fmt(timeElapsed)}
               </span>
@@ -789,13 +789,13 @@ export default function LiveAssessmentCandidate() {
                 <span className="text-[10px] font-extrabold text-blue-900/45 uppercase tracking-wider">
                   Progress
                 </span>
-                <span className="text-xs font-mono font-bold text-indigo-600 tabular-nums">
+                <span className="text-xs font-mono font-bold text-blue-600 tabular-nums">
                   {currentQIdx + 1}/{totalQ}
                 </span>
               </div>
               <div className="h-1.5 rounded-full bg-blue-50 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
+                  className="h-full rounded-full bg-blue-600 transition-all duration-300"
                   style={{ width: `${((currentQIdx + 1) / totalQ) * 100}%` }}
                 />
               </div>
@@ -810,7 +810,7 @@ export default function LiveAssessmentCandidate() {
                     key={i}
                     className={`aspect-square rounded-xl border flex items-center justify-center text-xs font-mono font-extrabold transition-all ${
                       isCurrent
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
                         : isDone
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                         : 'bg-white border-blue-100 text-slate-300'
@@ -877,7 +877,7 @@ export default function LiveAssessmentCandidate() {
                       <motion.div
                         animate={{ width: `${Math.max(0, 100 - pct)}%` }}
                         transition={{ duration: 1, ease: 'linear' }}
-                        className={`h-full ${urgent ? 'bg-rose-500' : 'bg-indigo-600'}`}
+                        className={`h-full ${urgent ? 'bg-rose-500' : 'bg-blue-600'}`}
                       />
                     </div>
 
@@ -899,8 +899,8 @@ export default function LiveAssessmentCandidate() {
                     </div>
 
                     {stt?.listening && stt?.transcript && (
-                      <div className="mx-5 mt-3 px-3.5 py-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200/50">
-                        <p className="text-xs text-indigo-800 italic font-medium">🎤 "{stt.transcript}"</p>
+                      <div className="mx-5 mt-3 px-3.5 py-2.5 rounded-xl bg-blue-50/50 border border-blue-200/50">
+                        <p className="text-xs text-blue-800 italic font-medium">🎤 "{stt.transcript}"</p>
                       </div>
                     )}
 
@@ -960,7 +960,7 @@ export default function LiveAssessmentCandidate() {
                           aiSpeaking ||
                           phase === CANDIDATE_PHASE.SUBMITTING_QUESTION
                         }
-                        className="h-10 px-6 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-600 to-violet-600 shadow-md shadow-indigo-600/25 disabled:opacity-40 transition-all cursor-pointer"
+                        className="h-10 px-6 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-xs disabled:opacity-40 transition-all cursor-pointer"
                       >
                         {phase === CANDIDATE_PHASE.SUBMITTING_QUESTION
                           ? 'Recording...'
@@ -981,8 +981,8 @@ export default function LiveAssessmentCandidate() {
               <div
                 className="relative rounded-3xl overflow-hidden shrink-0 aspect-[16/12] border transition-all duration-500"
                 style={{
-                  background: 'linear-gradient(160deg, #0B1220, #161225)',
-                  borderColor: aiSpeaking ? 'rgba(139,92,246,0.4)' : 'rgba(99,102,241,0.25)',
+                  background: 'linear-gradient(160deg, #0B1220, #0F172A)',
+                  borderColor: aiSpeaking ? 'rgba(59,130,246,0.4)' : 'rgba(148,163,184,0.25)',
                 }}
               >
                 <video
@@ -1004,7 +1004,7 @@ export default function LiveAssessmentCandidate() {
 
                 <div
                   className={`absolute top-3 right-3 z-20 rounded-full px-2.5 py-1 text-[10px] font-bold text-white ${
-                    aiSpeaking ? 'bg-violet-500' : 'bg-indigo-600'
+                    aiSpeaking ? 'bg-blue-500' : 'bg-blue-600'
                   }`}
                 >
                   {aiSpeaking ? "AI'S TURN" : 'YOUR TURN'}

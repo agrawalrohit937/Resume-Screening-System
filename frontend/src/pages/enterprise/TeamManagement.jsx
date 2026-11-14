@@ -195,7 +195,7 @@ export default function TeamManagement() {
         <div className="relative z-10 w-full p-6 sm:p-8 md:p-10 h-full flex flex-col justify-center">
           <div className="max-w-xl space-y-3.5 pt-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100/70 text-indigo-700 text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/70 text-blue-700 text-[11px] font-bold tracking-wider uppercase border border-blue-200/60">
                 <Building2 size={13} />
                 Tenant: <span className="font-mono">{tenantId || user?.tenant_id || 'default'}</span>
               </span>
@@ -206,7 +206,7 @@ export default function TeamManagement() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Team Management & <span className="text-indigo-600">Access Control</span>
+              Team Management & <span className="text-blue-600">Access Control</span>
             </h1>
 
             <p className="text-sm text-slate-600 max-w-md leading-relaxed">
@@ -220,7 +220,7 @@ export default function TeamManagement() {
                   setGeneratedInvite(null)
                   setShowInviteModal(true)
                 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-600/20 transition-all transform hover:-translate-y-0.5 active:scale-98 cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-all transform hover:-translate-y-0.5 active:scale-98 cursor-pointer"
               >
                 <UserPlus className="w-4 h-4" />
                 Invite Team Member
@@ -669,7 +669,7 @@ export default function TeamManagement() {
                             onClick={() => setInviteRole(r)}
                             className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start justify-between ${
                               isSelected
-                                ? 'bg-indigo-50/70 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
+                                ? 'bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
                                 : 'bg-slate-50/50 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                             }`}
                           >
@@ -684,7 +684,7 @@ export default function TeamManagement() {
                             </div>
                             <div
                               className={`w-5 h-5 rounded-full border flex items-center justify-center mt-1 shrink-0 transition-all ${
-                                isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white'
+                                isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'
                               }`}
                             >
                               {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -706,7 +706,7 @@ export default function TeamManagement() {
                     <button
                       type="submit"
                       disabled={submittingInvite}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer disabled:opacity-50"
                     >
                       {submittingInvite ? (
                         <>

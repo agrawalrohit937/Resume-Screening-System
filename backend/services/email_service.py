@@ -37,12 +37,39 @@ _OTP_DISPATCH = {
 }
 
 
+PUBLIC_FALLBACK_LOGO_URL = (
+    "https://raw.githubusercontent.com/agrawalrohit937/Resume-Screening-System/main/frontend/public/logo_email.png"
+)
+
+
+def _resolve_email_logo_url(custom_logo: Optional[str] = None) -> str:
+    """
+    Guarantees a 100% publicly accessible HTTPS logo URL for email clients.
+    Email providers (Gmail, Outlook, Yahoo) proxy images via their own cloud servers.
+    They cannot load images hosted on localhost or private IP addresses.
+    """
+    if custom_logo and str(custom_logo).strip().startswith("https://"):
+        cleaned = str(custom_logo).strip()
+        if not any(h in cleaned.lower() for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+            return cleaned
+
+    base_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+    if base_url and not any(h in base_url.lower() for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+        return f"{base_url}/logo_email.png"
+
+    return PUBLIC_FALLBACK_LOGO_URL
+
+
 def _render_template(filename: str, **context) -> str:
-    base_url = settings.FRONTEND_URL.rstrip("/")
-    public_base = "https://www.careershala.tech" if ("localhost" in base_url or "127.0.0.1" in base_url) else base_url
+    base_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+    public_base = "https://www.careershala.tech" if any(h in base_url.lower() for h in ("localhost", "127.0.0.1", "0.0.0.0")) else (base_url or "https://www.careershala.tech")
     context.setdefault("base_url", public_base)
-    context.setdefault("logo_url", f"{public_base}/logo_email.png")
-    context.setdefault("support_url", f"{base_url}/support")
+
+    # Sanitize logo_url so external email clients never receive unreachable localhost
+    raw_logo = context.get("logo_url")
+    context["logo_url"] = _resolve_email_logo_url(raw_logo)
+
+    context.setdefault("support_url", f"{public_base}/support")
     context.setdefault("support_email", getattr(settings, "SUPPORT_EMAIL", "support@careershala.tech") or "support@careershala.tech")
     context.setdefault("careers_email", getattr(settings, "CAREERS_EMAIL", "careers@careershala.tech") or "careers@careershala.tech")
     context.setdefault("info_email", getattr(settings, "INFO_EMAIL", "info@careershala.tech") or "info@careershala.tech")
@@ -521,7 +548,7 @@ class EmailService:
         html_attachments = "<p style='margin:0;color:#64748b;'>No attachments</p>" if not attachment_html_items else f"<ul style='margin:0;padding-left:18px;color:#334155;'>{''.join(attachment_html_items)}</ul>"
 
         base_url = settings.FRONTEND_URL.rstrip("/")
-        logo_url = f"{base_url}/logo_t.png"
+        logo_url = _resolve_email_logo_url()
 
         ticket_id = escape(str(getattr(ticket, "ticket_id", "N/A")))
         ticket_subject = escape(str(getattr(ticket, "subject", "Support Inquiry")))
@@ -687,10 +714,11 @@ class EmailService:
         retry_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Sends AI-personalized subscription payment recovery email via Brevo."""
-        base_url = settings.FRONTEND_URL.rstrip("/")
+        base_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+        public_base = "https://www.careershala.tech" if any(h in base_url.lower() for h in ("localhost", "127.0.0.1", "0.0.0.0")) else (base_url or "https://www.careershala.tech")
 
-        final_retry_url = retry_url or f"{base_url}/billing"
-        support_url = f"{base_url}/support"
+        final_retry_url = retry_url or f"{public_base}/billing"
+        support_url = f"{public_base}/support"
 
         html = _render_template(
             "payment_recovery.html",
@@ -700,7 +728,6 @@ class EmailService:
             failure_situation=failure_situation or "Temporary payment processing issue",
             retry_url=final_retry_url,
             support_url=support_url,
-            logo_url=f"{base_url}/logo.png",
         )
 
         subject = f"⚠️ Action Required: Renew your CareerShala {plan_name.capitalize()} subscription"
@@ -725,10 +752,11 @@ class EmailService:
         claim_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Sends bounded win-back discount offer email via Brevo."""
-        base_url = settings.FRONTEND_URL.rstrip("/")
+        base_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+        public_base = "https://www.careershala.tech" if any(h in base_url.lower() for h in ("localhost", "127.0.0.1", "0.0.0.0")) else (base_url or "https://www.careershala.tech")
 
-        final_claim_url = claim_url or f"{base_url}/premium?coupon={promo_code}"
-        support_url = f"{base_url}/support"
+        final_claim_url = claim_url or f"{public_base}/premium?coupon={promo_code}"
+        support_url = f"{public_base}/support"
 
         html = _render_template(
             "winback_offer.html",
@@ -741,7 +769,6 @@ class EmailService:
             valid_until_str=valid_until_str or "next 7 days",
             claim_url=final_claim_url,
             support_url=support_url,
-            logo_url=f"{base_url}/logo.png",
         )
 
         subject = f"🎁 Special Offer: {discount_pct}% Off CareerShala {plan_name.capitalize()}"

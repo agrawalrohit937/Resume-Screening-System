@@ -108,11 +108,11 @@ export default function Settings() {
           className="bg-white rounded-[2rem] border border-slate-200/70 p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden"
         >
           {/* Subtle Glow Accent */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-100/40 via-blue-50/20 to-purple-100/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           <div className="flex items-center gap-5 z-10">
             <AvatarRing user={user} ringSize={72} shape="circle">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden border-2 border-white shadow-md">
+              <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden border-2 border-white shadow-md">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover object-top" />
                 ) : (
@@ -122,14 +122,14 @@ export default function Settings() {
             </AvatarRing>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
                 <Shield size={12} /> Account & Security
               </div>
               <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                 {user?.full_name || 'Account Settings'}
               </h1>
               <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5">
-                {user?.email} · <span className="capitalize font-bold text-indigo-600">{user?.plan ? `${user.plan} plan` : 'Free plan'}</span>
+                {user?.email} · <span className="capitalize font-bold text-blue-600">{user?.plan ? `${user.plan} plan` : 'Free plan'}</span>
               </p>
             </div>
           </div>
@@ -144,7 +144,7 @@ export default function Settings() {
             </button>
             <button
               onClick={() => navigate('/billing')}
-              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200/50 transition-all cursor-pointer"
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-all cursor-pointer"
             >
               <CreditCard size={14} />
               Billing & Plans
@@ -168,7 +168,7 @@ export default function Settings() {
               {/* Header */}
               <div className="px-6 md:px-8 py-6 border-b border-slate-100 bg-white flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                  <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
                     <Lock size={20} />
                   </div>
                   <div>
@@ -201,7 +201,7 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={() => logout?.().then(() => navigate('/forgot-password'))}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline"
                         >
                           Switch to email & password via password reset <ExternalLink size={12} />
                         </button>
@@ -224,7 +224,7 @@ export default function Settings() {
                           onChange={(e) => setCurrentPassword(e.target.value)}
                           placeholder="Enter your current password"
                           disabled={loading}
-                          className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-indigo-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 shadow-sm"
+                          className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-blue-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 shadow-sm"
                         />
                         <button
                           type="button"
@@ -254,7 +254,7 @@ export default function Settings() {
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="Min. 8 characters"
                             disabled={loading}
-                            className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-indigo-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 shadow-sm"
+                            className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-blue-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 shadow-sm"
                           />
                           <button
                             type="button"
@@ -281,7 +281,7 @@ export default function Settings() {
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             placeholder="Re-type new password"
                             disabled={loading}
-                            className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-indigo-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 shadow-sm"
+                            className="w-full pl-11 pr-11 py-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-blue-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 shadow-sm"
                           />
                           <button
                             type="button"
@@ -371,7 +371,7 @@ export default function Settings() {
             {/* Security Best Practices Card */}
             <div className="bg-white rounded-[2rem] border border-slate-200/70 p-6 md:p-8 shadow-sm">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Sparkles size={16} className="text-indigo-600" /> Security Recommendations
+                <Sparkles size={16} className="text-blue-600" /> Security Recommendations
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
@@ -428,7 +428,7 @@ export default function Settings() {
 
                 <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                   <span className="font-bold text-slate-600">Current Plan</span>
-                  <span className="font-bold text-indigo-600 uppercase tracking-wide">
+                  <span className="font-bold text-blue-600 uppercase tracking-wide">
                     {user?.plan || 'Free Tier'}
                   </span>
                 </div>
@@ -441,56 +441,56 @@ export default function Settings() {
 
               <div
                 onClick={() => navigate('/billing')}
-                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 hover:bg-indigo-50/60 border border-slate-200/70 hover:border-indigo-200 transition-all cursor-pointer group"
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 hover:bg-slate-100/80 border border-slate-200/70 hover:border-slate-300 transition-all cursor-pointer group"
                 role="button"
                 tabIndex={0}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/60 flex items-center justify-center">
                     <CreditCard size={15} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">Billing & Invoices</h4>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">Billing & Invoices</h4>
                     <p className="text-[11px] text-slate-500">Manage your subscription</p>
                   </div>
                 </div>
-                <ChevronRight size={15} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={15} className="text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
               </div>
 
               <div
                 onClick={() => navigate('/profile')}
-                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 hover:bg-indigo-50/60 border border-slate-200/70 hover:border-indigo-200 transition-all cursor-pointer group"
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 hover:bg-slate-100/80 border border-slate-200/70 hover:border-slate-300 transition-all cursor-pointer group"
                 role="button"
                 tabIndex={0}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
                     <User size={15} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">Career Profile</h4>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">Career Profile</h4>
                     <p className="text-[11px] text-slate-500">Resume & personal details</p>
                   </div>
                 </div>
-                <ChevronRight size={15} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={15} className="text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
               </div>
 
               <div
                 onClick={() => navigate('/results')}
-                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 hover:bg-indigo-50/60 border border-slate-200/70 hover:border-indigo-200 transition-all cursor-pointer group"
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 hover:bg-slate-100/80 border border-slate-200/70 hover:border-slate-300 transition-all cursor-pointer group"
                 role="button"
                 tabIndex={0}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100/60 flex items-center justify-center">
                     <Zap size={15} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">ATS Scanner</h4>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">ATS Scanner</h4>
                     <p className="text-[11px] text-slate-500">Check resume compatibility</p>
                   </div>
                 </div>
-                <ChevronRight size={15} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={15} className="text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
               </div>
             </div>
 

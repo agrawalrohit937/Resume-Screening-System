@@ -38,7 +38,7 @@ function StepIndicator({ currentStep }) {
     <div className="flex items-center justify-between w-full mb-3 sm:mb-8 relative px-0.5">
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-[2px] bg-slate-100 -z-10" />
       <div
-        className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-indigo-600 -z-10 transition-all duration-500 ease-in-out"
+        className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-blue-600 -z-10 transition-all duration-500 ease-in-out"
         style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
       />
 
@@ -50,15 +50,15 @@ function StepIndicator({ currentStep }) {
           <div key={step.key} className="flex flex-col items-center gap-3 bg-white px-2">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${isActive
-                  ? 'bg-indigo-600 text-white ring-4 ring-indigo-50'
+                  ? 'bg-blue-600 text-white ring-4 ring-blue-50'
                   : isPast
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-blue-600 text-white'
                     : 'bg-white border-2 border-slate-200 text-slate-400'
                 }`}
             >
               {isPast ? <CheckCircle size={14} strokeWidth={3} /> : step.number}
             </div>
-            <span className={`text-xs font-semibold uppercase tracking-wider hidden sm:block ${isActive ? 'text-indigo-900' : isPast ? 'text-slate-600' : 'text-slate-400'
+            <span className={`text-xs font-semibold uppercase tracking-wider hidden sm:block ${isActive ? 'text-blue-900' : isPast ? 'text-slate-600' : 'text-slate-400'
               }`}>
               {step.label}
             </span>
@@ -288,7 +288,7 @@ export default function ApplyAssistant() {
               reset();
             }}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${activeTab === 'apply'
-                ? 'border-indigo-600 text-indigo-700 font-bold'
+                ? 'border-blue-600 text-blue-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
               }`}
           >
@@ -298,7 +298,7 @@ export default function ApplyAssistant() {
           <button
             onClick={() => setActiveTab('history')}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${activeTab === 'history'
-                ? 'border-indigo-600 text-indigo-700 font-bold'
+                ? 'border-blue-600 text-blue-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
               }`}
           >
@@ -375,7 +375,7 @@ export default function ApplyAssistant() {
                         <div className="space-y-2 sm:space-y-3">
                           <div>
                             <h2 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
-                              <FileText size={18} className="text-indigo-600 shrink-0" /> Candidate Profile
+                              <FileText size={18} className="text-blue-600 shrink-0" /> Candidate Profile
                             </h2>
                             <p className="text-xs text-slate-500 mt-0.5">We'll use your primary profile resume for this application.</p>
                           </div>
@@ -383,7 +383,7 @@ export default function ApplyAssistant() {
                           {/* Profile Resume Attached Card */}
                           <div className="p-3 sm:p-4 bg-slate-50/70 sm:bg-white rounded-xl sm:rounded-2xl border border-slate-200/80 sm:border-slate-200 shadow-none sm:shadow-sm">
                             <div className="flex items-center gap-3 sm:gap-3.5">
-                              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-50 text-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-50 text-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0">
                                 <FileText size={18} className="sm:w-5 sm:h-5" />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -410,7 +410,7 @@ export default function ApplyAssistant() {
                               <span className="text-slate-500">Need to update resume?</span>
                               <Link
                                 to="/profile"
-                                className="font-bold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-0.5"
+                                className="font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-0.5"
                               >
                                 Update in Profile <ArrowRight size={11} />
                               </Link>
@@ -448,7 +448,7 @@ export default function ApplyAssistant() {
                       <div className="space-y-3 sm:space-y-4">
                         <div>
                           <h2 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
-                            <Briefcase size={18} className="text-indigo-600 shrink-0" /> Job Information
+                            <Briefcase size={18} className="text-blue-600 shrink-0" /> Job Information
                           </h2>
                           <p className="text-xs text-slate-500 mt-0.5">Review or complete the target job details below.</p>
                         </div>
@@ -476,7 +476,7 @@ export default function ApplyAssistant() {
                       exit="exit"
                       className="flex flex-col items-center justify-center py-24 text-center"
                     >
-                      <Loader2 className="animate-spin text-indigo-600 mb-6" size={40} />
+                      <Loader2 className="animate-spin text-blue-600 mb-6" size={40} />
                       <h3 className="text-xl font-semibold text-slate-900 mb-2">Analyzing Requirements</h3>
                       <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
                         The AI is currently evaluating the job description and architecting the optimal outreach strategy based on your profile.
@@ -543,7 +543,7 @@ export default function ApplyAssistant() {
                       <button
                         type="button"
                         onClick={reset}
-                        className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
+                        className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-sm"
                       >
                         Start New Application
                       </button>

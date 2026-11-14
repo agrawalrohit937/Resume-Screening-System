@@ -78,10 +78,10 @@ function InfoItem({ label, value, icon: Icon }) {
   ) : ''
 
   return (
-    <div className="flex flex-col gap-1 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50/80 border border-slate-100 hover:border-indigo-200/80 transition-colors">
+    <div className="flex flex-col gap-1 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50/80 border border-slate-100 hover:border-blue-200/80 transition-colors">
       <dt className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 truncate">
-          {Icon && <Icon size={14} className="text-indigo-500 shrink-0" />}
+          {Icon && <Icon size={14} className="text-blue-500 shrink-0" />}
           <span className="truncate">{label}</span>
         </span>
         {isUrl && strVal && (
@@ -89,7 +89,7 @@ function InfoItem({ label, value, icon: Icon }) {
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="text-[10px] font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 shrink-0 px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 transition-colors"
+            className="text-[10px] font-extrabold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 shrink-0 px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 transition-colors"
             title="Open link"
           >
             Visit <ExternalLink size={10} />
@@ -99,7 +99,7 @@ function InfoItem({ label, value, icon: Icon }) {
       <dd className="text-xs sm:text-sm font-semibold text-slate-800 break-words leading-snug">
         {strVal ? (
           isUrl ? (
-            <a href={href} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline truncate block max-w-full">
+            <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate block max-w-full">
               {strVal}
             </a>
           ) : (
@@ -370,7 +370,7 @@ export default function Profile() {
         className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-6 md:p-8 shadow-xs relative overflow-hidden"
       >
         {/* Subtle Ambient Background Glow */}
-        <div className="absolute top-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-gradient-to-br from-indigo-100/50 via-purple-50/30 to-transparent rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-72 sm:w-96 h-72 sm:h-96 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 md:gap-8">
           
@@ -385,7 +385,7 @@ export default function Profile() {
               <AvatarRing user={user} ringSize={112} shape="circle">
                 <div className={`relative z-10 w-full h-full rounded-full overflow-hidden flex items-center justify-center text-white text-3xl sm:text-4xl font-black select-none border-4 shadow-md transition-transform duration-300 ${isPremium
                     ? 'border-[#F3C24B] bg-gradient-to-br from-[#F3C24B] to-[#B9812A] shadow-[#F3C24B]/30'
-                    : 'border-white bg-gradient-to-br from-indigo-500 to-purple-600'
+                    : 'border-white bg-blue-600'
                   }`}>
                   {displayedAvatarUrl && !imgError ? (
                     <img
@@ -414,7 +414,7 @@ export default function Profile() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
                 title="Change profile photo"
-                className="absolute bottom-1 right-1 p-2 sm:p-2.5 bg-white text-indigo-600 rounded-full shadow-md border border-slate-200/90 hover:bg-indigo-50 active:scale-95 disabled:opacity-50 transition-all z-30 touch-manipulation cursor-pointer"
+                className="absolute bottom-1 right-1 p-2 sm:p-2.5 bg-white text-blue-600 rounded-full shadow-md border border-slate-200/90 hover:bg-blue-50 active:scale-95 disabled:opacity-50 transition-all z-30 touch-manipulation cursor-pointer"
                 aria-label="Upload profile photo"
               >
                 <Camera size={15} strokeWidth={2.3} />
@@ -491,7 +491,7 @@ export default function Profile() {
                 className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs active:scale-95 cursor-pointer ${
                   editing
                     ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
                 }`}
               >
                 {editing ? (
@@ -506,7 +506,7 @@ export default function Profile() {
                   href={`/portfolio/${user.portfolio_slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 transition-colors"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-colors"
                 >
                   <Globe size={14} /> View Portfolio <ArrowUpRight size={13} />
                 </a>
@@ -522,32 +522,32 @@ export default function Profile() {
             <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <Award size={14} className="text-amber-500" /> Profile Strength
             </span>
-            <span className="text-xs font-extrabold text-indigo-600 font-display">
+            <span className="text-xs font-extrabold text-blue-600 font-display">
               {profileStats.percent}% Complete
             </span>
           </div>
 
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mb-2.5">
             <div 
-              className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-blue-600 rounded-full transition-all duration-500"
               style={{ width: `${Math.max(10, profileStats.percent)}%` }}
             />
           </div>
 
-          {/* Checklist chips that scroll horizontally on small mobile screens without breaking */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-semibold text-slate-500 custom-scrollbar">
+          {/* Full-width responsive 5-column grid across the entire card */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full pt-1">
             {profileStats.items.map((item) => (
-              <span
+              <div
                 key={item.key}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border whitespace-nowrap shrink-0 transition-colors ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-bold text-center transition-all ${
                   item.done
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
-                    : 'bg-slate-50 text-slate-400 border-slate-200/60'
+                    ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200/80 shadow-2xs'
+                    : 'bg-slate-50 text-slate-400 border-slate-200/70'
                 }`}
               >
-                {item.done ? <Check size={11} strokeWidth={2.8} /> : <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />}
-                {item.label}
-              </span>
+                {item.done ? <Check size={12} strokeWidth={3} className="text-emerald-600 shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />}
+                <span className="truncate">{item.label}</span>
+              </div>
             ))}
           </div>
         </div>
@@ -704,7 +704,7 @@ export default function Profile() {
               className={`flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-2xs active:scale-95 cursor-pointer ${
                 editing
                   ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
               }`}
             >
               {editing ? <><X size={14} /> Cancel</> : <><Pencil size={14} /> Edit</>}
@@ -732,9 +732,9 @@ export default function Profile() {
                   </div>
 
                   {/* Bio / About Box */}
-                  <div className="p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-indigo-50/40 border border-indigo-100/70">
-                    <dt className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-indigo-700 mb-2 flex items-center gap-1.5">
-                      <Sparkles size={13} className="text-indigo-600" /> Professional Summary / Bio
+                  <div className="p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <dt className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-blue-600" /> Professional Summary / Bio
                     </dt>
                     <dd className="text-xs sm:text-sm font-medium text-slate-700 leading-relaxed break-words">
                       {user.bio ? (
@@ -745,60 +745,6 @@ export default function Profile() {
                     </dd>
                   </div>
 
-                  {/* Live Portfolio Callout Banner */}
-                  {user.portfolio_slug && (
-                    <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
-                          <Sparkles size={14} className="text-amber-600 shrink-0" />
-                          <span>Your Public Career Portfolio is Live!</span>
-                        </div>
-                        <p className="text-[11px] text-amber-800/80 truncate max-w-full">
-                          /portfolio/{user.portfolio_slug}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={copyLivePortfolioLink}
-                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-white border border-amber-300 text-amber-900 rounded-lg text-xs font-bold hover:bg-amber-100/60 shadow-2xs transition-colors cursor-pointer"
-                        >
-                          <Copy size={12} /> Copy Link
-                        </button>
-                        
-                        {!user.portfolio_url && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const autoUrl = `${window.location.origin}/portfolio/${user.portfolio_slug}`
-                              try {
-                                await updateProfile({ portfolio_url: autoUrl })
-                                if (refreshUser) await refreshUser()
-                                toast.success('🎉 Live portfolio saved to profile!')
-                              } catch (e) {
-                                toast.error('Failed to update portfolio link.')
-                              }
-                            }}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 shadow-2xs transition-colors cursor-pointer"
-                          >
-                            <Check size={12} /> Save to Profile
-                          </button>
-                        )}
-
-                        <a
-                          href={`/portfolio/${user.portfolio_slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1.5 bg-white border border-amber-300 text-amber-900 rounded-lg hover:bg-amber-100/60 transition-colors"
-                          title="Open portfolio"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Social / Professional Links */}
                   <div className="pt-2 sm:pt-4 border-t border-slate-100">
                     <h3 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
@@ -807,7 +753,11 @@ export default function Profile() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
                       <InfoItem label="LinkedIn" value={user.linkedin_url} icon={Linkedin} />
                       <InfoItem label="GitHub" value={user.github_url} icon={Github} />
-                      <InfoItem label="Portfolio" value={user.portfolio_url} icon={LinkIcon} />
+                      <InfoItem 
+                        label="Portfolio" 
+                        value={user.portfolio_url || (user.portfolio_slug ? `/portfolio/${user.portfolio_slug}` : '')} 
+                        icon={LinkIcon} 
+                      />
                     </div>
                   </div>
                 </motion.div>
@@ -831,7 +781,7 @@ export default function Profile() {
                       label="Phone Number"
                       value={form.phone}
                       onChange={(v) => setForm({ ...form, phone: v })}
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+91 98765 43210"
                       icon={Phone}
                     />
                     <Input
@@ -894,24 +844,13 @@ export default function Profile() {
                         onChange={(v) => setForm({ ...form, github_url: v })}
                         placeholder="github.com/username"
                       />
-                      <div className="space-y-1">
-                        <Input
-                          label="Portfolio URL"
-                          icon={LinkIcon}
-                          value={form.portfolio_url}
-                          onChange={(v) => setForm({ ...form, portfolio_url: v })}
-                          placeholder="yourportfolio.dev"
-                        />
-                        {user.portfolio_slug && (
-                          <button
-                            type="button"
-                            onClick={() => setForm({ ...form, portfolio_url: `${window.location.origin}/portfolio/${user.portfolio_slug}` })}
-                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <Sparkles size={11} /> Use site portfolio: /portfolio/{user.portfolio_slug}
-                          </button>
-                        )}
-                      </div>
+                      <Input
+                        label="Personal Website / Portfolio (Optional)"
+                        icon={LinkIcon}
+                        value={form.portfolio_url}
+                        onChange={(v) => setForm({ ...form, portfolio_url: v })}
+                        placeholder={user.portfolio_slug ? `/portfolio/${user.portfolio_slug}` : 'https://yourportfolio.dev'}
+                      />
                     </div>
                   </div>
 
@@ -931,7 +870,7 @@ export default function Profile() {
                       type="button"
                       onClick={handleSave}
                       disabled={loading}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md shadow-indigo-200/50 flex items-center justify-center gap-2 cursor-pointer min-h-[44px] active:scale-98"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer min-h-[44px] active:scale-98"
                     >
                       {loading && <Loader2 size={16} className="animate-spin" />}
                       {loading ? 'Saving Changes...' : 'Save Profile Changes'}

@@ -284,20 +284,19 @@ export default function Dashboard() {
       <motion.div initial={{ y: 15 }} animate={{ y: 0 }} transition={{ type: "spring", duration: 0.6 }}>
         <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 md:p-10 relative overflow-hidden shadow-xs border border-slate-200/90 flex flex-col lg:flex-row items-center justify-between gap-4 sm:gap-6 lg:gap-8">
           
-          {/* Subtle Ambient Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/40 pointer-events-none" />
-          <div className="hidden sm:block absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+          {/* Subtle Clean Ambient Background */}
+          <div className="absolute inset-0 bg-slate-50/40 pointer-events-none" />
 
           {/* Left: Candidate Standing Info */}
           <div className="relative z-10 text-center lg:text-left flex-1 space-y-3 sm:space-y-4">
-            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] sm:text-[11px] font-bold tracking-wider uppercase border border-indigo-200/60 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] sm:text-[11px] font-bold tracking-wider uppercase border border-blue-200/70 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
               CareerMitra Active
             </div>
 
             <div className="space-y-1 sm:space-y-1.5">
               <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Welcome back, <span className="text-indigo-600">{firstName}</span>.
+                Welcome back, <span className="text-blue-600">{firstName}</span>.
               </h1>
               <p className="text-slate-600 font-medium text-xs sm:text-sm max-w-xl leading-relaxed">
                 {s.total_ats_checks === 0 
@@ -313,21 +312,21 @@ export default function Dashboard() {
             <div className="pt-1 sm:pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-2 sm:gap-3">
               <button 
                 onClick={openCopilot} 
-                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
+                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95"
               >
                 <Sparkles size={15} /> Ask CareerMitra
               </button>
               <button 
                 onClick={() => navigate('/results')} 
-                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
+                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95"
               >
-                <FileText size={15} className="text-indigo-600" /> Run ATS Resume Scan
+                <FileText size={15} className="text-blue-600" /> Run ATS Resume Scan
               </button>
               <button 
                 onClick={() => navigate('/live-interview')} 
-                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer"
+                className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-white border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-600 text-xs sm:text-sm font-bold shadow-2xs transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95"
               >
-                <Video size={15} className="text-purple-600" /> Practice Mock Interview
+                <Video size={15} className="text-blue-600" /> Practice Mock Interview
               </button>
             </div>
           </div>
@@ -335,7 +334,7 @@ export default function Dashboard() {
           {/* Right: Large Prominent Career Score Circle & Sleek Trophy Pill */}
           <div className="relative z-10 flex flex-col items-center gap-2 sm:gap-3 shrink-0">
             {/* Large Prominent Career Score Circle */}
-            <div className="relative w-32 h-32 sm:w-44 sm:h-44 md:w-52 md:h-52 bg-white rounded-full shadow-[0_12px_36px_rgba(79,70,229,0.12)] border border-slate-100 flex items-center justify-center p-2 sm:p-3">
+            <div className="relative w-32 h-32 sm:w-44 sm:h-44 md:w-52 md:h-52 bg-white rounded-full shadow-[0_12px_36px_rgba(37,99,235,0.10)] border border-slate-100 flex items-center justify-center p-2 sm:p-3">
               {(() => {
                 const clampedScore = Math.max(0, Math.min(100, Number(readiness) || 0))
                 const radius = 45
@@ -360,7 +359,7 @@ export default function Dashboard() {
                         cy="60" 
                         r={radius} 
                         fill="none" 
-                        stroke="#4F46E5" 
+                        stroke="#2563EB" 
                         strokeWidth="9"
                         strokeLinecap="round"
                         strokeDasharray={circumference} 
@@ -374,7 +373,7 @@ export default function Dashboard() {
               })()}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2 text-center">
                 <span className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 font-display tracking-tight leading-none">
-                  {readiness}<span className="text-xl sm:text-3xl text-indigo-600 font-extrabold">%</span>
+                  {readiness}<span className="text-xl sm:text-3xl text-blue-600 font-extrabold">%</span>
                 </span>
                 <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-slate-400 mt-1 whitespace-nowrap select-none">
                   Score
@@ -489,7 +488,7 @@ export default function Dashboard() {
 
             <button
               onClick={() => navigate('/results')}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               Scan &amp; Fix in ATS Matcher <ArrowRight size={14} />
             </button>
@@ -499,13 +498,13 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-3 sm:space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
                   {hasCertificate ? <Award size={20} /> : <BrainCircuit size={20} />}
                 </div>
                 <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
                   hasCertificate 
                     ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200/60'
+                    : 'bg-blue-50 text-blue-700 border-blue-200/60'
                 }`}>
                   {hasCertificate ? 'Certificate Unlocked' : 'Skill Assessment'}
                 </span>
@@ -525,11 +524,11 @@ export default function Dashboard() {
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5">
                 <div className="flex justify-between text-[11px] font-bold text-slate-700">
                   <span>Certification Benchmark</span>
-                  <span className="text-indigo-600">{interviewBest} / 100</span>
+                  <span className="text-blue-600">{interviewBest} / 100</span>
                 </div>
                 <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full rounded-full ${hasCertificate ? 'bg-amber-500' : 'bg-indigo-600'}`} 
+                    className={`h-full rounded-full ${hasCertificate ? 'bg-amber-500' : 'bg-blue-600'}`} 
                     style={{ width: `${Math.min(interviewBest, 100)}%` }} 
                   />
                 </div>
@@ -541,7 +540,7 @@ export default function Dashboard() {
               className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                 hasCertificate
                   ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
               }`}
             >
               {hasCertificate ? (
@@ -556,10 +555,10 @@ export default function Dashboard() {
           <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all space-y-3 sm:space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-200">
                   <Globe size={20} />
                 </div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                   Recruiter Visibility
                 </span>
               </div>
@@ -577,7 +576,7 @@ export default function Dashboard() {
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                   <span>Profile Health</span>
-                  <span className="text-purple-600">{profilePct}%</span>
+                  <span className="text-blue-600">{profilePct}%</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-[11px] font-bold">
                   {Object.entries(pcFields).slice(0, 4).map(([k, v]) => (
@@ -597,7 +596,7 @@ export default function Dashboard() {
 
             <button
               onClick={() => navigate('/portfolio-builder')}
-              className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               Build Live Portfolio <ArrowRight size={14} />
             </button>
@@ -614,7 +613,7 @@ export default function Dashboard() {
           <SectionHeader 
             title="Projects & Verified Skills" 
             subtitle="Skills and project repositories extracted directly from your resume & GitHub"
-            action={<Link to="/github" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">Analyze GitHub</Link>}
+            action={<Link to="/github" className="text-xs font-bold text-blue-600 hover:text-blue-800 transition">Analyze GitHub</Link>}
           />
           <Card className="p-4 sm:p-6 space-y-3.5 sm:space-y-5">
             {/* Top: GitHub & Project Workspace Connection Header */}
@@ -681,7 +680,7 @@ export default function Dashboard() {
                   </span>
                   <button
                     onClick={() => navigate('/results')}
-                    className="text-xs font-bold text-indigo-600 hover:underline shrink-0 ml-2"
+                    className="text-xs font-bold text-blue-600 hover:underline shrink-0 ml-2"
                   >
                     Scan Resume
                   </button>
@@ -692,7 +691,7 @@ export default function Dashboard() {
             {/* Project Showcase & Portfolio Launcher */}
             <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/60">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
                   <Layers size={16} />
                 </div>
                 <div>
@@ -704,7 +703,7 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => navigate('/portfolio-builder')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer shrink-0"
               >
                 Launch Builder <ArrowRight size={13} />
               </button>
@@ -717,7 +716,7 @@ export default function Dashboard() {
           <SectionHeader 
             title="Activity Stream" 
             subtitle="Recent applications, evaluations, and mock sessions"
-            action={<Link to="/analytics" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">View All</Link>}
+            action={<Link to="/analytics" className="text-xs font-bold text-blue-600 hover:text-blue-800 transition">View All</Link>}
           />
           <Card className="p-4 sm:p-6">
             {activityList.length === 0 ? (
@@ -738,7 +737,7 @@ export default function Dashboard() {
                   let iconTheme = 'text-blue-600 bg-blue-50 border-blue-200'
                   if (item.type === 'job_application') {
                     Icon = Briefcase
-                    iconTheme = 'text-indigo-600 bg-indigo-50 border-indigo-200'
+                    iconTheme = 'text-blue-600 bg-blue-50 border-blue-200'
                   } else if (item.type === 'resume_upload') {
                     Icon = UploadCloud
                     iconTheme = 'text-sky-600 bg-sky-50 border-sky-200'

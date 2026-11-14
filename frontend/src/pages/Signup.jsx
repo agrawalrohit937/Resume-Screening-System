@@ -382,7 +382,7 @@ export default function Signup() {
             <button
               type="submit"
               disabled={loading}
-              className="group mt-2.5 flex h-[42px] sm:h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-[13.5px] font-bold text-white shadow-lg shadow-[#2E9BDA]/20 transition-all hover:shadow-[#2E9BDA]/35 disabled:opacity-60"
+              className="group mt-2.5 flex h-[42px] sm:h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-[13.5px] font-bold text-white shadow-xs transition-all disabled:opacity-60 cursor-pointer"
             >
               {loading ? (
                 <>

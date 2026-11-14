@@ -310,13 +310,13 @@ export default function ManageCompany() {
 
           {/* Left Side: Text Content */}
           <div className="max-w-xl space-y-4 pt-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100/70 text-indigo-700 text-[11px] font-bold tracking-wider uppercase border border-indigo-200/50">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold tracking-wider uppercase border border-blue-200/50">
               <Building2 size={13} />
               Employer Branding Suite
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Company Profile &amp; <span className="text-indigo-600">Branding</span>
+              Company Profile &amp; <span className="text-blue-600">Branding</span>
             </h1>
 
             <p className="text-sm text-slate-600 max-w-md leading-relaxed">
@@ -379,7 +379,7 @@ export default function ManageCompany() {
               <button
                 type="button"
                 onClick={handleOpenPublicWebsite}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 text-xs font-semibold border border-slate-200 transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-blue-600 text-xs font-semibold border border-slate-200 transition cursor-pointer"
                 title="Visit primary company website"
               >
                 <span>View Public Page</span>
@@ -396,7 +396,7 @@ export default function ManageCompany() {
               <div className="relative w-32 h-32">
                 <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-amber-300 to-amber-500 rounded-full blur-[1px] opacity-90 translate-x-1.5 translate-y-1.5 pointer-events-none"></div>
 
-                <div className="relative z-10 w-full h-full rounded-full bg-indigo-600 border-[3px] border-white shadow-sm overflow-hidden flex items-center justify-center">
+                <div className="relative z-10 w-full h-full rounded-full bg-blue-600 border-[3px] border-white shadow-sm overflow-hidden flex items-center justify-center">
                   {resolvedLogo ? (
                     <img
                       src={resolvedLogo}
@@ -420,7 +420,7 @@ export default function ManageCompany() {
                 </div>
 
                 {!isReadOnly ? (
-                  <label className="absolute -bottom-1 -right-1 z-20 w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-500 shadow-md cursor-pointer hover:text-indigo-600 hover:bg-slate-50 transition-colors">
+                  <label className="absolute -bottom-1 -right-1 z-20 w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-500 shadow-md cursor-pointer hover:text-blue-600 hover:bg-slate-50 transition-colors">
                     <Pencil size={14} />
                     <input
                       ref={fileInputRef}
@@ -444,7 +444,7 @@ export default function ManageCompany() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition cursor-pointer"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 transition cursor-pointer"
                 >
                   Change Logo
                 </button>
@@ -668,12 +668,12 @@ export default function ManageCompany() {
                     handleAddPerk()
                   }
                 }}
-                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
               />
               <button
                 type="button"
                 onClick={handleAddPerk}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer shrink-0"
               >
                 <Plus size={14} />
                 Add Perk
@@ -709,7 +709,7 @@ export default function ManageCompany() {
                           perks: [...(prev.perks || []), suggestion],
                         }))
                       }
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 transition cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-slate-300 transition cursor-pointer"
                     >
                       <Plus size={12} />
                       {suggestion}
@@ -748,7 +748,7 @@ export default function ManageCompany() {
                   value={formData.linkedin}
                   onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
                   className={`w-full pl-10 pr-3.5 py-2.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 transition ${
-                    isReadOnly ? 'bg-slate-100/80 cursor-not-allowed text-slate-600' : 'bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                    isReadOnly ? 'bg-slate-100/80 cursor-not-allowed text-slate-600' : 'bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                   }`}
                 />
               </div>
@@ -765,7 +765,7 @@ export default function ManageCompany() {
                   value={formData.github}
                   onChange={(e) => setFormData({ ...formData, github: e.target.value })}
                   className={`w-full pl-10 pr-3.5 py-2.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 transition ${
-                    isReadOnly ? 'bg-slate-100/80 cursor-not-allowed text-slate-600' : 'bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                    isReadOnly ? 'bg-slate-100/80 cursor-not-allowed text-slate-600' : 'bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                   }`}
                 />
               </div>
@@ -779,7 +779,7 @@ export default function ManageCompany() {
             <button
               type="button"
               onClick={(e) => handleSave(e, true)}
-              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer"
             >
               Save as Draft
             </button>
@@ -787,7 +787,7 @@ export default function ManageCompany() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <span>{saving ? 'Saving...' : 'Save & Publish Profile'}</span>
               <ArrowRight size={15} />
