@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -22,7 +22,10 @@ import {
   MessageSquare,
   ExternalLink,
   Award,
-  FileText
+  FileText,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -31,7 +34,9 @@ import {
   recordApprovalDecision,
   updateApplicationStage,
   getScorecardsByApplication,
-  getCalibrationReport
+  getCalibrationReport,
+  createRequisition,
+  submitRequisition
 } from '../../services/api'
 import { useTenant } from '../../context/TenantContext'
 import { useAuth } from '../../context/AuthContext'
@@ -51,10 +56,19 @@ export default function HiringManagerDashboard() {
   const [requisitions, setRequisitions] = useState([])
   const [candidates, setCandidates] = useState([])
   const [loading, setLoading] = useState(true)
-  const [decisionModal, setDecisionModal] = useState(null) // { reqId, decision: 'approved' | 'rejected' }
-  const [comment, setComment] = useState('')
-  const [submittingDecision, setSubmittingDecision] = useState(false)
   const [hiringLoading, setHiringLoading] = useState({}) // { [candidateId]: true } while PATCH in-flight
+
+  // Create Requisition Form State
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [creatingReq, setCreatingReq] = useState(false)
+  const [newReqForm, setNewReqForm] = useState({
+    title: '',
+    department: 'Engineering',
+    headcount: 1,
+    budget_currency: 'INR',
+    budget_min: 1200000,
+    budget_max: 1800000,
+  })
 
   // Calibration & Scorecard Review State
   const [selectedCandidateForCalibration, setSelectedCandidateForCalibration] = useState(null)
@@ -121,39 +135,49 @@ export default function HiringManagerDashboard() {
     fetchData()
   }, [tenantId, fetchData])
 
-  const handleApprovalSubmit = async () => {
-    if (!decisionModal) return
-    const { reqId, decision } = decisionModal
-    setSubmittingDecision(true)
+  const handleCreateRequisition = async (e) => {
+    e.preventDefault()
+    if (!newReqForm.title.trim()) {
+      toast.error('Please enter a position title')
+      return
+    }
 
+    setCreatingReq(true)
     try {
-      await recordApprovalDecision(reqId, { decision, comments: comment })
-      toast.success(`Requisition ${decision === 'approved' ? 'Signed Off' : 'Rejected'}! 📋`)
+      const res = await createRequisition({
+        title: newReqForm.title.trim(),
+        department: newReqForm.department,
+        headcount: Number(newReqForm.headcount) || 1,
+        budget_min: Number(newReqForm.budget_min) || 0,
+        budget_max: Number(newReqForm.budget_max) || 0,
+        budget_currency: newReqForm.budget_currency,
+      })
+
+      const reqId = res?.data?.id
+      if (reqId) {
+        try {
+          await submitRequisition(reqId)
+        } catch {
+          // ignore if already submitted
+        }
+      }
+
+      toast.success('Requisition raised and submitted for approval! 📋')
+      setShowCreateModal(false)
+      setNewReqForm({
+        title: '',
+        department: 'Engineering',
+        headcount: 1,
+        budget_currency: 'INR',
+        budget_min: 1200000,
+        budget_max: 1800000,
+      })
       await fetchData()
-    } catch (e) {
-      // Optimistic local update in case backend demo mock
-      setRequisitions(prev =>
-        prev.map(r => {
-          if (r.id === reqId) {
-            const updatedChain = (r.approval_chain || []).map(step => {
-              const role = step.role || step.approver_role
-              return role === 'Hiring Manager' ? { ...step, status: decision } : step
-            })
-            const allApproved = updatedChain.every(s => s.status === 'approved')
-            return {
-              ...r,
-              status: decision === 'rejected' ? 'rejected' : allApproved ? 'approved' : 'pending_approval',
-              approval_chain: updatedChain
-            }
-          }
-          return r
-        })
-      )
-      toast.success(`Requisition decision recorded!`)
+    } catch (err) {
+      console.error('[HiringManagerDashboard] Create requisition error:', err)
+      toast.error(err?.response?.data?.detail || 'Failed to create requisition.')
     } finally {
-      setSubmittingDecision(false)
-      setDecisionModal(null)
-      setComment('')
+      setCreatingReq(false)
     }
   }
 
@@ -192,43 +216,77 @@ export default function HiringManagerDashboard() {
     return acc + Math.max(0, head - filled)
   }, 0)
 
+  const reqScrollRef = useRef(null)
+
+  const scrollReqHorizontally = (offset) => {
+    if (reqScrollRef.current) {
+      reqScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' })
+    }
+  }
+
+  // Sort requisitions: newest created_at first
+  const sortedRequisitions = useMemo(() => {
+    return [...requisitions].sort((a, b) => {
+      const da = new Date(a.created_at || 0).getTime()
+      const db = new Date(b.created_at || 0).getTime()
+      if (db !== da) return db - da
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
+  }, [requisitions])
+
   // Active pipeline: exclude candidates who have already been hired or rejected
   const activeCandidates = candidates.filter(c => c.status !== 'hired' && c.status !== 'rejected')
   const decidedCandidates = candidates.filter(c => c.status === 'hired' || c.status === 'rejected')
   const activeCandidatesCount = activeCandidates.length
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6 md:p-10 font-sans space-y-10 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-slate-50/50 py-5 px-4 sm:px-6 lg:px-8 font-sans space-y-6 max-w-7xl mx-auto">
       
-      {/* Top Banner */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      {/* Sleek Top Header Bar */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <span className="px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200/60 inline-flex items-center gap-1.5">
-            <Building className="w-3.5 h-3.5" /> Hiring Manager Portal
-          </span>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2 tracking-tight">
-            Requisitions & Department Pipeline
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200/70 inline-flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5" /> Hiring Manager Portal
+            </span>
+            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+              {user?.name || user?.full_name || 'Engineering'}
+            </span>
+          </div>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+            Requisitions &amp; Department Pipeline
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-0.5">
             Manage headcount allocations, approve hiring budgets, and decide on candidate offers.
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3 px-5 text-center">
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Headcount</div>
-            <div className="text-2xl font-black text-slate-900 mt-0.5">{totalOpenHeadcount} {totalOpenHeadcount === 1 ? 'Role' : 'Roles'}</div>
+        {/* Stats & Actions Row */}
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap w-full md:w-auto justify-between md:justify-end">
+          <div className="flex items-center gap-2">
+            <div className="bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2 text-center">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Open Headcount</div>
+              <div className="text-base font-black text-slate-900 leading-tight">{totalOpenHeadcount} {totalOpenHeadcount === 1 ? 'Role' : 'Roles'}</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/70 rounded-xl px-3.5 py-2 text-center">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">In Pipeline</div>
+              <div className="text-base font-black text-indigo-600 leading-tight">{activeCandidatesCount} Candidates</div>
+            </div>
+            <button
+              onClick={fetchData}
+              title="Refresh dashboard"
+              className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 text-slate-500 hover:text-slate-800 transition cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
-          <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3 px-5 text-center">
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">In Pipeline</div>
-            <div className="text-2xl font-black text-purple-600 mt-0.5">{activeCandidatesCount} Candidates</div>
-          </div>
+
           <button
-            onClick={fetchData}
-            title="Refresh dashboard"
-            className="p-3 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 transition shadow-2xs"
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm hover:shadow shadow-indigo-600/20 cursor-pointer shrink-0"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <Plus className="w-4 h-4" />
+            Raise Requisition
           </button>
         </div>
       </div>
@@ -236,14 +294,14 @@ export default function HiringManagerDashboard() {
       {/* Loading state */}
       {loading && requisitions.length === 0 && candidates.length === 0 ? (
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-8 shadow-xs animate-pulse space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-8 shadow-xs animate-pulse space-y-4">
             <div className="h-5 w-48 bg-slate-200 rounded" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="h-28 bg-slate-100 rounded-2xl" />
               <div className="h-28 bg-slate-100 rounded-2xl" />
             </div>
           </div>
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-8 shadow-xs animate-pulse space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-8 shadow-xs animate-pulse space-y-4">
             <div className="h-5 w-48 bg-slate-200 rounded" />
             <div className="h-40 bg-slate-100 rounded-2xl" />
           </div>
@@ -251,103 +309,238 @@ export default function HiringManagerDashboard() {
       ) : (
         <>
           {/* Section 1: Headcount & Requisition Approval Chain */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600" />
-                Headcount Requisitions & Budget Approval
-              </h2>
-              <span className="text-xs text-slate-500 font-medium">Sequential 3-Step Approval</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-0.5 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Headcount Requisitions &amp; Executive Sign-Off
+                </h2>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {sortedRequisitions.length}
+                </span>
+              </div>
+
+              {sortedRequisitions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
+                    Scroll horizontally
+                  </span>
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => scrollReqHorizontally(-380)}
+                      title="Scroll Left"
+                      className="p-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollReqHorizontally(380)}
+                      title="Scroll Right"
+                      className="p-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {requisitions.length === 0 ? (
-              <div className="p-12 text-center bg-white rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
+            {sortedRequisitions.length === 0 ? (
+              <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
                   <Briefcase className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800">No active requisitions</h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
                   There are currently no headcount requisitions awaiting your review or assigned to your department.
                 </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Raise First Requisition
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {requisitions.map((req) => {
-                  const chain = req.approval_chain || []
-                  const isPendingManager = chain.some(
-                    s => (s.role === 'Hiring Manager' || s.approver_role === 'hiring_manager') && s.status === 'pending'
-                  )
+              <div className="relative">
+                <div
+                  ref={reqScrollRef}
+                  className="flex items-stretch gap-4 overflow-x-auto pb-3 pt-1 px-0.5 custom-scrollbar snap-x snap-mandatory scroll-smooth"
+                >
+                  {sortedRequisitions.map((req) => {
+                    const chain = req.approval_chain || []
+                    const sym = (req.budget_currency === 'INR' || !req.budget_currency) ? '₹ ' : `${req.budget_currency} `
+                    const formattedBudget = req.budget_range || (
+                      req.budget_min && req.budget_max
+                        ? `${sym}${Number(req.budget_min).toLocaleString()} - ${sym}${Number(req.budget_max).toLocaleString()}`
+                        : req.budget_min
+                        ? `${sym}${Number(req.budget_min).toLocaleString()}`
+                        : 'Unspecified'
+                    )
 
-                  const formattedBudget = req.budget_range || (
-                    req.budget_min && req.budget_max
-                      ? `${req.budget_currency || '$'}${Number(req.budget_min).toLocaleString()} - ${req.budget_currency || '$'}${Number(req.budget_max).toLocaleString()}`
-                      : req.budget_min
-                      ? `${req.budget_currency || '$'}${Number(req.budget_min).toLocaleString()}`
-                      : 'Unspecified'
-                  )
+                    const execStep = chain.find(
+                      s => s.approver_role === 'executive' || s.approver_role === 'admin' || s.approver_id === 'finance_admin'
+                    ) || chain[0]
 
-                  return (
-                    <div key={req.id} className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                            req.status === 'approved'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : req.status === 'rejected'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
-                            {(req.status || 'pending').replace('_', ' ')}
-                          </span>
-                          <h3 className="font-bold text-slate-900 text-lg mt-2">{req.title}</h3>
-                          <p className="text-xs font-medium text-slate-500 mt-0.5">{req.department} • Headcount: {req.headcount || 1}</p>
+                    const isApproved = req.status === 'approved' || execStep?.status === 'approved'
+                    const isRejected = req.status === 'rejected' || execStep?.status === 'rejected'
+                    const isPending = !isApproved && !isRejected
+
+                    // Format Requester Name
+                    const rawCreator = req.hiring_manager_name || (req.hiring_manager_id === user?.id ? (user?.name || user?.email) : null)
+                    let creatorDisplay = 'Hiring Manager'
+                    if (rawCreator) {
+                      if (rawCreator.includes('@')) {
+                        creatorDisplay = user?.name ? `${user.name} (You)` : rawCreator.split('@')[0]
+                      } else {
+                        creatorDisplay = rawCreator.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+                      }
+                    }
+
+                    // Format Approver Name
+                    const rawApprover = execStep?.approver_name || 'Company Executive'
+                    const approverDisplay = rawApprover.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+
+                    return (
+                      <div
+                        key={req.id}
+                        className="w-[340px] sm:w-[380px] shrink-0 snap-start bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                      >
+                      {/* Top Header */}
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${
+                                isApproved
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : isRejected
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}
+                            >
+                              {isApproved ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Approved
+                                </>
+                              ) : isRejected ? (
+                                <>
+                                  <X className="w-3.5 h-3.5 text-rose-600" /> Rejected
+                                </>
+                              ) : (
+                                <>
+                                  <Clock className="w-3.5 h-3.5 text-amber-600" /> Pending Approval
+                                </>
+                              )}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                              {req.department || 'Engineering'}
+                            </span>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Salary Range</span>
+                            <div className="text-xs font-bold text-slate-900 mt-0.5">
+                              {formattedBudget}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs text-slate-400">Budget Range</span>
-                          <div className="text-xs font-bold text-slate-800 mt-0.5">{formattedBudget}</div>
+
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900 tracking-tight">{req.title}</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Target Headcount: <strong className="text-slate-800">{req.headcount || 1} {req.headcount === 1 ? 'Role' : 'Roles'}</strong>
+                          </p>
                         </div>
                       </div>
 
-                      {/* Approval Chain Stepper */}
-                      {chain.length > 0 && (
-                        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Approval Chain</div>
-                          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                            {chain.map((step, idx) => (
-                              <div key={step.step || step.step_order || idx} className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                                <div className="text-[10px] text-slate-400">{step.role || step.approver_role || 'Approver'}</div>
-                                <div className="font-bold text-slate-800 truncate mt-0.5">{step.approver || step.approver_id || 'Reviewer'}</div>
-                                <div className={`mt-1 text-[10px] font-bold capitalize ${
-                                  step.status === 'approved' ? 'text-emerald-600' : step.status === 'rejected' ? 'text-rose-600' : 'text-amber-600'
-                                }`}>
-                                  {step.status || 'pending'}
-                                </div>
-                              </div>
-                            ))}
+                      {/* Governance & Sign-Off Pipeline */}
+                      <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 grid grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Requested By</div>
+                          <div className="font-semibold text-slate-800 truncate" title={creatorDisplay}>
+                            {creatorDisplay}
+                          </div>
+                          <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Raised
                           </div>
                         </div>
-                      )}
 
-                      {/* Action Buttons for Hiring Manager */}
-                      {isPendingManager && (
-                        <div className="flex items-center gap-3 pt-2">
-                          <button
-                            onClick={() => setDecisionModal({ reqId: req.id, decision: 'approved' })}
-                            className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition flex items-center justify-center gap-1.5 shadow-sm"
-                          >
-                            <Check className="w-4 h-4" /> Approve Requisition
-                          </button>
-                          <button
-                            onClick={() => setDecisionModal({ reqId: req.id, decision: 'rejected' })}
-                            className="px-4 py-2.5 rounded-xl bg-white border border-rose-200 text-rose-600 font-semibold text-xs hover:bg-rose-50 transition flex items-center gap-1"
-                          >
-                            <X className="w-4 h-4" /> Reject
-                          </button>
+                        <div className="space-y-0.5 border-l border-slate-200/80 pl-3">
+                          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Executive Sign-Off</div>
+                          <div className="font-semibold text-slate-800 truncate" title={approverDisplay}>
+                            {approverDisplay}
+                          </div>
+                          <div className={`text-[10px] font-bold capitalize flex items-center gap-1 ${
+                            isApproved ? 'text-emerald-600' : isRejected ? 'text-rose-600' : 'text-amber-600'
+                          }`}>
+                            {isApproved ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Authorized
+                              </>
+                            ) : isRejected ? (
+                              <>
+                                <X className="w-3 h-3 text-rose-600" /> Declined
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3 h-3 text-amber-600" /> In Review
+                              </>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Card Footer Status Banner */}
+                      <div className="pt-1">
+                        {req.status === 'draft' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await submitRequisition(req.id)
+                                toast.success('Requisition submitted for approval! 📋')
+                                await fetchData()
+                              } catch {
+                                toast.error('Failed to submit requisition.')
+                              }
+                            }}
+                            className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <ArrowRight className="w-4 h-4" /> Submit for Approval
+                          </button>
+                        )}
+
+                        {isPending && (
+                          <div className="flex items-center gap-2 text-xs font-medium text-amber-800 bg-amber-50/70 border border-amber-200/70 rounded-xl px-3 py-2">
+                            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span className="truncate">Awaiting executive budget sign-off</span>
+                          </div>
+                        )}
+
+                        {isApproved && (
+                          <div className="flex items-center gap-2 text-xs font-medium text-emerald-800 bg-emerald-50/70 border border-emerald-200/70 rounded-xl px-3 py-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="truncate">Approved by Executive. Authorized for hiring.</span>
+                          </div>
+                        )}
+
+                        {isRejected && (
+                          <div className="flex items-center gap-2 text-xs font-medium text-rose-800 bg-rose-50/70 border border-rose-200/70 rounded-xl px-3 py-2">
+                            <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <span className="truncate">Requisition rejected during executive budget review.</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
+                </div>
               </div>
             )}
           </div>
@@ -356,7 +549,7 @@ export default function HiringManagerDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <Users className="w-5 h-5 text-purple-600" />
+                <Users className="w-5 h-5 text-indigo-600" />
                 Active Candidate Pipeline &amp; Decisions
               </h2>
               <span className="text-xs text-slate-500 font-medium">Ranked by Calibrated ATS Match</span>
@@ -385,11 +578,11 @@ export default function HiringManagerDashboard() {
                             <button
                               type="button"
                               onClick={() => openCalibrationModal(cand)}
-                              className="group flex items-center gap-1.5 font-bold text-slate-900 text-base hover:text-purple-600 transition-colors text-left"
+                              className="group flex items-center gap-1.5 font-bold text-slate-900 text-base hover:text-indigo-600 transition-colors text-left"
                               title="Click to review candidate calibration & scorecards"
                             >
                               <span>{cand.name}</span>
-                              <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-purple-600 transition-colors" />
+                              <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                             </button>
 
                             <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -409,7 +602,7 @@ export default function HiringManagerDashboard() {
                             {cand.job_id && (
                               <Link
                                 to={`/recruiter/jobs/${cand.job_id}/applicants`}
-                                className="text-[11px] font-medium text-slate-400 hover:text-purple-600 transition flex items-center gap-0.5"
+                                className="text-[11px] font-medium text-slate-400 hover:text-indigo-600 transition flex items-center gap-0.5"
                                 title="View in Job Pipeline"
                               >
                                 Pipeline <ExternalLink className="w-2.5 h-2.5" />
@@ -430,7 +623,7 @@ export default function HiringManagerDashboard() {
                                   href={cand.resume_url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-purple-600 hover:underline flex items-center gap-1 font-medium"
+                                  className="text-indigo-600 hover:underline flex items-center gap-1 font-medium"
                                 >
                                   <FileText className="w-3 h-3" /> Resume
                                 </a>
@@ -446,10 +639,10 @@ export default function HiringManagerDashboard() {
                               type="button"
                               onClick={() => openCalibrationModal(cand)}
                               disabled={isActing}
-                              className="px-3.5 py-2 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/80 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                              className="px-3.5 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
                               title="Review interviewer scorecards and qualitative evidence"
                             >
-                              <FileCheck className="w-3.5 h-3.5 text-purple-600" />
+                              <FileCheck className="w-3.5 h-3.5 text-indigo-600" />
                               Review Scorecards
                             </button>
                             <button
@@ -491,7 +684,7 @@ export default function HiringManagerDashboard() {
                             <button
                               type="button"
                               onClick={() => openCalibrationModal(cand)}
-                              className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 text-xs font-semibold transition flex items-center gap-1"
+                              className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-semibold transition flex items-center gap-1"
                             >
                               <Eye className="w-3 h-3" /> View Scorecards
                             </button>
@@ -533,7 +726,7 @@ export default function HiringManagerDashboard() {
                       <button
                         type="button"
                         onClick={() => openCalibrationModal(cand)}
-                        className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 text-xs font-semibold transition flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-semibold transition flex items-center gap-1"
                       >
                         <Eye className="w-3 h-3" /> Scorecards
                       </button>
@@ -566,7 +759,7 @@ export default function HiringManagerDashboard() {
               {/* Sticky / Fixed Modal Header */}
               <div className="shrink-0 p-6 md:px-8 border-b border-slate-100 bg-white flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg shrink-0">
                     {selectedCandidateForCalibration.name?.slice(0, 2).toUpperCase() || 'CA'}
                   </div>
                   <div>
@@ -579,7 +772,7 @@ export default function HiringManagerDashboard() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      {selectedCandidateForCalibration.role} • Stage: <span className="font-semibold text-purple-700">{selectedCandidateForCalibration.stage}</span>
+                      {selectedCandidateForCalibration.role} • Stage: <span className="font-semibold text-indigo-700">{selectedCandidateForCalibration.stage}</span>
                     </p>
                   </div>
                 </div>
@@ -589,7 +782,7 @@ export default function HiringManagerDashboard() {
                       href={selectedCandidateForCalibration.resume_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 text-xs font-semibold flex items-center gap-1.5 transition"
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition"
                     >
                       <FileText className="w-3.5 h-3.5" /> Resume
                     </a>
@@ -597,7 +790,7 @@ export default function HiringManagerDashboard() {
                   {selectedCandidateForCalibration.job_id && (
                     <Link
                       to={`/recruiter/jobs/${selectedCandidateForCalibration.job_id}/applicants`}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 text-xs font-semibold flex items-center gap-1.5 transition"
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition"
                     >
                       <ExternalLink className="w-3.5 h-3.5" /> Pipeline
                     </Link>
@@ -616,16 +809,16 @@ export default function HiringManagerDashboard() {
               <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
                 {loadingCalibration ? (
                   <div className="py-14 flex flex-col items-center justify-center space-y-3">
-                    <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+                    <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
                     <p className="text-xs text-slate-500 font-medium">Fetching interview scorecards & consensus report from database...</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Calibration Consensus Banner */}
-                    <div className="bg-gradient-to-br from-purple-50/60 via-slate-50 to-indigo-50/40 rounded-2xl p-5 border border-purple-100 space-y-3">
+                    <div className="bg-gradient-to-br from-indigo-50/60 via-slate-50 to-blue-50/40 rounded-2xl p-5 border border-indigo-100 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-purple-800 flex items-center gap-1.5">
-                          <Award className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                          <Award className="w-4 h-4 text-indigo-600" />
                           Inter-Rater Calibration Overview
                         </span>
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
@@ -645,19 +838,19 @@ export default function HiringManagerDashboard() {
                       </p>
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-center">
-                        <div className="bg-white/80 p-2.5 rounded-xl border border-purple-100/60">
+                        <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100/60">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Scorecards</span>
                           <span className="text-lg font-black text-slate-900">{calibrationReport?.scorecard_count || scorecardsList.length}</span>
                         </div>
-                        <div className="bg-white/80 p-2.5 rounded-xl border border-purple-100/60">
+                        <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100/60">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Mean Score</span>
-                          <span className="text-lg font-black text-purple-700">{calibrationReport?.mean_score ? Number(calibrationReport.mean_score).toFixed(1) : (calibrationReport?.mean_competency_score ? Number(calibrationReport.mean_competency_score).toFixed(1) : 'N/A')}/5</span>
+                          <span className="text-lg font-black text-indigo-700">{calibrationReport?.mean_score ? Number(calibrationReport.mean_score).toFixed(1) : (calibrationReport?.mean_competency_score ? Number(calibrationReport.mean_competency_score).toFixed(1) : 'N/A')}/5</span>
                         </div>
-                        <div className="bg-white/80 p-2.5 rounded-xl border border-purple-100/60">
+                        <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100/60">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Score Variance</span>
                           <span className="text-lg font-black text-slate-900">{calibrationReport?.score_variance !== undefined ? Number(calibrationReport.score_variance).toFixed(2) : (calibrationReport?.rating_variance !== undefined ? Number(calibrationReport.rating_variance).toFixed(2) : '0.00')}</span>
                         </div>
-                        <div className="bg-white/80 p-2.5 rounded-xl border border-purple-100/60">
+                        <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100/60">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">Consensus</span>
                           <span className="text-xs font-black text-slate-900 uppercase block mt-1">
                             {calibrationReport?.consensus_recommendation ? calibrationReport.consensus_recommendation.replace('_', ' ') : (scorecardsList.length > 0 ? 'Evaluating' : 'Pending')}
@@ -679,7 +872,7 @@ export default function HiringManagerDashboard() {
                     {/* Interviewer Scorecards List */}
                     <div className="space-y-4">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-purple-600" />
+                        <Users className="w-4 h-4 text-indigo-600" />
                         Submitted Scorecards ({scorecardsList.length})
                       </h4>
 
@@ -710,7 +903,7 @@ export default function HiringManagerDashboard() {
                             return (
                               <div
                                 key={sc.id || sc._id || idx}
-                                className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-3 hover:border-purple-200 transition"
+                                className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-3 hover:border-indigo-200 transition"
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex items-center gap-2.5">
@@ -751,7 +944,7 @@ export default function HiringManagerDashboard() {
                                                 key={val}
                                                 className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
                                                   val <= Number(score)
-                                                    ? 'bg-purple-600 text-white'
+                                                    ? 'bg-indigo-600 text-white'
                                                     : 'bg-slate-200 text-slate-400'
                                                 }`}
                                               >
@@ -839,48 +1032,163 @@ export default function HiringManagerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* Decision Modal */}
+      {/* Create Requisition Modal */}
       <AnimatePresence>
-        {decisionModal && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-4"
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full border border-slate-200 shadow-2xl space-y-5"
             >
-              <h3 className="text-lg font-bold text-slate-900">
-                Confirm {decisionModal.decision === 'approved' ? 'Approval' : 'Rejection'}
-              </h3>
-              <p className="text-xs text-slate-500">
-                Provide rationale or comments for the finance and executive review chain.
-              </p>
-              <textarea
-                rows={3}
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Optional comments / notes..."
-                className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-purple-500/20 focus:outline-none"
-              />
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <Briefcase className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Raise New Requisition</h3>
+                    <p className="text-xs text-slate-500">Official headcount and budget authorization request</p>
+                  </div>
+                </div>
                 <button
-                  onClick={() => setDecisionModal(null)}
-                  disabled={submittingDecision}
-                  className="px-4 py-2 rounded-xl text-slate-600 text-xs font-semibold hover:bg-slate-100 transition"
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleApprovalSubmit}
-                  disabled={submittingDecision}
-                  className={`px-5 py-2 rounded-xl text-white text-xs font-semibold transition flex items-center gap-1.5 ${
-                    decisionModal.decision === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
-                  }`}
-                >
-                  {submittingDecision && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Submit Decision
+                  <X className="w-5 h-5" />
                 </button>
               </div>
+
+              <form onSubmit={handleCreateRequisition} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Job Title / Position Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newReqForm.title}
+                    onChange={(e) => setNewReqForm({ ...newReqForm, title: e.target.value })}
+                    placeholder="e.g. Senior AI Engineer, Full Stack Developer"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Department <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={newReqForm.department}
+                      onChange={(e) => setNewReqForm({ ...newReqForm, department: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white"
+                    >
+                      <option value="Engineering">Engineering</option>
+                      <option value="Data & AI">Data &amp; AI</option>
+                      <option value="Product">Product</option>
+                      <option value="Design">Design</option>
+                      <option value="Operations">Operations</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Sales">Sales</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Headcount (Openings) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      required
+                      value={newReqForm.headcount}
+                      onChange={(e) => setNewReqForm({ ...newReqForm, headcount: parseInt(e.target.value) || 1 })}
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Currency
+                    </label>
+                    <select
+                      value={newReqForm.budget_currency}
+                      onChange={(e) => setNewReqForm({ ...newReqForm, budget_currency: e.target.value })}
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 bg-white"
+                    >
+                      <option value="INR">INR (₹)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Budget Min
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newReqForm.budget_min}
+                      onChange={(e) => setNewReqForm({ ...newReqForm, budget_min: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 1200000"
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Budget Max
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newReqForm.budget_max}
+                      onChange={(e) => setNewReqForm({ ...newReqForm, budget_max: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 1800000"
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-[11px] text-indigo-900 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-indigo-700">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Direct Executive Approval Flow:
+                  </div>
+                  <div>This requisition is submitted directly to the Company Executive for single-stage budget authorization and hiring sign-off.</div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingReq}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold text-xs hover:bg-indigo-700 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer shadow-indigo-600/20"
+                  >
+                    {creatingReq ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        Submit Requisition
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

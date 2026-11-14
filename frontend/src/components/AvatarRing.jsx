@@ -9,10 +9,11 @@ export function getUserPlan(user) {
     user.subscription?.tier ||
     user.subscription?.plan ||
     user.tier ||
-    'free'
+    ''
   const normalized = String(raw).toLowerCase()
-  if (normalized.includes('premium')) return 'premium'
-  if (normalized.includes('pro')) return 'pro'
+  if (normalized.includes('enterprise') || normalized.includes('premium') || normalized.includes('vip')) return 'premium'
+  if (normalized.includes('pro') || normalized.includes('growth') || (user.subscription_active && normalized !== 'free')) return 'pro'
+  if (user.subscription_active) return 'pro'
   return 'free'
 }
 

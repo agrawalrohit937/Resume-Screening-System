@@ -30,7 +30,7 @@ def _format_recommended_job(job: Job, is_applied: bool = False) -> Dict[str, Any
         "matched_skills": [],
         "match_score": 0.0,
         "is_applied": is_applied,
-        "created_at": job.created_at,
+        "created_at": job.created_at.isoformat() if hasattr(job.created_at, "isoformat") else str(job.created_at) if job.created_at else None,
         "is_external": bool(job.is_external),
         "external_apply_url": job.external_apply_url,
     }

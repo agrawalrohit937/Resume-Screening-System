@@ -263,6 +263,10 @@ export default function Signup() {
             {/* COMPANY NAME (Shown if Employer / Company is selected) */}
             {selectedRole === 'employer' && (
               <div>
+                <div className="mb-2.5 p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/60 text-[11px] text-blue-800 flex items-start gap-2">
+                  <Building2 className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
+                  <span>Employer accounts require an official corporate work email (e.g. name@company.com). Personal emails (@gmail, @yahoo) are not allowed.</span>
+                </div>
                 <label htmlFor="company_name" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                   Company / Organization Name
                 </label>
@@ -292,14 +296,14 @@ export default function Signup() {
             {/* EMAIL */}
             <div>
               <label htmlFor="email" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
-                Email Address
+                {selectedRole === 'employer' ? 'Work Email Address' : 'Email Address'}
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
                 <input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={selectedRole === 'employer' ? 'you@company.com' : 'you@example.com'}
                   aria-label="Email Address"
                   disabled={loading}
                   {...register('email', {
@@ -307,6 +311,16 @@ export default function Signup() {
                     pattern: {
                       value: /^\S+@\S+$/i,
                       message: "Invalid email address"
+                    },
+                    validate: (value) => {
+                      if (selectedRole === 'employer') {
+                        const domain = value.split('@')[1]?.toLowerCase()
+                        const generic = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'proton.me', 'mail.com', 'aol.com']
+                        if (domain && generic.includes(domain)) {
+                          return 'Employers must use an official corporate email (e.g. name@company.com), personal emails are not allowed.'
+                        }
+                      }
+                      return true
                     }
                   })}
                   className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-4 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${

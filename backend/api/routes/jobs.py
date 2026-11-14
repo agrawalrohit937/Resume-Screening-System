@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse as _JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter
@@ -264,7 +265,7 @@ async def get_recommended_jobs(
         resume_repo=resume_repo,
         include_external=str(user_role or "").lower() == UserRole.CANDIDATE.value,
     )
-    response = _JSONResponse(content=result)
+    response = _JSONResponse(content=jsonable_encoder(result))
     response.headers["Cache-Control"] = "private, max-age=300"
     return response
 

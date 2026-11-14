@@ -505,8 +505,9 @@ export default function Billing() {
               </button>
               {!isFree && subscriptionActive && (
                 <button 
+                  type="button"
                   onClick={() => setShowCancelModal(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-rose-600 border border-slate-200 hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-rose-600 border border-slate-200 hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm cursor-pointer"
                 >
                   Cancel Subscription
                 </button>
@@ -641,111 +642,114 @@ export default function Billing() {
       </motion.div>
 
       {/* ── Cancel Subscription Modal ── */}
-      <AnimatePresence>
-        {showCancelModal && typeof document !== 'undefined' && createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !cancelling && setShowCancelModal(false)}
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showCancelModal && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !cancelling && setShowCancelModal(false)}
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden p-6 z-10 space-y-4"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-                    <AlertTriangle size={20} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 z-10 space-y-4"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">Cancel Subscription?</h3>
+                      <p className="text-xs text-slate-500 font-medium">Revert to Free Tier</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">Cancel Subscription?</h3>
-                    <p className="text-xs text-slate-500 font-medium">Revert to Free Tier</p>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={() => setShowCancelModal(false)}
+                    className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button
-                  disabled={cancelling}
-                  onClick={() => setShowCancelModal(false)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100"
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-3.5 text-xs text-rose-800 leading-relaxed">
-                <p className="font-bold mb-0.5">Are you sure you want to cancel {currentConfig.name}?</p>
-                <p className="text-rose-700/90 text-[11px]">
-                  Your subscription will be deactivated immediately and your account will revert to the standard Free Tier.
-                </p>
-              </div>
+                <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-3.5 text-xs text-rose-800 leading-relaxed">
+                  <p className="font-bold mb-0.5">Are you sure you want to cancel {currentConfig.name}?</p>
+                  <p className="text-rose-700/90 text-[11px]">
+                    Your subscription will be deactivated immediately and your account will revert to the standard Free Tier.
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Reason for cancelling
-                </label>
-                <CustomDropdown
-                  value={cancelReason}
-                  onChange={(val) => setCancelReason(val)}
-                  options={[
-                    { value: 'Too expensive', label: 'Too expensive' },
-                    { value: 'Temporary need fulfilled', label: 'Found a job / Interview cleared' },
-                    { value: 'Missing features', label: 'Missing features I need' },
-                    { value: 'Switching to another platform', label: 'Switching to another service' },
-                    { value: 'Technical issues', label: 'Technical difficulties' },
-                    { value: 'Other', label: 'Other reason' }
-                  ]}
-                  className="w-full"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Reason for cancelling
+                  </label>
+                  <CustomDropdown
+                    value={cancelReason}
+                    onChange={(val) => setCancelReason(val)}
+                    options={[
+                      { value: 'Too expensive', label: 'Too expensive' },
+                      { value: 'Temporary need fulfilled', label: 'Found a job / Interview cleared' },
+                      { value: 'Missing features', label: 'Missing features I need' },
+                      { value: 'Switching to another platform', label: 'Switching to another service' },
+                      { value: 'Technical issues', label: 'Technical difficulties' },
+                      { value: 'Other', label: 'Other reason' }
+                    ]}
+                    className="w-full"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Additional feedback (optional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={cancelFeedback}
-                  onChange={(e) => setCancelFeedback(e.target.value)}
-                  placeholder="How could we make CareerShala better?"
-                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white resize-none transition-all placeholder:text-slate-400"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Additional feedback (optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={cancelFeedback}
+                    onChange={(e) => setCancelFeedback(e.target.value)}
+                    placeholder="How could we make CareerShala better?"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white resize-none transition-all placeholder:text-slate-400"
+                  />
+                </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={cancelling}
-                  onClick={() => setShowCancelModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                >
-                  Keep Subscription
-                </button>
-                <button
-                  type="button"
-                  disabled={cancelling}
-                  onClick={handleCancelSubscription}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-sm disabled:opacity-50"
-                >
-                  {cancelling ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      Cancelling...
-                    </>
-                  ) : (
-                    'Confirm Cancel'
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={() => setShowCancelModal(false)}
+                    className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                  >
+                    Keep Subscription
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={handleCancelSubscription}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {cancelling ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Cancelling...
+                      </>
+                    ) : (
+                      'Confirm Cancel'
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* ── Tax Invoice Receipt Modal ── */}
       <AnimatePresence>

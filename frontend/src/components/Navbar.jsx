@@ -339,7 +339,25 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
     )
   }
 
-  const isPremiumUser = user?.plan === 'premium' || user?.subscription_tier === 'premium'
+  const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
+  const userPlan = String(rawPlan).toLowerCase()
+  const isPremiumUser = userPlan.includes('premium') || userPlan.includes('pro') || userPlan.includes('enterprise') || userPlan.includes('growth') || Boolean(user?.subscription_active)
+
+  const userRolesArray = Array.isArray(user?.roles) ? user.roles.map(r => String(r).toLowerCase().trim()) : []
+  const userRoles = [...userRolesArray, String(user?.role || '').toLowerCase().trim()].filter(Boolean)
+  const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
+  const isHiringManager = userRoles.includes('hiring_manager')
+  const isInterviewer = userRoles.includes('interviewer')
+  const isRecruiterRole = isRecruiter || userRoles.includes('recruiter')
+  const isAdmin = userRoles.includes('admin') || userRoles.includes('platform_admin')
+
+  let roleLabel = 'Candidate'
+  if (isAdmin) roleLabel = 'Admin'
+  else if (isExecutive) roleLabel = 'Executive'
+  else if (isHiringManager) roleLabel = 'Hiring Manager'
+  else if (isRecruiterRole) roleLabel = 'Recruiter'
+  else if (isInterviewer) roleLabel = 'Interviewer'
+  else if (isPremiumUser) roleLabel = userPlan.includes('premium') ? 'VIP Member' : 'Pro Member'
 
   return (
     <header className="h-[64px] shrink-0 sticky top-0 z-40 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 lg:px-6 shadow-2xs relative">
@@ -507,17 +525,19 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
             aria-label="User account menu"
             className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-xl hover:bg-slate-100 border border-transparent hover:border-slate-200/80 transition-all cursor-pointer select-none"
           >
-            <AvatarRing user={user} ringSize={32} shape="circle">
-              <UserAvatar user={user} size="sm" />
-            </AvatarRing>
+            <div className="relative">
+              <AvatarRing user={user} ringSize={32} shape="circle">
+                <UserAvatar user={user} size="sm" />
+              </AvatarRing>
+            </div>
             
             <div className="hidden sm:flex flex-col text-left leading-tight">
-              <span className="text-xs font-extrabold text-slate-900 truncate max-w-[100px] flex items-center gap-1">
+              <span className="text-xs font-extrabold text-slate-900 truncate max-w-[110px] flex items-center gap-1">
                 {user?.full_name?.split(' ')[0] || 'User'}
-                {isPremiumUser && <Crown size={11} className="text-amber-500 fill-amber-400 shrink-0" />}
+                {isPremiumUser && <Crown size={12} className="text-amber-400 fill-amber-400 shrink-0" />}
               </span>
-              <span className="text-[10.5px] font-semibold text-slate-400 truncate max-w-[100px] capitalize">
-                {user?.role === 'recruiter' ? 'Recruiter' : isPremiumUser ? 'Pro Member' : 'Candidate'}
+              <span className="text-[10.5px] font-semibold text-slate-400 truncate max-w-[110px]">
+                {roleLabel}
               </span>
             </div>
 

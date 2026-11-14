@@ -15,7 +15,10 @@ import {
   Briefcase,
   Building2,
   Shield,
-  Zap
+  Zap,
+  TrendingUp,
+  Users,
+  Crown
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
@@ -23,7 +26,7 @@ import AvatarRing, { getUserPlan } from './AvatarRing'
 import { getMyAnalytics } from '../services/api'
 import { getGamificationProfile } from '../services/interviewApi'
 
-function DropdownAvatar({ user }) {
+function DropdownAvatar({ user, hasCrown }) {
   const imgUrl = resolveAvatarUrl(user)
   const initials = getInitials(user?.full_name)
 
@@ -42,6 +45,11 @@ function DropdownAvatar({ user }) {
           )}
         </div>
       </AvatarRing>
+      {hasCrown && (
+        <div className="absolute -top-2.5 -right-1.5 z-20 rotate-[15deg] drop-shadow-md">
+          <Crown size={15} className="text-amber-400 fill-amber-400 drop-shadow-[0_2px_8px_rgba(243,194,75,0.7)]" />
+        </div>
+      )}
     </div>
   )
 }
@@ -83,8 +91,11 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
 
   const canSwitchContext = hasEmployerRole && hasCandidateRole && !isAdmin
   const plan = getUserPlan(user)
-  const isPremium = plan === 'premium'
-  const isPro = plan === 'pro'
+  const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
+  const userPlan = String(rawPlan).toLowerCase()
+  const isPremium = plan === 'premium' || userPlan.includes('premium') || userPlan.includes('enterprise')
+  const isPro = plan === 'pro' || userPlan.includes('pro') || userPlan.includes('growth') || Boolean(user?.subscription_active)
+  const hasCrown = isPremium || isPro
 
   // 100% Real Stats fetched from analytics / gamification (cached in localStorage for instant 0ms load)
   const [realStats, setRealStats] = useState(() => {
@@ -159,21 +170,45 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
           onClick={() => handleNavigate('/profile')}
           className="flex items-center gap-3 p-1.5 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer select-none"
         >
-          <DropdownAvatar user={user} />
+          <DropdownAvatar user={user} hasCrown={hasCrown} />
           
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <h3 className="text-xs font-black text-slate-900 truncate leading-tight">
                 {user?.full_name || 'Rohit Agrawal'}
               </h3>
-              <span className={`text-[9.5px] font-black uppercase px-1.5 py-0.2 rounded border ${
-                isPremium
+              <span className={`text-[9.5px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                effectiveRole === 'admin'
+                  ? 'bg-slate-100 text-slate-800 border-slate-300'
+                  : effectiveRole === 'exec'
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : effectiveRole === 'hiring_manager'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : effectiveRole === 'interviewer'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : effectiveRole === 'recruiter'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : isPremium
                   ? 'bg-amber-50 text-amber-800 border-amber-200'
                   : isPro
                   ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   : 'bg-slate-100 text-slate-600 border-slate-200'
               }`}>
-                {effectiveRole === 'admin' ? 'Admin' : effectiveRole === 'recruiter' ? 'Recruiter' : isPremium ? 'VIP' : isPro ? 'PRO' : 'FREE'}
+                {effectiveRole === 'admin'
+                  ? 'Admin'
+                  : effectiveRole === 'exec'
+                  ? 'Executive'
+                  : effectiveRole === 'hiring_manager'
+                  ? 'Hiring Manager'
+                  : effectiveRole === 'interviewer'
+                  ? 'Interviewer'
+                  : effectiveRole === 'recruiter'
+                  ? 'Recruiter'
+                  : isPremium
+                  ? 'VIP'
+                  : isPro
+                  ? 'PRO'
+                  : 'FREE'}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 truncate font-medium mt-0.5">
@@ -231,27 +266,43 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
         )}
       </div>
 
-      {/* 3. CONTEXT SWITCHER (if dual hat) */}
+      {/* 3. CONTEXT SWITCHER: Modern Segmented Switch (Candidate vs Employer) */}
       {canSwitchContext && (
-        <div className="px-3.5 py-1.5 bg-indigo-50/60 border-b border-indigo-100/60 flex items-center justify-between">
-          <span className="text-[10px] font-bold text-indigo-900 flex items-center gap-1">
-            <ArrowLeftRight size={10} className="text-indigo-500" />
-            {isCandidateView ? 'Candidate Active' : 'Employer Active'}
-          </span>
-          <button
-            type="button"
-            onClick={handleSwitchContext}
-            className="px-2 py-0.5 text-[9px] font-extrabold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded shadow-2xs transition-colors cursor-pointer"
-          >
-            Switch ↗
-          </button>
+        <div className="px-3.5 pt-2 pb-1.5 border-b border-slate-100">
+          <div className="p-1 bg-slate-100/90 rounded-2xl grid grid-cols-2 gap-1 text-xs text-center border border-slate-200/50">
+            <button
+              type="button"
+              onClick={!isCandidateView ? handleSwitchContext : undefined}
+              className={`py-1.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                isCandidateView
+                  ? 'bg-white text-indigo-700 shadow-2xs font-extrabold'
+                  : 'text-slate-500 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <User size={13} className={isCandidateView ? 'text-indigo-600' : 'text-slate-400'} />
+              <span>Candidate</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={isCandidateView ? handleSwitchContext : undefined}
+              className={`py-1.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none ${
+                !isCandidateView
+                  ? 'bg-white text-indigo-700 shadow-2xs font-extrabold'
+                  : 'text-slate-500 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <Building2 size={13} className={!isCandidateView ? 'text-indigo-600' : 'text-slate-400'} />
+              <span>Employer</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* 4. MODERN 2X2 ACTION TILES */}
       <div className="px-3.5 py-2">
         <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 mb-1.5 px-0.5">
-          Learning & Career Hub
+          {effectiveRole === 'candidate' ? 'Learning & Career Hub' : 'Enterprise Workspace'}
         </p>
 
         {effectiveRole === 'candidate' && (
@@ -327,10 +378,10 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
             <button
               type="button"
               onClick={() => handleNavigate('/billing')}
-              className="p-2.5 rounded-2xl bg-slate-50/90 hover:bg-purple-50/80 border border-slate-200/70 hover:border-purple-200 text-left transition-all group cursor-pointer shadow-2xs"
+              className="p-2.5 rounded-2xl bg-slate-50/90 hover:bg-indigo-50/80 border border-slate-200/70 hover:border-indigo-200 text-left transition-all group cursor-pointer shadow-2xs"
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="w-7 h-7 rounded-xl bg-white border border-slate-200/70 flex items-center justify-center text-purple-600 shadow-2xs group-hover:scale-105 transition-transform">
+                <div className="w-7 h-7 rounded-xl bg-white border border-slate-200/70 flex items-center justify-center text-indigo-600 shadow-2xs group-hover:scale-105 transition-transform">
                   <CreditCard size={14} strokeWidth={2.4} />
                 </div>
                 <span className={`text-[9.5px] font-black px-1.5 py-0.2 rounded border ${
@@ -339,11 +390,11 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
                   {isPremium ? 'VIP' : isPro ? 'PRO' : 'Upgrade'}
                 </span>
               </div>
-              <p className="text-xs font-extrabold text-slate-800 group-hover:text-purple-600 truncate leading-tight">
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-600 truncate leading-tight">
                 Subscription
               </p>
               <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
-                AI Tokens & Plan
+                AI Tokens &amp; Plan
               </p>
             </button>
 
@@ -374,26 +425,98 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
           </div>
         )}
 
+        {/* Hiring Manager 2x2 Grid */}
+        {effectiveRole === 'hiring_manager' && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleNavigate('/hiring-manager/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Briefcase size={16} className="text-indigo-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Requisitions</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Headcount &amp; Budget</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/hiring-manager/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Target size={16} className="text-indigo-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Candidates</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Pipeline &amp; Offers</p>
+            </button>
+          </div>
+        )}
+
+        {/* Executive 2x2 Grid */}
+        {effectiveRole === 'exec' && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleNavigate('/exec/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <TrendingUp size={16} className="text-indigo-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Executive Board</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Analytics &amp; Approvals</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/settings/team')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Users size={16} className="text-indigo-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Team Access</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Roles &amp; Invites</p>
+            </button>
+          </div>
+        )}
+
+        {/* Interviewer 2x2 Grid */}
+        {effectiveRole === 'interviewer' && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleNavigate('/interviewer/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Zap size={16} className="text-blue-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-blue-700 truncate">Interview Kits</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Live Scorecards</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/interviewer/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Target size={16} className="text-blue-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-blue-700 truncate">Evaluations</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Candidate Calibrate</p>
+            </button>
+          </div>
+        )}
+
         {/* Admin 2x2 Grid */}
         {effectiveRole === 'admin' && (
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => handleNavigate('/admin')}
-              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-200/70 text-left transition-all group cursor-pointer"
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer"
             >
-              <Shield size={16} className="text-purple-600 mb-1" />
+              <Shield size={16} className="text-indigo-600 mb-1" />
               <p className="text-xs font-extrabold text-slate-800">Admin Console</p>
               <p className="text-[10px] text-slate-400">Platform KPIs</p>
             </button>
             <button
               type="button"
               onClick={() => handleNavigate('/settings')}
-              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-200/70 text-left transition-all group cursor-pointer"
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer"
             >
-              <Settings size={16} className="text-purple-600 mb-1" />
+              <Settings size={16} className="text-indigo-600 mb-1" />
               <p className="text-xs font-extrabold text-slate-800">System Config</p>
-              <p className="text-[10px] text-slate-400">Security & Keys</p>
+              <p className="text-[10px] text-slate-400">Security &amp; Keys</p>
             </button>
           </div>
         )}

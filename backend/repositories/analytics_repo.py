@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.tables import (
     CandidateApplication, Job, Resume, ATSResult,
-    Certificate, InterviewSessionModel, User, EeoResponse
+    Certificate, InterviewSessionModel, User, EeoResponse,
+    Requisition as RequisitionTable
 )
 from repositories.base_repo import BaseRepository
 
@@ -63,13 +64,12 @@ class AnalyticsRepository(BaseRepository):
                 resumes = (await sess.execute(res_stmt)).scalars().all()
                 for r in resumes:
                     dt = r.created_at or now
-                    fname = r.filename or "Primary Resume.pdf"
-                    clean_name = fname.split("_")[0] if ("_" in fname and len(fname.split("_")[0]) > 6) else fname
+                    fname = r.original_filename or r.filename or "Primary Resume.pdf"
                     activity.append({
                         "id": f"res_{r.id}",
                         "type": "resume_upload",
                         "title": "Resume Uploaded & Parsed",
-                        "detail": clean_name,
+                        "detail": fname,
                         "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
                         "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
                     })
@@ -123,11 +123,28 @@ class AnalyticsRepository(BaseRepository):
                 int_sess_rows = (await sess.execute(int_stmt)).scalars().all()
                 for i_sess in int_sess_rows:
                     dt = i_sess.created_at or now
+                    role_title = i_sess.job_title or "General"
+                    score_val = getattr(i_sess, 'overall_score', None)
+                    sess_status = str(getattr(i_sess, 'status', 'completed')).lower()
+
+                    if sess_status == 'completed' and score_val is not None:
+                        title_text = f"Mock Interview Completed ({role_title})"
+                        detail_text = f"Final Score: {int(score_val)}%"
+                    elif score_val is not None:
+                        title_text = f"Mock Interview ({role_title})"
+                        detail_text = f"Score: {int(score_val)}%"
+                    elif sess_status in ('aborted', 'cancelled'):
+                        title_text = f"Mock Interview Aborted ({role_title})"
+                        detail_text = "Session incomplete"
+                    else:
+                        title_text = f"Mock Interview Session ({role_title})"
+                        detail_text = "Practice session recorded"
+
                     activity.append({
                         "id": f"int_{i_sess.id}",
                         "type": "interview",
-                        "title": "Mock Interview Completed",
-                        "detail": f"Score: {int(getattr(i_sess, 'overall_score', 80) or getattr(i_sess, 'score', 80) or 80)}%",
+                        "title": title_text,
+                        "detail": detail_text,
                         "created_at": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
                         "timestamp": dt.timestamp() if hasattr(dt, "timestamp") else 0,
                     })
@@ -203,11 +220,30 @@ class AnalyticsRepository(BaseRepository):
             eeo_res = await session.execute(eeo_stmt.limit(1000))
             eeo_responses = [{"race_ethnicity": r.race_ethnicity, "gender": r.gender} for r in eeo_res.scalars().all()]
 
+            req_stmt = select(RequisitionTable).order_by(RequisitionTable.created_at.desc())
+            if tenant_id and tenant_id != "default":
+                req_stmt = req_stmt.where(RequisitionTable.tenant_id == tenant_id)
+            req_res = await session.execute(req_stmt.limit(100))
+            req_rows = req_res.scalars().all()
+            requisitions_list = []
+            for r in req_rows:
+                d = dict(r.data or {})
+                requisitions_list.append({
+                    "id": str(r.id),
+                    "title": r.title,
+                    "department": r.department or "General",
+                    "status": r.status,
+                    "headcount": int(d.get("headcount", 1) or 1),
+                    "filled_count": int(d.get("filled_count", 0) or 0),
+                    "created_at": r.created_at,
+                })
+
             return {
                 "jobs_list": jobs_list,
                 "job_ids": job_ids,
                 "hired_app_rows": [{"job_id": str(r.job_id), "created_at": r.created_at, "updated_at": r.updated_at} for r in hired_app_rows],
                 "total_offers": total_offers,
                 "eeo_responses": eeo_responses,
+                "requisitions_list": requisitions_list,
             }
 

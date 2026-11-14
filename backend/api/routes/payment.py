@@ -1,3 +1,5 @@
+import uuid
+import structlog
 from config.db import get_pg_session_factory
 from sqlalchemy import select, update
 from models.tables import Company, User, UserGamification
@@ -9,6 +11,8 @@ from pydantic import BaseModel, Field
 from api.deps import get_current_user, get_user_repo
 from schemas.user_schema import UserModel, MessageResponse
 from services.razorpay_service import razorpay_service
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
@@ -156,32 +160,18 @@ async def activate_user_subscription(
 
     # 🏢 Automatic Company & Team Member Subscription Inheritance:
     # If the user is an Executive / belongs to a company tenant and activates a plan,
-    # propagate the subscription immediately to the company profile and ALL team members (recruiters, interviewers) under that company!
+    # propagate the subscription immediately to ALL team members (recruiters, interviewers) under that company!
     tenant_id = getattr(user, "tenant_id", None)
     if tenant_id and tenant_id != "default":
         try:
             async with get_pg_session_factory()() as session:
                 comp_stmt = select(Company).where(Company.tenant_id == tenant_id)
                 comp = (await session.execute(comp_stmt)).scalar_one_or_none()
-                if comp:
-                    comp.plan = normalized_plan
-                    comp.subscription_active = True
-                    comp.subscription_status = "active"
-                    comp.subscription_start_date = start_date
-                    comp.subscription_end_date = end_date
-                    comp.subscribed_by = str(user.id)
-                    comp.updated_at = now
-                else:
+                if not comp:
                     new_comp = Company(
                         id=str(uuid.uuid4()),
                         tenant_id=tenant_id,
                         company_name=tenant_id.replace("-", " ").title(),
-                        plan=normalized_plan,
-                        subscription_active=True,
-                        subscription_status="active",
-                        subscription_start_date=start_date,
-                        subscription_end_date=end_date,
-                        subscribed_by=str(user.id),
                         created_at=now,
                         updated_at=now,
                     )
@@ -200,6 +190,11 @@ async def activate_user_subscription(
                     )
                 )
                 await session.commit()
+                logger.info(
+                    "Propagated company subscription to team members",
+                    tenant_id=tenant_id,
+                    plan=normalized_plan,
+                )
         except Exception as e:
             logger.error("Failed to propagate company subscription to team members", error=str(e))
 
@@ -253,23 +248,12 @@ async def cancel_subscription(
     }
     await user_repo.add_payment_history(str(current_user.id), cancel_record)
 
-    # 🏢 Propagate cancellation to tenant company profile and members
+    # 🏢 Propagate cancellation to tenant members
     tenant_id = getattr(current_user, "tenant_id", None)
     if tenant_id and tenant_id != "default":
         try:
             now_dt = datetime.now(timezone.utc)
             async with get_pg_session_factory()() as session:
-                await session.execute(
-                    update(Company)
-                    .where(Company.tenant_id == tenant_id)
-                    .values(
-                        plan="free",
-                        subscription_active=False,
-                        subscription_status="cancelled",
-                        subscription_end_date=None,
-                        updated_at=now_dt,
-                    )
-                )
                 await session.execute(
                     update(User)
                     .where(User.tenant_id == tenant_id)
@@ -282,8 +266,9 @@ async def cancel_subscription(
                     )
                 )
                 await session.commit()
-        except Exception:
-            pass
+                logger.info("Propagated subscription cancellation to tenant members", tenant_id=tenant_id)
+        except Exception as e:
+            logger.error("Failed to propagate subscription cancellation to tenant members", error=str(e))
 
     # If user had an active recovery case, close it as churned
     try:

@@ -48,7 +48,12 @@ class RequisitionService:
     async def list_requisitions(self, tenant_id: Optional[str] = None, limit: int = 100) -> List[RequisitionModel]:
         resolved_tenant = tenant_id or get_current_tenant_id()
         async with self._get_session() as session:
-            stmt = select(RequisitionTable).where(RequisitionTable.tenant_id == str(resolved_tenant)).limit(limit)
+            stmt = (
+                select(RequisitionTable)
+                .where(RequisitionTable.tenant_id == str(resolved_tenant))
+                .order_by(RequisitionTable.created_at.desc())
+                .limit(limit)
+            )
             rows = (await session.execute(stmt)).scalars().all()
             results = []
             for r in rows:
@@ -59,6 +64,8 @@ class RequisitionService:
                 d["department"] = r.department
                 d["hiring_manager_id"] = r.hiring_manager_id
                 d["status"] = r.status
+                d["created_at"] = r.created_at
+                d["updated_at"] = r.updated_at
                 results.append(RequisitionModel(**d))
             return results
 
@@ -130,12 +137,19 @@ class RequisitionService:
         budget_max: float = 0.0,
         currency: str = "USD",
         approval_chain: Optional[List[ApprovalStep]] = None,
-        tenant_id: Optional[str] = None
+        tenant_id: Optional[str] = None,
+        hiring_manager_name: Optional[str] = None,
+        hiring_manager_email: Optional[str] = None,
     ) -> RequisitionModel:
         resolved_tenant = tenant_id or get_current_tenant_id()
         chain = approval_chain or [
-            ApprovalStep(step_order=1, approver_id=hiring_manager_id, approver_role="hiring_manager"),
-            ApprovalStep(step_order=2, approver_id="finance_admin", approver_role="admin")
+            ApprovalStep(
+                step_order=1,
+                approver_id="executive",
+                approver_role="executive",
+                approver_name="Company Executive",
+                status=ApprovalDecision.PENDING,
+            )
         ]
         req = RequisitionModel(
             tenant_id=resolved_tenant,
@@ -146,6 +160,8 @@ class RequisitionService:
             budget_max=budget_max,
             budget_currency=currency,
             hiring_manager_id=hiring_manager_id,
+            hiring_manager_name=hiring_manager_name,
+            hiring_manager_email=hiring_manager_email,
             approval_chain=chain,
             status=RequisitionStatus.DRAFT
         )
@@ -204,7 +220,9 @@ class RequisitionService:
         approver_id: str,
         decision: ApprovalDecision,
         comments: Optional[str] = None,
-        tenant_id: Optional[str] = None
+        tenant_id: Optional[str] = None,
+        approver_role: Optional[str] = None,
+        approver_name: Optional[str] = None,
     ) -> Optional[RequisitionModel]:
         resolved_tenant = tenant_id or get_current_tenant_id()
         async with self._get_session() as session:
@@ -230,10 +248,19 @@ class RequisitionService:
 
             updated_step = False
             for step in req.approval_chain:
-                if step.approver_id == approver_id and step.status == ApprovalDecision.PENDING:
+                matches_id = (step.approver_id == approver_id) or (step.approver_id in ("executive", "admin", "finance_admin"))
+                matches_role = (
+                    step.approver_role in ("executive", "admin")
+                    and (approver_role or "").lower() in ("executive", "admin", "owner", "")
+                )
+
+                if (matches_id or matches_role) and step.status == ApprovalDecision.PENDING:
                     step.status = decision
                     step.decided_at = datetime.now(timezone.utc)
                     step.comments = comments
+                    step.approver_id = approver_id
+                    if approver_name:
+                        step.approver_name = approver_name
                     updated_step = True
                     break
 

@@ -526,8 +526,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const currentViewMode = VIEW_MODES.find(v => v.key === adminViewMode) || VIEW_MODES[0]
   const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
   const userPlan = String(rawPlan).toLowerCase()
-  const isPremium = userPlan.includes('premium')
-  const isPro = userPlan.includes('pro')
+  const isPremium = userPlan.includes('enterprise') || userPlan.includes('premium') || userPlan.includes('vip')
+  const isPro = userPlan.includes('pro') || userPlan.includes('growth') || (Boolean(user?.subscription_active) && !isPremium)
   const hasCrown = isPremium || isPro
 
   if (isImmersive) return null
@@ -1167,7 +1167,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                       EXECUTIVE
                     </span>
                   ) : isHiringManager ? (
-                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-purple-800 bg-purple-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-purple-200 shadow-2xs">
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-indigo-800 bg-indigo-50 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-indigo-200/80 shadow-2xs">
                       HIRING MANAGER
                     </span>
                   ) : isRecruiterRole ? (
