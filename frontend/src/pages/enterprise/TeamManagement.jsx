@@ -412,10 +412,14 @@ export default function TeamManagement() {
                           <td className="py-4 px-6">
                             <div className="flex flex-wrap gap-1.5">
                               {roles
-                                .filter((r) => String(r).toLowerCase().trim() !== 'candidate' || roles.length === 1)
+                                .filter((r) => {
+                                  const clean = String(r).replace(/^UserRole\./i, '').toLowerCase().trim()
+                                  return clean !== 'candidate' || roles.length === 1
+                                })
                                 .map((r) => {
-                                  const cfg = ROLE_CONFIG[r] || {
-                                    label: r,
+                                  const cleanR = String(r).replace(/^UserRole\./i, '').toLowerCase().trim()
+                                  const cfg = ROLE_CONFIG[cleanR] || {
+                                    label: cleanR.charAt(0).toUpperCase() + cleanR.slice(1).replace('_', ' '),
                                     color: 'bg-slate-100 text-slate-700 border-slate-200',
                                   }
                                   return (

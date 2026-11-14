@@ -158,7 +158,6 @@ const ADMIN_NAV_SECTIONS = [
     items: [
       { to: '/admin', label: 'Admin Dashboard', icon: Icons.admin },
       { to: '/recruiter', label: 'Manage Job Postings', icon: Icons.recruiter },
-      { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
       { to: '/jobs', label: 'Explore Feed', icon: Icons.dashboard },
     ],
   },
@@ -222,6 +221,7 @@ const RECRUITER_PRIMARY_SECTIONS = [
   {
     title: 'Organization',
     items: [
+      { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
       { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
       { to: '/profile', label: 'Recruiter Profile', icon: Icons.profile },
     ],
