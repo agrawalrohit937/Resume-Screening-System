@@ -410,13 +410,28 @@ async def list_team_members(
     """
     tenant_id = current_user.tenant_id or "default"
     users_list_models, _ = await user_repo.list_users(tenant_id=tenant_id, skip=0, limit=100)
+
+    # Strictly filter for enterprise/staff members (exclude regular candidates)
+    enterprise_staff_roles = {"recruiter", "hiring_manager", "interviewer", "executive", "admin", "platform_admin"}
+
+    def _is_enterprise_staff(u_role: Any, u_roles: Any) -> bool:
+        clean_primary = str(u_role or "").lower().replace("userrole.", "").strip()
+        clean_roles = {
+            str(r).lower().replace("userrole.", "").strip()
+            for r in (u_roles if isinstance(u_roles, list) else [u_role])
+            if r
+        }
+        if clean_primary in enterprise_staff_roles:
+            return True
+        return bool(clean_roles.intersection(enterprise_staff_roles))
+
     raw_members = [
         {
             "_id": u.id,
             "email": u.email,
             "full_name": u.full_name,
-            "role": u.role,
-            "roles": u.roles,
+            "role": str(u.role or "").replace("UserRole.", "").lower().strip(),
+            "roles": [str(r).replace("UserRole.", "").lower().strip() for r in (u.roles if isinstance(u.roles, list) else [u.role]) if r],
             "tenant_id": u.tenant_id,
             "status": u.status,
             "created_at": u.created_at,
@@ -424,19 +439,19 @@ async def list_team_members(
             "profile_picture": u.profile_picture,
         }
         for u in users_list_models
-        if getattr(u, "status", None) != "deleted"
+        if getattr(u, "status", None) != "deleted" and _is_enterprise_staff(u.role, u.roles)
     ]
     raw_invites = await invite_repo.list_by_tenant(tenant_id)
 
     members: List[TeamMemberItem] = []
     for m in raw_members:
-        r_list = m.get("roles") or ([m.get("role")] if m.get("role") else ["candidate"])
+        r_list = m.get("roles") or ([m.get("role")] if m.get("role") else ["recruiter"])
         members.append(
             TeamMemberItem(
                 id=str(m.get("id") or m.get("_id")),
                 email=m.get("email", ""),
                 full_name=m.get("full_name", ""),
-                role=str(m.get("role", "candidate")),
+                role=str(m.get("role", "recruiter")),
                 roles=[str(r) for r in r_list],
                 tenant_id=m.get("tenant_id", tenant_id),
                 status=str(m.get("status", "active")),

@@ -42,10 +42,10 @@ def calculate_slot_id(now: Optional[datetime] = None, slot_type: Optional[str] =
     return f"{date_str}_07:30" if ist_now.hour < 12 else f"{date_str}_14:00"
 
 
-async def run_external_job_scrape() -> Dict[str, int]:
-    """Run JSearch external scrape + 5-day cleanup against PostgreSQL."""
+async def run_external_job_scrape(slot_type: Optional[str] = None) -> Dict[str, int]:
+    """Run JSearch external scrape + 7-day cleanup against PostgreSQL."""
     try:
-        return await scrape_external_jobs()
+        return await scrape_external_jobs(slot_type=slot_type, num_pages=2, max_age_days=7)
     except Exception as exc:
         logger.error("External job scrape failed", error=str(exc))
         return {"fetched": 0, "upserted": 0, "skipped": 0, "deleted": 0}
@@ -74,7 +74,7 @@ async def run_nightly_job_alerts(
     )
 
     if not target_email:
-        await run_external_job_scrape()
+        await run_external_job_scrape(slot_type=effective_slot_type)
 
     sf = session_factory or get_pg_session_factory()
     async with sf() as session:

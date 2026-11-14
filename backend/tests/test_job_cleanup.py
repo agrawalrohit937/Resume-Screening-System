@@ -55,3 +55,23 @@ async def test_cleanup_stale_external_jobs_error_handling():
     assert result["deleted_count"] == 0
     assert "Database connection timeout" in result["error"]
 
+
+def test_resolve_queries_for_slot_rotation():
+    from services.job_scraper import (
+        resolve_queries_for_slot,
+        MORNING_QUERIES,
+        AFTERNOON_QUERIES,
+    )
+
+    morning = resolve_queries_for_slot("morning")
+    assert morning == MORNING_QUERIES
+    assert "Fresher Software Engineer in India" in morning
+
+    afternoon = resolve_queries_for_slot("afternoon")
+    assert afternoon == AFTERNOON_QUERIES
+    assert "Frontend Developer React in India" in afternoon
+
+    # Verify no overlap between morning and afternoon to maximize unique job discovery
+    assert set(morning).isdisjoint(set(afternoon))
+
+
