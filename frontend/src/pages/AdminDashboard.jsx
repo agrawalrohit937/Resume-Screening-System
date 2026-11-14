@@ -359,13 +359,13 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-xs">
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">Admin Panel</h1>
               <p className="text-[12px] font-semibold text-slate-400">
-                Welcome back, {user?.full_name} · <span className="text-indigo-500">Administrator</span>
+                Welcome back, {user?.full_name} · <span className="text-blue-600">Administrator</span>
               </p>
             </div>
           </div>
@@ -815,7 +815,7 @@ export default function AdminDashboard() {
                 </h4>
                 <div className="space-y-3">
                   {selectedTicket.messages.map((msg, i) => (
-                    <div key={msg.id || i} className={`rounded-xl p-3 text-[12.5px] ${msg.role === 'support' ? 'bg-indigo-50 border border-indigo-100' : 'bg-slate-50 border border-slate-100'}`}>
+                    <div key={msg.id || i} className={`rounded-xl p-3 text-[12.5px] ${msg.role === 'support' ? 'bg-blue-50 border border-blue-100' : 'bg-slate-50 border border-slate-100'}`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="font-bold text-slate-700 capitalize">{msg.role === 'support' ? '🛡️ Support' : '👤 User'}</span>
                         <span className="text-[10px] text-slate-400">{formatDateTime(msg.created_at)}</span>
@@ -915,12 +915,12 @@ export default function AdminDashboard() {
                 onChange={e => setAppNotes(e.target.value)}
                 placeholder="Add notes about this candidate..."
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-[12.5px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all resize-none"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-[12.5px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
               />
               <button
                 onClick={() => handleUpdateAppStatus(selectedApp.status)}
                 disabled={updatingAppStatus || appNotes === (selectedApp.admin_notes || '')}
-                className="mt-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-[11.5px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition-all"
+                className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-[11.5px] font-bold hover:bg-blue-700 disabled:opacity-40 transition-all shadow-xs"
               >
                 Save Notes
               </button>

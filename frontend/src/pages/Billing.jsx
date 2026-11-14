@@ -297,29 +297,29 @@ export default function Billing() {
       name: 'Candidate Pro',
       price: '₹199',
       period: '/ 3 months',
-      badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      accent: 'bg-indigo-600'
+      badge: 'bg-blue-50 text-blue-700 border-blue-200',
+      accent: 'bg-blue-600'
     },
     candidate_pro: {
       name: 'Candidate Pro',
       price: '₹199',
       period: '/ 3 months',
-      badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      accent: 'bg-indigo-600'
+      badge: 'bg-blue-50 text-blue-700 border-blue-200',
+      accent: 'bg-blue-600'
     },
     premium: {
       name: 'Job Seeker VIP',
       price: '₹399',
       period: '/ 3 months',
       badge: 'bg-amber-50 text-amber-700 border-amber-200',
-      accent: 'bg-gradient-to-r from-amber-400 to-orange-500'
+      accent: 'bg-amber-500'
     },
     candidate_premium: {
       name: 'Job Seeker VIP',
       price: '₹399',
       period: '/ 3 months',
       badge: 'bg-amber-50 text-amber-700 border-amber-200',
-      accent: 'bg-gradient-to-r from-amber-400 to-orange-500'
+      accent: 'bg-amber-500'
     },
     recruiter_pro: {
       name: 'Recruiter Growth',
@@ -339,15 +339,15 @@ export default function Billing() {
       name: 'Recruiter Enterprise',
       price: '₹2,499',
       period: '/ 3 months',
-      badge: 'bg-purple-50 text-purple-700 border-purple-200',
-      accent: 'bg-purple-600'
+      badge: 'bg-slate-900 text-white border-slate-800',
+      accent: 'bg-slate-900'
     },
     enterprise: {
       name: 'Recruiter Enterprise',
       price: '₹2,499',
       period: '/ 3 months',
-      badge: 'bg-purple-50 text-purple-700 border-purple-200',
-      accent: 'bg-purple-600'
+      badge: 'bg-slate-900 text-white border-slate-800',
+      accent: 'bg-slate-900'
     }
   }
 
@@ -408,7 +408,7 @@ export default function Billing() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100 border border-amber-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+          className="p-5 rounded-2xl bg-amber-50/80 border border-amber-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
         >
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md">

@@ -86,7 +86,7 @@ export default function GitHub() {
       {/* ── 1. Sleek Modern Header Bar ── */}
       <div className="w-full bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl px-4 py-2.5 shadow-xs flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#2E9BDA] to-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
             <Github size={17} />
           </div>
           <div>
@@ -109,7 +109,7 @@ export default function GitHub() {
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">@</span>
             <input 
-              className="w-44 sm:w-56 pl-7 pr-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50/80 focus:bg-white focus:ring-2 focus:ring-[#2E9BDA]/30 focus:border-[#2E9BDA] focus:outline-none transition"
+              className="w-44 sm:w-56 pl-7 pr-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50/80 focus:bg-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 focus:outline-none transition"
               placeholder="github-username" 
               value={username}
               onChange={e => setUsername(e.target.value)} 
@@ -120,7 +120,7 @@ export default function GitHub() {
             type="button"
             onClick={() => analyze()} 
             disabled={loading} 
-            className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-indigo-600 hover:from-[#2587bf] hover:to-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60 shrink-0"
+            className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60 shrink-0"
           >
             {loading ? (
               <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -154,9 +154,9 @@ export default function GitHub() {
               <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-sky-100/40 via-transparent to-transparent rounded-full -z-0 pointer-events-none" />
 
               <div className="flex items-center gap-4 relative z-10">
-                {/* Big Stylish Profile Photo with Glowing Ring */}
+                {/* Profile Photo with Clean Border */}
                 <div className="relative shrink-0">
-                  <div className="p-1 rounded-2xl bg-gradient-to-tr from-[#2E9BDA] via-indigo-500 to-purple-500 shadow-sm">
+                  <div className="p-1 rounded-2xl bg-slate-100 border border-slate-200/90 shadow-2xs">
                     {result.profile?.avatar_url ? (
                       <img 
                         src={result.profile.avatar_url} 
@@ -164,7 +164,7 @@ export default function GitHub() {
                         className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover bg-white"
                       />
                     ) : (
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-sky-50 text-[#2E9BDA] flex items-center justify-center font-black text-2xl">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-2xl">
                         {(result.profile?.name || result.username || 'G').charAt(0)}
                       </div>
                     )}
@@ -405,10 +405,10 @@ export default function GitHub() {
 
           {/* Row 3: Single Compact AI Insight Line */}
           {result.insights?.length > 0 && (
-            <div className="w-full bg-gradient-to-r from-sky-50/80 via-indigo-50/40 to-white border border-sky-200/80 rounded-xl px-4 py-2 flex items-center gap-2.5 text-xs text-sky-950 shadow-2xs">
-              <Sparkles size={14} className="text-[#2E9BDA] shrink-0" />
+            <div className="w-full bg-slate-50 border border-slate-200/90 rounded-xl px-4 py-2 flex items-center gap-2.5 text-xs text-slate-800 shadow-2xs">
+              <Sparkles size={14} className="text-blue-600 shrink-0" />
               <p className="truncate text-xs font-medium">
-                <strong className="font-extrabold text-[#2E9BDA] mr-1">AI Recommendation:</strong> 
+                <strong className="font-extrabold text-blue-600 mr-1">AI Recommendation:</strong> 
                 {result.insights[0]}
               </p>
             </div>
@@ -420,7 +420,7 @@ export default function GitHub() {
       {/* ── Initial Empty State ── */}
       {!result && !loading && (
         <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-12 flex flex-col items-center text-center gap-3 shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-[#2E9BDA] flex items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
             <Github size={24} />
           </div>
           <h3 className="text-sm font-bold text-slate-900">Ready to Analyze GitHub Profile</h3>

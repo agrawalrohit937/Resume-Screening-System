@@ -24,8 +24,8 @@ function ToggleSwitch({ checked, onChange, id }) {
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
-        checked ? 'bg-indigo-600' : 'bg-slate-200'
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+        checked ? 'bg-blue-600' : 'bg-slate-200'
       }`}
     >
       <span
@@ -166,8 +166,8 @@ export default function RecruiterSettings() {
       
       {/* ── 1. Page Header (Directly on Page Background) ─────────────────── */}
       <div className="pt-2 pb-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50/50 text-indigo-600 border border-indigo-100 text-xs font-semibold mb-2.5">
-          <Settings size={13} className="text-indigo-600" />
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/50 text-blue-600 border border-blue-100 text-xs font-semibold mb-2.5">
+          <Settings size={13} className="text-blue-600" />
           Account & Preferences
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -184,7 +184,7 @@ export default function RecruiterSettings() {
         className="w-full bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6 sm:p-8 space-y-6"
       >
         <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2.5 pb-4 border-b border-slate-100">
-          <User size={18} className="text-indigo-600" />
+          <User size={18} className="text-blue-600" />
           Hiring Lead Information
         </h2>
 
@@ -197,7 +197,7 @@ export default function RecruiterSettings() {
                 type="text"
                 value={profileData.full_name}
                 onChange={e => setProfileData({ ...profileData, full_name: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -224,7 +224,7 @@ export default function RecruiterSettings() {
                 type="text"
                 value={profileData.company}
                 onChange={e => setProfileData({ ...profileData, company: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -236,7 +236,7 @@ export default function RecruiterSettings() {
                 type="text"
                 value={profileData.title}
                 onChange={e => setProfileData({ ...profileData, title: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function RecruiterSettings() {
                 type="tel"
                 value={profileData.phone}
                 onChange={e => setProfileData({ ...profileData, phone: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -258,7 +258,7 @@ export default function RecruiterSettings() {
           <button
             type="submit"
             disabled={savingAccount}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             {savingAccount ? 'Saving...' : 'Save Profile Changes'}
           </button>
@@ -272,7 +272,7 @@ export default function RecruiterSettings() {
         <div className="w-full bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6 sm:p-8 flex flex-col justify-between space-y-6">
           <div className="space-y-6">
             <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2.5 pb-4 border-b border-slate-100">
-              <Bell size={18} className="text-indigo-600" />
+              <Bell size={18} className="text-blue-600" />
               Applicant & Pipeline Alerts
             </h2>
 
@@ -324,7 +324,7 @@ export default function RecruiterSettings() {
         >
           <div className="space-y-5">
             <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2.5 pb-4 border-b border-slate-100">
-              <Shield size={18} className="text-indigo-600" />
+              <Shield size={18} className="text-blue-600" />
               Security & Password
             </h2>
 
@@ -338,7 +338,7 @@ export default function RecruiterSettings() {
                     placeholder="••••••••"
                     value={passwords.current_password}
                     onChange={e => setPasswords({ ...passwords, current_password: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   />
                 </div>
               </div>
@@ -353,7 +353,7 @@ export default function RecruiterSettings() {
                       placeholder="••••••••"
                       value={passwords.new_password}
                       onChange={e => setPasswords({ ...passwords, new_password: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export default function RecruiterSettings() {
                       placeholder="••••••••"
                       value={passwords.confirm_password}
                       onChange={e => setPasswords({ ...passwords, confirm_password: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
                 </div>
@@ -378,7 +378,7 @@ export default function RecruiterSettings() {
             <button
               type="submit"
               disabled={savingPassword}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-50"
             >
               {savingPassword ? 'Updating...' : 'Update Password'}
             </button>

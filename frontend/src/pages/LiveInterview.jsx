@@ -57,12 +57,12 @@ function AvatarOrb({ speaking }) {
       <motion.div
         animate={speaking ? { scale: [1, 1.18, 1], opacity: [0.45, 0.15, 0.45] } : { scale: 1, opacity: 0.18 }}
         transition={{ duration: 1.6, repeat: speaking ? Infinity : 0, ease: 'easeInOut' }}
-        className={`absolute h-36 w-36 rounded-full blur-2xl ${speaking ? 'bg-violet-500' : 'bg-slate-500'}`}
+        className={`absolute h-36 w-36 rounded-full blur-2xl ${speaking ? 'bg-blue-600' : 'bg-slate-500'}`}
       />
       <div
         className={`relative h-24 w-24 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${
           speaking
-            ? 'bg-gradient-to-br from-violet-500 to-indigo-600 border-violet-300/60 shadow-[0_0_36px_rgba(124,108,240,0.45)]'
+            ? 'bg-blue-600 border-blue-400/60 shadow-[0_0_36px_rgba(37,99,235,0.35)]'
             : 'bg-white/10 border-white/15'
         }`}
       >
@@ -137,7 +137,7 @@ const QuestionGridMatrixSidebar = React.memo(function QuestionGridMatrixSidebar(
     const needsReview = hasAnswer && (score === null || score < 50)
     const isCompleted = hasAnswer && score !== null && score >= 50
 
-    if (isCurrent) return 'bg-gradient-to-br from-[#2E9BDA] to-[#1d6fa5] border-transparent text-white shadow-md shadow-[#2E9BDA]/30'
+    if (isCurrent) return 'bg-blue-600 border-transparent text-white shadow-xs'
     if (isCompleted) return 'bg-emerald-50 border-emerald-200 text-blue-950'
     if (needsReview) return 'bg-rose-50 border-rose-200 text-blue-950'
     return 'bg-white border-blue-100 text-blue-300'
@@ -149,13 +149,13 @@ const QuestionGridMatrixSidebar = React.memo(function QuestionGridMatrixSidebar(
         <div>
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-[10.5px] font-extrabold text-blue-900/45 uppercase tracking-wider">Question Map</span>
-            <span className="text-[11px] font-mono font-bold text-[#1d6fa5] tabular-nums">{doneCount}/{count}</span>
+            <span className="text-[11px] font-mono font-bold text-blue-700 tabular-nums">{doneCount}/{count}</span>
           </div>
           <div className="h-[5px] rounded-full bg-blue-50 overflow-hidden">
             <motion.div
               animate={{ width: `${count ? (doneCount / count) * 100 : 0}%` }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
-              className="h-full rounded-full bg-gradient-to-r from-[#2E9BDA] to-emerald-500"
+              className="h-full rounded-full bg-blue-600"
             />
           </div>
         </div>
@@ -333,14 +333,14 @@ const AnswerInput = React.memo(function AnswerInput({
                     initial={{ scale: 0.9, opacity: 0.7 }}
                     animate={{ scale: [1, 1.45, 1.7], opacity: [0.6, 0.25, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
-                    className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-500/25 to-indigo-500/30 blur-sm pointer-events-none"
+                    className="absolute inset-0 rounded-full bg-rose-500/20 blur-sm pointer-events-none"
                   />
                   <motion.div
                     key="wave-2"
                     initial={{ scale: 0.9, opacity: 0.7 }}
                     animate={{ scale: [1, 1.3, 1.5], opacity: [0.5, 0.2, 0] }}
                     transition={{ duration: 2, repeat: Infinity, delay: 0.6, ease: 'easeOut' }}
-                    className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#2E9BDA]/25 to-violet-500/25 blur-xs pointer-events-none"
+                    className="absolute inset-0 rounded-full bg-rose-500/15 blur-xs pointer-events-none"
                   />
                 </>
               )}
@@ -349,7 +349,7 @@ const AnswerInput = React.memo(function AnswerInput({
             {/* Ambient Circular Halo */}
             <div
               className={`absolute w-32 h-32 rounded-full blur-xl transition-all duration-500 ${
-                isRecording ? 'bg-violet-400/35' : 'bg-slate-200/50'
+                isRecording ? 'bg-rose-400/25' : 'bg-slate-200/50'
               }`}
             />
 
@@ -360,10 +360,10 @@ const AnswerInput = React.memo(function AnswerInput({
               whileTap={{ scale: isSpeaking ? 1 : 0.95 }}
               disabled={isSpeaking || loading}
               onClick={sttHook?.toggleListening}
-              className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-xl ${
+              className={`relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-lg ${
                 isRecording
-                  ? 'bg-gradient-to-tr from-violet-600 via-indigo-600 to-purple-500 text-white shadow-violet-500/40 ring-4 ring-violet-200 animate-pulse'
-                  : 'bg-gradient-to-b from-white to-blue-50/70 border-2 border-blue-200 text-[#1d6fa5] shadow-blue-500/10 hover:border-[#2E9BDA] hover:shadow-md'
+                  ? 'bg-rose-600 text-white shadow-rose-500/30 ring-4 ring-rose-200 animate-pulse'
+                  : 'bg-white border-2 border-slate-200 text-blue-600 shadow-xs hover:border-blue-400 hover:shadow-md'
               } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               <Mic className={`h-9 w-9 transition-transform duration-300 ${isRecording ? 'scale-110' : ''}`} />
@@ -384,7 +384,7 @@ const AnswerInput = React.memo(function AnswerInput({
                     duration: 0.6 + (i % 3) * 0.15,
                     ease: 'easeInOut',
                   }}
-                  className="w-[3px] rounded-full bg-gradient-to-t from-violet-500 to-indigo-600"
+                  className="w-[3px] rounded-full bg-rose-500"
                 />
               ))}
             </div>
@@ -452,7 +452,7 @@ const AnswerInput = React.memo(function AnswerInput({
           whileTap={{ scale: hasContent && !isSpeaking && !loading ? 0.98 : 1 }}
           onClick={handleSubmit}
           disabled={loading || !hasContent || isSpeaking}
-          className="h-10 px-6 rounded-xl font-bold text-[13px] text-white bg-gradient-to-r from-violet-600 via-[#1d6fa5] to-indigo-600 shadow-md shadow-violet-500/25 disabled:opacity-40 disabled:shadow-none transition-all inline-flex items-center gap-2"
+          className="h-10 px-6 rounded-xl font-bold text-[13px] text-white bg-blue-600 hover:bg-blue-700 shadow-xs hover:shadow-sm disabled:opacity-40 disabled:shadow-none transition-all inline-flex items-center gap-2 cursor-pointer"
         >
           {loading ? (
             <>
@@ -522,7 +522,7 @@ function FeedbackPanel({ eval: ev, question, questionNum, isLast, onNext, loadin
         <motion.button
           whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
           onClick={onNext} disabled={loading}
-          className="h-11 px-7 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] text-white font-bold text-[13px] shadow-md shadow-[#2E9BDA]/25 disabled:opacity-60 transition-all inline-flex items-center justify-center gap-2"
+          className="h-11 px-7 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[13px] shadow-xs hover:shadow-sm disabled:opacity-60 transition-all inline-flex items-center justify-center gap-2 cursor-pointer"
         >
           {loading ? (
             <>
@@ -878,9 +878,9 @@ export default function LiveInterviewV2() {
             animate={{ scale: 1, opacity: 1 }}
             className="max-w-[460px] w-full bg-white rounded-3xl p-8 shadow-2xl border border-blue-100 flex flex-col items-center space-y-6"
           >
-            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#2E9BDA] to-[#1d6fa5] flex items-center justify-center text-white shadow-lg shadow-[#2E9BDA]/25">
+            <div className="relative w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xs">
               <Bot className="w-8 h-8" />
-              <div className="absolute inset-0 rounded-2xl border-2 border-[#2E9BDA] animate-ping opacity-30" />
+              <div className="absolute inset-0 rounded-2xl border-2 border-blue-400 animate-ping opacity-30" />
             </div>
 
             <div className="space-y-2">
@@ -1059,9 +1059,9 @@ export default function LiveInterviewV2() {
                     transition={{ duration: 0.3 }}
                     className="flex-1 flex flex-col justify-center items-center bg-white rounded-3xl border border-blue-100 p-8 text-center shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-6 min-h-[420px]"
                   >
-                    <div className="relative w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#2E9BDA]/15 to-[#1d6fa5]/20 flex items-center justify-center text-[#1d6fa5] shadow-inner">
-                      <Bot className="w-8 h-8 text-[#1d6fa5]" />
-                      <div className="absolute inset-0 rounded-3xl border-2 border-[#2E9BDA]/40 animate-ping opacity-35" />
+                    <div className="relative w-16 h-16 rounded-3xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+                      <Bot className="w-8 h-8 text-blue-600" />
+                      <div className="absolute inset-0 rounded-3xl border-2 border-blue-400 animate-ping opacity-35" />
                     </div>
 
                     <div className="space-y-2 max-w-md">
@@ -1074,16 +1074,16 @@ export default function LiveInterviewV2() {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-blue-50 text-[#1d6fa5] border border-blue-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#2E9BDA] animate-pulse" />
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
                         Scoring Technical Depth
                       </span>
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Analyzing Clarity
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
                         Generating Rubric Feedback
                       </span>
                     </div>
@@ -1092,7 +1092,7 @@ export default function LiveInterviewV2() {
                       <motion.div
                         animate={{ x: ['-100%', '100%'] }}
                         transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
-                        className="w-1/2 h-full bg-gradient-to-r from-[#2E9BDA] to-[#1d6fa5] rounded-full"
+                        className="w-1/2 h-full bg-blue-600 rounded-full"
                       />
                     </div>
                   </motion.div>

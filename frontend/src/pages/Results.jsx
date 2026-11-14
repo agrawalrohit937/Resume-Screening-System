@@ -493,8 +493,7 @@ export default function Results() {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-24 sm:pb-20 font-sans text-slate-900 antialiased relative px-3 sm:px-6 lg:px-8">
-      <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-gradient-to-b from-[#2E9BDA]/10 to-transparent blur-3xl rounded-full -z-10 pointer-events-none" />
-      <div className="absolute -top-32 left-0 w-[500px] h-[500px] bg-gradient-to-br from-indigo-100/10 to-transparent blur-3xl rounded-full -z-10 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[500px] h-[350px] bg-blue-500/5 blur-3xl rounded-full -z-10 pointer-events-none" />
 
       <div className="w-full relative z-10 space-y-4 sm:space-y-6">
         <AnimatePresence mode="wait">
@@ -509,8 +508,8 @@ export default function Results() {
             >
               {/* Hero Section */}
               <div className="text-center max-w-3xl mx-auto mb-5 sm:mb-8 mt-1 sm:mt-3 px-1">
-                <h1 className="text-xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-1.5 sm:mb-3 leading-tight">
-                  Optimize Your Resume for <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#2E9BDA] to-indigo-600">Corporate Screening</span>
+                <h1 className="text-xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-1.5 sm:mb-3 leading-tight">
+                  Optimize Your Resume for <span className="text-blue-600">Corporate Screening</span>
                 </h1>
                 <p className="text-slate-500 text-xs sm:text-base md:text-lg font-medium max-w-2xl mx-auto leading-relaxed line-clamp-2 sm:line-clamp-none">
                   Evaluate your profile against target roles using semantic AI and strict enterprise boolean filters.
@@ -518,15 +517,15 @@ export default function Results() {
               </div>
 
               {pastResult && (
-                <div className="flex flex-wrap items-center justify-between gap-3 max-w-3xl mx-auto mb-5 p-3.5 bg-gradient-to-r from-sky-50 via-indigo-50/50 to-white border border-sky-200/80 rounded-2xl shadow-2xs">
-                  <div className="flex items-center gap-2.5 text-xs text-slate-700">
+                <div className="flex flex-wrap items-center justify-between gap-3 max-w-3xl mx-auto mb-5 p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl shadow-2xs">
+                  <div className="flex items-center gap-2.5 text-xs text-slate-700 font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Previous scan available: <strong>{Math.round(pastResult.score || pastResult.overall_score || 75)}% ATS Match</strong></span>
+                    <span>Previous scan available: <strong className="text-slate-900">{Math.round(pastResult.score || pastResult.overall_score || 75)}% ATS Match</strong></span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setResult(pastResult)}
-                    className="px-3.5 py-1.5 rounded-xl bg-white border border-sky-300 text-[#1d6fa5] hover:bg-sky-50 text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-blue-300 text-blue-600 hover:bg-blue-50/50 text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
                     <span>View Last Result</span>
                     <span>→</span>
@@ -553,9 +552,9 @@ export default function Results() {
 
                   <div className="flex-1 flex flex-col">
                     {uploadDone ? (
-                      <div className="flex-1 w-full bg-gradient-to-b from-emerald-50/50 to-white border-2 border-emerald-100 border-dashed rounded-xl sm:rounded-[1.5rem] p-4 sm:p-8 flex flex-col items-center justify-center text-center">
-                        <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2.5 sm:mb-4 shadow-2xs">
-                          <CheckCircle2 size={24} className="sm:w-9 sm:h-9" />
+                      <div className="flex-1 w-full bg-slate-50/60 border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-8 flex flex-col items-center justify-center text-center">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center mb-2.5 sm:mb-4 shadow-2xs">
+                          <CheckCircle2 size={24} className="sm:w-8 sm:h-8" />
                         </div>
                         <h4 className="text-sm sm:text-lg font-bold text-slate-900 truncate w-full max-w-xs">{resumeFile?.name || 'Resume Ready'}</h4>
                         <p className="text-xs sm:text-sm text-emerald-600 font-bold mt-0.5 sm:mt-1">Successfully Parsed & Ready</p>
@@ -569,12 +568,12 @@ export default function Results() {
                     ) : (
                       <div 
                         {...getResumeRootProps()} 
-                        className={`flex-1 w-full border-2 border-dashed rounded-xl sm:rounded-[1.5rem] flex flex-col items-center justify-center p-5 sm:p-8 text-center cursor-pointer transition-all relative overflow-hidden ${
+                        className={`flex-1 w-full border-2 border-dashed rounded-xl sm:rounded-2xl flex flex-col items-center justify-center p-5 sm:p-8 text-center cursor-pointer transition-all relative overflow-hidden ${
                           uploading
                             ? 'border-emerald-400 bg-emerald-50/20 shadow-inner'
                             : resumeDrag 
-                              ? 'border-[#2E9BDA] bg-[#2E9BDA]/5' 
-                              : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
+                              ? 'border-blue-500 bg-blue-50/10' 
+                              : 'border-slate-300/80 bg-slate-50/40 hover:bg-slate-50 hover:border-slate-400'
                         }`}
                       >
                         <input {...getResumeInputProps()} />
@@ -610,7 +609,7 @@ export default function Results() {
                               {/* Minimal Clean Green Progress Bar */}
                               <div className="w-52 sm:w-72 bg-slate-200/80 h-2 rounded-full overflow-hidden p-0.5 shadow-inner">
                                 <motion.div
-                                  className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                                  className="bg-emerald-600 h-full rounded-full shadow-2xs"
                                   style={{ width: `${uploadProgress}%` }}
                                   transition={{ duration: 0.2 }}
                                 />
@@ -619,8 +618,8 @@ export default function Results() {
                           </>
                         ) : (
                           <>
-                            <div className="w-11 h-11 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white shadow-2xs border border-slate-100 flex items-center justify-center mb-2.5 sm:mb-4">
-                              <Upload size={20} className="sm:w-6 sm:h-6 text-[#2E9BDA]" />
+                            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-white shadow-2xs border border-slate-200/80 flex items-center justify-center mb-2.5 sm:mb-3 text-blue-600">
+                              <Upload size={20} className="sm:w-6 sm:h-6 text-blue-600" />
                             </div>
                             <p className="text-xs sm:text-base font-bold text-slate-800">
                               <span className="sm:hidden">Tap to upload your resume</span>
@@ -718,11 +717,11 @@ export default function Results() {
               {/* Master Scan CTA Button */}
               <div className="flex justify-center mt-5 sm:mt-10 mb-4 sm:mb-0">
                 <motion.button
-                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileHover={{ scale: 1.01, y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleAnalyze}
                   disabled={analyzing || !uploadDone || !isJdReady}
-                  className="group w-full max-w-xl py-3.5 sm:py-4 px-4 rounded-xl sm:rounded-[1.25rem] font-black text-xs sm:text-base text-white bg-gradient-to-r from-[#2E9BDA] via-[#248bc7] to-indigo-600 shadow-lg shadow-[#2E9BDA]/25 flex items-center justify-center gap-2 sm:gap-3 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:shadow-[#2E9BDA]/35 active:scale-98"
+                  className="group w-full max-w-xl py-3.5 sm:py-4 px-4 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-base text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md flex items-center justify-center gap-2 sm:gap-3 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
                 >
                   {analyzing ? (
                     <><Loader2 size={18} className="animate-spin shrink-0" /> Evaluating Profile...</>

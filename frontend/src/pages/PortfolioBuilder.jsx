@@ -706,7 +706,7 @@ export default function PortfolioBuilder() {
                       setViewMode('step');
                       goToStep(1);
                     }}
-                    className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 text-white text-xs sm:text-sm font-black rounded-xl sm:rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center gap-2.5 group active:scale-95 cursor-pointer"
+                    className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-2xl shadow-xs hover:shadow transition-all flex items-center justify-center gap-2.5 group active:scale-95 cursor-pointer"
                   >
                     {hasExistingPortfolio ? 'Edit Portfolio Wizard' : 'Start Portfolio Wizard'}
                     <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform" />
@@ -906,7 +906,7 @@ export default function PortfolioBuilder() {
             {/* Glowing Linear Progress Bar */}
             <div className="w-full bg-slate-100 h-2 sm:h-2.5 rounded-full overflow-hidden shadow-inner p-0.5">
               <div
-                className="bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 h-full transition-all duration-500 ease-out rounded-full shadow-xs"
+                className="bg-blue-600 h-full transition-all duration-500 ease-out rounded-full shadow-2xs"
                 style={{ width: `${(currentStep / stepMeta.length) * 100}%` }}
               ></div>
             </div>
@@ -923,7 +923,7 @@ export default function PortfolioBuilder() {
                     onClick={() => goToStep(s.id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-xs'
+                        ? 'bg-blue-600 text-white shadow-xs'
                         : isDone
                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80'
                         : 'bg-slate-50 text-slate-600 border border-slate-200'
@@ -952,7 +952,7 @@ export default function PortfolioBuilder() {
                     onClick={() => goToStep(s.id)}
                     className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl transition-all text-left cursor-pointer ${
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-md font-bold'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
                         : isDone
                         ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/80'
                         : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100 border border-slate-100'
@@ -965,7 +965,7 @@ export default function PortfolioBuilder() {
                     </div>
                     <div className="truncate">
                       <div className="text-[11px] leading-tight truncate">{s.label.split(' ')[0]}</div>
-                      <div className={`text-[9px] truncate ${isActive ? 'text-indigo-100' : 'text-slate-400'}`}>{s.desc}</div>
+                      <div className={`text-[9px] truncate ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{s.desc}</div>
                     </div>
                   </button>
                 );

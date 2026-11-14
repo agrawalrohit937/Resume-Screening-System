@@ -429,7 +429,7 @@ Requirements & Qualifications:
               <button
                 type="button"
                 onClick={() => setIsPostModalOpen(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold shadow-xs hover:shadow transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={16} />
                 <span>Post New Job</span>
@@ -773,7 +773,7 @@ Requirements & Qualifications:
               <button
                 type="button"
                 onClick={() => setIsPostModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm transition cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow transition cursor-pointer"
               >
                 <Plus size={16} />
                 Post Your First Job
@@ -876,7 +876,7 @@ Requirements & Qualifications:
                       setSelectedJob(null)
                       navigate(`/recruiter/jobs/${id}/applicants`)
                     }}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs hover:shadow cursor-pointer"
                   >
                     <Users size={14} />
                     <span>Open Pipeline ({selectedJob.applicant_count || 0})</span>
@@ -1093,7 +1093,7 @@ Requirements & Qualifications:
                         type="submit"
                         disabled={postingLoading}
                         onClick={(e) => handleCreateJob(e, false)}
-                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
                       >
                         {postingLoading ? 'Publishing...' : 'Publish Job'}
                       </button>
@@ -1363,7 +1363,7 @@ Requirements & Qualifications:
                     <button
                       type="submit"
                       disabled={editLoading}
-                      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
                     >
                       {editLoading ? 'Saving...' : 'Save Changes'}
                     </button>

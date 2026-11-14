@@ -167,7 +167,7 @@ export default function UnifiedATSReadinessCard({
             type="button"
             onClick={onEnhance}
             disabled={enhancing}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] text-white text-xs font-extrabold shadow-sm hover:shadow-md transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer"
           >
             <Sparkles size={13} />
             <span className="hidden sm:inline">Supercharge Resume</span>
@@ -465,15 +465,15 @@ export default function UnifiedATSReadinessCard({
 
       {/* ── CLEAN & ATTRACTIVE SUPERCHARGE RESUME BANNER ── */}
       <motion.div
-        whileHover={{ y: -3 }}
+        whileHover={{ y: -2 }}
         transition={{ type: "spring", stiffness: 350, damping: 25 }}
-        className="rounded-3xl bg-gradient-to-r from-sky-50/90 via-white to-sky-50/70 border border-sky-200/90 p-6 sm:p-8 shadow-sm hover:shadow-xl hover:shadow-sky-100/50 hover:border-[#2E9BDA]/40 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden transition-all duration-300 group"
+        className="rounded-3xl bg-white border border-slate-200/90 p-6 sm:p-8 shadow-xs hover:border-slate-300 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden transition-all duration-300 group"
       >
-        <div className="absolute top-0 right-0 w-80 h-80 bg-[#2E9BDA]/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition-transform duration-700" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="space-y-2.5 text-center md:text-left relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-100/80 text-[#2E9BDA] text-xs font-bold border border-sky-200 mb-1 shadow-2xs">
-            <Sparkles size={13} className="text-[#2E9BDA] animate-pulse" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200/80 mb-1 shadow-2xs">
+            <Sparkles size={13} className="text-blue-600 animate-pulse" />
             AI Resume Enhancement
           </div>
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -484,17 +484,17 @@ export default function UnifiedATSReadinessCard({
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-semibold text-slate-700 justify-center md:justify-start">
-            <span className="flex items-center gap-1.5 hover:text-[#2E9BDA] transition-colors">
+            <span className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
               <CheckCircle2 size={13} className="text-emerald-500" />
               High-Impact Bullet Points
             </span>
             <span className="text-slate-300">•</span>
-            <span className="flex items-center gap-1.5 hover:text-[#2E9BDA] transition-colors">
+            <span className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
               <CheckCircle2 size={13} className="text-emerald-500" />
               Skill Gap Integration
             </span>
             <span className="text-slate-300">•</span>
-            <span className="flex items-center gap-1.5 hover:text-[#2E9BDA] transition-colors">
+            <span className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
               <CheckCircle2 size={13} className="text-emerald-500" />
               1-Click ATS PDF Export
             </span>
@@ -504,12 +504,12 @@ export default function UnifiedATSReadinessCard({
         <div className="shrink-0 relative z-10 w-full md:w-auto">
           {onEnhance && (
             <motion.button
-              whileHover={{ scale: 1.04, y: -2 }}
-              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               type="button"
               onClick={onEnhance}
               disabled={enhancing}
-              className="w-full md:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] hover:from-[#2587bf] hover:to-[#1e74a8] text-white font-extrabold text-sm shadow-md shadow-sky-500/25 hover:shadow-lg hover:shadow-sky-500/40 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5 group/btn"
+              className="w-full md:w-auto px-7 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-xs hover:shadow transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5 group/btn"
             >
               <Sparkles size={16} className="group-hover/btn:rotate-12 transition-transform duration-300" />
               <span>Supercharge Resume Now 🚀</span>
