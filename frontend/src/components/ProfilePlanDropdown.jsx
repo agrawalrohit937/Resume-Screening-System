@@ -17,16 +17,16 @@ import {
   Shield,
   Zap,
   TrendingUp,
-  Users,
-  Crown
+  Users
 } from 'lucide-react'
+import Crown, { getCrownVariant } from './common/Crown'
 import { useAuth } from '../context/AuthContext'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 import AvatarRing, { getUserPlan } from './AvatarRing'
 import { getMyAnalytics } from '../services/api'
 import { getGamificationProfile } from '../services/interviewApi'
 
-function DropdownAvatar({ user, hasCrown }) {
+function DropdownAvatar({ user, hasCrown, crownVariant }) {
   const imgUrl = resolveAvatarUrl(user)
   const initials = getInitials(user?.full_name)
 
@@ -47,7 +47,7 @@ function DropdownAvatar({ user, hasCrown }) {
       </AvatarRing>
       {hasCrown && (
         <div className="absolute -top-2.5 -right-1.5 z-20 rotate-[15deg] drop-shadow-md">
-          <Crown size={15} className="text-amber-400 fill-amber-400 drop-shadow-[0_2px_8px_rgba(243,194,75,0.7)]" />
+          <Crown size={15} variant={crownVariant} />
         </div>
       )}
     </div>
@@ -90,12 +90,10 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
   }
 
   const canSwitchContext = hasEmployerRole && hasCandidateRole && !isAdmin
-  const plan = getUserPlan(user)
-  const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
-  const userPlan = String(rawPlan).toLowerCase()
-  const isPremium = plan === 'premium' || userPlan.includes('premium') || userPlan.includes('enterprise')
-  const isPro = plan === 'pro' || userPlan.includes('pro') || userPlan.includes('growth') || Boolean(user?.subscription_active)
-  const hasCrown = isPremium || isPro
+  const crownVariant = getCrownVariant(user)
+  const hasCrown = Boolean(crownVariant)
+  const isPremium = crownVariant === 'gold'
+  const isPro = crownVariant === 'silver'
 
   // 100% Real Stats fetched from analytics / gamification (cached in localStorage for instant 0ms load)
   const [realStats, setRealStats] = useState(() => {
@@ -170,12 +168,15 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
           onClick={() => handleNavigate('/profile')}
           className="flex items-center gap-3 p-1.5 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer select-none"
         >
-          <DropdownAvatar user={user} hasCrown={hasCrown} />
+          <DropdownAvatar user={user} hasCrown={hasCrown} crownVariant={crownVariant} />
           
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <h3 className="text-xs font-black text-slate-900 truncate leading-tight">
+              <h3 className="text-xs font-black text-slate-900 truncate leading-tight flex items-center gap-1">
                 {user?.full_name || 'Rohit Agrawal'}
+                {hasCrown && (
+                  <Crown size={12} variant={crownVariant} className="shrink-0" />
+                )}
               </h3>
               <span className={`text-[9.5px] font-black uppercase px-2 py-0.5 rounded-md border ${
                 effectiveRole === 'admin'

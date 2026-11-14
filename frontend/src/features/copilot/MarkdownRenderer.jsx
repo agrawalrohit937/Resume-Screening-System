@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check } from 'lucide-react';
@@ -82,16 +83,29 @@ export default function MarkdownRenderer({ content }) {
               {children}
             </td>
           ),
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline font-medium transition-colors"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const isInternal = href && (href.startsWith('/') || href.startsWith('#'));
+            if (isInternal) {
+              return (
+                <Link
+                  to={href}
+                  className="text-indigo-600 hover:text-indigo-800 underline font-semibold transition-colors"
+                >
+                  {children}
+                </Link>
+              );
+            }
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 hover:text-indigo-800 underline font-medium transition-colors"
+              >
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {content}

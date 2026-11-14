@@ -9,7 +9,7 @@ import {
   LayoutDashboard,
   Trophy,
   Settings,
-  Crown,
+  Crown as LucideCrown,
   User,
   Globe,
   X,
@@ -24,6 +24,7 @@ import AvatarRing from './AvatarRing'
 import NotificationBell from './NotificationBell'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 import ProfilePlanDropdown from './ProfilePlanDropdown'
+import Crown, { getCrownVariant } from './common/Crown'
 import { getGamificationProfile } from '../services/interviewApi'
 
 // Fast spotlight search routes
@@ -36,7 +37,7 @@ const SEARCH_ROUTES = [
   { name: 'Application Tracker', path: '/applications', icon: Compass, keywords: ['applications', 'status', 'interviews', 'applied'] },
   { name: 'Portfolio Builder', path: '/portfolio-builder', icon: Globe, keywords: ['portfolio', 'website', 'developer site', 'showcase'] },
   { name: 'Career Quest & Rewards', path: '/gamification', icon: Trophy, keywords: ['quest', 'rewards', 'badges', 'xp', 'streak', 'leaderboard'] },
-  { name: 'Billing & Subscriptions', path: '/billing', icon: Crown, keywords: ['billing', 'upgrade', 'pro', 'credits', 'plans'] },
+  { name: 'Billing & Subscriptions', path: '/billing', icon: LucideCrown, keywords: ['billing', 'upgrade', 'pro', 'credits', 'plans'] },
   { name: 'My Profile & CV', path: '/profile', icon: User, keywords: ['profile', 'resume', 'bio', 'account'] },
   { name: 'Account Settings', path: '/settings', icon: Settings, keywords: ['settings', 'password', 'security', 'preferences'] },
 ]
@@ -339,9 +340,10 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
     )
   }
 
-  const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
-  const userPlan = String(rawPlan).toLowerCase()
-  const isPremiumUser = userPlan.includes('premium') || userPlan.includes('pro') || userPlan.includes('enterprise') || userPlan.includes('growth') || Boolean(user?.subscription_active)
+  const crownVariant = getCrownVariant(user)
+  const hasCrown = Boolean(crownVariant)
+  const isPremium = crownVariant === 'gold'
+  const isPro = crownVariant === 'silver'
 
   const userRolesArray = Array.isArray(user?.roles) ? user.roles.map(r => String(r).toLowerCase().trim()) : []
   const userRoles = [...userRolesArray, String(user?.role || '').toLowerCase().trim()].filter(Boolean)
@@ -357,7 +359,7 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   else if (isHiringManager) roleLabel = 'Hiring Manager'
   else if (isRecruiterRole) roleLabel = 'Recruiter'
   else if (isInterviewer) roleLabel = 'Interviewer'
-  else if (isPremiumUser) roleLabel = userPlan.includes('premium') ? 'VIP Member' : 'Pro Member'
+  else if (hasCrown) roleLabel = isPremium ? 'VIP Member' : 'Pro Member'
 
   return (
     <header className="h-[64px] shrink-0 sticky top-0 z-40 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-3 sm:px-5 lg:px-6 shadow-2xs relative">
@@ -481,16 +483,16 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
           <Search size={16} strokeWidth={2.5} />
         </button>
 
-        {/* AI Copilot Button (Sleek Brand Blue Gradient Pill) */}
+        {/* AI Copilot Button (CareerMitra) */}
         <button
           type="button"
           onClick={openCopilot}
-          aria-label="Open AI Copilot"
-          className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-gradient-to-r from-[#2E9BDA] to-[#2587bf] hover:from-[#2587bf] hover:to-[#1e74a8] text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-sky-500/20 active:scale-98 transition-all cursor-pointer"
-          title="Open AI Career Copilot"
+          aria-label="Open CareerMitra AI Copilot"
+          className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-indigo-500/20 active:scale-98 transition-all cursor-pointer"
+          title="Open CareerMitra AI Career Copilot"
         >
-          <Sparkles size={14} className="text-sky-100 animate-pulse" />
-          <span className="hidden sm:inline">Copilot</span>
+          <Sparkles size={14} className="text-indigo-200 animate-pulse" />
+          <span className="hidden sm:inline">CareerMitra</span>
         </button>
 
         {/* Daily Streak Flame Pill (Candidate Gamification) */}
@@ -525,16 +527,25 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
             aria-label="User account menu"
             className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-xl hover:bg-slate-100 border border-transparent hover:border-slate-200/80 transition-all cursor-pointer select-none"
           >
+            {/* User Profile Avatar Ring (Clean, no floating crown on avatar in Navbar) */}
             <div className="relative">
               <AvatarRing user={user} ringSize={32} shape="circle">
                 <UserAvatar user={user} size="sm" />
               </AvatarRing>
             </div>
             
+            {/* User Name & Single Tier Crown (Silver for Pro, Gold for Premium/VIP) */}
             <div className="hidden sm:flex flex-col text-left leading-tight">
               <span className="text-xs font-extrabold text-slate-900 truncate max-w-[110px] flex items-center gap-1">
                 {user?.full_name?.split(' ')[0] || 'User'}
-                {isPremiumUser && <Crown size={12} className="text-amber-400 fill-amber-400 shrink-0" />}
+                {hasCrown && (
+                  <Crown 
+                    size={12} 
+                    variant={crownVariant} 
+                    className="shrink-0" 
+                    title={isPremium ? 'Premium / VIP Tier' : 'Pro Tier'}
+                  />
+                )}
               </span>
               <span className="text-[10.5px] font-semibold text-slate-400 truncate max-w-[110px]">
                 {roleLabel}

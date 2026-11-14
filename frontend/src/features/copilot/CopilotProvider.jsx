@@ -1,13 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   streamChatV2,
-  fetchSessions,
-  createSession,
-  deleteSession,
-  fetchSessionMessages,
   submitMessageFeedback,
-  migrateLocalStorage,
 } from '../../services/copilotApi';
 
 const CopilotContext = createContext(null);
@@ -25,127 +21,100 @@ const INITIAL_GREETING = {
   created_at: new Date().toISOString(),
 };
 
-const DEFAULT_SUGGESTIONS = [
-  { label: '🎯 ATS Match', prompt: 'Review my ATS match score and readiness' },
-  { label: '✨ Polish Resume', prompt: 'Rewrite my top 3 resume bullets for higher impact' },
-  { label: '🎙️ Mock Interview', prompt: 'Practice a mock interview for my role' },
-  { label: '🚀 Career Roadmap', prompt: 'Build a 4-week learning roadmap for my career' },
-];
+const getContextualSuggestions = (pathname = '') => {
+  if (pathname.includes('/results')) {
+    return [
+      { label: '🎯 Missing Skills', prompt: 'What key skills am I missing for this job description?' },
+      { label: '📈 Boost ATS Score', prompt: 'Give me 3 actionable steps to increase my ATS match score above 85%' },
+      { label: '✨ Bullet Diffs', prompt: 'Rewrite my resume experience bullets to match this target role' },
+      { label: '🔍 Recruiter Perspective', prompt: 'What would a recruiter flag as weak in my resume for this role?' },
+    ];
+  }
+  if (pathname.includes('/interview') || pathname.includes('/live-interview')) {
+    return [
+      { label: '🎙️ Mock Question', prompt: 'Ask me a real behavioral interview question for my target role' },
+      { label: '💡 STAR Method', prompt: 'How should I structure my answer using the STAR framework?' },
+      { label: '🧠 System Design', prompt: 'Give me a system design practice problem with key discussion points' },
+      { label: '📊 Scoring Criteria', prompt: 'What do interviewers evaluate most in technical answers?' },
+    ];
+  }
+  if (pathname.includes('/jobs')) {
+    return [
+      { label: '💼 Best Matches', prompt: 'Which of the recommended jobs best fit my verified skill set?' },
+      { label: '📝 Tailor Resume', prompt: 'How should I tailor my profile for top tech job postings?' },
+      { label: '🎯 Skill Gap', prompt: 'What skill should I learn next to unlock higher-paying roles?' },
+      { label: '⚡ Recruiter Note', prompt: 'Draft a short, compelling message to connect with the hiring manager' },
+    ];
+  }
+  if (pathname.includes('/github')) {
+    return [
+      { label: '🐙 Repo Analysis', prompt: 'How can I make my top GitHub repository stand out to recruiters?' },
+      { label: '⭐ Readme Review', prompt: 'Give me tips to write a high-converting README for my project' },
+      { label: '🛠️ Project Ideas', prompt: 'Suggest 2 standout full-stack projects to add to my portfolio' },
+      { label: '🚀 Code Quality', prompt: 'What engineering practices impress hiring managers looking at code?' },
+    ];
+  }
+  // Default General / Dashboard
+  return [
+    { label: '🎯 ATS Match', prompt: 'Review my ATS match score and readiness' },
+    { label: '✨ Polish Resume', prompt: 'Rewrite my top 3 resume bullets for higher impact' },
+    { label: '🎙️ Mock Interview', prompt: 'Practice a mock interview for my role' },
+    { label: '🚀 Career Roadmap', prompt: 'Build a 4-week learning roadmap for my career' },
+  ];
+};
 
 export function CopilotProvider({ children }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const auth = useAuth?.() || {};
   const user = auth.user;
   const userId = user?.id || user?._id || user?.user_id || null;
 
-  // Key storage per user to prevent cross-account chat leaks
-  const sessionKey = userId ? `careershala:copilot:${userId}:session_id` : null;
-  const messagesKey = userId ? `careershala:copilot:${userId}:continuous_messages` : null;
-
   const [isOpen, setIsOpen] = useState(false);
-  const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([INITIAL_GREETING]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState('');
-  const [suggestions, setSuggestions] = useState(DEFAULT_SUGGESTIONS);
+  const [suggestions, setSuggestions] = useState(() => getContextualSuggestions(location?.pathname));
 
   const abortControllerRef = useRef(null);
 
-  // Synchronize and isolate chat state whenever active user changes or logs out
+  // Dynamically update quick suggestions when candidate changes page
   useEffect(() => {
-    // 1. Abort any running generation from prior user
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsGenerating(false);
-    setCurrentStatus('');
+    setSuggestions(getContextualSuggestions(location?.pathname));
+  }, [location?.pathname]);
 
-    // 2. If logged out, reset all internal state to default
+  // Clean up any stale localStorage chat caches on mount / user switch
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('careershala:copilot:')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [userId]);
+
+  // Reset state when user logs out or switches accounts
+  useEffect(() => {
     if (!userId) {
-      setSessions([]);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setIsGenerating(false);
+      setCurrentStatus('');
       setCurrentSessionId(null);
       setMessages([INITIAL_GREETING]);
-      setSuggestions(DEFAULT_SUGGESTIONS);
-      return;
+      setIsOpen(false);
     }
+  }, [userId]);
 
-    // 3. Load user-keyed storage for the authenticated user
-    let isMounted = true;
-    let localMessagesLoaded = false;
-
-    if (messagesKey) {
-      const savedMessages = localStorage.getItem(messagesKey);
-      if (savedMessages) {
-        try {
-          const parsed = JSON.parse(savedMessages);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMessages(parsed);
-            localMessagesLoaded = true;
-          }
-        } catch (e) {
-          console.warn('Could not parse local messages for user:', e);
-        }
-      }
-    }
-
-    if (sessionKey) {
-      const savedSessionId = localStorage.getItem(sessionKey);
-      if (savedSessionId && savedSessionId !== 'undefined' && savedSessionId !== 'null') {
-        setCurrentSessionId(savedSessionId);
-      }
-    }
-
-    // Load backend conversation list for this user
-    const loadInitialBackendChat = async () => {
-      try {
-        const res = await fetchSessions();
-        if (!isMounted) return;
-        if (res && res.sessions && res.sessions.length > 0) {
-          setSessions(res.sessions);
-          if (!localMessagesLoaded) {
-            const latest = res.sessions[0];
-            const sId = latest?.id || latest?._id || latest?.session_id;
-            if (sId && sId !== 'undefined' && sId !== 'null') {
-              setCurrentSessionId(sId);
-              if (sessionKey) localStorage.setItem(sessionKey, sId);
-              const msgRes = await fetchSessionMessages(sId);
-              if (isMounted && msgRes && msgRes.messages && msgRes.messages.length > 0) {
-                setMessages(msgRes.messages);
-              }
-            }
-          }
-        } else {
-          setSessions([]);
-          if (!localMessagesLoaded) {
-            setCurrentSessionId(null);
-            setMessages([INITIAL_GREETING]);
-          }
-        }
-      } catch (e) {
-        console.warn('Could not load backend chat for user:', e);
-      }
-    };
-
-    loadInitialBackendChat();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [userId, sessionKey, messagesKey]);
-
-  // Persist continuous chat messages to user-keyed localStorage
-  useEffect(() => {
-    if (messagesKey && messages && messages.length > 1) {
-      try {
-        localStorage.setItem(messagesKey, JSON.stringify(messages));
-      } catch (e) {
-        // quota or privacy mode
-      }
-    }
-  }, [messages, messagesKey]);
-
-  // Global event listener for navbar / button trigger & logout event
+  // Global event listeners (Ctrl/Cmd+K, logout event, custom open trigger)
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
     window.addEventListener('careershala:open-copilot', handleOpen);
@@ -165,11 +134,9 @@ export function CopilotProvider({ children }) {
       }
       setIsGenerating(false);
       setCurrentStatus('');
-      setSessions([]);
       setCurrentSessionId(null);
       setMessages([INITIAL_GREETING]);
       setIsOpen(false);
-      setIsExpanded(false);
     };
     window.addEventListener('careershala:logout', handleLogout);
 
@@ -180,55 +147,23 @@ export function CopilotProvider({ children }) {
     };
   }, []);
 
-  // Switch active session
-  const switchSession = async (sessionId) => {
-    if (isGenerating) stopGeneration();
-    setCurrentSessionId(sessionId);
-    if (sessionKey) localStorage.setItem(sessionKey, sessionId);
-    const result = await fetchSessionMessages(sessionId);
-    if (result?.messages) setMessages(result.messages);
-  };
-
-  // Start fresh session
-  const createNewChat = async () => {
-    if (isGenerating) stopGeneration();
-    try {
-      if (messagesKey) localStorage.removeItem(messagesKey);
-      const newSession = await createSession('New Conversation');
-      setSessions((prev) => [newSession, ...prev]);
-      setCurrentSessionId(newSession.id);
-      if (sessionKey) localStorage.setItem(sessionKey, newSession.id);
-      setMessages([INITIAL_GREETING]);
-      setSuggestions(DEFAULT_SUGGESTIONS);
-    } catch {
-      if (messagesKey) localStorage.removeItem(messagesKey);
-      setCurrentSessionId(null);
-      setMessages([INITIAL_GREETING]);
-    }
-  };
-
-  // Delete session
-  const removeSession = async (sessionId) => {
-    try {
-      await deleteSession(sessionId);
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      if (currentSessionId === sessionId) {
-        createNewChat();
-      }
-    } catch (e) {
-      console.error('Failed to remove session:', e);
-    }
-  };
-
   // Stop active streaming generation
-  const stopGeneration = () => {
+  const stopGeneration = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     setIsGenerating(false);
     setCurrentStatus('');
-  };
+  }, []);
+
+  // Start fresh in-memory chat
+  const createNewChat = useCallback(() => {
+    stopGeneration();
+    setCurrentSessionId(null);
+    setMessages([INITIAL_GREETING]);
+    setSuggestions(getContextualSuggestions(location?.pathname));
+  }, [stopGeneration, location?.pathname]);
 
   // Send message
   const sendMessage = async (text, quickAction = null, forceRefresh = false) => {
@@ -249,9 +184,9 @@ export function CopilotProvider({ children }) {
       id: botMsgId,
       role: 'assistant',
       content: '',
-      citations: [],
-      ui_cards: [],
       created_at: new Date().toISOString(),
+      ui_cards: [],
+      citations: [],
     };
 
     setMessages((prev) => [...prev, userMsg, botMsg]);
@@ -265,15 +200,18 @@ export function CopilotProvider({ children }) {
       await streamChatV2({
         message: trimmed,
         sessionId: currentSessionId,
+        history: messages.slice(-6).map((m) => ({
+          role: m.role,
+          content: m.content || '',
+        })),
         quickAction,
         forceRefresh,
         signal: controller.signal,
         onEvent: (ev) => {
           switch (ev.type) {
             case 'session':
-              if (ev.session_id && ev.session_id !== currentSessionId) {
+              if (ev.session_id) {
                 setCurrentSessionId(ev.session_id);
-                if (sessionKey) localStorage.setItem(sessionKey, ev.session_id);
               }
               break;
 
@@ -287,10 +225,8 @@ export function CopilotProvider({ children }) {
               break;
             }
 
-            case 'tool_result': {
-              const toolName = ev.tool || ev.name || '';
+            case 'tool_result':
               break;
-            }
 
             case 'ui_card':
               setMessages((prev) =>
@@ -337,14 +273,14 @@ export function CopilotProvider({ children }) {
             }
 
             case 'suggestions':
-              if (Array.isArray(ev.items)) {
+              if (Array.isArray(ev.items) && ev.items.length > 0) {
                 setSuggestions(ev.items);
               }
               break;
 
             case 'navigate':
               if (ev.to) {
-                window.location.href = ev.to;
+                navigate(ev.to);
               }
               break;
 
@@ -409,7 +345,6 @@ export function CopilotProvider({ children }) {
       value={{
         isOpen,
         setIsOpen,
-        sessions,
         currentSessionId,
         messages,
         isGenerating,
@@ -420,8 +355,6 @@ export function CopilotProvider({ children }) {
         createNewChat,
         startNewSession: createNewChat,
         clearMessages: createNewChat,
-        switchSession,
-        removeSession,
         rateMessage,
       }}
     >

@@ -564,7 +564,7 @@ async def get_latest_ats_result(
     result_repo: ResultRepository = Depends(get_result_repo),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
 ):
-    """Get the user's most recent ATS check result and linked JD for auto-restoring after refresh."""
+    """Get the user's most recent ATS check result and linked resume."""
     results, total = await result_repo.get_results_by_user(
         str(current_user.id),
         skip=0,
@@ -574,21 +574,13 @@ async def get_latest_ats_result(
         return {"has_result": False}
 
     latest = results[0]
-    jd_doc = await result_repo.get_jd_by_id(latest.job_description_id) if latest.job_description_id else None
     resume = await resume_repo.get_by_id(latest.resume_id) if latest.resume_id else None
 
     latest_dict = latest.model_dump() if hasattr(latest, "model_dump") else dict(latest)
-    
-    jd_text = ""
-    if jd_doc:
-        jd_text = getattr(jd_doc, "raw_text", "") or getattr(jd_doc, "description", "") or ""
 
     return {
         "has_result": True,
         "result": latest_dict,
-        "job_title": getattr(latest, "job_title", "") or (jd_doc.title if jd_doc else "Target Role"),
-        "job_description": jd_text,
-        "required_skills": getattr(jd_doc, "required_skills", []) if jd_doc else [],
         "resume": (lambda r, lid: {
             "id": str(r.id) if r else lid,
             "file_name": getattr(r, "file_name", "Profile Resume.pdf") if r else "Profile Resume.pdf",

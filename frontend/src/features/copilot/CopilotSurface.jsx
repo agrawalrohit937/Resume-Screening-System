@@ -6,8 +6,8 @@ import CopilotInput from './CopilotInput';
 import { Bot, Sparkles, X, RotateCcw } from 'lucide-react';
 
 export default function CopilotSurface() {
-  const { isOpen, setIsOpen, startNewSession, createNewChat } = useCopilot();
-  const handleNewChat = startNewSession || createNewChat;
+  const { isOpen, setIsOpen, createNewChat } = useCopilot();
+  const handleNewChat = createNewChat;
 
   const popoverRef = useRef(null);
   const fabRef = useRef(null);
@@ -97,10 +97,13 @@ export default function CopilotSurface() {
             {/* Ultra-Clean Header */}
             <div className="px-4 py-3 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                   <Sparkles size={15} />
                 </div>
-                <h3 className="text-sm font-bold text-slate-800 truncate">CareerMitra</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 truncate leading-tight">CareerMitra</h3>
+                  <p className="text-[10px] text-slate-400 font-medium leading-none">AI Career Copilot</p>
+                </div>
               </div>
 
               {/* Header Action Buttons */}
