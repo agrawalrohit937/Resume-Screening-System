@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useLocation, Navigate, Outlet, Link } from 'react-router-dom'
-import { Menu, Crown } from 'lucide-react'
+import { Menu } from 'lucide-react'
+import Crown, { getCrownVariant } from './common/Crown'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 import Navbar from './Navbar'
@@ -70,8 +71,10 @@ function MobileHeader({ onMenuToggle }) {
     else if (isRecruiterRole) homeRoute = '/recruiter/dashboard'
   }
 
-  const isPremium = user?.plan === 'premium' || user?.subscription_tier === 'premium'
-  const isPro = user?.plan === 'pro' || user?.subscription_tier === 'pro'
+  const crownVariant = getCrownVariant(user)
+  const hasCrown = Boolean(crownVariant)
+  const isPremium = crownVariant === 'gold'
+  const isPro = crownVariant === 'silver'
 
   useEffect(() => {
     setIsProfileOpen(false)
@@ -138,14 +141,9 @@ function MobileHeader({ onMenuToggle }) {
                     </div>
                   )}
                 </AvatarRing>
-                {isPremium && (
+                {hasCrown && (
                   <div className="absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
-                    <Crown size={15} className="text-amber-500 fill-amber-400" />
-                  </div>
-                )}
-                {isPro && (
-                  <div className="absolute -top-2 -right-1 z-20 rotate-[15deg] drop-shadow-md">
-                    <Crown size={15} className="text-slate-400 fill-slate-300" />
+                    <Crown size={15} variant={crownVariant} />
                   </div>
                 )}
               </div>

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import AvatarRing from './AvatarRing'
+import Crown, { getCrownVariant } from './common/Crown'
 import { resolveAvatarUrl, getInitials } from '../utils/avatarUtils'
 
 const ATS_SESSION_KEY = 'careershala_ats_session'
@@ -86,24 +87,6 @@ const Icons = {
   pipeline: <FolderKanban {...ICON_PROPS} />,
   check: <Check className="w-3 h-3" strokeWidth={3} />,
   logout: <LogOut className="w-4 h-4" strokeWidth={2.2} />,
-}
-
-const Crown = ({ size = 22, variant = 'gold', className = '' }) => {
-  const isSilver = variant === 'silver'
-  const isEmerald = variant === 'emerald'
-  return (
-    <LucideCrown
-      size={size}
-      strokeWidth={2.2}
-      className={`${
-        isEmerald
-          ? 'text-emerald-400 fill-emerald-400 drop-shadow-[0_2px_8px_rgba(52,211,153,0.7)]'
-          : isSilver
-          ? 'text-slate-300 fill-slate-200 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]'
-          : 'text-amber-400 fill-amber-400 drop-shadow-[0_2px_8px_rgba(243,194,75,0.7)]'
-      } ${className}`}
-    />
-  )
 }
 
 const CANDIDATE_NAV_SECTIONS = [
@@ -524,11 +507,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
   const visibleSections = getNavSections()
   const currentViewMode = VIEW_MODES.find(v => v.key === adminViewMode) || VIEW_MODES[0]
-  const rawPlan = user?.plan || user?.subscription_tier || user?.subscription?.tier || user?.subscription?.plan || user?.tier || ''
-  const userPlan = String(rawPlan).toLowerCase()
-  const isPremium = userPlan.includes('premium')
-  const isPro = userPlan.includes('pro')
-  const hasCrown = isPremium || isPro
+  const crownVariant = getCrownVariant(user)
+  const hasCrown = Boolean(crownVariant)
+  const isPremium = crownVariant === 'gold'
+  const isPro = crownVariant === 'silver'
 
   if (isImmersive) return null
 
@@ -1138,7 +1120,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
             
             {hasCrown && (
               <div className="absolute -top-2.5 -right-2 z-20 rotate-[15deg] drop-shadow-md">
-                <Crown size={16} gradId="profileCrown" variant={isPremium ? 'gold' : 'silver'} />
+                <Crown size={16} variant={crownVariant} />
               </div>
             )}
           </div>
@@ -1152,7 +1134,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                   </p>
                   {hasCrown && (
                     <div className="shrink-0">
-                      <Crown size={14} gradId="profileInlineCrown" variant={isPremium ? 'gold' : 'silver'} />
+                      <Crown size={14} variant={crownVariant} />
                     </div>
                   )}
                 </div>
@@ -1167,7 +1149,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                       EXECUTIVE
                     </span>
                   ) : isHiringManager ? (
-                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-purple-800 bg-purple-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-purple-200 shadow-2xs">
+                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-indigo-800 bg-indigo-50 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-indigo-200/80 shadow-2xs">
                       HIRING MANAGER
                     </span>
                   ) : isRecruiterRole ? (

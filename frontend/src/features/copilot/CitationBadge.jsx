@@ -12,9 +12,9 @@ export default function CitationBadge({ citation }) {
   const score = citation.score ? Math.round(citation.score * 100) : null;
 
   const getIcon = () => {
-    if (source.includes('resume')) return <FileText size={11} className="text-blue-600" />;
+    if (source.includes('resume')) return <FileText size={11} className="text-indigo-600" />;
     if (source.includes('job')) return <Briefcase size={11} className="text-emerald-600" />;
-    return <BookOpen size={11} className="text-purple-600" />;
+    return <BookOpen size={11} className="text-indigo-600" />;
   };
 
   const handleClick = (e) => {

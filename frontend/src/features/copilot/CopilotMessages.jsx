@@ -39,7 +39,7 @@ export default function CopilotMessages() {
             className={`flex gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}
           >
             {!isUser && (
-              <div className="w-5 h-5 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0 mt-1">
+              <div className="w-5 h-5 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 mt-1">
                 <Sparkles size={11} />
               </div>
             )}
@@ -48,7 +48,7 @@ export default function CopilotMessages() {
               <div
                 className={`p-3 rounded-2xl text-sm leading-relaxed max-w-full overflow-hidden break-words ${
                   isUser
-                    ? 'bg-blue-600 text-white rounded-tr-xs shadow-xs'
+                    ? 'bg-indigo-600 text-white rounded-tr-xs shadow-xs'
                     : 'bg-gray-100/90 text-slate-800 rounded-tl-xs border border-gray-200/60 shadow-xs'
                 }`}
               >
@@ -60,14 +60,14 @@ export default function CopilotMessages() {
                       <div className="relative inline">
                         <MarkdownRenderer content={msg.content} />
                         {isGenerating && idx === messages.length - 1 && (
-                          <span className="inline-block w-1.5 h-3.5 bg-blue-500 animate-pulse ml-1 align-middle rounded-xs" />
+                          <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-pulse ml-1 align-middle rounded-xs" />
                         )}
                       </div>
                     ) : isGenerating && idx === messages.length - 1 ? (
                       <div className="flex items-center gap-1.5 py-1 px-0.5 text-slate-400">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
                     ) : null}
 
@@ -126,7 +126,7 @@ export default function CopilotMessages() {
       {/* Live Status Indicator */}
       {isGenerating && currentStatus && (
         <div className="flex items-center gap-1.5 p-1.5 px-3 rounded-full bg-white border border-slate-200 text-slate-500 text-xs w-fit shadow-xs animate-pulse">
-          <Loader2 size={11} className="animate-spin text-blue-600" />
+          <Loader2 size={11} className="animate-spin text-indigo-600" />
           <span className="font-medium text-[11px]">{currentStatus}</span>
         </div>
       )}
@@ -145,10 +145,10 @@ export default function CopilotMessages() {
                 <button
                   key={idx}
                   onClick={() => sendMessage(prompt)}
-                  className="px-2.5 py-2 rounded-xl bg-white hover:bg-blue-50/70 active:bg-blue-100/70 text-slate-700 hover:text-blue-700 border border-slate-200/90 hover:border-blue-300 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shadow-2xs text-left flex items-center justify-between group"
+                  className="px-2.5 py-2 rounded-xl bg-white hover:bg-indigo-50/70 active:bg-indigo-100/70 text-slate-700 hover:text-indigo-700 border border-slate-200/90 hover:border-indigo-300 text-[11px] sm:text-xs font-semibold transition-all cursor-pointer shadow-2xs text-left flex items-center justify-between group"
                 >
                   <span className="truncate">{label}</span>
-                  <span className="text-[10px] text-slate-300 group-hover:text-blue-400 transition-colors shrink-0 ml-1">→</span>
+                  <span className="text-[10px] text-slate-300 group-hover:text-indigo-400 transition-colors shrink-0 ml-1">→</span>
                 </button>
               );
             })}

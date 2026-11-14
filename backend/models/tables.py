@@ -327,7 +327,7 @@ class TeamInvite(Base):
     email = Column(String(255), nullable=False, index=True)
     role = Column(String(50), nullable=False)
     invited_by = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    token = Column(String(255), nullable=False, unique=True, index=True)
+    token = Column(Text, nullable=False, unique=True, index=True)
     status = Column(String(50), default="pending", index=True)
     created_at = Column(DateTime(timezone=True), default=now_utc)
     expires_at = Column(DateTime(timezone=True), nullable=False)

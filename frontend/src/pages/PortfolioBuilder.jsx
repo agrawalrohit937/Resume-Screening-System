@@ -588,6 +588,8 @@ export default function PortfolioBuilder() {
     })
   };
 
+  const currentTheme = THEMES.find(t => t.id === formData.theme_id) || THEMES[0];
+
   // Removed full-screen blocking loader. Progressive loading renders form immediately.
   return (
     <div className="w-full space-y-8 font-sans text-slate-900 pb-16">
@@ -614,123 +616,85 @@ export default function PortfolioBuilder() {
               {/* Left Column: Copy & Actions */}
               <div className="lg:col-span-8 space-y-4 sm:space-y-6">
                 
-                {/* Badges Bar */}
+                {/* Badges Bar (Clean & Truthful) */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[11px] sm:text-xs font-black rounded-full shadow-2xs ${
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[11px] sm:text-xs font-bold rounded-full shadow-2xs ${
                     hasExistingPortfolio 
-                      ? 'bg-emerald-50/90 border border-emerald-200/80 text-emerald-800' 
-                      : 'bg-indigo-50/90 border border-indigo-200/80 text-indigo-700'
+                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
+                      : 'bg-indigo-50 border border-indigo-200 text-indigo-700'
                   }`}>
                     <span className={`w-2 h-2 rounded-full ${hasExistingPortfolio ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`}></span>
-                    {hasExistingPortfolio ? `Your Portfolio is Live (@${formData.username})` : 'Draft Mode • Ready to Build'}
+                    {hasExistingPortfolio ? `Portfolio Live • @${formData.username}` : 'Draft Mode • Ready to Build'}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50/90 border border-indigo-200/80 text-indigo-700 text-[11px] sm:text-xs font-bold rounded-full shadow-2xs">
-                    <Sparkles size={12} /> Auto-Engineered from Resume
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-[11px] sm:text-xs font-bold rounded-full">
-                    <ShieldCheck size={12} className="text-indigo-600" /> Independent Domain
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200/80 text-slate-600 text-[11px] sm:text-xs font-bold rounded-full">
+                    <Sparkles size={12} className="text-indigo-600" /> Auto-Synced from Resume
                   </span>
                 </div>
 
-                {/* Main Headline */}
-                <div className="space-y-2 sm:space-y-3">
+                {/* Main Headline & Crisp Subtitle */}
+                <div className="space-y-2 sm:space-y-2.5">
                   <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
-                    Smart Portfolio Studio
+                    Developer Portfolio Studio
                   </h1>
-                  <p className="text-xs sm:text-base text-slate-600 max-w-2xl leading-relaxed">
-                    Build a world-class personal developer website in minutes. Turn your raw resume into an interactive case-study showcase with real macOS browser frames, dynamic particle background, and adaptive theme switching.
+                  <p className="text-xs sm:text-sm text-slate-600 max-w-xl leading-relaxed">
+                    Manage and customize your live developer portfolio, showcase your case studies &amp; verified skills, and share your personal website with recruiters.
                   </p>
                 </div>
 
-                {/* Live URL Pill Bar & Profile Sync Status (ONLY SHOWN FOR PUBLISHED PORTFOLIOS) */}
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-1">
-                  {hasExistingPortfolio ? (
-                    <>
-                      <div className="flex items-center bg-slate-50/90 hover:bg-white border border-slate-200/90 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl shadow-inner text-[11px] sm:text-xs font-mono text-slate-800 max-w-full truncate transition-colors">
-                        <Globe size={15} className="text-indigo-600 mr-2 shrink-0" />
-                        <span className="truncate select-all font-semibold">{publicUrl}</span>
+                {/* Live URL Share Bar (Unified, Clean, No Duplication) */}
+                {hasExistingPortfolio ? (
+                  <div className="flex flex-wrap items-center gap-2 max-w-xl pt-1">
+                    <div className="flex items-center flex-1 min-w-[260px] bg-slate-50 hover:bg-white border border-slate-200/90 rounded-xl p-1 shadow-2xs transition-colors">
+                      <div className="flex items-center gap-2 px-3 flex-1 min-w-0">
+                        <Globe size={14} className="text-indigo-600 shrink-0" />
+                        <span className="text-xs font-mono text-slate-700 truncate select-all">{publicUrl}</span>
                       </div>
-
                       <button
                         onClick={copyPublicLink}
-                        className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                        className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
                       >
-                        {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                        {copied ? 'Copied' : 'Copy Link'}
+                        {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                        <span>{copied ? 'Copied' : 'Copy'}</span>
                       </button>
-
                       <a
                         href={publicUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs transition-all flex items-center gap-1.5 hover:text-indigo-600 cursor-pointer"
-                        title="View Public Page"
+                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer shrink-0 ml-1 active:scale-95"
+                        title="Visit Live Website"
                       >
-                        <ExternalLink size={15} />
+                        <span>Visit</span>
+                        <ExternalLink size={12} />
                       </a>
-
-                      {/* Profile Settings Sync Action Pill */}
-                      {isProfileSynced ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl sm:rounded-2xl shadow-2xs">
-                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                          Synced to Profile Settings
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleSyncToProfile(publicUrl)}
-                          disabled={syncingProfile}
-                          className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl sm:rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                          title="Add this portfolio link into your Profile System Settings"
-                        >
-                          {syncingProfile ? (
-                            <RefreshCw size={13} className="animate-spin text-amber-600" />
-                          ) : (
-                            <Zap size={13} className="text-amber-600" />
-                          )}
-                          <span>⚡ Sync to Profile Settings</span>
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/90 border border-slate-200/90 rounded-xl sm:rounded-2xl text-xs text-slate-600 font-medium max-w-xl">
-                      <Sparkles size={15} className="text-indigo-600 shrink-0" />
-                      <span>No live portfolio published yet. Click <strong>Start Portfolio Wizard</strong> below to customize and publish your website.</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600 font-medium max-w-xl">
+                    <Sparkles size={15} className="text-indigo-600 shrink-0" />
+                    <span>No live portfolio published yet. Click <strong>Start Portfolio Wizard</strong> below to customize and launch your website.</span>
+                  </div>
+                )}
 
-                {/* Big Action Buttons */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                {/* Primary Action Buttons */}
+                <div className="flex flex-wrap items-center gap-3 pt-1">
                   <button
                     onClick={() => {
                       setViewMode('step');
                       goToStep(1);
                     }}
-                    className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-2xl shadow-xs hover:shadow transition-all flex items-center justify-center gap-2.5 group active:scale-95 cursor-pointer"
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:shadow transition flex items-center gap-2 group active:scale-95 cursor-pointer"
                   >
                     {hasExistingPortfolio ? 'Edit Portfolio Wizard' : 'Start Portfolio Wizard'}
-                    <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
                   </button>
-
-                  {hasExistingPortfolio && (
-                    <a
-                      href={publicUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black rounded-xl sm:rounded-2xl border border-emerald-200/90 shadow-xs transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
-                    >
-                      <Eye size={15} className="text-emerald-600" />
-                      View Live Website
-                    </a>
-                  )}
 
                   <button
                     onClick={() => loadPortfolioData(true)}
                     disabled={loading}
-                    className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-4 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-xs transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold rounded-xl border border-slate-200 shadow-2xs hover:shadow-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
                   >
                     <RefreshCw size={14} className={`text-indigo-600 ${loading ? 'animate-spin' : ''}`} />
-                    {loading ? 'Syncing...' : 'Re-Sync from Resume'}
+                    <span>{loading ? 'Syncing...' : 'Re-Sync from Resume'}</span>
                   </button>
                 </div>
 
@@ -738,14 +702,14 @@ export default function PortfolioBuilder() {
 
               {/* Right Column: Live Portfolio Avatar & Card Preview */}
               <div className="lg:col-span-4 flex flex-col items-center justify-center">
-                <div className="relative w-full max-w-[280px] p-5 sm:p-6 bg-gradient-to-b from-white to-slate-50 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xl text-center space-y-3.5">
+                <div className="relative w-full max-w-[280px] p-5 sm:p-6 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm text-center space-y-3.5">
                   
-                  {/* Glowing Status Dot */}
+                  {/* Status Indicator */}
                   <div className="absolute top-3.5 right-3.5">
                     {hasExistingPortfolio ? (
-                      <span className="relative flex h-3 w-3" title="Live on Web">
+                      <span className="relative flex h-2.5 w-2.5" title="Live on Web">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                       </span>
                     ) : (
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-300 block" title="Draft (Not Published)"></span>
@@ -753,7 +717,7 @@ export default function PortfolioBuilder() {
                   </div>
 
                   {/* Circular Avatar */}
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-full p-1 bg-gradient-to-tr from-indigo-600 via-cyan-400 to-indigo-500 shadow-md">
+                  <div className="relative w-20 h-20 mx-auto rounded-full p-1 bg-gradient-to-tr from-indigo-500 to-blue-500 shadow-xs">
                     <div className="w-full h-full rounded-full overflow-hidden bg-white flex items-center justify-center">
                       {formData.avatar_url ? (
                         <img
@@ -762,29 +726,35 @@ export default function PortfolioBuilder() {
                           className="w-full h-full object-cover rounded-full"
                         />
                       ) : (
-                        <User size={36} className="text-slate-400" />
+                        <User size={32} className="text-slate-400" />
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
                       {formData.full_name || 'Candidate Name'}
                     </h3>
-                    <p className="text-[11px] sm:text-xs font-medium text-slate-500 line-clamp-1">
+                    <p className="text-[11px] sm:text-xs font-semibold text-slate-500 line-clamp-1">
                       {formData.headline || 'Software Engineer'}
                     </p>
+                    <div className="pt-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                        <Palette size={10} />
+                        Theme: {currentTheme?.name || 'Lumina Glass'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Micro Stats Matrix */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
-                    <div className="p-2 bg-white rounded-xl border border-slate-100">
+                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="block font-black text-indigo-600 text-sm">{formData.projects?.length || 0}</span>
-                      <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">Projects</span>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase">Projects</span>
                     </div>
-                    <div className="p-2 bg-white rounded-xl border border-slate-100">
+                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="block font-black text-emerald-600 text-sm">{totalSkillsCount}</span>
-                      <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase">Skills</span>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase">Skills</span>
                     </div>
                   </div>
 
@@ -792,14 +762,14 @@ export default function PortfolioBuilder() {
                   <div className="pt-2 border-t border-slate-100">
                     {hasExistingPortfolio ? (
                       isProfileSynced ? (
-                        <div className="flex items-center justify-center gap-1 text-[10.5px] font-bold text-emerald-700 bg-emerald-50/80 py-1.5 px-2 rounded-xl border border-emerald-100 truncate">
-                          <CheckCircle2 size={12} className="shrink-0" /> Linked to Profile
+                        <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 py-1.5 px-2 rounded-xl border border-emerald-200">
+                          <CheckCircle2 size={12} className="shrink-0 text-emerald-600" /> Linked to Profile
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleSyncToProfile(publicUrl)}
-                          className="w-full flex items-center justify-center gap-1.5 text-[10.5px] font-extrabold text-amber-800 bg-amber-50 hover:bg-amber-100 py-1.5 px-2 rounded-xl border border-amber-200 transition-colors cursor-pointer"
+                          className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 py-1.5 px-2 rounded-xl border border-amber-300 transition-colors cursor-pointer"
                         >
                           <Zap size={11} className="text-amber-600 shrink-0" /> Sync to Profile
                         </button>
@@ -817,47 +787,83 @@ export default function PortfolioBuilder() {
             </div>
           </div>
 
-          {/* 3 Luxury Feature Cards Grid */}
+          {/* 3 Interactive Management Tiles */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-sm transition-all space-y-3 sm:space-y-4 group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-                <Rocket size={20} className="sm:w-6 sm:h-6" />
+            {/* Tile 1: Theme Studio */}
+            <div 
+              onClick={() => {
+                setViewMode('step');
+                goToStep(6);
+              }}
+              className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all space-y-3 group cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Palette size={20} />
+                </div>
+                <span className="text-[11px] font-bold text-indigo-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                  Change <ArrowRight size={11} />
+                </span>
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  {formData.projects?.length || 0} Featured Case Studies
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                  Theme: {currentTheme?.name || 'Lumina Glass'}
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Engineered with real macOS browser frames, live demo URLs, research notes, and quantifiable accuracy tags.
+                  6 adaptive developer themes with light &amp; dark modes, particle background, and responsive layouts.
                 </p>
               </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-sm transition-all space-y-3 sm:space-y-4 group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-                <Code2 size={20} className="sm:w-6 sm:h-6" />
+            {/* Tile 2: Featured Projects */}
+            <div 
+              onClick={() => {
+                setViewMode('step');
+                goToStep(4);
+              }}
+              className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-cyan-300 transition-all space-y-3 group cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Rocket size={20} />
+                </div>
+                <span className="text-[11px] font-bold text-cyan-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                  Edit <ArrowRight size={11} />
+                </span>
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  {totalSkillsCount} Skills in 6 Domains
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-cyan-600 transition-colors">
+                  {formData.projects?.length || 0} Case Studies Linked
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Taxonomically grouped across Machine Learning, Analytics, Backend APIs, Frontend UI, and DevOps tools.
+                  Interactive case studies with live demo URLs, research highlights, and GitHub repository links.
                 </p>
               </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-sm transition-all space-y-3 sm:space-y-4 group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
-                <ShieldCheck size={20} className="sm:w-6 sm:h-6" />
+            {/* Tile 3: Tech Stack Matrix */}
+            <div 
+              onClick={() => {
+                setViewMode('step');
+                goToStep(3);
+              }}
+              className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all space-y-3 group cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Code2 size={20} />
+                </div>
+                <span className="text-[11px] font-bold text-emerald-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                  Manage <ArrowRight size={11} />
+                </span>
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  Clean Personal Branding
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-emerald-600 transition-colors">
+                  {totalSkillsCount} Verified Skills
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Independent developer portfolio with dark/light mode toggle and zero platform watermarks.
+                  Taxonomically grouped across Machine Learning, Analytics, Backend APIs, Frontend, and Cloud tools.
                 </p>
               </div>
             </div>

@@ -50,6 +50,8 @@ async def create_requisition_route(
 ):
     """Creates a new headcount requisition in DRAFT status."""
     tenant_id = getattr(current_user, "tenant_id", "default")
+    hm_name = getattr(current_user, "full_name", None) or getattr(current_user, "email", "Hiring Manager")
+    hm_email = getattr(current_user, "email", None)
     return await service.create_requisition(
         title=payload.title,
         department=payload.department,
@@ -60,6 +62,8 @@ async def create_requisition_route(
         currency=payload.budget_currency,
         approval_chain=payload.approval_chain,
         tenant_id=tenant_id,
+        hiring_manager_name=hm_name,
+        hiring_manager_email=hm_email,
     )
 
 
@@ -120,12 +124,16 @@ async def record_decision_route(
 ):
     """Records an approval or rejection step in the requisition approval chain."""
     tenant_id = getattr(current_user, "tenant_id", "default")
+    user_role = (getattr(current_user, "role", "") or "").lower()
+    approver_name = getattr(current_user, "full_name", None) or getattr(current_user, "email", "Company Executive")
     req = await service.record_approval_decision(
         requisition_id=requisition_id,
         approver_id=current_user.id or "approver_user",
         decision=payload.decision,
         comments=payload.comments,
         tenant_id=tenant_id,
+        approver_role=user_role,
+        approver_name=approver_name,
     )
     if not req:
         raise HTTPException(status_code=404, detail="Requisition not found or not pending approval")

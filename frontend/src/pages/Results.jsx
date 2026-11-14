@@ -62,10 +62,10 @@ export default function Results() {
   const [uploadStage, setUploadStage] = useState('Uploading Document...')
 
   const [jdMode, setJdMode] = useState('paste')
-  const [jdText, setJdText] = useState(() => saved?.jdText || '')
+  const [jdText, setJdText] = useState('')
   const [jdFile, setJdFile] = useState(null)
-  const [jobTitle, setJobTitle] = useState(() => saved?.jobTitle || '')
-  const [requiredSkills, setRequiredSkills] = useState(() => saved?.requiredSkills || '')
+  const [jobTitle, setJobTitle] = useState('')
+  const [requiredSkills, setRequiredSkills] = useState('')
 
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState(() => saved?.result || null)
@@ -88,16 +88,13 @@ export default function Results() {
   // Sync active scan state to sessionStorage so page refresh NEVER loses progress
   useEffect(() => {
     try {
-      if (result || jdText || showEnhancedStudio || enhancedStudioData || resumeId) {
+      if (result || showEnhancedStudio || enhancedStudioData || resumeId) {
         sessionStorage.setItem(
           SESSION_KEY,
           JSON.stringify({
             resumeId,
             resumeFile: resumeFile ? { name: resumeFile.name, file_url: resumeFile.file_url } : null,
             uploadDone,
-            jdText,
-            jobTitle,
-            requiredSkills,
             result,
             showEnhancedStudio,
             enhancedStudioData,
@@ -107,7 +104,7 @@ export default function Results() {
     } catch (e) {
       console.warn('Failed to sync to sessionStorage', e)
     }
-  }, [resumeId, resumeFile, uploadDone, jdText, jobTitle, requiredSkills, result, showEnhancedStudio, enhancedStudioData])
+  }, [resumeId, resumeFile, uploadDone, result, showEnhancedStudio, enhancedStudioData])
 
   useEffect(() => {
     let isMounted = true
@@ -128,6 +125,9 @@ export default function Results() {
       setInvalidDocData(null)
       setShowEnhancedStudio(false)
       setEnhancedStudioData(null)
+      setJdText('')
+      setJobTitle('')
+      setRequiredSkills('')
     }
 
     if (!user) {
@@ -142,7 +142,7 @@ export default function Results() {
         return
       }
 
-      // 2. Auto-restore user's most recent ATS scan & JD from database on first load/refresh
+      // 2. Auto-restore user's most recent ATS scan & linked resume on first load/refresh
       try {
         const { data: latestScan } = await getLatestATSResult()
         if (latestScan?.has_result && isMounted) {
@@ -152,9 +152,6 @@ export default function Results() {
           if (cached?.result) {
             setResult(cached.result)
           }
-          if (latestScan.job_description) setJdText(latestScan.job_description)
-          if (latestScan.job_title) setJobTitle(latestScan.job_title)
-          if (latestScan.required_skills?.length > 0) setRequiredSkills(latestScan.required_skills.join(', '))
           if (latestScan.resume) {
             setResumeId(latestScan.resume.id)
             setResumeFile({ name: latestScan.resume.file_name, file_url: latestScan.resume.file_url })

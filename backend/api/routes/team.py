@@ -278,8 +278,28 @@ async def accept_team_invite(
         assigned_role_enum = UserRole.RECRUITER
 
     # Fetch tenant's established company profile if available
-    company_doc = await company_repo.get_by_tenant_id(tenant_id)
+    company_doc = await company_repo.get_by_tenant_id(tenant_id) if hasattr(company_repo, "get_by_tenant_id") else None
     company_name = company_doc.get("company_name") if company_doc else None
+
+    # 🏢 Look up active company subscription sponsored by Executive under this tenant
+    active_sponsor = None
+    if tenant_id and tenant_id != "default":
+        try:
+            from config.db import get_pg_session_factory
+            from sqlalchemy import select
+            from models.tables import User as UserModelTable
+            async with get_pg_session_factory()() as session:
+                sponsor_stmt = select(UserModelTable).where(
+                    UserModelTable.tenant_id == tenant_id,
+                    UserModelTable.subscription_active == True,
+                    UserModelTable.subscription_end_date > datetime.now(timezone.utc),
+                ).order_by(UserModelTable.subscription_end_date.desc()).limit(1)
+                active_sponsor = (await session.execute(sponsor_stmt)).scalar_one_or_none()
+        except Exception:
+            pass
+
+    has_co_sub = bool(active_sponsor)
+    co_plan = active_sponsor.plan if active_sponsor else "recruiter_pro"
 
     # Check if user already exists
     existing_user = await user_repo.get_by_email(email)
@@ -320,12 +340,12 @@ async def accept_team_invite(
             updates["company_name"] = company_name
 
         # 🏢 Inherit active company subscription if company executive has upgraded
-        if company_doc and company_doc.get("subscription_active"):
-            updates["plan"] = company_doc.get("plan", "recruiter_pro")
+        if has_co_sub:
+            updates["plan"] = co_plan
             updates["subscription_active"] = True
             updates["subscription_status"] = "active"
-            updates["subscription_start_date"] = company_doc.get("subscription_start_date")
-            updates["subscription_end_date"] = company_doc.get("subscription_end_date")
+            updates["subscription_start_date"] = active_sponsor.subscription_start_date
+            updates["subscription_end_date"] = active_sponsor.subscription_end_date
             updates["company_subscription"] = True
 
         # Preserve full name if already set, or update if provided in payload
@@ -346,7 +366,6 @@ async def accept_team_invite(
         hashed = hash_password(payload.password)
         assigned_role_val = assigned_role_enum.value.lower()
         new_roles = ["candidate", assigned_role_val] if assigned_role_val != "candidate" else ["candidate"]
-        has_co_sub = bool(company_doc and company_doc.get("subscription_active"))
         new_user_data = {
             "email": email,
             "full_name": payload.full_name,
@@ -361,11 +380,11 @@ async def accept_team_invite(
             "email_verified": True,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
-            "plan": company_doc.get("plan", "recruiter_pro") if has_co_sub else "free",
+            "plan": co_plan if has_co_sub else "free",
             "subscription_active": has_co_sub,
             "subscription_status": "active" if has_co_sub else "expired",
-            "subscription_start_date": company_doc.get("subscription_start_date") if has_co_sub else None,
-            "subscription_end_date": company_doc.get("subscription_end_date") if has_co_sub else None,
+            "subscription_start_date": active_sponsor.subscription_start_date if has_co_sub else None,
+            "subscription_end_date": active_sponsor.subscription_end_date if has_co_sub else None,
             "company_subscription": has_co_sub,
             "auth_methods": ["password"],
             "last_login_method": "password",

@@ -163,10 +163,16 @@ async def get_enterprise_analytics(
     hired_apps = ent_data["hired_app_rows"]
     total_offers = ent_data["total_offers"]
     eeo_responses = ent_data["eeo_responses"]
+    requisitions_list = ent_data.get("requisitions_list", [])
+
+    approved_reqs = [r for r in requisitions_list if str(r.get("status", "")).lower() == "approved"]
+    req_approved_headcount = sum(int(r.get("headcount", 1) or 1) for r in approved_reqs)
+    req_filled_hires = sum(int(r.get("filled_count", 0) or 0) for r in requisitions_list)
 
     open_jobs = [j for j in jobs_list if str(j.get("status", "open")).lower() in ("open", "active")]
-    approved_headcount = len(open_jobs)
-    filled_hires = len(hired_apps)
+    job_approved_headcount = sum(int(j.get("openings", 1) or 1) for j in open_jobs)
+    approved_headcount = max(job_approved_headcount, req_approved_headcount)
+    filled_hires = max(len(hired_apps), req_filled_hires)
 
     now = datetime.now(timezone.utc)
     months_meta = []
@@ -180,12 +186,20 @@ async def get_enterprise_analytics(
 
     # 3. Department breakdown
     dept_map: dict = {}
+    for r in requisitions_list:
+        dept = r.get("department") or "General"
+        if dept not in dept_map:
+            dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
+        if str(r.get("status", "")).lower() == "approved":
+            dept_map[dept]["approved"] += int(r.get("headcount", 1) or 1)
+        dept_map[dept]["filled"] += int(r.get("filled_count", 0) or 0)
+
     for j in jobs_list:
         dept = j.get("department") or "General"
         if dept not in dept_map:
             dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
         if str(j.get("status", "open")).lower() in ("open", "active"):
-            dept_map[dept]["approved"] += int(j.get("openings", 1) or 1)
+            dept_map[dept]["approved"] = max(dept_map[dept]["approved"], int(j.get("openings", 1) or 1))
 
     if hired_apps:
         job_dept_map = {str(j["id"]): (j.get("department") or "General") for j in jobs_list}

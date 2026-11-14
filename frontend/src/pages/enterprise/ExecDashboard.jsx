@@ -1,20 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts'
 import {
   TrendingUp,
   Users,
@@ -25,18 +10,17 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  PieChart as PieIcon,
-  Download,
-  Filter,
   Loader2,
   RefreshCw,
-  Inbox,
   FileText,
   Table,
-  Lock
+  Check,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getExecAnalytics } from '../../services/api'
+import { getExecAnalytics, getRequisitions, recordApprovalDecision } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useTenant } from '../../context/TenantContext'
 import CustomDropdown from '../../components/common/CustomDropdown'
@@ -48,17 +32,29 @@ export default function ExecDashboard() {
   const [loading, setLoading] = useState(true)
   const [analyticsError, setAnalyticsError] = useState(false)
   const [selectedQuarter, setSelectedQuarter] = useState('Q3 2026')
-  const [diversityTab, setDiversityTab] = useState('summary') // 'summary' | 'race' | 'gender'
+  const [requisitions, setRequisitions] = useState([])
+  const [actionLoading, setActionLoading] = useState({})
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true)
     setAnalyticsError(false)
     try {
-      const res = await getExecAnalytics()
-      if (res.data?.success && res.data?.data) {
-        setAnalytics(res.data.data)
-      } else {
-        setAnalytics(res.data || null)
+      const [analyticsRes, reqRes] = await Promise.allSettled([
+        getExecAnalytics(),
+        getRequisitions(),
+      ])
+
+      if (analyticsRes.status === 'fulfilled') {
+        const res = analyticsRes.value
+        if (res.data?.success && res.data?.data) {
+          setAnalytics(res.data.data)
+        } else {
+          setAnalytics(res.data || null)
+        }
+      }
+
+      if (reqRes.status === 'fulfilled' && Array.isArray(reqRes.value?.data)) {
+        setRequisitions(reqRes.value.data)
       }
     } catch (err) {
       console.error('[ExecDashboard] Fetch error:', err)
@@ -71,19 +67,77 @@ export default function ExecDashboard() {
     }
   }, [])
 
+  const handleRequisitionDecision = async (reqId, decision) => {
+    setActionLoading(prev => ({ ...prev, [reqId]: decision }))
+    try {
+      await recordApprovalDecision(reqId, {
+        decision,
+        comments: `${decision === 'approved' ? 'Approved' : 'Rejected'} by Company Executive`,
+      })
+      toast.success(`Requisition ${decision === 'approved' ? 'Approved' : 'Rejected'}! 📋`)
+      await fetchAnalytics()
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to update requisition decision.')
+    } finally {
+      setActionLoading(prev => ({ ...prev, [reqId]: null }))
+    }
+  }
+
   useEffect(() => {
     fetchAnalytics()
   }, [tenantId, fetchAnalytics])
 
+  const scrollContainerRef = useRef(null)
+
+  const scrollHorizontally = (offset) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' })
+    }
+  }
+
+  // Sort requisitions: Pending approval first, then most recent created_at first
+  const sortedRequisitions = useMemo(() => {
+    return [...requisitions].sort((a, b) => {
+      if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1
+      if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1
+      const da = new Date(a.created_at || 0).getTime()
+      const db = new Date(b.created_at || 0).getTime()
+      if (db !== da) return db - da
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
+  }, [requisitions])
+
+  // Headcount fallback calculation from live requisitions state if backend hasn't refreshed
+  const reqApprovedCount = useMemo(() => {
+    return requisitions
+      .filter(r => r.status === 'approved')
+      .reduce((sum, r) => sum + (Number(r.headcount) || 1), 0)
+  }, [requisitions])
+
   const kpis = analytics?.kpis || {}
-  const approvedHeadcount = Number(kpis.approved_headcount || 0)
+  const approvedHeadcount = Math.max(Number(kpis.approved_headcount || 0), reqApprovedCount)
   const filledHires = Number(kpis.filled_hires || 0)
-  const attainmentPct = Number(kpis.headcount_attainment_pct || 0)
+  const attainmentPct = approvedHeadcount > 0 ? Math.round((filledHires / approvedHeadcount) * 100) : Number(kpis.headcount_attainment_pct || 0)
   const offerRate = Number(kpis.offer_acceptance_rate || 0)
   const avgTimeToFill = Number(kpis.avg_time_to_fill_days || 0)
   const hasCompletedHires = filledHires > 0
 
-  const headcountData = Array.isArray(analytics?.headcount_by_department) ? analytics.headcount_by_department : []
+  const backendHeadcount = Array.isArray(analytics?.headcount_by_department) ? analytics.headcount_by_department : []
+  const headcountData = useMemo(() => {
+    if (backendHeadcount.length > 0) return backendHeadcount
+    // Synthesize from live requisitions if backend hasn't populated
+    const map = {}
+    requisitions.forEach(r => {
+      const dept = r.department || 'Engineering'
+      if (!map[dept]) map[dept] = { department: dept, approved: 0, filled: 0 }
+      if (r.status === 'approved') {
+        map[dept].approved += Number(r.headcount) || 1
+      }
+      map[dept].filled += Number(r.filled_count) || 0
+    })
+    return Object.values(map).filter(d => d.approved > 0 || d.filled > 0)
+  }, [backendHeadcount, requisitions])
+
   const diversityData = Array.isArray(analytics?.diversity_distribution) ? analytics.diversity_distribution : []
   const genderData = Array.isArray(analytics?.gender_distribution) ? analytics.gender_distribution : []
   const raceData = Array.isArray(analytics?.race_distribution) ? analytics.race_distribution : []
@@ -384,13 +438,6 @@ export default function ExecDashboard() {
     }
   }
 
-  // Resolve active demographic view for chart
-  const activeDiversityData = diversityTab === 'race'
-    ? (raceData.length > 0 ? raceData : diversityData)
-    : diversityTab === 'gender'
-    ? (genderData.length > 0 ? genderData : diversityData)
-    : diversityData
-
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans text-slate-800 antialiased">
       
@@ -491,18 +538,7 @@ export default function ExecDashboard() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7 bg-white p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs h-[360px] animate-pulse">
-              <div className="h-4 w-48 bg-slate-200 rounded mb-2" />
-              <div className="h-3 w-64 bg-slate-100 rounded mb-8" />
-              <div className="h-56 bg-slate-50 rounded-xl" />
-            </div>
-            <div className="lg:col-span-5 bg-white p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs h-[360px] animate-pulse">
-              <div className="h-4 w-48 bg-slate-200 rounded mb-2" />
-              <div className="h-3 w-64 bg-slate-100 rounded mb-8" />
-              <div className="h-56 bg-slate-50 rounded-xl" />
-            </div>
-          </div>
+          <div className="bg-white p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs h-40 animate-pulse" />
         </div>
       ) : (
         <>
@@ -572,14 +608,14 @@ export default function ExecDashboard() {
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Avg Time-To-Fill
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
                   <Clock className="w-5 h-5" />
                 </div>
               </div>
               <p className="text-3xl font-black text-slate-900 mt-3">
               {hasCompletedHires ? avgTimeToFill : '—'} <span className="text-base font-bold text-slate-500">{hasCompletedHires ? 'Days' : ''}</span>
               </p>
-              <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-purple-600">
+              <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11.5px] font-semibold text-indigo-600">
                 <Clock className="w-3.5 h-3.5" />
                 <span>Duration from requisition opening to fill</span>
               </div>
@@ -587,290 +623,164 @@ export default function ExecDashboard() {
 
           </div>
 
-          {/* ── 3. Charts Row: Departmental Headcount + Anonymized Diversity ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Left: Departmental Headcount (Approved vs. Filled) */}
-            <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl p-6 shadow-xs space-y-5">
-              <div className="flex items-center justify-between flex-wrap gap-2">
+          {/* ── 2.5 Headcount Requisitions & Budget Approval Section (Horizontal Stream) ── */}
+          {sortedRequisitions.length > 0 && (
+            <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                    Departmental Headcount: Approved vs. Filled
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Authorized target headcount vs confirmed candidate hires.</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                      Headcount Requisitions &amp; Budget Governance
+                    </h3>
+                    {sortedRequisitions.filter(r => r.status === 'pending_approval').length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                        {sortedRequisitions.filter(r => r.status === 'pending_approval').length} Pending Sign-Off
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Executive sign-off for new team requisitions, salary bands, and headcount allocation (recent first).
+                  </p>
                 </div>
-                <span className="text-[11px] font-semibold text-slate-400">Live requisition attainment</span>
+
+                {/* Horizontal Navigation & Counter */}
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
+                    {sortedRequisitions.length} Requisitions • Scroll horizontally
+                  </span>
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => scrollHorizontally(-380)}
+                      title="Scroll Left"
+                      className="p-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollHorizontally(380)}
+                      title="Scroll Right"
+                      className="p-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {headcountData.length === 0 ? (
-                <div className="h-72 flex flex-col items-center justify-center p-6 text-center space-y-2 bg-slate-50/50 rounded-2xl border border-slate-100">
-                  <Building className="w-10 h-10 text-slate-300" />
-                  <p className="text-xs font-semibold text-slate-600">No departmental headcount data available</p>
-                  <p className="text-[11px] text-slate-400 max-w-sm">Approved headcount allocations and hires across departments will appear here once requisitions are initiated.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 px-4 py-3">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Portfolio allocation</p>
-                      <p className="text-sm font-bold text-slate-800 mt-0.5">
-                        {filledHires} of {approvedHeadcount} authorized roles filled
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-indigo-700">{attainmentPct}%</p>
-                      <p className="text-[10px] font-semibold text-indigo-500">attainment</p>
-                    </div>
-                  </div>
+              {/* Horizontal Scroll Track (Prevents vertical page bloat) */}
+              <div className="relative">
+                <div
+                  ref={scrollContainerRef}
+                  className="flex items-stretch gap-4 overflow-x-auto pb-3 pt-1 px-0.5 custom-scrollbar snap-x snap-mandatory scroll-smooth"
+                >
+                  {sortedRequisitions.map((req) => {
+                    const isApproved = req.status === 'approved'
+                    const isRejected = req.status === 'rejected'
+                    const isPending = !isApproved && !isRejected
+                    const isLoading = actionLoading[req.id]
 
-                  <div className="h-28 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={headcountData.map((item) => ({
-                          department: item.department || 'General',
-                          approved: Number(item.approved || 0),
-                          filled: Number(item.filled || 0)
-                        }))}
-                        layout="vertical"
-                        margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
-                        barCategoryGap="28%"
-                      >
-                        <XAxis type="number" hide domain={[0, 'dataMax']} />
-                        <YAxis type="category" dataKey="department" hide />
-                        <Tooltip
-                          cursor={{ fill: '#EEF2FF' }}
-                          contentStyle={{
-                            backgroundColor: '#0F172A',
-                            color: '#fff',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            border: 'none'
-                          }}
-                          formatter={(value, name) => [value, name === 'approved' ? 'Approved roles' : 'Filled hires']}
-                        />
-                        <Bar dataKey="approved" fill="#CBD5E1" radius={[0, 8, 8, 0]} barSize={14} name="approved" />
-                        <Bar dataKey="filled" fill="#4F46E5" radius={[0, 8, 8, 0]} barSize={14} name="filled" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                    const sym = (req.budget_currency === 'INR' || !req.budget_currency || req.budget_currency === '$') ? '₹ ' : `${req.budget_currency} `
+                    const formattedBudget = req.budget_range || (
+                      req.budget_min && req.budget_max
+                        ? `${sym}${Number(req.budget_min).toLocaleString()} - ${sym}${Number(req.budget_max).toLocaleString()}`
+                        : req.budget_min
+                        ? `${sym}${Number(req.budget_min).toLocaleString()}`
+                        : 'Unspecified'
+                    )
 
-                  <div className="flex items-center gap-4 text-[10px] font-semibold text-slate-500">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Approved roles
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" /> Filled hires
-                    </span>
-                  </div>
-
-                  <div className="space-y-4 pt-1 border-t border-slate-100">
-                  {headcountData.map((item) => {
-                    const approved = Number(item.approved || 0)
-                    const filled = Number(item.filled || 0)
-                    const attainment = approved > 0 ? Math.min(100, Math.round((filled / approved) * 100)) : 0
                     return (
-                      <div key={item.department || 'General'} className="space-y-2.5">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-800 truncate">{item.department || 'General'}</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              {approved - filled > 0 ? `${approved - filled} open requisition${approved - filled === 1 ? '' : 's'}` : 'Fully staffed'}
+                      <div
+                        key={req.id}
+                        className="w-[340px] sm:w-[380px] shrink-0 snap-start p-5 rounded-2xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all flex flex-col justify-between space-y-4 shadow-2xs"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
+                                isApproved
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : isRejected
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}
+                            >
+                              {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending Sign-Off'}
+                            </span>
+                            <div className="text-right">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Salary Range</span>
+                              <div className="text-xs font-bold text-slate-800 mt-0.5">{formattedBudget}</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-base">{req.title}</h4>
+                            <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                              {req.department || 'Engineering'} • Headcount: <strong className="text-slate-800">{req.headcount || 1}</strong>
                             </p>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-extrabold text-slate-900">{filled} <span className="text-slate-400 font-semibold">/ {approved}</span></p>
-                            <p className="text-[10px] font-bold text-indigo-600">{attainment}% filled</p>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                          <span className="text-[11px] text-slate-400">Requested by</span>
+                          <span className="font-semibold text-slate-800 truncate max-w-[180px]">
+                            {req.hiring_manager_name || 'Hiring Manager'}
+                          </span>
+                        </div>
+
+                        {/* Executive Action Buttons */}
+                        {isPending && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={!!isLoading}
+                              onClick={() => handleRequisitionDecision(req.id, 'approved')}
+                              className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+                            >
+                              {isLoading === 'approved' ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              Approve Headcount
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!!isLoading}
+                              onClick={() => handleRequisitionDecision(req.id, 'rejected')}
+                              className="px-4 py-2 rounded-xl bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            >
+                              {isLoading === 'rejected' ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <X className="w-3.5 h-3.5" />
+                              )}
+                              Reject
+                            </button>
                           </div>
-                        </div>
-                        <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                          <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all" style={{ width: `${attainment}%` }} />
-                        </div>
+                        )}
+
+                        {isApproved && (
+                          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>Approved &amp; authorized for job posting by Executive</span>
+                          </div>
+                        )}
+
+                        {isRejected && (
+                          <div className="flex items-center gap-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
+                            <X className="w-4 h-4 text-rose-600 shrink-0" />
+                            <span>Requisition rejected during executive budget review</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
-                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Right: EEO Demographics Aggregate Anonymized Breakdown */}
-            <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                      Anonymized Diversity
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                      EEO Vault Isolated
-                    </span>
-                  </div>
-                  {totalEeoResponses > 0 && (
-                    <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                      {totalEeoResponses} responses
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Aggregate candidate self-identification. Strictly decoupled from ATS scoring.
-                </p>
-
-                {/* Diversity View Tabs (When responses exist) */}
-                {totalEeoResponses > 0 && (
-                  <div className="flex items-center gap-1.5 p-1 bg-slate-100/70 rounded-xl mt-3 text-xs">
-                    <button
-                      onClick={() => setDiversityTab('summary')}
-                      className={`flex-1 py-1 px-2 rounded-lg font-semibold transition cursor-pointer ${
-                        diversityTab === 'summary' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      URM Overview
-                    </button>
-                    <button
-                      onClick={() => setDiversityTab('race')}
-                      className={`flex-1 py-1 px-2 rounded-lg font-semibold transition cursor-pointer ${
-                        diversityTab === 'race' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Race / Ethnicity
-                    </button>
-                    <button
-                      onClick={() => setDiversityTab('gender')}
-                      className={`flex-1 py-1 px-2 rounded-lg font-semibold transition cursor-pointer ${
-                        diversityTab === 'gender' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Gender
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {activeDiversityData.length === 0 ? (
-                <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-3 bg-slate-50/50 rounded-2xl border border-slate-100">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                    <PieIcon className="w-6 h-6 text-indigo-500" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-bold text-slate-700">No diversity responses submitted yet</p>
-                    <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
-                      Aggregate demographics will populate here as candidates complete voluntary EEO disclosures during job application.
-                    </p>
-                  </div>
-                  <p className="text-[10px] font-semibold text-slate-400">Data appears when candidates voluntarily complete the EEO disclosure.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="h-48 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={activeDiversityData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={75}
-                          paddingAngle={4}
-                          dataKey="value"
-                        >
-                          {activeDiversityData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color || '#6366F1'} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(val, name, item) => [`${val}% (${item?.payload?.count || 0} applicants)`, name]}
-                          contentStyle={{
-                            backgroundColor: '#0F172A',
-                            color: '#fff',
-                            borderRadius: '12px',
-                            fontSize: '12px'
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div className="space-y-1.5 pt-2 border-t border-slate-100 max-h-36 overflow-y-auto custom-scrollbar">
-                    {activeDiversityData.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between text-xs py-0.5">
-                        <div className="flex items-center gap-2 min-w-0 pr-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color || '#6366F1' }} />
-                          <span className="text-slate-600 font-medium truncate">{item.name}</span>
-                        </div>
-                        <span className="font-bold text-slate-900 shrink-0">
-                          {item.value}% {item.count ? <span className="text-[10px] text-slate-400 font-normal">({item.count})</span> : null}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="inline-flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-emerald-600" /> Statutory EEO-1 standard
-                </span>
-                <span>Privacy protected</span>
               </div>
             </div>
-
-          </div>
-
-          {/* ── 4. Bottom Row: Hiring Velocity & Attainment ── */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl p-6 shadow-xs space-y-5">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                  Hiring Velocity & Monthly Requisition Progression
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Monthly candidate hires completed vs approved target headcount over the last 6 months.
-                </p>
-              </div>
-              <span className="text-[11px] font-semibold text-slate-400">Last 6 months</span>
-            </div>
-
-            {!hasVelocityActivity ? (
-              <div className="h-56 relative overflow-hidden flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-indigo-100 bg-gradient-to-br from-slate-50 via-white to-indigo-50/60">
-                <div className="absolute inset-x-8 bottom-12 border-b border-dashed border-slate-200" />
-                <div className="absolute inset-x-12 bottom-12 flex justify-between">
-                  {velocityData.map((item) => (
-                    <span key={item.month} className="w-2.5 h-2.5 rounded-full bg-indigo-200 ring-4 ring-indigo-50" />
-                  ))}
-                </div>
-                <div className="relative w-12 h-12 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center justify-center mb-3">
-                  <TrendingUp className="w-6 h-6 text-indigo-400" />
-                </div>
-                <p className="relative text-sm font-bold text-slate-700">Hiring activity will appear here</p>
-                <p className="relative text-[11px] text-slate-400 mt-1 max-w-md">
-                  No confirmed hires have been recorded in the last six months. The live trend graph will populate as candidates reach the hired stage.
-                </p>
-              </div>
-            ) : (
-              <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={velocityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                    <XAxis dataKey="month" tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#64748B', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#0F172A',
-                        color: '#fff',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        border: 'none'
-                      }}
-                    />
-                    <Area type="monotone" dataKey="hires" stroke="#4F46E5" strokeWidth={3} fill="#6366F1" fillOpacity={0.14} name="Confirmed Hires" />
-                    {velocityData.some((item) => Number(item.target || 0) > 0) && (
-                      <Line type="monotone" dataKey="target" stroke="#94A3B8" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Planning Target" />
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          )}
         </>
       )}
 

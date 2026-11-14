@@ -29,7 +29,8 @@ class ApprovalDecision(str, Enum):
 class ApprovalStep(BaseModel):
     step_order: int = 1
     approver_id: str
-    approver_role: str = "hiring_manager"
+    approver_role: str = "executive"
+    approver_name: Optional[str] = "Company Executive"
     status: ApprovalDecision = ApprovalDecision.PENDING
     decided_at: Optional[datetime] = None
     comments: Optional[str] = None
@@ -47,6 +48,8 @@ class RequisitionModel(BaseModel):
     budget_min: float = 0.0
     budget_max: float = 0.0
     hiring_manager_id: str
+    hiring_manager_name: Optional[str] = None
+    hiring_manager_email: Optional[str] = None
     recruiter_id: Optional[str] = None
     linked_job_id: Optional[str] = None
     approval_chain: List[ApprovalStep] = Field(default_factory=list)

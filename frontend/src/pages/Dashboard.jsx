@@ -246,11 +246,7 @@ export default function Dashboard() {
     ? analytics.top_matched_skills
     : Array.isArray(user?.skills) && user.skills.length > 0
       ? user.skills.map(s => ({ skill: s, frequency: 1 }))
-      : [
-          { skill: 'Python', frequency: 2 },
-          { skill: 'FastAPI', frequency: 2 },
-          { skill: 'PostgreSQL', frequency: 2 }
-        ]
+      : []
 
   // Score Trend Data
   const trendPoints = scoreTrend.length > 0 

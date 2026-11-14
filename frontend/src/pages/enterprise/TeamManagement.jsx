@@ -584,56 +584,61 @@ export default function TeamManagement() {
             {/* Modal Content */}
             <div className="p-6 space-y-5">
               {generatedInvite ? (
-                /* Success view with copy link */
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-bold text-blue-900">Invitation Link Generated!</h4>
-                      <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                        A secure token was created for <span className="font-bold">{generatedInvite.email}</span> with role{' '}
-                        <span className="font-bold underline">{generatedInvite.role}</span>.
-                      </p>
-                    </div>
+                /* Success view: Email Sent confirmation with optional backup copy */
+                <div className="space-y-5 text-center py-2">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
+                    <CheckCircle2 className="w-8 h-8" />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Direct Invitation Link
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={generatedInvite.invite_link}
-                        className="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-700 select-all outline-none"
-                      />
-                      <button
-                        onClick={() => handleCopyLink(generatedInvite.invite_link, 'modal')}
-                        className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shrink-0 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
-                      >
-                        {copiedId === 'modal' ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            Copy Link
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Share this URL directly with the invitee. When opened, they can set their password and immediately join your organization.
+                    <h4 className="text-base font-bold text-slate-900">
+                      Invitation Email Sent!
+                    </h4>
+                    <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                      An official invitation has been sent to{' '}
+                      <span className="font-semibold text-slate-800">{generatedInvite.email}</span>{' '}
+                      to join as a{' '}
+                      <span className="font-semibold text-indigo-600">
+                        {ROLE_CONFIG[generatedInvite.role]?.label || generatedInvite.role}
+                      </span>.
                     </p>
                   </div>
 
-                  <div className="pt-3 flex justify-end">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left text-xs text-slate-600 space-y-2">
+                    <div className="flex items-center gap-2 font-medium text-slate-700">
+                      <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Sent via Brevo Email Service</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 pl-6">
+                      The invitee can open the email, verify their account, and set their password to immediately access your workspace.
+                    </p>
+                  </div>
+
+                  {/* Secondary backup copy option */}
+                  <div className="pt-1 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyLink(generatedInvite.invite_link, 'modal')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      {copiedId === 'modal' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 font-semibold">Link Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Copy link as backup</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
                     <button
                       onClick={() => setShowInviteModal(false)}
-                      className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors cursor-pointer"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
                     >
                       Done
                     </button>

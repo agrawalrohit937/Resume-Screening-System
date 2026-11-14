@@ -49,10 +49,11 @@ class TeamInviteRepository:
     async def create_invite(self, data: Dict[str, Any]) -> Dict[str, Any]:
         async with self.session_factory() as session:
             now = datetime.now(timezone.utc)
-            clean_data = {k: v for k, v in data.items() if hasattr(TeamInvite, k) and k != "id"}
+            clean_data = {k: v for k, v in data.items() if hasattr(TeamInvite, k) and k not in ("id", "created_at")}
+            created_at = data.get("created_at") or now
             invite = TeamInvite(
                 id=gen_uuid_str(),
-                created_at=now,
+                created_at=created_at,
                 **clean_data
             )
             session.add(invite)
@@ -74,13 +75,14 @@ class TeamInviteRepository:
                 for k, v in data.items():
                     if hasattr(existing, k) and k not in ("id", "created_at"):
                         setattr(existing, k, v)
-                await session.commit()
-                await session.refresh(existing)
-                return _invite_to_dict(existing)
+                    await session.commit()
+                    await session.refresh(existing)
+                    return _invite_to_dict(existing)
             else:
                 now = datetime.now(timezone.utc)
-                clean_data = {k: v for k, v in data.items() if hasattr(TeamInvite, k) and k != "id"}
-                invite = TeamInvite(id=gen_uuid_str(), created_at=now, **clean_data)
+                clean_data = {k: v for k, v in data.items() if hasattr(TeamInvite, k) and k not in ("id", "created_at")}
+                created_at = data.get("created_at") or now
+                invite = TeamInvite(id=gen_uuid_str(), created_at=created_at, **clean_data)
                 session.add(invite)
                 await session.commit()
                 await session.refresh(invite)

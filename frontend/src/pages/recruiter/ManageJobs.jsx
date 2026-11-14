@@ -38,6 +38,7 @@ import ScheduleLiveInterviewModal from '../../components/recruiter/ScheduleLiveI
 export default function ManageJobs() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const isHiringManager = (user?.role || '').toLowerCase() === 'hiring_manager' || (Array.isArray(user?.roles) && user.roles.includes('hiring_manager'))
   const cacheKey = `careershala_recruiter_jobs:${user?.id || user?._id || user?.email || 'anonymous'}`
   const hasCachedJobs = useRef(false)
 
@@ -408,19 +409,21 @@ Requirements & Qualifications:
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div>
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-500 border border-slate-200/60 rounded-full px-3 py-1 text-xs font-medium">
-                  <Briefcase size={13} className="text-slate-400" />
-                  Recruiter Control Center
+                <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded-full px-3 py-1 text-xs font-semibold">
+                  <Briefcase size={13} className="text-indigo-600" />
+                  {isHiringManager ? 'Department Hiring Portal' : 'Recruiter Control Center'}
                 </span>
-                <span className="bg-slate-100 text-slate-500 border border-slate-200/60 rounded-full px-3 py-1 text-xs font-medium">
-                  {user?.full_name || 'Recruiter'}
+                <span className="bg-slate-100 text-slate-600 border border-slate-200/60 rounded-full px-3 py-1 text-xs font-medium">
+                  {user?.full_name || user?.name || (isHiringManager ? 'Hiring Manager' : 'Recruiter')}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Manage Job Postings
+                {isHiringManager ? 'Department Job Postings' : 'Manage Job Postings'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xl">
-                Oversee active openings, monitor incoming candidate submissions, and publish new positions indexed into the AI semantic matcher.
+                {isHiringManager
+                  ? 'Monitor active department openings, review candidates in your talent pipeline, and configure job requirements.'
+                  : 'Oversee active openings, monitor incoming candidate submissions, and publish new positions indexed into the AI semantic matcher.'}
               </p>
             </div>
 
@@ -429,10 +432,10 @@ Requirements & Qualifications:
               <button
                 type="button"
                 onClick={() => setIsPostModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold shadow-xs hover:shadow transition-all flex items-center gap-2 cursor-pointer"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold shadow-xs hover:shadow shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={16} />
-                <span>Post New Job</span>
+                <span>{isHiringManager ? 'Create Department Posting' : 'Post New Job'}</span>
               </button>
             </div>
           </div>
@@ -642,10 +645,10 @@ Requirements & Qualifications:
                           <button
                             type="button"
                             onClick={() => navigate(`/recruiter/jobs/${job.id}/applicants`)}
-                            className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors cursor-pointer"
                             title="Open Applicants Kanban Pipeline"
                           >
-                            <Users size={13} className="text-blue-600" />
+                            <Users size={13} className="text-indigo-600" />
                             <span>{job.applicant_count || 0}</span>
                           </button>
                         </td>
@@ -773,7 +776,7 @@ Requirements & Qualifications:
               <button
                 type="button"
                 onClick={() => setIsPostModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow transition cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow shadow-indigo-600/20 transition cursor-pointer"
               >
                 <Plus size={16} />
                 Post Your First Job
@@ -876,7 +879,7 @@ Requirements & Qualifications:
                       setSelectedJob(null)
                       navigate(`/recruiter/jobs/${id}/applicants`)
                     }}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs hover:shadow cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs hover:shadow shadow-indigo-600/20 cursor-pointer"
                   >
                     <Users size={14} />
                     <span>Open Pipeline ({selectedJob.applicant_count || 0})</span>
@@ -1093,7 +1096,7 @@ Requirements & Qualifications:
                         type="submit"
                         disabled={postingLoading}
                         onClick={(e) => handleCreateJob(e, false)}
-                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
+                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
                       >
                         {postingLoading ? 'Publishing...' : 'Publish Job'}
                       </button>
@@ -1363,7 +1366,7 @@ Requirements & Qualifications:
                     <button
                       type="submit"
                       disabled={editLoading}
-                      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
                     >
                       {editLoading ? 'Saving...' : 'Save Changes'}
                     </button>

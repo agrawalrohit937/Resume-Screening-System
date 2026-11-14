@@ -264,11 +264,22 @@ async def get_current_user(
     # inherit the company's active subscription if the company executive upgraded the tenant!
     if user.tenant_id and user.tenant_id != "default" and not user.subscription_active:
         try:
-            company_doc = await get_company_repo().get_by_tenant_id(user.tenant_id)
-            if company_doc and company_doc.get("subscription_active"):
-                user.plan = company_doc.get("plan", "recruiter_pro")
-                user.subscription_active = True
-                user.subscription_status = "active"
+            from config.db import get_pg_session_factory
+            from sqlalchemy import select
+            from models.tables import User as UserModelTable
+            async with get_pg_session_factory()() as session:
+                sponsor_stmt = select(UserModelTable).where(
+                    UserModelTable.tenant_id == user.tenant_id,
+                    UserModelTable.subscription_active == True,
+                    UserModelTable.subscription_end_date > datetime.now(timezone.utc),
+                ).order_by(UserModelTable.subscription_end_date.desc()).limit(1)
+                active_sponsor = (await session.execute(sponsor_stmt)).scalar_one_or_none()
+                if active_sponsor:
+                    user.plan = active_sponsor.plan or "recruiter_pro"
+                    user.subscription_active = True
+                    user.subscription_status = "active"
+                    user.subscription_start_date = active_sponsor.subscription_start_date
+                    user.subscription_end_date = active_sponsor.subscription_end_date
         except Exception:
             pass
 

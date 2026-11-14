@@ -74,6 +74,7 @@ class CopilotRouter:
         # Navigation shortcuts
         nav_map = {
             "/ats": ("/results", "Opening ATS Matcher"),
+            "/jobs": ("/jobs", "Opening Job Feed & Recommendations"),
             "/interview": ("/interview", "Taking you to Interview Practice"),
             "/upload": ("/upload", "Opening Resume Library"),
             "/enhance": ("/enhance", "Opening Resume Enhancer"),

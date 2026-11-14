@@ -8,6 +8,7 @@ in sync automatically instead of drifting.
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
@@ -361,8 +362,12 @@ async def link_or_create_user(
     if any(r in ("executive", "exec", "employer", "recruiter", "hiring_manager") for r in roles_list) and "@" in email:
         domain = email.split("@")[1].split(".")[0].lower()
         common = {"gmail", "yahoo", "hotmail", "outlook", "icloud", "proton", "mail", "aol"}
-        if domain not in common:
-            resolved_tenant = domain
+        if domain in common:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employer accounts cannot be registered with personal email domains (@gmail, @yahoo, etc.). Please use your official company/work email.",
+            )
+        resolved_tenant = domain
 
     user_data: Dict[str, Any] = {
         "email": email.lower(),
