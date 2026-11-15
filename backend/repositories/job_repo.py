@@ -391,3 +391,14 @@ class JobRepository(BaseRepository):
             d["id"] = app_id
             d["_id"] = app_id
             return d
+
+    async def update_candidate_application_stage(self, application_id: str, new_stage: str) -> bool:
+        async with self.session_factory() as session:
+            stmt = (
+                update(CandidateApplication)
+                .where(CandidateApplication.id == str(application_id))
+                .values(stage=str(new_stage), updated_at=datetime.now(timezone.utc))
+            )
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount > 0

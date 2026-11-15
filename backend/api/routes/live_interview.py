@@ -41,6 +41,7 @@ from services.evaluation_service import EvaluationService
 from services.gamification_service import GamificationService
 
 from repositories.resume_repo import ResumeRepository
+from repositories.job_repo import JobRepository
 
 
 logger = structlog.get_logger(__name__)
@@ -449,7 +450,19 @@ async def schedule_live_interview(
         )
 
     employer_name = getattr(user, "full_name", None) or "Hiring Manager"
-    company_name = getattr(user, "company_name", None) or "CareerShala Enterprise"
+    company_name = getattr(user, "company_name", None)
+    company_logo = getattr(user, "company_logo", None)
+    if payload.job_id:
+        try:
+            job_repo = JobRepository()
+            job_doc = await job_repo.get_by_id(str(payload.job_id))
+            if job_doc:
+                company_name = job_doc.get("company_name") or job_doc.get("company") or company_name
+                company_logo = job_doc.get("company_logo") or company_logo
+        except Exception as e:
+            logger.warning("Could not fetch job info for live interview schedule", error=str(e))
+    company_name = company_name or "CareerShala Technologies"
+
     result = await svc.schedule_employer_session(
         employer_id=str(user.id),
         employer_name=employer_name,
@@ -465,6 +478,7 @@ async def schedule_live_interview(
         candidate_name=payload.candidate_name,
         application_id=payload.application_id,
         num_questions=payload.num_questions,
+        company_logo=company_logo,
     )
     return {"success": True, **result}
 
@@ -492,7 +506,19 @@ async def schedule_bulk_live_interviews(
         )
 
     employer_name = getattr(user, "full_name", None) or "Hiring Manager"
-    company_name = getattr(user, "company_name", None) or "CareerShala Enterprise"
+    company_name = getattr(user, "company_name", None)
+    company_logo = getattr(user, "company_logo", None)
+    if payload.job_id:
+        try:
+            job_repo = JobRepository()
+            job_doc = await job_repo.get_by_id(str(payload.job_id))
+            if job_doc:
+                company_name = job_doc.get("company_name") or job_doc.get("company") or company_name
+                company_logo = job_doc.get("company_logo") or company_logo
+        except Exception as e:
+            logger.warning("Could not fetch job info for bulk live interview schedule", error=str(e))
+    company_name = company_name or "CareerShala Technologies"
+
     result = await svc.schedule_bulk_employer_sessions(
         employer_id=str(user.id),
         employer_name=employer_name,
@@ -506,6 +532,7 @@ async def schedule_bulk_live_interviews(
         expiry_hours=payload.expiry_hours,
         candidates=[c.model_dump() for c in payload.candidates],
         num_questions=payload.num_questions,
+        company_logo=company_logo,
     )
     return {"success": True, **result}
 

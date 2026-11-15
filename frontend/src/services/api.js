@@ -82,6 +82,8 @@ const clearLocalAuth = () => {
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("tenant_id");
   localStorage.removeItem("user");
+  localStorage.removeItem("careershala_user");
+  localStorage.removeItem("careershala_view_context");
 };
 
 const processQueue = (error, token = null) => {
@@ -153,9 +155,10 @@ api.interceptors.response.use(
           // or when already on /login or public landing pages! Hard reloads force
           // AuthContext to remount, call /auth/me, get 401, and reload in an infinite loop.
           const isAuthMe = originalRequest?.url?.includes('/auth/me');
-          const isAlreadyOnLogin = typeof window !== 'undefined' && window.location.pathname === '/login';
+          const isExplicitLogout = typeof sessionStorage !== 'undefined' && sessionStorage.getItem("careershala_explicit_logout") === "true";
+          const isAlreadyOnLogin = typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname === '/');
 
-          if (!isAuthMe && !isAlreadyOnLogin) {
+          if (!isAuthMe && !isAlreadyOnLogin && !isExplicitLogout) {
             window.location.href = "/login";
           }
           return Promise.reject(err);
@@ -200,9 +203,10 @@ api.interceptors.response.use(
         clearLocalAuth();
 
         const isAuthMe = originalRequest?.url?.includes('/auth/me');
-        const isAlreadyOnLogin = typeof window !== 'undefined' && window.location.pathname === '/login';
+        const isExplicitLogout = typeof sessionStorage !== 'undefined' && sessionStorage.getItem("careershala_explicit_logout") === "true";
+        const isAlreadyOnLogin = typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname === '/');
 
-        if (!isAuthMe && !isAlreadyOnLogin) {
+        if (!isAuthMe && !isAlreadyOnLogin && !isExplicitLogout) {
           window.location.href = "/login?reason=auth_expired";
         }
 

@@ -488,10 +488,10 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
           type="button"
           onClick={openCopilot}
           aria-label="Open CareerMitra AI Copilot"
-          className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-indigo-500/20 active:scale-98 transition-all cursor-pointer"
+          className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-blue-500/20 active:scale-98 transition-all cursor-pointer"
           title="Open CareerMitra AI Career Copilot"
         >
-          <Sparkles size={14} className="text-indigo-200 animate-pulse" />
+          <Sparkles size={14} className="text-blue-200 animate-pulse" />
           <span className="hidden sm:inline">CareerMitra</span>
         </button>
 

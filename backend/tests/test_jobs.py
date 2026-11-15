@@ -860,6 +860,38 @@ async def test_explore_jobs_merges_internal_and_external_with_priority_sort():
     assert external_job["external_apply_url"] == "https://linkedin.com/jobs/view/999"
 
 
+@pytest.mark.asyncio
+async def test_candidate_hired_email_template_rendering(monkeypatch):
+    """Verify EmailService.send_candidate_hired successfully renders candidate_hired.html and dispatches."""
+    from services.email_service import EmailService
+    from unittest.mock import AsyncMock
+
+    mock_send = AsyncMock(return_value={"sent": True})
+    monkeypatch.setattr(EmailService, "_send_brevo_email", mock_send)
+
+    service = EmailService()
+    result = await service.send_candidate_hired(
+        to_email="candidate@example.com",
+        candidate_name="Alex Mercer",
+        job_title="Lead AI Engineer",
+        company_name="Apex Corp",
+        recruiter_email="hiring@apex.com",
+        salary_range="$180,000 - $220,000",
+        location="Remote",
+    )
+
+    assert mock_send.called
+    call_kwargs = mock_send.call_args.kwargs
+    assert call_kwargs["to_email"] == "candidate@example.com"
+    assert "Lead AI Engineer" in call_kwargs["subject"]
+    assert "Apex Corp" in call_kwargs["subject"]
+    assert "Alex Mercer" in call_kwargs["html_body"]
+    assert "Lead AI Engineer" in call_kwargs["html_body"]
+    assert "Apex Corp" in call_kwargs["html_body"]
+    assert "$180,000 - $220,000" in call_kwargs["html_body"]
+
+
+
 
 
 

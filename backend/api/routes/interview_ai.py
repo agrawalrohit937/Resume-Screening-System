@@ -251,12 +251,12 @@ async def claim_daily_visit_reward(
 # ─── GET /interview/gamification/leaderboard ─────────────────────────────────
 @ai_router.get("/gamification/leaderboard")
 async def get_leaderboard(
-    limit: int = 50,
+    limit: int = 100,
     current_user: UserModel = Depends(get_current_user),
     gamification: GamificationService = Depends(get_gamification_service),
 ):
     """Global leaderboard — top performers by total points."""
-    board = await gamification.get_leaderboard(limit=min(limit, 100))
+    board = await gamification.get_leaderboard(limit=min(limit, 200))
 
     my_rank = next((e["rank"] for e in board if e["user_id"] == str(current_user.id)), None)
 

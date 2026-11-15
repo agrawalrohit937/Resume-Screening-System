@@ -10,23 +10,9 @@ import RouteErrorBoundary from './components/RouteErrorBoundary'
 import Loader from './components/Loader'
 import RoleGuard from './components/RoleGuard'
 
-function applyTheme(theme) {
-  const root = document.documentElement
-  if (theme) root.dataset.theme = theme
-}
-
-function getInitialTheme() {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'light' || saved === 'dark') return saved
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-function ThemeInit() {
-  useEffect(() => {
-    const theme = getInitialTheme()
-    applyTheme(theme)
-  }, [])
-  return null
+// Ensure consistent light theme across all browsers and operating system settings
+if (typeof document !== 'undefined') {
+  document.documentElement.dataset.theme = 'light'
 }
 
 const Login = lazy(() => import('./pages/Login'))
@@ -172,9 +158,7 @@ export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
-
         <TenantProvider>
-          <ThemeInit />
           <BootLoaderGate>
             <Toaster
               position="top-right"

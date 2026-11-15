@@ -83,9 +83,18 @@ export default function Signup() {
     onSuccess: async (codeResponse) => {
       setLoading(true)
       try {
-        await googleLogin(codeResponse.access_token, selectedRole)
+        const googleRes = await googleLogin(codeResponse.access_token, selectedRole)
         toast.success('Welcome to CareerShala! 🚀')
-        navigate('/dashboard')
+        const userRoles = [
+          ...(Array.isArray(googleRes?.user?.roles) ? googleRes.user.roles : []),
+          googleRes?.user?.role,
+          selectedRole,
+        ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+
+        const isEmployer = userRoles.some((r) =>
+          ['executive', 'exec', 'recruiter', 'admin', 'hiring_manager'].includes(r)
+        )
+        navigate(isEmployer ? '/recruiter/company' : '/profile')
       } catch (err) {
         console.error('Google Auth Backend Error:', err)
         const errorMsg = typeof err.response?.data?.detail === 'string'

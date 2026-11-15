@@ -9,6 +9,7 @@ import MobileBottomNav from './MobileBottomNav'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import AvatarRing from './AvatarRing'
 import { resolveAvatarUrl } from '../utils/avatarUtils'
+import Loader from './Loader'
 
 import ProfilePlanDropdown from './ProfilePlanDropdown'
 import { CopilotProvider } from '../features/copilot'
@@ -317,7 +318,9 @@ export default function AppLayout() {
                   : 'max-w-7xl'
             } animate-fade-in`}>
               <RouteErrorBoundary>
-                <Outlet />
+                <Suspense fallback={<Loader />}>
+                  <Outlet />
+                </Suspense>
               </RouteErrorBoundary>
             </div>
           </main>

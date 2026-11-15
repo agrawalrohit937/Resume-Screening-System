@@ -188,6 +188,15 @@ export default function ScheduleLiveInterviewModal({
             targetJobId = list[0].id
             setSelectedJob(list[0])
             setSelectedJobId(list[0].id)
+          } else if (targetJobId && list.length > 0) {
+            const matched = list.find((j) => String(j.id) === String(targetJobId))
+            if (matched) {
+              setSelectedJob((prev) => ({
+                ...matched,
+                ...prev,
+                jd_text_raw: matched.jd_text_raw || prev?.jd_text_raw || '',
+              }))
+            }
           }
 
           if (targetJobId) {
@@ -286,10 +295,12 @@ export default function ScheduleLiveInterviewModal({
     }
 
     const jdText =
-      selectedJob.jd_text_raw ||
-      selectedJob.job_description ||
-      selectedJob.description ||
-      selectedJob.title
+      selectedJob.jd_text_raw?.trim() ||
+      selectedJob.job_description?.trim() ||
+      selectedJob.description?.trim() ||
+      (selectedJob.title?.trim()
+        ? `${selectedJob.title.trim()} role responsibilities, technical competence, problem solving, and team qualifications.`
+        : '')
 
     if (!jdText || jdText.length < 10) {
       toast.error('Selected job does not have a complete Job Description text.')

@@ -31,9 +31,164 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
-import { getMyPostedJobs, createJob, updateJob, toggleJobStatus } from '../../services/api'
+import { getMyPostedJobs, createJob, updateJob, toggleJobStatus, getCompanyProfile } from '../../services/api'
 import CustomDropdown from '../../components/common/CustomDropdown'
 import ScheduleLiveInterviewModal from '../../components/recruiter/ScheduleLiveInterviewModal'
+
+const CURRENCY_OPTIONS = [
+  { value: '₹', label: '₹ INR' },
+  { value: '$', label: '$ USD' },
+  { value: '€', label: '€ EUR' },
+  { value: '£', label: '£ GBP' },
+  { value: 'C$', label: 'C$ CAD' },
+  { value: 'A$', label: 'A$ AUD' },
+]
+
+const PERIOD_OPTIONS = [
+  { value: 'LPA', label: 'LPA (Year)' },
+  { value: '/ year', label: 'Per Year' },
+  { value: '/ month', label: 'Per Month' },
+  { value: '/ hr', label: 'Per Hour' },
+]
+
+function formatSalaryRange(currency = '₹', min = '', max = '', period = 'LPA') {
+  const cleanMin = String(min || '').trim()
+  const cleanMax = String(max || '').trim()
+
+  if (!cleanMin && !cleanMax) return ''
+
+  if (cleanMin && cleanMax) {
+    if (period === 'LPA') {
+      return `${currency}${cleanMin} - ${currency}${cleanMax} LPA`
+    }
+    return `${currency}${cleanMin} - ${currency}${cleanMax} ${period}`
+  }
+
+  if (cleanMin) {
+    if (period === 'LPA') return `${currency}${cleanMin}+ LPA`
+    return `${currency}${cleanMin}+ ${period}`
+  }
+
+  if (period === 'LPA') return `Up to ${currency}${cleanMax} LPA`
+  return `Up to ${currency}${cleanMax} ${period}`
+}
+
+function parseSalaryRange(salaryStr) {
+  if (!salaryStr || typeof salaryStr !== 'string') {
+    return { currency: '₹', min: '', max: '', period: 'LPA' }
+  }
+
+  const str = salaryStr.trim()
+  let currency = '₹'
+  if (str.includes('$')) currency = '$'
+  else if (str.includes('€')) currency = '€'
+  else if (str.includes('£')) currency = '£'
+  else if (str.includes('C$')) currency = 'C$'
+  else if (str.includes('A$')) currency = 'A$'
+  else if (str.includes('₹') || str.toLowerCase().includes('inr')) currency = '₹'
+
+  let period = currency === '₹' ? 'LPA' : '/ year'
+  const lower = str.toLowerCase()
+  if (lower.includes('lpa') || lower.includes('lakh')) {
+    period = 'LPA'
+  } else if (lower.includes('/ month') || lower.includes('/mo') || lower.includes('per month') || lower.includes('/m')) {
+    period = '/ month'
+  } else if (lower.includes('/ hr') || lower.includes('/hour') || lower.includes('per hr')) {
+    period = '/ hr'
+  } else if (lower.includes('/ year') || lower.includes('/yr') || lower.includes('per year') || lower.includes('annual')) {
+    period = '/ year'
+  }
+
+  const matches = str.match(/[\d,.]+/g) || []
+  const cleanNumbers = matches.filter(n => n !== '.' && n !== ',')
+
+  const min = cleanNumbers[0] || ''
+  const max = cleanNumbers[1] || ''
+
+  return { currency, min, max, period }
+}
+
+function SalaryRangeControl({ salary, onChange }) {
+  const updateField = (field, val) => {
+    const next = { ...salary, [field]: val }
+    if (field === 'currency') {
+      if (val === '₹' && (next.period === '/ year' || !next.period)) next.period = 'LPA'
+      if (val !== '₹' && next.period === 'LPA') next.period = '/ year'
+    }
+    onChange(next)
+  }
+
+  const preview = formatSalaryRange(salary.currency, salary.min, salary.max, salary.period)
+
+  return (
+    <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-bold text-slate-700">Salary Range</label>
+        {preview ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/90 text-[11px] font-bold">
+            {preview}
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-400 font-medium">Negotiable / Competitive</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Currency</label>
+          <CustomDropdown
+            value={salary.currency}
+            onChange={val => updateField('currency', val)}
+            options={CURRENCY_OPTIONS}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Min</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 select-none">
+              {salary.currency}
+            </span>
+            <input
+              type="text"
+              placeholder={salary.period === 'LPA' ? 'e.g. 10' : 'e.g. 80,000'}
+              value={salary.min}
+              onChange={e => updateField('min', e.target.value)}
+              className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Max</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 select-none">
+              {salary.currency}
+            </span>
+            <input
+              type="text"
+              placeholder={salary.period === 'LPA' ? 'e.g. 18' : 'e.g. 130,000'}
+              value={salary.max}
+              onChange={e => updateField('max', e.target.value)}
+              className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Period</label>
+          <CustomDropdown
+            value={salary.period}
+            onChange={val => updateField('period', val)}
+            options={PERIOD_OPTIONS}
+            className="w-full"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function ManageJobs() {
   const { user } = useAuth()
@@ -45,17 +200,25 @@ export default function ManageJobs() {
   // State
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [companyBranding, setCompanyBranding] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'open' | 'closed'
   const [togglingId, setTogglingId] = useState(null)
   const [selectedJob, setSelectedJob] = useState(null)
   const [openMenuJobId, setOpenMenuJobId] = useState(null)
+  const [menuAnchor, setMenuAnchor] = useState(null)
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [scheduleJobTarget, setScheduleJobTarget] = useState(null)
 
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingJob, setEditingJob] = useState(null)
+  const [editSalary, setEditSalary] = useState({
+    currency: '₹',
+    min: '',
+    max: '',
+    period: 'LPA',
+  })
   const [editFormData, setEditFormData] = useState({
     title: '',
     jd_text_raw: '',
@@ -69,33 +232,64 @@ export default function ManageJobs() {
   const [editSkillInput, setEditSkillInput] = useState('')
   const [editLoading, setEditLoading] = useState(false)
 
+  const handleEditSalaryChange = (nextSalary) => {
+    setEditSalary(nextSalary)
+    const formatted = formatSalaryRange(nextSalary.currency, nextSalary.min, nextSalary.max, nextSalary.period)
+    setEditFormData(prev => ({ ...prev, salary_range: formatted }))
+  }
+
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.job-action-menu')) {
+      if (!e.target.closest('.job-action-menu') && !e.target.closest('.job-action-trigger')) {
         setOpenMenuJobId(null)
+        setMenuAnchor(null)
+      }
+    }
+    const handleScrollOrResize = () => {
+      if (openMenuJobId) {
+        setOpenMenuJobId(null)
+        setMenuAnchor(null)
       }
     }
     document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [])
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      document.removeEventListener('click', handleClickOutside)
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [openMenuJobId])
 
   // Post modal state
   const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [postingLoading, setPostingLoading] = useState(false)
+  const [postSalary, setPostSalary] = useState({
+    currency: '₹',
+    min: '',
+    max: '',
+    period: 'LPA',
+  })
   const [formData, setFormData] = useState({
     title: '',
     company_name: '',
     jd_text_raw: '',
     required_skills: '',
-    min_years: 0,
-    location: 'Remote',
+    min_years: '',
+    location: '',
     work_mode: 'Remote',
-    salary_range: '$90,000 - $130,000',
-    department: 'Engineering',
+    salary_range: '',
+    department: '',
   })
 
+  const handlePostSalaryChange = (nextSalary) => {
+    setPostSalary(nextSalary)
+    const formatted = formatSalaryRange(nextSalary.currency, nextSalary.min, nextSalary.max, nextSalary.period)
+    setFormData(prev => ({ ...prev, salary_range: formatted }))
+  }
+
   // Smart skills input state
-  const [skillsList, setSkillsList] = useState(['React', 'Node.js', 'PostgreSQL'])
+  const [skillsList, setSkillsList] = useState([])
   const [skillInput, setSkillInput] = useState('')
 
   const handleAddSkill = (val) => {
@@ -215,40 +409,82 @@ Requirements & Qualifications:
     }
   }
 
-  // Resolve company name from session or local preferences
+  // Resolve company name from company branding, session or local preferences
+  useEffect(() => {
+    getCompanyProfile()
+      .then((res) => {
+        if (res.data?.company_profile) {
+          setCompanyBranding(res.data.company_profile)
+        }
+      })
+      .catch(() => {})
+  }, [user?.tenant_id])
+
   const resolveCompany = () => {
+    if (companyBranding?.company_name?.trim()) return companyBranding.company_name.trim()
     if (user?.company_name?.trim()) return user.company_name.trim()
     try {
       const c = JSON.parse(localStorage.getItem('recruiter_company_profile') || '{}')
       if (c.company_name?.trim()) return c.company_name.trim()
     } catch {}
+    if (user?.tenant_id && user.tenant_id !== 'default') {
+      return user.tenant_id.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+    }
     try {
       const p = JSON.parse(localStorage.getItem('recruiter_preferences') || '{}')
       if (p.company?.trim()) return p.company.trim()
     } catch {}
-    return 'CareerShala Technologies'
+    return ''
   }
 
   // Create New Job (Draft vs Publish)
   const handleCreateJob = async (e, isDraft = false) => {
     if (e) e.preventDefault()
     if (!formData.title?.trim()) {
-      toast.error('Please enter a Job Title.')
+      toast.error('Job Title is required.')
       return
     }
-    if (!formData.jd_text_raw?.trim()) {
-      toast.error('Please enter or generate a Job Description.')
+    if (!formData.work_mode) {
+      toast.error('Work Mode is required.')
+      return
+    }
+    if (!formData.location?.trim()) {
+      toast.error('Location is required.')
+      return
+    }
+    if (formData.min_years === '' || formData.min_years === null || formData.min_years === undefined) {
+      toast.error('Minimum Experience is required.')
+      return
+    }
+    if (!formData.department?.trim()) {
+      toast.error('Department is required.')
+      return
+    }
+    if (!skillsList || skillsList.length === 0) {
+      toast.error('Please add at least one Required Skill.')
+      return
+    }
+    if (!formData.jd_text_raw?.trim() || formData.jd_text_raw.trim().length < 20) {
+      toast.error('Job Description is required and must be at least 20 characters.')
+      return
+    }
+
+    const companyName = resolveCompany()
+    if (!companyName) {
+      toast.error('Company Name is required. Please set up your Company Profile.')
       return
     }
 
     setPostingLoading(true)
     try {
-      const companyName = resolveCompany()
       const payload = {
         ...formData,
         title: formData.title.trim(),
         company_name: companyName,
+        company_logo: companyBranding?.logo_url || undefined,
         jd_text_raw: formData.jd_text_raw.trim(),
+        location: formData.location.trim(),
+        department: formData.department.trim(),
         min_years: parseFloat(formData.min_years) || 0,
         required_skills: skillsList,
         status: isDraft ? 'draft' : 'open',
@@ -261,18 +497,24 @@ Requirements & Qualifications:
       }
       toast.success(isDraft ? 'Job saved as draft! 📋' : 'Job published successfully! 🚀')
       setIsPostModalOpen(false)
-      setSkillsList(['React', 'Node.js', 'PostgreSQL'])
+      setSkillsList([])
       setSkillInput('')
+      setPostSalary({
+        currency: '₹',
+        min: '',
+        max: '',
+        period: 'LPA',
+      })
       setFormData({
         title: '',
         company_name: '',
         jd_text_raw: '',
         required_skills: '',
-        min_years: 0,
-        location: 'Remote',
+        min_years: '',
+        location: '',
         work_mode: 'Remote',
-        salary_range: '$90,000 - $130,000',
-        department: 'Engineering',
+        salary_range: '',
+        department: '',
       })
       fetchJobs(true)
     } catch (err) {
@@ -286,6 +528,8 @@ Requirements & Qualifications:
   // Open Edit Modal with prefilled data
   const handleOpenEditModal = (job) => {
     setEditingJob(job)
+    const parsed = parseSalaryRange(job.salary_range)
+    setEditSalary(parsed)
     setEditFormData({
       title: job.title || '',
       jd_text_raw: job.jd_text_raw || '',
@@ -326,11 +570,30 @@ Requirements & Qualifications:
     if (e) e.preventDefault()
     if (!editingJob) return
     if (!editFormData.title?.trim()) {
-      toast.error('Please enter a Job Title.')
+      toast.error('Job Title is required.')
+      return
+    }
+    if (!editFormData.location?.trim()) {
+      toast.error('Location is required.')
+      return
+    }
+    if (!editFormData.department?.trim()) {
+      toast.error('Department is required.')
       return
     }
 
     const hasApplicants = (editingJob.applicant_count || 0) > 0
+    if (!hasApplicants) {
+      if (!editSkillsList || editSkillsList.length === 0) {
+        toast.error('Please add at least one Required Skill.')
+        return
+      }
+      if (!editFormData.jd_text_raw?.trim() || editFormData.jd_text_raw.trim().length < 20) {
+        toast.error('Job Description is required and must be at least 20 characters.')
+        return
+      }
+    }
+
     setEditLoading(true)
     try {
       const payload = {
@@ -561,7 +824,7 @@ Requirements & Qualifications:
               ))}
             </div>
           ) : filteredJobs.length > 0 ? (
-            <div className="overflow-x-auto custom-scrollbar w-full">
+            <div className="overflow-x-auto custom-scrollbar w-full min-h-[160px]">
               <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -676,80 +939,26 @@ Requirements & Qualifications:
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setOpenMenuJobId(openMenuJobId === job.id ? null : job.id)
+                                  if (openMenuJobId === job.id) {
+                                    setOpenMenuJobId(null)
+                                    setMenuAnchor(null)
+                                  } else {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    const spaceBelow = window.innerHeight - rect.bottom
+                                    const openUp = spaceBelow < 185
+                                    setMenuAnchor({
+                                      top: openUp ? Math.max(10, rect.top - 165) : rect.bottom + 6,
+                                      right: Math.max(12, window.innerWidth - rect.right),
+                                      job,
+                                    })
+                                    setOpenMenuJobId(job.id)
+                                  }
                                 }}
-                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                className="job-action-trigger p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                                 title="More options"
                               >
                                 <MoreVertical size={16} />
                               </button>
-
-                              {openMenuJobId === job.id && (
-                                <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 text-left animate-in fade-in zoom-in-95 duration-100">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setScheduleJobTarget(job)
-                                      setIsScheduleModalOpen(true)
-                                      setOpenMenuJobId(null)
-                                    }}
-                                    className="w-full px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 flex items-center gap-2 cursor-pointer transition-colors"
-                                  >
-                                    <Sparkles size={14} className="text-indigo-500" />
-                                    <span>AI Interview</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleOpenEditModal(job)
-                                      setOpenMenuJobId(null)
-                                    }}
-                                    className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
-                                  >
-                                    <Pencil size={14} className="text-slate-400" />
-                                    <span>Edit Role</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedJob(job)
-                                      setOpenMenuJobId(null)
-                                    }}
-                                    className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
-                                  >
-                                    <Eye size={14} className="text-slate-400" />
-                                    <span>View Details</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    disabled={togglingId === job.id}
-                                    onClick={() => {
-                                      handleToggleStatus(job)
-                                      setOpenMenuJobId(null)
-                                    }}
-                                    className={`w-full px-3.5 py-2 text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                                      isOpen
-                                        ? 'text-rose-600 hover:bg-rose-50'
-                                        : 'text-emerald-600 hover:bg-emerald-50'
-                                    } disabled:opacity-50`}
-                                  >
-                                    {isOpen ? (
-                                      <>
-                                        <XCircle size={14} className="text-rose-500" />
-                                        <span>Close Role</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <CheckCircle2 size={14} className="text-emerald-500" />
-                                        <span>Reopen Role</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           </div>
                         </td>
@@ -950,10 +1159,10 @@ Requirements & Qualifications:
                       />
                     </div>
 
-                    {/* 2. 3-Column Grid: Work Mode, Min Exp, Department */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* 2. Work Mode & Location */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Work Mode</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Work Mode *</label>
                         <CustomDropdown
                           value={formData.work_mode}
                           onChange={val => setFormData({ ...formData, work_mode: val })}
@@ -966,22 +1175,40 @@ Requirements & Qualifications:
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Min Exp (Years)</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Location *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. San Francisco, CA, Bangalore, or Remote"
+                          value={formData.location}
+                          onChange={e => setFormData({ ...formData, location: e.target.value })}
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 3. Min Exp & Department */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Min Exp (Years) *</label>
                         <input
                           type="number"
+                          required
                           step="0.5"
                           min="0"
                           max="15"
+                          placeholder="e.g. 2"
                           value={formData.min_years}
                           onChange={e => setFormData({ ...formData, min_years: e.target.value })}
                           className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Department</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Department *</label>
                         <input
                           type="text"
-                          placeholder="e.g. Engineering"
+                          required
+                          placeholder="e.g. Engineering, Product, Design"
                           value={formData.department}
                           onChange={e => setFormData({ ...formData, department: e.target.value })}
                           className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
@@ -989,35 +1216,22 @@ Requirements & Qualifications:
                       </div>
                     </div>
 
-                    {/* 3. 2-Column Grid: Location & Salary Range */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Location</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. San Francisco, CA or Remote"
-                          value={formData.location}
-                          onChange={e => setFormData({ ...formData, location: e.target.value })}
-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Salary Range</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. $90,000 - $130,000"
-                          value={formData.salary_range}
-                          onChange={e => setFormData({ ...formData, salary_range: e.target.value })}
-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                    </div>
+                    {/* 4. Salary Range & Currency Control */}
+                    <SalaryRangeControl
+                      salary={postSalary}
+                      onChange={handlePostSalaryChange}
+                    />
 
                     {/* 4. Smart Skills Input (Tag/Pill UI) */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">
-                        Required Skills
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-600">
+                          Required Skills *
+                        </label>
+                        {skillsList.length === 0 && (
+                          <span className="text-[11px] text-amber-600 font-medium">At least 1 skill required</span>
+                        )}
+                      </div>
                       <div className="w-full min-h-[42px] p-1.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-1.5 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all cursor-text">
                         {skillsList.map((skill, index) => (
                           <span
@@ -1190,8 +1404,8 @@ Requirements & Qualifications:
                       />
                     </div>
 
-                    {/* 2. 3-Column Grid: Work Mode, Min Exp, Department */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* 2. Work Mode & Location */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Work Mode</label>
                         <CustomDropdown
@@ -1205,7 +1419,20 @@ Requirements & Qualifications:
                           className="w-full"
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Location</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. San Francisco, CA or Remote"
+                          value={editFormData.location}
+                          onChange={e => setEditFormData({ ...editFormData, location: e.target.value })}
+                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                    </div>
 
+                    {/* 3. Min Exp & Department */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="block text-xs font-bold text-slate-600">Min Exp (Years)</label>
@@ -1230,7 +1457,6 @@ Requirements & Qualifications:
                           }`}
                         />
                       </div>
-
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Department</label>
                         <input
@@ -1243,29 +1469,11 @@ Requirements & Qualifications:
                       </div>
                     </div>
 
-                    {/* 3. Location & Salary Range */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Location</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. San Francisco, CA or Remote"
-                          value={editFormData.location}
-                          onChange={e => setEditFormData({ ...editFormData, location: e.target.value })}
-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Salary Range</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. $90,000 - $130,000"
-                          value={editFormData.salary_range}
-                          onChange={e => setEditFormData({ ...editFormData, salary_range: e.target.value })}
-                          className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                    </div>
+                    {/* 4. Salary Range & Currency Control */}
+                    <SalaryRangeControl
+                      salary={editSalary}
+                      onChange={handleEditSalaryChange}
+                    />
 
                     {/* 4. Required Skills */}
                     <div>
@@ -1388,6 +1596,88 @@ Requirements & Qualifications:
         }}
         initialJob={scheduleJobTarget}
       />
+
+      {/* ── Floating Fixed Action Dropdown (Portaled to prevent table clipping) ── */}
+      {openMenuJobId && menuAnchor && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: `${menuAnchor.top}px`,
+            right: `${menuAnchor.right}px`,
+            zIndex: 99999,
+          }}
+          className="job-action-menu w-44 bg-white rounded-xl shadow-2xl border border-slate-200/90 py-1.5 text-left ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setScheduleJobTarget(menuAnchor.job)
+              setIsScheduleModalOpen(true)
+              setOpenMenuJobId(null)
+              setMenuAnchor(null)
+            }}
+            className="w-full px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Sparkles size={14} className="text-indigo-500" />
+            <span>AI Interview</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              handleOpenEditModal(menuAnchor.job)
+              setOpenMenuJobId(null)
+              setMenuAnchor(null)
+            }}
+            className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Pencil size={14} className="text-slate-400" />
+            <span>Edit Role</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedJob(menuAnchor.job)
+              setOpenMenuJobId(null)
+              setMenuAnchor(null)
+            }}
+            className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Eye size={14} className="text-slate-400" />
+            <span>View Details</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={togglingId === menuAnchor.job.id}
+            onClick={() => {
+              handleToggleStatus(menuAnchor.job)
+              setOpenMenuJobId(null)
+              setMenuAnchor(null)
+            }}
+            className={`w-full px-3.5 py-2 text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
+              menuAnchor.job.status === 'open'
+                ? 'text-rose-600 hover:bg-rose-50'
+                : 'text-emerald-600 hover:bg-emerald-50'
+            } disabled:opacity-50`}
+          >
+            {menuAnchor.job.status === 'open' ? (
+              <>
+                <XCircle size={14} className="text-rose-500" />
+                <span>Close Role</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={14} className="text-emerald-500" />
+                <span>Reopen Role</span>
+              </>
+            )}
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
