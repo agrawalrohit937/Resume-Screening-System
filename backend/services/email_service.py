@@ -340,6 +340,7 @@ class EmailService:
         interview_mode_label: str = "Live AI Assessment",
         magic_link_url: str = "",
         expiry_hours: int = 48,
+        company_logo: Optional[str] = None,
     ) -> bool:
         """Sends an enterprise B2B Live AI interview magic link invitation email."""
         target_email = recipient_email or to_email
@@ -347,7 +348,7 @@ class EmailService:
             logger.warning("No recipient email provided for live interview invitation")
             return False
 
-        subject = f"Live AI Interview Assessment: {job_title} at {company_name}"
+        subject = f"Interview Invitation: {job_title} - {company_name}"
 
         html = _render_template(
             "live_interview_invitation.html",
@@ -357,9 +358,42 @@ class EmailService:
             interview_mode_label=interview_mode_label or "All-in-One Assessment",
             magic_link_url=magic_link_url,
             expiry_hours=expiry_hours,
+            company_logo=company_logo,
         )
         logger.info("Dispatching live interview invitation email", to=target_email, job=job_title)
         return await self._send(target_email, subject, html, is_critical=True)
+
+    async def send_candidate_hired(
+        self,
+        *,
+        to_email: str,
+        candidate_name: str,
+        job_title: str,
+        company_name: str,
+        recruiter_email: Optional[str] = None,
+        salary_range: Optional[str] = None,
+        location: Optional[str] = None,
+        company_logo: Optional[str] = None,
+    ) -> bool:
+        """Sends an official congratulations / job offer notification email to the hired candidate."""
+        if not to_email:
+            logger.warning("No recipient email provided for candidate hired email")
+            return False
+
+        subject = f"Offer of Employment: {job_title} - {company_name}"
+
+        html = _render_template(
+            "candidate_hired.html",
+            candidate_name=candidate_name or "Candidate",
+            company_name=company_name or "the hiring team",
+            job_title=job_title or "Position",
+            recruiter_email=recruiter_email,
+            salary_range=salary_range,
+            location=location or "Remote",
+            company_logo=company_logo,
+        )
+        logger.info("Dispatching candidate hired offer email", to=to_email, company=company_name, job=job_title)
+        return await self._send(to_email, subject, html, is_critical=True)
 
     async def send_certificate(
         self,

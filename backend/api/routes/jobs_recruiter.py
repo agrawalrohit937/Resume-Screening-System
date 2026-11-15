@@ -23,7 +23,7 @@ from api.deps import (
     get_resume_repo,
 )
 from config.db import get_pg_session_factory
-from models.tables import AuditLog, CandidateApplication, Job
+from models.tables import AuditLog, CandidateApplication, Job, User
 from repositories.application_repo import ApplicationRepository
 from repositories.company_repo import CompanyRepository
 from repositories.job_repo import JobRepository
@@ -78,8 +78,35 @@ async def create_job(
         )
 
     raw_text = payload.jd_text_raw.strip()
-    company_clean = payload.company_name.strip()
-    company_profile = (await company_repo.get_by_name(company_clean)) or {}
+    if not raw_text or len(raw_text) < 20:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job description (JD) is required and must be at least 20 characters long.",
+        )
+    if not payload.title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job title is required.",
+        )
+    if not payload.location.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Location is required.",
+        )
+    if not payload.required_skills or len(payload.required_skills) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one required skill must be specified.",
+        )
+
+    tenant_id = getattr(current_user, "tenant_id", "default") or "default"
+    tenant_comp = await company_repo.get_by_tenant_id(tenant_id) if tenant_id != "default" else None
+    if tenant_comp and tenant_comp.get("company_name"):
+        company_clean = tenant_comp["company_name"].strip()
+        company_profile = tenant_comp
+    else:
+        company_clean = payload.company_name.strip() or getattr(current_user, "company_name", None) or "CareerShala Technologies"
+        company_profile = (await company_repo.get_by_name(company_clean)) or {}
     now = datetime.now(timezone.utc)
 
     occ_code = payload.occupation_code or map_job_title_to_occupation(payload.title)
@@ -360,7 +387,15 @@ async def update_application_stage(
     if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter or Administrator access required.")
 
-    app_doc = await app_repo.get_by_id_only(app_id)
+    # 1. Primary lookup: CandidateApplication (for job applicants on recruiter Kanban)
+    app_doc = await job_repo.get_candidate_application_by_id(app_id)
+    is_candidate_app = True
+
+    # 2. Fallback lookup: JobApplication (AI Apply Assistant applications)
+    if not app_doc:
+        app_doc = await app_repo.get_by_id_only(app_id)
+        is_candidate_app = False
+
     if not app_doc:
         raise HTTPException(status_code=404, detail="Application record not found.")
 
@@ -386,7 +421,10 @@ async def update_application_stage(
         except Exception:
             pass
 
-    await app_repo.update_stage(app_id, target_stage)
+    if is_candidate_app:
+        await job_repo.update_candidate_application_stage(app_id, target_stage)
+    else:
+        await app_repo.update_stage(app_id, target_stage)
     logger.info("Application stage updated", application_id=app_id, new_stage=target_stage, updated_by=str(current_user.id))
 
     try:
@@ -413,44 +451,78 @@ async def update_application_stage(
             try:
                 from services.email_service import EmailService
                 candidate_id = app_doc_snap.get("candidate_id")
-                if not candidate_id:
-                    return
+                cand_doc = None
                 user_repository = UserRepository()
-                cand_doc = await user_repository.get_by_id(str(candidate_id))
-                if not cand_doc or not cand_doc.get("email"):
-                    return
-                to_email = cand_doc["email"]
-                cand_name = cand_doc.get("full_name") or to_email.split("@")[0]
+                if candidate_id:
+                    try:
+                        cand_doc = await user_repository.get_by_id(str(candidate_id))
+                    except Exception as _ce:
+                        logger.warning("Could not look up candidate user by ID", candidate_id=candidate_id, error=str(_ce))
 
-                job_title, company_name, recruiter_email = "the position", "the hiring team", None
+                to_email = getattr(cand_doc, "email", None) or app_doc_snap.get("candidate_email")
+                if not to_email:
+                    logger.warning("No email found for candidate in application, skipping hire email", application_id=app_id)
+                    return
+                cand_name = getattr(cand_doc, "full_name", None) or app_doc_snap.get("candidate_name") or to_email.split("@")[0]
+
+                job_title = "Position"
+                company_name = "the hiring team"
+                company_logo = None
+                recruiter_email = None
+                salary_range = None
+                location = None
+
                 try:
                     j_doc = await job_repo.get_by_id(str(app_doc_snap.get("job_id", "")))
                     if j_doc:
-                        job_title = j_doc.get("title", job_title)
+                        job_title = j_doc.get("title") or job_title
                         company_name = j_doc.get("company_name") or j_doc.get("company") or company_name
+                        company_logo = j_doc.get("company_logo")
                         recruiter_email = j_doc.get("contact_email")
+                        salary_range = j_doc.get("salary_range")
+                        location = j_doc.get("location")
                         if not recruiter_email and j_doc.get("created_by"):
                             rec_doc = await user_repository.get_by_id(str(j_doc["created_by"]))
                             if rec_doc:
-                                recruiter_email = rec_doc.get("email")
-                except Exception:
-                    pass
+                                recruiter_email = getattr(rec_doc, "email", None)
 
-                subject = f"Official Job Offer: {job_title} at {company_name}"
-                html_body = (
-                    f"<p>Dear {cand_name},</p>"
-                    f"<p>We are thrilled to inform you that <strong>{company_name}</strong> would like to extend an "
-                    f"official offer for the position of <strong>{job_title}</strong>. Your recruiter will follow up shortly with offer details.</p>"
-                    f"<p>Questions? Contact <a href='mailto:{recruiter_email or 'careers@careershala.tech'}'>{recruiter_email or 'careers@careershala.tech'}</a>.</p>"
-                )
-                await EmailService().send_email(
+                        # Look up company profile by tenant_id for latest branding
+                        job_tenant = j_doc.get("tenant_id")
+                        if job_tenant and job_tenant != "default":
+                            c_doc = await company_repo.get_by_tenant_id(job_tenant)
+                            if c_doc:
+                                company_name = c_doc.get("company_name") or company_name
+                                company_logo = c_doc.get("logo_url") or company_logo
+                except Exception as _je:
+                    logger.warning("Could not resolve job details for hire email", error=str(_je))
+
+                # Fallback to current user's organization profile if still default
+                if not company_logo or company_name in ("the hiring team", "CareerShala Enterprise", "CareerShala Technologies"):
+                    c_user_tenant = getattr(current_user, "tenant_id", None)
+                    if c_user_tenant and c_user_tenant != "default":
+                        c_doc = await company_repo.get_by_tenant_id(c_user_tenant)
+                        if c_doc:
+                            company_name = c_doc.get("company_name") or company_name
+                            company_logo = c_doc.get("logo_url") or company_logo
+
+                if not company_logo:
+                    company_logo = getattr(current_user, "company_logo", None)
+
+                # Fallback recruiter email to the current acting user if still None
+                if not recruiter_email and getattr(current_user, "email", None):
+                    recruiter_email = current_user.email
+
+                await EmailService().send_candidate_hired(
                     to_email=to_email,
-                    to_name=cand_name,
-                    subject=subject,
-                    html_content=html_body,
-                    reply_to_email=recruiter_email,
-                    reply_to_name=company_name if recruiter_email else None,
+                    candidate_name=cand_name,
+                    job_title=job_title,
+                    company_name=company_name,
+                    recruiter_email=recruiter_email,
+                    salary_range=salary_range,
+                    location=location,
+                    company_logo=company_logo,
                 )
+                logger.info("Candidate hired notification email sent successfully", to=to_email, job=job_title, company=company_name)
             except Exception as exc:
                 logger.error("Hire email background task failed", application_id=app_id, error=str(exc))
 
@@ -503,29 +575,33 @@ async def save_company_profile(
         "updated_by": str(current_user.id),
         "updated_at": now,
     }
-    await company_repo.upsert(clean_name, profile_dict)
+    await company_repo.upsert(tenant_id, profile_dict)
 
-    update_fields = {
-        k: v
-        for k, v in {
-            "company_logo": profile_dict.get("logo_url"),
-            "company_website": profile_dict.get("website"),
-            "company_about": profile_dict.get("about"),
-        }.items()
-        if v
-    }
-    if update_fields:
-        async def _upd_jobs(sess: AsyncSession):
-            await sess.execute(update(Job).where(func.lower(Job.company_name) == clean_name.lower()).values(**update_fields))
-            await sess.commit()
+    update_fields = {"company_name": clean_name}
+    if profile_dict.get("logo_url"):
+        update_fields["company_logo"] = profile_dict["logo_url"]
+    if profile_dict.get("website"):
+        update_fields["company_website"] = profile_dict["website"]
+    if profile_dict.get("about"):
+        update_fields["company_about"] = profile_dict["about"]
 
-        active_sess = session if hasattr(session, "execute") else None
-        if active_sess:
-            await _upd_jobs(active_sess)
+    async def _upd_jobs_and_users(sess: AsyncSession):
+        if tenant_id and tenant_id != "default":
+            await sess.execute(update(Job).where(or_(Job.tenant_id == tenant_id, Job.created_by == str(current_user.id))).values(**update_fields))
+            await sess.execute(update(User).where(or_(User.tenant_id == tenant_id, User.id == str(current_user.id))).values(company_name=clean_name))
         else:
-            async with get_pg_session_factory()() as sess:
-                await _upd_jobs(sess)
+            await sess.execute(update(Job).where(Job.created_by == str(current_user.id)).values(**update_fields))
+            await sess.execute(update(User).where(User.id == str(current_user.id)).values(company_name=clean_name))
+        await sess.commit()
 
+    active_sess = session if hasattr(session, "execute") else None
+    if active_sess:
+        await _upd_jobs_and_users(active_sess)
+    else:
+        async with get_pg_session_factory()() as sess:
+            await _upd_jobs_and_users(sess)
+
+    current_user.company_name = clean_name
     logger.info("Company profile updated", company=clean_name, user_id=str(current_user.id))
     return {"success": True, "message": "Company profile saved successfully.", "profile": profile_dict}
 
@@ -630,6 +706,8 @@ async def get_job_applications(
         "status": job_doc.get("status", "open"),
         "department": job_doc.get("department"),
         "required_skills": job_doc.get("required_skills", []),
+        "jd_text_raw": job_doc.get("jd_text_raw", ""),
+        "min_years": job_doc.get("min_years", 0.0),
         "applicant_count": len(enriched_applications),
         "created_at": job_doc.get("created_at").isoformat() if hasattr(job_doc.get("created_at"), "isoformat") else str(job_doc.get("created_at", "")),
     }

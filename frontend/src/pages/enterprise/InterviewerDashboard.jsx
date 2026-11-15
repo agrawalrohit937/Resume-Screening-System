@@ -117,7 +117,8 @@ export default function InterviewerDashboard() {
     setLoadingAi(true)
     try {
       const res = await getEmployerLiveSessions()
-      const data = Array.isArray(res.data) ? res.data : []
+      const raw = res.data?.sessions || (Array.isArray(res.data) ? res.data : [])
+      const data = Array.isArray(raw) ? raw : []
       setLiveSessions(data)
     } catch (err) {
       console.error('[InterviewerDashboard] AI Sessions error:', err)

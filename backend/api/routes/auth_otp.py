@@ -171,9 +171,6 @@ async def signup(
 
     # Establish global CompanyProfile for the tenant if this is an Executive / Employer signup
     if is_enterprise and resolved_tenant != "default":
-        from services.multi_tenancy.tenant_cleanup import purge_orphaned_tenant_if_needed
-        await purge_orphaned_tenant_if_needed(db, resolved_tenant, excluding_user_id=str(user.id))
-
         c_name = (payload.company_name or "").strip() or resolved_tenant.replace("-", " ").title()
         from repositories.company_repo import CompanyRepository
         comp_repo = CompanyRepository()

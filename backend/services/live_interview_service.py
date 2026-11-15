@@ -559,6 +559,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         candidate_name: Optional[str] = None,
         application_id: Optional[str] = None,
         num_questions: int = 6,
+        company_logo: Optional[str] = None,
     ) -> Dict:
         """Schedule an enterprise B2B live interview session from employer dashboard and generate magic token."""
 
@@ -728,6 +729,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                     ),
                     magic_link_url=magic_link_url,
                     expiry_hours=expiry_hours,
+                    company_logo=company_logo,
                 )
             except Exception as mail_err:
                 logger.warning(
@@ -968,6 +970,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         expiry_hours: int = 48,
         candidates: List[Dict] = None,
         num_questions: int = 6,
+        company_logo: Optional[str] = None,
     ) -> Dict:
         """Bulk schedule live AI interviews for multiple candidates in a pipeline stage."""
 
@@ -1060,6 +1063,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                         ),
                         magic_link_url=magic_link_url,
                         expiry_hours=expiry_hours,
+                        company_logo=company_logo,
                     )
 
                     logger.info(

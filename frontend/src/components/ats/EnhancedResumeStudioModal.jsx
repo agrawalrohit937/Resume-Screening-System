@@ -20,7 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { recompileResumePdf } from '../../services/api'
+import api, { recompileResumePdf } from '../../services/api'
 
 export default function EnhancedResumeStudioModal({
   data,
@@ -72,9 +72,15 @@ export default function EnhancedResumeStudioModal({
       url = result.file_url
     }
 
-    if (url && typeof url === 'string' && url.startsWith('/api')) {
-      const apiOrigin = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || window.location.origin
-      url = apiOrigin + url
+    if (url && typeof url === 'string') {
+      // Normalize any stale Cloudinary URLs from /raw/authenticated/ to /raw/upload/
+      if (url.includes('cloudinary.com') && url.includes('/raw/authenticated/')) {
+        url = url.replace('/raw/authenticated/', '/raw/upload/')
+      }
+      if (url.startsWith('/api')) {
+        const apiOrigin = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || window.location.origin
+        url = apiOrigin + url
+      }
     }
     return url
   }, [resumeFile, result])
@@ -103,9 +109,9 @@ export default function EnhancedResumeStudioModal({
   }, [initialPdfUrl])
 
   // ── Build Initial Editable State ───────────────────────────────────────────
-  const buildInitialResume = () => {
+  const buildInitialResume = (overrideExt = null) => {
     const base = data?.enhanced_data || {}
-    const ext = result?.extracted_data || {}
+    const ext = overrideExt || result?.extracted_data || result?.parsed_data || {}
     const contact = base.contact || ext.contact || ext.contact_info || {}
 
     // Clean certs
@@ -182,8 +188,14 @@ export default function EnhancedResumeStudioModal({
       rawSkills = ext.skills
     }
 
+    let fallbackName = 'Rohit Agrawal'
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}')
+      if (u.name || u.full_name) fallbackName = u.name || u.full_name
+    } catch (e) {}
+
     return {
-      full_name: base.full_name || ext.full_name || ext.name || 'Rohit Agrawal',
+      full_name: base.full_name || ext.full_name || ext.name || fallbackName,
       role_title: base.target_role || base.role_title || ext.role_title || '',
       email: contact.email || ext.email || '',
       phone: contact.phone || ext.phone || '',
@@ -217,10 +229,36 @@ export default function EnhancedResumeStudioModal({
   const [pageLayout, setPageLayout] = useState('auto') // 'auto' (2-page if multi-page), '1page', '2page'
   const isTwoPage = pageLayout === '2page' || (pageLayout === 'auto' && isMultiPageContent)
 
-  // Sync if initial data changes
+  // Sync if initial data changes and user has not made unsaved manual edits
   useEffect(() => {
-    setResumeData(buildInitialResume())
+    if (!hasUnsavedChanges) {
+      setResumeData(buildInitialResume())
+    }
   }, [data, result])
+
+  // Fallback: If resumeData has empty sections (e.g. initial scan cache had no extracted_data), fetch from resume API
+  useEffect(() => {
+    const rid = result?.resume_id || data?.resume_id
+    if (
+      rid &&
+      !hasUnsavedChanges &&
+      (!resumeData.experience || resumeData.experience.length === 0) &&
+      (!resumeData.education || resumeData.education.length === 0)
+    ) {
+      api.get(`/resume/${rid}`)
+        .then(res => {
+          if (res.data?.parsed_data) {
+            setResumeData(prev => {
+              if ((!prev.experience || prev.experience.length === 0) && (!prev.education || prev.education.length === 0)) {
+                return buildInitialResume(res.data.parsed_data)
+              }
+              return prev
+            })
+          }
+        })
+        .catch(err => console.warn('Could not fetch resume details in modal:', err))
+    }
+  }, [result?.resume_id, data?.resume_id])
 
   const handleDownload = async () => {
     setIsRecompiling(true)
@@ -1181,7 +1219,7 @@ export default function EnhancedResumeStudioModal({
                     <button
                       type="button"
                       onClick={() => handleRecompilePDF()}
-                      disabled={isRecompiling}
+                      disabled={isRecompiling || isGenerating}
                       className="px-3.5 py-1 text-[11px] font-bold text-white bg-[#2E9BDA] hover:bg-[#2587bf] rounded-md shadow-xs transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                     >
                       {isRecompiling ? (

@@ -150,6 +150,7 @@ function getNavItemsForRole(effectiveRole) {
           { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
         ],
         right: [
+          { to: '/interviewer/dashboard', label: 'Scorecards', icon: ClipboardCheck },
           { to: '/recruiter/company', label: 'Company', icon: Building2 },
         ],
       }

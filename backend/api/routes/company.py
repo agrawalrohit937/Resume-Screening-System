@@ -75,8 +75,6 @@ async def get_company_profile(
 
     # 1. Primary lookup by tenant_id
     if tenant_id and tenant_id != "default":
-        from services.multi_tenancy.tenant_cleanup import purge_orphaned_tenant_if_needed
-        await purge_orphaned_tenant_if_needed(db, tenant_id, excluding_user_id=str(current_user.id))
         company_doc = await company_repo.get_by_tenant_id(tenant_id)
 
     # 2. Secondary lookup by company_name if tenant_id match not found
@@ -84,23 +82,23 @@ async def get_company_profile(
         company_name_clean = current_user.company_name.strip()
         company_doc = await company_repo.get_by_name(company_name_clean)
 
-    # 3. Fallback placeholder if no profile created yet
+    # 3. Clean empty template if no profile created yet
     if not company_doc:
         default_name = getattr(current_user, "company_name", None) or (
-            tenant_id.replace("-", " ").title() if tenant_id != "default" else "CareerShala Technologies"
+            tenant_id.replace("-", " ").title() if tenant_id != "default" else ""
         )
         company_doc = {
             "tenant_id": tenant_id,
-            "company_name": default_name,
-            "tagline": "Empowering talent with precision AI",
+            "company_name": default_name or "",
+            "tagline": "",
             "logo_url": None,
             "cover_url": None,
-            "website": None,
-            "location": "Remote",
-            "industry": "Technology",
-            "team_size": "50-200 employees",
-            "about": "Building the next generation career and talent acquisition intelligence platform.",
-            "perks": ["Flexible Hours", "Health Insurance", "Remote Work"],
+            "website": "",
+            "location": "",
+            "industry": "",
+            "team_size": "",
+            "about": "",
+            "perks": [],
             "linkedin": None,
             "github": None,
             "twitter": None,
@@ -179,24 +177,31 @@ async def update_company_profile(
 
     saved = await company_repo.upsert(tenant_id, profile_dict)
 
-    # Synchronize logo, website, and about across open jobs for this tenant / company
-    update_job_fields: Dict[str, Any] = {}
-    if profile_dict["logo_url"]:
+    # Synchronize company_name, logo, website, and about across jobs and users for this tenant
+    update_job_fields: Dict[str, Any] = {"company_name": clean_name}
+    if profile_dict.get("logo_url"):
         update_job_fields["company_logo"] = profile_dict["logo_url"]
-    if profile_dict["website"]:
+    if profile_dict.get("website"):
         update_job_fields["company_website"] = profile_dict["website"]
-    if profile_dict["about"]:
+    if profile_dict.get("about"):
         update_job_fields["company_about"] = profile_dict["about"]
 
-    if update_job_fields:
-        from sqlalchemy import update
-        from models import Job
-        from config.db import get_pg_session_factory
-        session_factory = get_pg_session_factory()
-        async with session_factory() as session:
-            stmt = update(Job).where(Job.tenant_id == tenant_id).values(**update_job_fields)
-            await session.execute(stmt)
-            await session.commit()
+    from sqlalchemy import update, or_
+    from models import Job, User
+    from config.db import get_pg_session_factory
+    session_factory = get_pg_session_factory()
+    async with session_factory() as session:
+        if tenant_id and tenant_id != "default":
+            job_stmt = update(Job).where(or_(Job.tenant_id == tenant_id, Job.created_by == str(current_user.id))).values(**update_job_fields)
+            user_stmt = update(User).where(or_(User.tenant_id == tenant_id, User.id == str(current_user.id))).values(company_name=clean_name)
+        else:
+            job_stmt = update(Job).where(Job.created_by == str(current_user.id)).values(**update_job_fields)
+            user_stmt = update(User).where(User.id == str(current_user.id)).values(company_name=clean_name)
+        await session.execute(job_stmt)
+        await session.execute(user_stmt)
+        await session.commit()
+
+    current_user.company_name = clean_name
 
     logger.info(
         "Company profile updated successfully",
@@ -235,7 +240,7 @@ async def delete_company_profile(
         )
 
     from services.multi_tenancy.tenant_cleanup import cascade_delete_tenant
-    result = await cascade_delete_tenant(db, tenant_id=tenant_id, deleted_by_user_id=str(current_user.id))
+    result = await cascade_delete_tenant(tenant_id=tenant_id, deleted_by_user_id=str(current_user.id))
 
     return {
         "success": True,

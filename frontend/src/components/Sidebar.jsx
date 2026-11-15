@@ -162,6 +162,12 @@ const EXEC_PRIMARY_SECTIONS = [
     ],
   },
   {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
+    ],
+  },
+  {
     title: 'Organization',
     items: [
       { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
@@ -186,6 +192,12 @@ const HIRING_MANAGER_PRIMARY_SECTIONS = [
     ],
   },
   {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
+    ],
+  },
+  {
     title: 'Organization',
     items: [
       { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
@@ -199,6 +211,12 @@ const RECRUITER_PRIMARY_SECTIONS = [
     items: [
       { to: '/recruiter/dashboard', label: 'Dashboard', icon: Icons.dashboard },
       { to: '/recruiter/jobs', label: 'Jobs & Pipelines', badge: 'Active', icon: Icons.briefcase },
+    ],
+  },
+  {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
     ],
   },
   {
@@ -309,6 +327,24 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       onNavigate?.()
     }
   }, [location.pathname, mobile, onNavigate])
+
+  // Idle Preload high-priority routes (Gamification, Interview, ATS Results) for instantaneous 0ms transitions
+  useEffect(() => {
+    const idlePreload = () => {
+      prefetchRoute('/gamification')
+      prefetchRoute('/interview')
+      prefetchRoute('/results')
+      prefetchRoute('/portfolio-builder')
+    }
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(idlePreload, { timeout: 2000 })
+      return () => window.cancelIdleCallback?.(id)
+    } else {
+      const timer = setTimeout(idlePreload, 1200)
+      return () => clearTimeout(timer)
+    }
+  }, [])
 
   const handleItemClick = (path) => {
     setViewModeOpen(false)
@@ -771,6 +807,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     }}
                     onMouseEnter={() => prefetchRoute(item.to)}
                     onTouchStart={() => prefetchRoute(item.to)}
+                    onPointerDown={() => prefetchRoute(item.to)}
                     title={isCompact ? item.label : undefined}
                     className={`relative flex items-center justify-between px-3.5 h-11 rounded-xl text-[13px] font-semibold transition-all duration-200 group
                       ${isCompact ? 'justify-center px-0' : ''}

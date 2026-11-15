@@ -67,7 +67,7 @@ export default function CareerQuest() {
 
     // 3. Non-blocking Background Leaderboard Sync
     const syncLeaderboard = () => {
-      getLeaderboard(30)
+      getLeaderboard(100)
         .then((l) => {
           if (!isMounted) return
           const board = l.data?.leaderboard || []
@@ -99,7 +99,7 @@ export default function CareerQuest() {
   // Instant fetch for leaderboard if user clicks Tab 2 and it hasn't loaded yet
   useEffect(() => {
     if (activeTab === 2 && (!leaderboard || leaderboard.length === 0)) {
-      getLeaderboard(30)
+      getLeaderboard(100)
         .then((l) => {
           const board = l.data?.leaderboard || []
           if (board.length) setLeaderboard(board)
@@ -115,7 +115,7 @@ export default function CareerQuest() {
     try {
       const [updatedProfile, updatedLeaderboard] = await Promise.all([
         getGamificationProfile(),
-        getLeaderboard(30),
+        getLeaderboard(100),
       ])
       const nextProfile = updatedProfile.data || null
       const nextLeaderboard = updatedLeaderboard.data?.leaderboard || []

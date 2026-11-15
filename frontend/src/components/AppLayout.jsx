@@ -9,6 +9,7 @@ import MobileBottomNav from './MobileBottomNav'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import AvatarRing from './AvatarRing'
 import { resolveAvatarUrl } from '../utils/avatarUtils'
+import Loader from './Loader'
 
 import ProfilePlanDropdown from './ProfilePlanDropdown'
 import { CopilotProvider } from '../features/copilot'
@@ -192,9 +193,25 @@ export default function AppLayout() {
       user?.role,
     ].map((role) => String(role || '').toLowerCase())
     const isRecruiter = roles.some((role) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(role))
-    if (!isRecruiter) return
+    
+    if (isRecruiter) {
+      import('../pages/recruiter/RecruiterDashboard').catch(() => {})
+    } else {
+      // Idle preload candidate-critical lazy routes for instantaneous 0ms page transitions
+      const preloadCandidateRoutes = () => {
+        import('../pages/CareerQuest').catch(() => {})
+        import('../pages/Interview').catch(() => {})
+        import('../pages/Results').catch(() => {})
+      }
 
-    import('../pages/recruiter/RecruiterDashboard').catch(() => {})
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        const id = window.requestIdleCallback(preloadCandidateRoutes, { timeout: 2500 })
+        return () => window.cancelIdleCallback?.(id)
+      } else {
+        const timer = setTimeout(preloadCandidateRoutes, 1500)
+        return () => clearTimeout(timer)
+      }
+    }
   }, [user])
 
   useEffect(() => {
@@ -301,7 +318,9 @@ export default function AppLayout() {
                   : 'max-w-7xl'
             } animate-fade-in`}>
               <RouteErrorBoundary>
-                <Outlet />
+                <Suspense fallback={<Loader />}>
+                  <Outlet />
+                </Suspense>
               </RouteErrorBoundary>
             </div>
           </main>

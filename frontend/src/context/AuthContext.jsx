@@ -182,6 +182,9 @@ export function AuthProvider({ children }) {
     try { sessionStorage.removeItem("careershala_explicit_logout") } catch (_) {}
     localStorage.setItem("access_token", data.access_token)
     localStorage.setItem("refresh_token", data.refresh_token)
+    if (data?.user) {
+      try { localStorage.setItem("careershala_user", JSON.stringify(data.user)) } catch (_) {}
+    }
     if (data?.user?.tenant_id && data.user.tenant_id !== 'default') {
       localStorage.setItem("tenant_id", data.user.tenant_id)
       api.defaults.headers.common["x-tenant-id"] = data.user.tenant_id

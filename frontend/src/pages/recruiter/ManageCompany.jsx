@@ -58,17 +58,16 @@ export default function ManageCompany() {
       try { return JSON.parse(saved) } catch (e) {}
     }
     return {
-      company_name: user?.company_name || 'CareerShala Technologies',
-      tagline: 'Empowering careers with AI',
+      company_name: user?.company_name || '',
+      tagline: '',
       logo_url: '',
-      website: 'https://careershala.tech',
-      location: 'Bengaluru, India',
-      industry: 'Technology',
-      team_size: '51-200 employees',
-      about:
-        'At CareerShala, we are building the next generation AI-powered career platform to connect talent with opportunities. Our mission is to empower individuals and organizations to achieve their full potential through technology, transparency, and trust.',
-      linkedin: 'https://www.linkedin.com/company/careershala',
-      github: 'https://github.com/careershala',
+      website: '',
+      location: '',
+      industry: '',
+      team_size: '',
+      about: '',
+      linkedin: '',
+      github: '',
       perks: [],
     }
   })

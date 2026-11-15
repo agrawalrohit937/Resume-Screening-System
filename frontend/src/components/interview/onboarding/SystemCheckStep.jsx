@@ -410,13 +410,6 @@ export default function SystemCheckStep({
                           mic.stop()
                           setStep('speaker')
                         }}
-                        skip={mic.state !== 'ok' ? {
-                          label: "Having trouble? Skip this check",
-                          onClick: () => {
-                            mic.stop()
-                            setStep('speaker')
-                          }
-                        } : null}
                       />
                     </motion.div>
                   )}
@@ -470,13 +463,6 @@ export default function SystemCheckStep({
                           tts.stop()
                           setStep('ready')
                         }}
-                        skip={speakerConfirmed !== true ? {
-                          label: 'Skip this check',
-                          onClick: () => {
-                            tts.stop()
-                            setStep('ready')
-                          }
-                        } : null}
                       />
                     </motion.div>
                   )}
@@ -574,18 +560,6 @@ export default function SystemCheckStep({
                           <><MonitorCheck className="h-4 w-4" /> Enter Full-Screen &amp; Start Interview</>
                         )}
                       </motion.button>
-
-                      {canSkipAi && !allAiReady && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => { setEnteringFs(true); onComplete?.(); }}
-                            className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 underline underline-offset-2"
-                          >
-                            Network taking time? Proceed with core proctoring →
-                          </button>
-                        </div>
-                      )}
 
                       {isMobile && (
                         <p className="text-[11.5px] text-amber-700 font-semibold">

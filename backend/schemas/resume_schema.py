@@ -212,6 +212,7 @@ class EnhanceResumeRequest(BaseModel):
     
     # ── Strict ATS Engine Integration ──
     strict_missing_keywords: Optional[List[str]] = None
+    current_score: Optional[float] = None
 
     # ── NEW: Human-in-the-Loop Integration ──
     # The HITL wizard bundle. None/absent = user was never shown a wizard (e.g. quick path).

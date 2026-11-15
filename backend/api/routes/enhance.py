@@ -262,7 +262,8 @@ async def enhance_and_download(
                 })
 
         # Calculate score lift
-        before_score = int(round(payload.current_score if payload.current_score is not None else 81))
+        cur_sc = getattr(payload, "current_score", None)
+        before_score = int(round(cur_sc if cur_sc is not None else 81))
         after_score = min(98, max(94, before_score + 14))
         score_lift = {
             "before": before_score,

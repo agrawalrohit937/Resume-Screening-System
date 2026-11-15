@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {Bot,
+import {
+  Bot,
   LogOut,
   Volume2,
   VolumeX,
@@ -18,7 +19,11 @@ import {Bot,
   XCircle,
   HelpCircle,
   Layers,
-  Lock, Loader2} from 'lucide-react'
+  Lock,
+  Loader2,
+  Trash2,
+  RotateCcw,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 
@@ -51,6 +56,56 @@ const CANDIDATE_PHASE = {
   ERROR: 'error',
 }
 
+// ── Custom End Assessment confirmation modal ─────────────────────────────────
+function EndAssessmentModal({ open, onCancel, onConfirm }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[3000000000] flex items-center justify-center bg-blue-950/50 backdrop-blur-sm p-4"
+          onClick={onCancel}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 12 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-blue-100"
+          >
+            <div className="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
+              <LogOut className="h-5 w-5" />
+            </div>
+            <h3 className="text-[18px] font-extrabold text-blue-950">End this interview session?</h3>
+            <p className="text-[13px] text-blue-900/55 font-medium mt-1.5 leading-relaxed">
+              Leaving now will conclude your assessment and submit your responses captured so far to the hiring team. Are you sure you want to exit?
+            </p>
+            <div className="flex items-center gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 h-11 rounded-xl border border-blue-200 text-blue-900/70 font-bold text-[13px] hover:bg-blue-50 transition-all cursor-pointer"
+              >
+                Stay &amp; Continue
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className="flex-1 h-11 rounded-xl bg-rose-600 text-white font-bold text-[13px] hover:bg-rose-700 transition-all shadow-md shadow-rose-600/20 cursor-pointer"
+              >
+                End Assessment
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 export default function LiveAssessmentCandidate() {
   const { token } = useParams()
   const navigate = useNavigate()
@@ -71,6 +126,7 @@ export default function LiveAssessmentCandidate() {
   const warningTimerRef = useRef(null)
 
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [showEndConfirm, setShowEndConfirm] = useState(false)
   const spokenForQRef = useRef(-1)
   const avatarVideoRef = useRef(null)
 
@@ -181,13 +237,31 @@ export default function LiveAssessmentCandidate() {
   }, [phase, token])
 
   const fsGate = useFullscreenImmersive({
-    onUnexpectedExit: () =>
+    onUnexpectedExit: () => {
+      if (showEndConfirm) return
       handleCheatingEvent({
         event_type: 'fullscreen_exit',
         severity: 'high',
         details: 'Exited full-screen mode',
-      }),
+      })
+    },
   })
+
+  const confirmEndAssessment = async () => {
+    setShowEndConfirm(false)
+    stt.stopListening?.()
+    tts.stop()
+    try {
+      await fsGate.exitImmersive()
+    } catch (_) {}
+    try {
+      const timeTaken = questionStartAt ? Math.round((Date.now() - questionStartAt) / 1000) : questionTimer
+      await api.post(`/live-interview/magic/${token}/complete`, {
+        total_time_secs: timeElapsed + timeTaken,
+      })
+    } catch (_) {}
+    setPhase(CANDIDATE_PHASE.COMPLETED)
+  }
 
   // Avatar video sync with TTS
   useEffect(() => {
@@ -201,7 +275,7 @@ export default function LiveAssessmentCandidate() {
     }
   }, [tts.speaking])
 
-  // Proctoring ML hook — zero overhead during onboarding, loaded on demand when user starts
+  // Proctoring ML hook — pre-warmed during system check so AI models are 100% active before test starts
   const [loadModels, setLoadModels] = useState(false)
   const [isLaunchingRoom, setIsLaunchingRoom] = useState(false)
 
@@ -209,47 +283,62 @@ export default function LiveAssessmentCandidate() {
     videoRef,
     canvasRef,
     onEvent: handleCheatingEvent,
-    active: !isMobile && (loadModels || phase === CANDIDATE_PHASE.ACTIVE),
+    active: !isMobile && (phase === CANDIDATE_PHASE.SYSTEM_CHECK || phase === CANDIDATE_PHASE.ACTIVE || loadModels || isLaunchingRoom),
     isLive: phase === CANDIDATE_PHASE.ACTIVE,
     faceInterval: 650,
     objectInterval: 8000,
   })
 
   const handleStartFromSystemCheck = useCallback(async () => {
+    const isReady = Boolean(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady))
+    if (!isReady) {
+      setIsLaunchingRoom(true)
+      return
+    }
+
     try {
       await fsGate.enterImmersive()
     } catch (_) {}
-    setLoadModels(true)
-    setIsLaunchingRoom(true)
-  }, [fsGate])
+    try {
+      await handleStartSession()
+    } catch (_) {}
+  }, [fsGate, detectionStatus])
 
   useEffect(() => {
     if (!isLaunchingRoom) return
     let cancelled = false
-    const launch = async () => {
-      if (detectionStatus?.isWorkerReady) {
+    const checkAndLaunch = async () => {
+      const isReady = Boolean(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady))
+      if (isReady && !cancelled) {
+        setIsLaunchingRoom(false)
+        try {
+          await fsGate.enterImmersive()
+        } catch (_) {}
         try {
           await handleStartSession()
         } catch (_) {}
-        if (!cancelled) {
-          setIsLaunchingRoom(false)
-        }
       }
     }
-    launch()
+    checkAndLaunch()
+
+    // Fallback: after 20s if secondary network CDN was slow but primary face model is ready
     const timer = setTimeout(async () => {
-      if (!cancelled && isLaunchingRoom) {
+      if (!cancelled && isLaunchingRoom && detectionStatus?.mpReady) {
+        setIsLaunchingRoom(false)
+        try {
+          await fsGate.enterImmersive()
+        } catch (_) {}
         try {
           await handleStartSession()
         } catch (_) {}
-        setIsLaunchingRoom(false)
       }
-    }, 4500)
+    }, 20000)
+
     return () => {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [isLaunchingRoom, detectionStatus?.isWorkerReady])
+  }, [isLaunchingRoom, detectionStatus?.mpReady, detectionStatus?.tfReady, detectionStatus?.allModelsReady, fsGate])
 
   // Camera setup
   const startCamera = useCallback(async () => {
@@ -652,19 +741,19 @@ export default function LiveAssessmentCandidate() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  {detectionStatus?.isWorkerReady ? (
+                  {(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady)) ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   ) : (
                     <Loader2 className="w-4 h-4 text-[#2E9BDA] animate-spin" />
                   )}
-                  AI FaceMesh &amp; Gaze Models
+                  AI FaceMesh &amp; Proctoring Engines
                 </span>
                 <span className={`font-bold text-[11px] px-2 py-0.5 rounded-full border ${
-                  detectionStatus?.isWorkerReady
+                  (detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady))
                     ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                     : 'text-[#1d6fa5] bg-blue-50 border-blue-200 animate-pulse'
                 }`}>
-                  {detectionStatus?.isWorkerReady ? 'READY' : 'LOADING...'}
+                  {(detectionStatus?.allModelsReady || (detectionStatus?.mpReady && detectionStatus?.tfReady)) ? 'READY' : 'ACTIVATING...'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -677,17 +766,6 @@ export default function LiveAssessmentCandidate() {
                 </span>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={async () => {
-                try { await handleStartSession() } catch (_) {}
-                setIsLaunchingRoom(false)
-              }}
-              className="text-[11.5px] font-semibold text-blue-400 hover:text-blue-600 transition-colors underline underline-offset-2"
-            >
-              Skip wait and launch immediately →
-            </button>
           </motion.div>
         </div>
       </ImmersiveShell>
@@ -696,18 +774,22 @@ export default function LiveAssessmentCandidate() {
 
   if (phase === CANDIDATE_PHASE.SYSTEM_CHECK) {
     return (
-      <SystemCheckStep
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        cameraReady={cameraReady}
-        cameraError={cameraError}
-        startCamera={startCamera}
-        detectionStatus={detectionStatus}
-        fsGate={fsGate}
-        onPrepareAi={() => setLoadModels(true)}
-        onBack={() => setPhase(CANDIDATE_PHASE.WELCOME)}
-        onComplete={handleStartFromSystemCheck}
-      />
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FAFC] via-[#EFF6FF] to-[#F1F5F9] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center font-sans">
+        <div className="max-w-6xl w-full mx-auto">
+          <SystemCheckStep
+            videoRef={videoRef}
+            canvasRef={canvasRef}
+            cameraReady={cameraReady}
+            cameraError={cameraError}
+            startCamera={startCamera}
+            detectionStatus={detectionStatus}
+            fsGate={fsGate}
+            onPrepareAi={() => setLoadModels(true)}
+            onBack={() => setPhase(CANDIDATE_PHASE.WELCOME)}
+            onComplete={handleStartFromSystemCheck}
+          />
+        </div>
+      </div>
     )
   }
 
@@ -730,6 +812,12 @@ export default function LiveAssessmentCandidate() {
           warningCount={cheatingData.warning_count}
           maxWarnings={MAX_WARNINGS}
           onDismiss={() => setCurrentWarning(null)}
+        />
+
+        <EndAssessmentModal
+          open={showEndConfirm}
+          onCancel={() => setShowEndConfirm(false)}
+          onConfirm={confirmEndAssessment}
         />
 
         {/* Top Header */}
@@ -757,7 +845,7 @@ export default function LiveAssessmentCandidate() {
                 })
               }
               title={voiceEnabled ? 'Mute AI voice' : 'Enable AI voice'}
-              className={`h-9 w-9 rounded-xl flex items-center justify-center border transition-all ${
+              className={`h-9 w-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
                 voiceEnabled
                   ? 'border-blue-200 text-blue-900/60 hover:border-blue-300'
                   : 'border-amber-300 bg-amber-50 text-amber-600'
@@ -776,6 +864,15 @@ export default function LiveAssessmentCandidate() {
             <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
               Live Proctoring Active
             </span>
+
+            {/* End Assessment Button */}
+            <button
+              type="button"
+              onClick={() => setShowEndConfirm(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-rose-200 bg-rose-50/70 text-rose-700 text-xs font-bold hover:bg-rose-100 hover:border-rose-300 transition-all cursor-pointer shadow-xs ml-1"
+            >
+              <LogOut className="h-3.5 w-3.5" /> End Assessment
+            </button>
           </div>
         </div>
 
@@ -828,9 +925,9 @@ export default function LiveAssessmentCandidate() {
           </div>
 
           {/* Main Question & Answer Area */}
-          <div className="flex-1 grid gap-5 p-5 overflow-hidden" style={{ gridTemplateColumns: '1fr 340px' }}>
+          <div className="flex-1 grid gap-5 p-5 overflow-hidden" style={{ gridTemplateColumns: '1fr 350px' }}>
             
-            {/* Left: Question Card & Answer Workspace */}
+            {/* Left/Center: Question Card with Avatar Video & Voice Stage */}
             <div className="flex flex-col gap-4 min-h-0 h-full">
               {q && (
                 <motion.div
@@ -841,38 +938,91 @@ export default function LiveAssessmentCandidate() {
                   onAnimationComplete={handleQuestionRevealed}
                   className="flex flex-col gap-4 flex-1 min-h-0"
                 >
-                  {/* Question Card */}
-                  <div className="bg-white rounded-3xl border border-blue-100 p-6 shrink-0 shadow-sm">
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${diffCfg.color} ${diffCfg.bg} ${diffCfg.border}`}>
-                        {diffCfg.label.toUpperCase()}
-                      </span>
-                      <span className="text-[11px] font-bold text-blue-900/40">
-                        {(q.category || 'TECHNICAL').toUpperCase()}
-                      </span>
-                      <span className="ml-auto font-mono text-[11px] text-blue-900/40 font-semibold">
-                        Question {currentQIdx + 1} of {totalQ}
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <h1 className="text-lg sm:text-xl font-bold text-blue-950 leading-relaxed flex-1">
-                        {q.text}
-                      </h1>
-                      {tts.supported && (
-                        <button
-                          onClick={repeatQuestion}
-                          title="Replay question"
-                          className="shrink-0 h-8 w-8 rounded-lg border border-blue-200 text-blue-900/40 hover:border-indigo-500 hover:text-indigo-600 flex items-center justify-center transition-all cursor-pointer"
+                  {/* Top Question Card with AI Interviewer Avatar Video */}
+                  <div className="bg-white rounded-3xl border border-blue-100 p-5 shrink-0 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                      {/* Alex — AI Interviewer Avatar Video */}
+                      <div
+                        className="relative rounded-2xl overflow-hidden shrink-0 w-full sm:w-[220px] aspect-[4/3] border transition-all duration-500 bg-slate-950 shadow-sm"
+                        style={{
+                          borderColor: aiSpeaking ? 'rgba(139,92,246,0.5)' : 'rgba(46,155,218,0.3)',
+                          boxShadow: aiSpeaking ? '0 0 0 3px rgba(139,92,246,0.18), 0 12px 24px -10px rgba(139,92,246,0.45)' : 'none',
+                        }}
+                      >
+                        <video
+                          ref={avatarVideoRef}
+                          autoPlay
+                          loop
+                          muted={true}
+                          playsInline
+                          crossOrigin="anonymous"
+                          onError={(e) => console.warn('[LiveAssessmentCandidate] Avatar video load error:', e)}
+                          className="absolute inset-0 w-full h-full object-cover z-0"
                         >
-                          <Repeat className="h-4 w-4" />
-                        </button>
-                      )}
+                          <source src="/interviewer-avatar.mp4" type="video/mp4" />
+                        </video>
+
+                        <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          <span className="text-white text-[9px] font-extrabold tracking-wide">LIVE AI</span>
+                        </div>
+
+                        <div className={`absolute top-2 right-2 z-20 rounded-full px-2 py-0.5 text-[9.5px] font-bold text-white shadow-sm ${aiSpeaking ? 'bg-violet-600' : 'bg-[#2E9BDA]'}`}>
+                          {aiSpeaking ? "AI'S TURN" : 'YOUR TURN'}
+                        </div>
+
+                        <div className="absolute bottom-2 left-2 right-2 z-20 bg-black/45 backdrop-blur-sm rounded-xl px-2.5 py-1.5 border border-white/10 flex items-center justify-between">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-white leading-tight truncate">Alex</p>
+                            <p className="text-[9.5px] text-slate-300 font-medium">AI Technical Interviewer</p>
+                          </div>
+                          {aiSpeaking && (
+                            <div className="flex items-center gap-0.5">
+                              <span className="w-1 h-3 rounded-full bg-violet-400 animate-pulse" />
+                              <span className="w-1 h-4 rounded-full bg-violet-300 animate-pulse delay-75" />
+                              <span className="w-1 h-2 rounded-full bg-violet-400 animate-pulse delay-150" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Question Details */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${diffCfg.color} ${diffCfg.bg} ${diffCfg.border}`}>
+                              {diffCfg.label.toUpperCase()}
+                            </span>
+                            <span className="text-[10.5px] font-bold text-blue-900/40">{(q.category || 'TECHNICAL').toUpperCase()}</span>
+                            <span className="ml-auto font-mono text-[11px] text-blue-900/40 font-bold">Q{currentQIdx + 1} / {totalQ}</span>
+                          </div>
+                          <h1 className="text-[16.5px] sm:text-[17.5px] font-bold text-blue-950 leading-relaxed">{q.text}</h1>
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-2.5 mt-2 border-t border-blue-50/80">
+                          {tts.supported && (
+                            <button
+                              onClick={repeatQuestion}
+                              title="Replay question"
+                              className="h-8 px-3 rounded-xl border border-blue-200 text-[#1d6fa5] hover:bg-blue-50/70 font-semibold text-[11.5px] flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <Repeat className="h-3.5 w-3.5" /> Replay Question Audio
+                            </button>
+                          )}
+                          {aiSpeaking && (
+                            <span className="text-[11px] font-semibold text-violet-600 flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-ping" />
+                              Speaking question...
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Answer Input Workspace */}
+                  {/* Spoken Assessment Workspace — 100% Dedicated to Spoken Voice Evaluation */}
                   <div className="bg-white rounded-3xl border border-blue-100 flex flex-col flex-1 min-h-0 overflow-hidden shadow-sm">
+                    {/* Urgency Progress Line */}
                     <div className="h-[3px] bg-blue-50 w-full">
                       <motion.div
                         animate={{ width: `${Math.max(0, 100 - pct)}%` }}
@@ -881,10 +1031,16 @@ export default function LiveAssessmentCandidate() {
                       />
                     </div>
 
+                    {/* Stage Header */}
                     <div className="px-5 py-3 flex items-center justify-between border-b border-blue-50">
-                      <span className="text-xs font-extrabold text-blue-950 uppercase tracking-wider">
-                        Your Response
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-blue-950 uppercase tracking-wider">
+                          Spoken Assessment
+                        </span>
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                          Voice Mode Active
+                        </span>
+                      </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5 bg-slate-50 border border-blue-100 rounded-full px-3 py-1">
                           <Clock size={12} className="text-slate-400" />
@@ -893,31 +1049,111 @@ export default function LiveAssessmentCandidate() {
                           </span>
                         </div>
                         <span className="text-[11px] text-blue-900/35 font-semibold">
-                          {answerText.length} chars
+                          {(answerText.trim() ? answerText.trim().split(/\s+/).length : 0)} words • {answerText.length} chars
                         </span>
                       </div>
                     </div>
 
-                    {stt?.listening && stt?.transcript && (
-                      <div className="mx-5 mt-3 px-3.5 py-2.5 rounded-xl bg-blue-50/50 border border-blue-200/50">
-                        <p className="text-xs text-blue-800 italic font-medium">🎤 "{stt.transcript}"</p>
-                      </div>
-                    )}
+                    {/* Center Glowing Mic Button & Concentric Waves Stage */}
+                    <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-5 relative overflow-hidden">
+                      <div className="w-full max-w-lg flex flex-col items-center justify-center my-auto">
+                        
+                        {/* Center Mic Button with Ripple Waves */}
+                        <div className="relative flex items-center justify-center h-36 w-36 mb-2">
+                          <AnimatePresence>
+                            {stt?.listening && (
+                              <>
+                                <motion.div
+                                  key="wave-1"
+                                  initial={{ scale: 0.9, opacity: 0.7 }}
+                                  animate={{ scale: [1, 1.45, 1.7], opacity: [0.6, 0.25, 0] }}
+                                  transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                                  className="absolute inset-0 rounded-full bg-rose-500/20 blur-sm pointer-events-none"
+                                />
+                                <motion.div
+                                  key="wave-2"
+                                  initial={{ scale: 0.9, opacity: 0.7 }}
+                                  animate={{ scale: [1, 1.3, 1.5], opacity: [0.5, 0.2, 0] }}
+                                  transition={{ duration: 2, repeat: Infinity, delay: 0.6, ease: 'easeOut' }}
+                                  className="absolute inset-0 rounded-full bg-rose-500/15 blur-xs pointer-events-none"
+                                />
+                              </>
+                            )}
+                          </AnimatePresence>
 
-                    <div className="flex-1 p-5 flex">
-                      <textarea
-                        value={answerText}
-                        onChange={(e) => setAnswerText(e.target.value)}
-                        disabled={aiSpeaking || phase === CANDIDATE_PHASE.SUBMITTING_QUESTION}
-                        placeholder={
-                          aiSpeaking
-                            ? 'Alex is asking the question... Prepare your approach, then speak or type your answer here.'
-                            : 'Type or speak your answer. Detail your reasoning, architecture, and practical experience.'
-                        }
-                        className="w-full h-full outline-none resize-none bg-transparent text-sm text-blue-950 placeholder:text-blue-900/25 font-medium leading-relaxed disabled:opacity-60"
-                      />
+                          {/* Ambient Circular Halo */}
+                          <div
+                            className={`absolute w-28 h-28 rounded-full blur-xl transition-all duration-500 ${
+                              stt?.listening ? 'bg-rose-400/25' : 'bg-slate-200/50'
+                            }`}
+                          />
+
+                          {/* Interactive Center Mic Button */}
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: aiSpeaking ? 1 : 1.05 }}
+                            whileTap={{ scale: aiSpeaking ? 1 : 0.95 }}
+                            disabled={aiSpeaking || phase === CANDIDATE_PHASE.SUBMITTING_QUESTION}
+                            onClick={stt?.toggleListening}
+                            className={`relative z-10 w-20 h-20 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-lg cursor-pointer ${
+                              stt?.listening
+                                ? 'bg-rose-600 text-white shadow-rose-500/30 ring-4 ring-rose-200 animate-pulse'
+                                : 'bg-white border-2 border-slate-200 text-blue-600 shadow-xs hover:border-blue-400 hover:shadow-md'
+                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                          >
+                            <Mic className={`h-8 w-8 transition-transform duration-300 ${stt?.listening ? 'scale-110' : ''}`} />
+                          </motion.button>
+                        </div>
+
+                        {/* Dynamic Sound Waveform Bars when recording */}
+                        {stt?.listening ? (
+                          <div className="flex items-center gap-1.5 h-6 mb-3">
+                            {[12, 22, 16, 28, 14, 26, 18, 24, 15].map((h, i) => (
+                              <motion.span
+                                key={i}
+                                animate={{
+                                  height: [`${h * 0.4}px`, `${h}px`, `${h * 0.3}px`],
+                                }}
+                                transition={{
+                                  repeat: Infinity,
+                                  duration: 0.6 + (i % 3) * 0.15,
+                                  ease: 'easeInOut',
+                                }}
+                                className="w-[3px] rounded-full bg-rose-500"
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[13px] font-bold text-blue-950 mb-3 tracking-tight">
+                            {aiSpeaking ? 'Alex is speaking...' : 'Click microphone to speak your answer'}
+                          </p>
+                        )}
+
+                        {/* Live Streaming Spoken Preview Card — Instant 0ms Word Streaming */}
+                        <div className="w-full rounded-2xl bg-slate-50/90 border border-blue-100/70 p-4 max-h-[120px] overflow-y-auto text-center shadow-inner">
+                          {answerText.trim() || (stt?.listening && stt?.transcript) ? (
+                            <p className="text-[13px] text-blue-950 font-medium leading-relaxed italic">
+                              "{answerText ? <span>{answerText} </span> : null}
+                              {stt?.transcript ? (
+                                <span className="text-violet-600 font-semibold underline decoration-violet-300">
+                                  {stt.transcript}
+                                </span>
+                              ) : null}"
+                            </p>
+                          ) : stt?.listening ? (
+                            <p className="text-[12px] text-violet-600 font-semibold animate-pulse">
+                              Listening... speak your response clearly
+                            </p>
+                          ) : (
+                            <p className="text-[12px] text-blue-900/40 font-medium">
+                              Tap the microphone button above to start answering verbally. Words stream in real time.
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Bottom Action Bar */}
                     <div className="px-5 py-3.5 border-t border-blue-50 bg-slate-50/60 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {stt?.supported && (
@@ -926,13 +1162,13 @@ export default function LiveAssessmentCandidate() {
                             disabled={aiSpeaking || phase === CANDIDATE_PHASE.SUBMITTING_QUESTION}
                             onClick={stt.toggleListening}
                             className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                              stt.listening
+                              stt?.listening
                                 ? 'border-rose-300 bg-rose-50 text-rose-600'
-                                : 'border-blue-200 bg-white text-blue-900/60 hover:border-blue-300'
-                            }`}
+                                : 'border-blue-200 bg-white text-blue-900/60 hover:border-blue-300 hover:bg-blue-50/50'
+                            } disabled:opacity-40 disabled:cursor-not-allowed`}
                           >
-                            <Mic className="h-3.5 w-3.5" />
-                            <span>{stt.listening ? 'Recording…' : 'Speak Answer'}</span>
+                            <Repeat className="h-3.5 w-3.5" />
+                            <span>{stt?.listening ? 'Stop Recording' : 'Speak Again'}</span>
                           </button>
                         )}
                         <button
@@ -941,9 +1177,10 @@ export default function LiveAssessmentCandidate() {
                             setAnswerText('')
                             stt?.resetTranscript?.()
                           }}
-                          className="h-9 px-3.5 rounded-xl border border-blue-200 bg-white text-blue-900/50 text-xs font-bold hover:border-blue-300 transition-all cursor-pointer"
+                          disabled={!answerText.trim() && !stt?.transcript}
+                          className="h-9 px-3.5 rounded-xl border border-blue-200 bg-white text-blue-900/50 text-xs font-bold hover:border-blue-300 hover:text-rose-600 disabled:opacity-40 transition-all cursor-pointer"
                         >
-                          Clear
+                          Clear Answer
                         </button>
                       </div>
 
@@ -951,22 +1188,24 @@ export default function LiveAssessmentCandidate() {
                         type="button"
                         onClick={() =>
                           handleSubmitAnswer({
-                            answerText,
-                            answerSource: stt?.listening ? 'voice' : 'text',
+                            answerText: answerText.trim() || stt?.transcript || '',
+                            answerSource: 'voice',
                           })
                         }
                         disabled={
-                          answerText.trim().length < 5 ||
+                          (answerText.trim().length < 5 && !(stt?.transcript && stt.transcript.length >= 5)) ||
                           aiSpeaking ||
                           phase === CANDIDATE_PHASE.SUBMITTING_QUESTION
                         }
-                        className="h-10 px-6 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-xs disabled:opacity-40 transition-all cursor-pointer"
+                        className="h-10 px-6 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-xs disabled:opacity-40 transition-all cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        {phase === CANDIDATE_PHASE.SUBMITTING_QUESTION
-                          ? 'Recording...'
-                          : isLastQ
-                          ? 'Submit & Finish Assessment →'
-                          : 'Next Question →'}
+                        {phase === CANDIDATE_PHASE.SUBMITTING_QUESTION ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...</>
+                        ) : isLastQ ? (
+                          <>Submit &amp; Finish Assessment <ArrowRight className="h-3.5 w-3.5" /></>
+                        ) : (
+                          <>Submit &amp; Next Question <ArrowRight className="h-3.5 w-3.5" /></>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -974,66 +1213,29 @@ export default function LiveAssessmentCandidate() {
               )}
             </div>
 
-            {/* Right: AI Interviewer Video + Proctoring Cam */}
-            <div className="flex flex-col gap-4 h-full min-h-0 overflow-y-auto pr-1">
-              
-              {/* AI Avatar */}
-              <div
-                className="relative rounded-3xl overflow-hidden shrink-0 aspect-[16/12] border transition-all duration-500"
-                style={{
-                  background: 'linear-gradient(160deg, #0B1220, #0F172A)',
-                  borderColor: aiSpeaking ? 'rgba(59,130,246,0.4)' : 'rgba(148,163,184,0.25)',
-                }}
-              >
-                <video
-                  ref={avatarVideoRef}
-                  autoPlay
-                  loop
-                  muted={true}
-                  playsInline
-                  crossOrigin="anonymous"
-                  className="absolute inset-0 w-full h-full object-cover z-0"
-                >
-                  <source src="/interviewer-avatar.mp4" type="video/mp4" />
-                </video>
-
-                <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-white text-[10px] font-extrabold tracking-wide">LIVE AI</span>
-                </div>
-
-                <div
-                  className={`absolute top-3 right-3 z-20 rounded-full px-2.5 py-1 text-[10px] font-bold text-white ${
-                    aiSpeaking ? 'bg-blue-500' : 'bg-blue-600'
-                  }`}
-                >
-                  {aiSpeaking ? "AI'S TURN" : 'YOUR TURN'}
-                </div>
-
-                <div className="absolute bottom-3 left-3 right-3 z-20 bg-black/40 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/10">
-                  <p className="text-xs font-bold text-slate-100">Alex — AI Technical Interviewer</p>
-                  <p className="text-[10.5px] text-slate-400">{sessionData?.company_name || 'Hiring Team'}</p>
-                </div>
-              </div>
-
-              {/* Candidate Proctoring Panel */}
-              <div className="bg-white rounded-3xl border border-blue-100 p-4 shrink-0">
-                <div className="flex items-center justify-between border-b border-blue-50 pb-2.5 mb-3">
-                  <span className="text-[11px] font-extrabold text-blue-900/45 uppercase tracking-wider inline-flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Proctoring Stream
+            {/* Right rail: Candidate Proctoring Station ONLY (Camera at the very top, zero scroll lag) */}
+            <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+              <div className="bg-white rounded-3xl border border-blue-100 p-3.5 flex flex-col gap-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] h-full overflow-hidden">
+                <div className="flex items-center justify-between border-b border-blue-50 pb-2.5 shrink-0">
+                  <span className="text-[11px] font-extrabold text-blue-900/50 uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#2E9BDA]" /> Candidate Camera &amp; Proctoring
                   </span>
-                  <span className="font-mono text-[11px] font-bold text-emerald-600">● SECURE</span>
+                  <span className="font-mono text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE
+                  </span>
                 </div>
-                <DetectionPanel
-                  detectionStatus={detectionStatus}
-                  videoRef={videoRef}
-                  canvasRef={canvasRef}
-                  warningCount={cheatingData.warning_count}
-                  maxWarnings={MAX_WARNINGS}
-                  cheatingScore={cheatingData.score}
-                />
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <DetectionPanel
+                    detectionStatus={detectionStatus}
+                    videoRef={videoRef}
+                    canvasRef={canvasRef}
+                    warningCount={cheatingData.warning_count}
+                    maxWarnings={MAX_WARNINGS}
+                    cheatingScore={cheatingData.score}
+                    hideIntegrity={true}
+                  />
+                </div>
               </div>
-
             </div>
 
           </div>

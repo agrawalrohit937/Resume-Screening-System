@@ -239,6 +239,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
             {/* Real Streak */}
             <div 
               onClick={() => handleNavigate('/gamification')}
+              onMouseEnter={() => import('../pages/CareerQuest').catch(() => {})}
               className="flex flex-col items-center justify-center py-1.5 px-1 rounded-lg bg-white border border-slate-200/60 shadow-2xs cursor-pointer hover:border-orange-300 transition-colors"
               title="Real Daily Streak"
             >
@@ -357,6 +358,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
             <button
               type="button"
               onClick={() => handleNavigate('/gamification')}
+              onMouseEnter={() => import('../pages/CareerQuest').catch(() => {})}
               className="p-2.5 rounded-2xl bg-slate-50/90 hover:bg-amber-50/80 border border-slate-200/70 hover:border-amber-200 text-left transition-all group cursor-pointer shadow-2xs"
             >
               <div className="flex items-center justify-between mb-1">
@@ -461,6 +463,24 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
               <TrendingUp size={16} className="text-indigo-600 mb-1" />
               <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Executive Board</p>
               <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Analytics &amp; Approvals</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/interviewer/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Target size={16} className="text-blue-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-blue-700 truncate">Evaluations</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Candidate Scorecards</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/recruiter/jobs')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Briefcase size={16} className="text-emerald-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-emerald-700 truncate">Jobs Pipeline</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Applicants &amp; Posts</p>
             </button>
             <button
               type="button"

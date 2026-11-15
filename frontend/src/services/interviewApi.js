@@ -41,7 +41,7 @@ export const claimDailyVisitReward = () =>
 
 
 let _leaderboardInFlight = null
-export const getLeaderboard = (limit = 20) => {
+export const getLeaderboard = (limit = 50) => {
   if (_leaderboardInFlight) return _leaderboardInFlight
   _leaderboardInFlight = api.get(`/interview/ai/gamification/leaderboard?limit=${limit}`)
     .finally(() => {

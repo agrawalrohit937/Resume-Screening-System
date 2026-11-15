@@ -78,9 +78,17 @@ export default function VerifyEmail() {
           : [String(res?.user?.role || 'candidate').toLowerCase()]
         navigate(getSmartRedirectPath(userRoles))
       } else {
-        await verifyEmail(email, code)
+        const verifyRes = await verifyEmail(email, code)
         toast.success('Email verified! 🎉')
-        navigate('/dashboard')
+        const userRoles = [
+          ...(Array.isArray(verifyRes?.user?.roles) ? verifyRes.user.roles : []),
+          verifyRes?.user?.role,
+        ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
+
+        const isEmployer = userRoles.some((r) =>
+          ['executive', 'exec', 'recruiter', 'admin', 'hiring_manager'].includes(r)
+        )
+        navigate(isEmployer ? '/recruiter/company' : '/profile')
       }
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Invalid code')
