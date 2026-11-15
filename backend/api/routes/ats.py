@@ -290,8 +290,7 @@ async def match_resume(
     t_start = time.perf_counter()
 
     # Direct Groq JD parser: extracts clean candidate specs (avoids company age confusion)
-    db_conn = getattr(result_repo, "db", None) or getattr(resume_repo, "collection", {}).database
-    jd_specs = await parse_jd_with_groq(job_description, db=db_conn)
+    jd_specs = await parse_jd_with_groq(job_description)
     if not jd_specs:
         raise HTTPException(
             status_code=502,
@@ -386,6 +385,7 @@ async def match_resume(
 
         # ── Scoring Engine Version ──
         "scoring_version": scored.get("scoring_version", "2.3.0"),
+        "extracted_data": extracted_data,
     }
 
     result = None
@@ -460,8 +460,7 @@ async def bulk_match(
 
     # Parse JD once with Groq for the entire batch (avoids company tenure confusion)
     bulk_required_skills = payload.required_skills or []
-    db_conn = getattr(resume_repo, "collection", {}).database
-    jd_specs = await parse_jd_with_groq(payload.job_description, db=db_conn)
+    jd_specs = await parse_jd_with_groq(payload.job_description)
     if not jd_specs:
         raise HTTPException(
             status_code=502,
@@ -577,6 +576,12 @@ async def get_latest_ats_result(
     resume = await resume_repo.get_by_id(latest.resume_id) if latest.resume_id else None
 
     latest_dict = latest.model_dump() if hasattr(latest, "model_dump") else dict(latest)
+    if not latest_dict.get("extracted_data") and resume:
+        parsed = getattr(resume, "parsed_data", None)
+        if hasattr(parsed, "model_dump"):
+            parsed = parsed.model_dump()
+        if isinstance(parsed, dict):
+            latest_dict["extracted_data"] = parsed
 
     return {
         "has_result": True,
@@ -730,6 +735,7 @@ def _build_ats_response(result_id: str, resume_id: str, job_title: str, data: di
         skills_score=float(data.get("skills_score")) if data.get("skills_score") is not None else None,
         projects_score=float(data.get("projects_score")) if data.get("projects_score") is not None else None,
         active_weights=data.get("active_weights") or {},
+        extracted_data=data.get("extracted_data"),
     )
 
 

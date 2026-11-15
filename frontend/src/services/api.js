@@ -73,6 +73,28 @@ api.interceptors.request.use((config) => {
 });
 
 
+// Concurrency mutex & queue for automatic 401 token refresh
+let isRefreshing = false;
+let failedQueue = [];
+
+const clearLocalAuth = () => {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("tenant_id");
+  localStorage.removeItem("user");
+};
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // RESPONSE INTERCEPTOR (AUTO REFRESH + DEBUG)
 
 api.interceptors.response.use(
@@ -99,12 +121,32 @@ api.interceptors.response.use(
       !originalRequest._retry &&
       !isNonRefreshable
     ) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((newToken) => {
+            originalRequest._retry = true;
+            if (originalRequest.headers?.set) {
+              originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
+            } else if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            }
+            return api(originalRequest);
+          })
+          .catch((queuedErr) => Promise.reject(queuedErr));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
         const refreshToken = localStorage.getItem("refresh_token");
 
         if (!refreshToken) {
+          isRefreshing = false;
+          processQueue(err, null);
           clearLocalAuth();
 
           // CRITICAL FIX: Never execute window.location.href hard reloads for /auth/me
@@ -147,9 +189,14 @@ api.interceptors.response.use(
           originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
         }
 
+        processQueue(null, newAccessToken);
+        isRefreshing = false;
+
         return api(originalRequest);
 
       } catch (refreshError) {
+        processQueue(refreshError, null);
+        isRefreshing = false;
         clearLocalAuth();
 
         const isAuthMe = originalRequest?.url?.includes('/auth/me');

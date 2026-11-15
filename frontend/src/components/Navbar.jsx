@@ -500,6 +500,9 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
           <button
             type="button"
             onClick={() => navigate('/gamification')}
+            onMouseEnter={() => import('../pages/CareerQuest').catch(() => {})}
+            onTouchStart={() => import('../pages/CareerQuest').catch(() => {})}
+            onPointerDown={() => import('../pages/CareerQuest').catch(() => {})}
             title={`Daily Practice Streak: ${streakCount} Day${streakCount === 1 ? '' : 's'} • Click to view Rewards`}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border border-amber-200/90 text-amber-800 transition-all cursor-pointer shadow-2xs group"
           >

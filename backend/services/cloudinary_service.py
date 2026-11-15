@@ -14,6 +14,7 @@ Folder layout under the 'careerpilot' root:
 import asyncio
 import io
 import os
+import re
 from functools import partial
 from typing import Optional, Tuple
 import tempfile
@@ -255,19 +256,23 @@ def extract_public_id_from_url(url: str) -> Optional[str]:
     Works for:
       - https://res.cloudinary.com/.../raw/upload/v12345/careerpilot/resumes/resume_abc.pdf
       - https://res.cloudinary.com/.../raw/authenticated/s--xxx--/v12345/careerpilot/resumes/resume_abc.pdf
+    Handles trailing URL fragments (#page=1) and query parameters gracefully.
     """
     if not url:
         return None
-    match = re.search(r"/(?:upload|authenticated)/(?:s--[^/]+--/)?(?:v\d+/)?(careerpilot/.+?)(?:\?[^#]*)?$", url)
+    clean_url = str(url).split("#")[0]
+    match = re.search(r"/(?:upload|authenticated)/(?:s--[^/]+--/)?(?:v\d+/)?(careerpilot/[^?#]+)", clean_url)
     if match:
         return match.group(1)
     return None
 
 
-def generate_signed_resume_url(public_id: str, expires_in: int = 300, resource_type: str = "raw") -> str:
+def generate_signed_resume_url(public_id: str, expires_in: int = 3600, resource_type: str = "raw", delivery_type: str = "upload") -> str:
     """
-    Generates a time-limited signed URL (default 5 minutes) for private/authenticated resume delivery.
+    Generates a time-limited signed URL for resume delivery.
     Ensures safe access without exposing raw public Cloudinary URLs.
+    Defaults to delivery_type='upload' (matching standard Cloudinary storage)
+    so signed URLs resolve correctly to /raw/upload/s--.../.
     """
     import time
     import cloudinary.utils
@@ -275,18 +280,33 @@ def generate_signed_resume_url(public_id: str, expires_in: int = 300, resource_t
     if not public_id:
         return ""
 
-    clean_pid = public_id.strip()
+    clean_pid = str(public_id).strip()
+
+    # Extract version if present in URL
+    ver_match = re.search(r"/v(\d+)/", clean_pid)
+    version = ver_match.group(1) if ver_match else None
+
+    extracted = extract_public_id_from_url(clean_pid)
+    if extracted:
+        clean_pid = extracted
+
     if not clean_pid.startswith(FOLDER_ROOT) and not clean_pid.startswith("http"):
         clean_pid = f"{FOLDER_RESUMES}/{clean_pid}"
 
     expires_at = int(time.time()) + expires_in
 
+    url_kwargs = {
+        "resource_type": resource_type,
+        "type": delivery_type,
+        "sign_url": True,
+        "expires_at": expires_at,
+    }
+    if version:
+        url_kwargs["version"] = version
+
     url, _ = cloudinary.utils.cloudinary_url(
         clean_pid,
-        resource_type=resource_type,
-        type="authenticated",
-        sign_url=True,
-        expires_at=expires_at,
+        **url_kwargs,
     )
     return url
 

@@ -239,6 +239,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
             {/* Real Streak */}
             <div 
               onClick={() => handleNavigate('/gamification')}
+              onMouseEnter={() => import('../pages/CareerQuest').catch(() => {})}
               className="flex flex-col items-center justify-center py-1.5 px-1 rounded-lg bg-white border border-slate-200/60 shadow-2xs cursor-pointer hover:border-orange-300 transition-colors"
               title="Real Daily Streak"
             >
@@ -357,6 +358,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
             <button
               type="button"
               onClick={() => handleNavigate('/gamification')}
+              onMouseEnter={() => import('../pages/CareerQuest').catch(() => {})}
               className="p-2.5 rounded-2xl bg-slate-50/90 hover:bg-amber-50/80 border border-slate-200/70 hover:border-amber-200 text-left transition-all group cursor-pointer shadow-2xs"
             >
               <div className="flex items-center justify-between mb-1">

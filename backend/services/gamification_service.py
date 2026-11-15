@@ -8,7 +8,7 @@ from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any
 
 import structlog
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_, cast, String
 
 from config.db import get_pg_session_factory
 from models import UserGamification, User, gen_uuid_str
@@ -454,18 +454,29 @@ class GamificationService:
             "points_to_next": pts_to_next,
         }
 
-    async def get_leaderboard(self, limit: int = 20) -> List[Dict[str, Any]]:
+    async def get_leaderboard(self, limit: int = 50) -> List[Dict[str, Any]]:
         global _leaderboard_cache
         now = time.time()
         if _leaderboard_cache["data"] is not None and (now - _leaderboard_cache["ts"]) < _LEADERBOARD_CACHE_TTL:
             return _leaderboard_cache["data"]
 
         async with self.session_factory() as session:
+            # Query users who have candidate role (either primary role == 'candidate' or 'candidate' in roles array)
+            # Outerjoin ensures all verified candidates are included even if they haven't earned XP yet
             stmt = (
                 select(UserGamification, User)
-                .join(User, UserGamification.user_id == User.id)
-                .where(User.role.notin_(["admin", "recruiter"]))
-                .order_by(desc(UserGamification.total_points))
+                .outerjoin(UserGamification, UserGamification.user_id == User.id)
+                .where(
+                    or_(
+                        User.role == "candidate",
+                        func.cast(User.roles, String).ilike("%candidate%"),
+                        User.role.is_(None),
+                    )
+                )
+                .order_by(
+                    desc(func.coalesce(UserGamification.total_points, 0)),
+                    desc(User.created_at),
+                )
                 .limit(limit)
             )
             res = await session.execute(stmt)
@@ -474,7 +485,12 @@ class GamificationService:
         result = []
         rank = 1
         for gam_profile, user_obj in rows:
-            user_role = (user_obj.role or "candidate").lower()
+            user_roles = [str(r).lower().strip() for r in (getattr(user_obj, "roles", None) or []) if r]
+            primary_role = str(getattr(user_obj, "role", None) or "").lower().strip()
+            is_candidate = "candidate" in user_roles or primary_role == "candidate" or (not user_roles and not primary_role)
+            if not is_candidate:
+                continue
+
             full_name = (getattr(user_obj, "full_name", None) or getattr(user_obj, "name", None) or "").strip()
             if not full_name:
                 email = (user_obj.email or "").strip()
@@ -483,25 +499,29 @@ class GamificationService:
                 else:
                     full_name = "Anonymous Candidate"
 
-            streak_info = self._calculate_streak(gam_profile.active_dates or [])
-            badges = gam_profile.badges or []
+            active_dates = gam_profile.active_dates if (gam_profile and gam_profile.active_dates) else []
+            streak_info = self._calculate_streak(active_dates) if gam_profile else {"current_streak": 0, "longest_streak": 0}
+            badges = gam_profile.badges if (gam_profile and gam_profile.badges) else []
             avatar = getattr(user_obj, "profile_picture", None)
+            total_points = gam_profile.total_points if (gam_profile and gam_profile.total_points) else 0
 
             result.append({
                 "rank": rank,
-                "user_id": str(gam_profile.user_id),
+                "user_id": str(user_obj.id),
                 "full_name": full_name,
-                "role": user_role,
+                "role": "candidate",
+                "roles": user_roles if user_roles else [primary_role or "candidate"],
+                "is_candidate": True,
                 "avatar_url": avatar,
                 "profile_picture": avatar,
                 "display_picture": avatar,
                 "google_picture": avatar,
                 "linked_accounts": {},
-                "total_points": gam_profile.total_points or 0,
-                "level_info": self._compute_level(gam_profile.total_points or 0),
-                "current_streak": streak_info["current_streak"],
-                "total_interviews": gam_profile.interviews_completed or 0,
-                "average_score": float(gam_profile.average_score or 0.0),
+                "total_points": total_points,
+                "level_info": self._compute_level(total_points),
+                "current_streak": streak_info.get("current_streak", 0),
+                "total_interviews": (gam_profile.interviews_completed if gam_profile else 0) or 0,
+                "average_score": float((gam_profile.average_score if gam_profile else 0.0) or 0.0),
                 "badge_count": len(badges),
                 "top_badge": badges[-1] if badges else None,
             })

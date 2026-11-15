@@ -75,10 +75,13 @@ export default function Leaderboard({ leaderboard = [], currentUserId }) {
   const { user: currentUser } = useAuth()
   const [visibleCount, setVisibleCount] = useState(10)
 
-  // Only display candidates on the leaderboard (exclude admin & recruiter)
-  const candidateLeaderboard = leaderboard.filter(
-    (e) => !e.role || String(e.role).toLowerCase() === 'candidate'
-  )
+  // Display any user who holds the candidate role (including users with multiple roles)
+  const candidateLeaderboard = leaderboard.filter((e) => {
+    if (e.is_candidate) return true
+    if (Array.isArray(e.roles) && e.roles.some((r) => String(r).toLowerCase() === 'candidate')) return true
+    const roleStr = String(e.role || '').toLowerCase()
+    return !roleStr || roleStr === 'candidate'
+  })
 
   const myIndex = candidateLeaderboard.findIndex((e) => String(e.user_id) === String(currentUserId))
   const myRank = myIndex !== -1 ? myIndex + 1 : null

@@ -171,6 +171,7 @@ class ATSMatchResponse(BaseModel):
     skills_score: Optional[float] = None
     projects_score: Optional[float] = None
     active_weights: Optional[Dict[str, float]] = Field(default_factory=dict)
+    extracted_data: Optional[Dict[str, Any]] = None
 
 
 class BulkATSResultItem(BaseModel):

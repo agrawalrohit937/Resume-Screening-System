@@ -418,8 +418,21 @@ export default function Results() {
     setEnhancing(true)
 
     // Pre-populate candidate's original bullets so Studio opens immediately without blank lag
+    let extracted = result?.extracted_data
+    if (!extracted && resumeId) {
+      try {
+        const resResp = await api.get(`/resume/${resumeId}`)
+        if (resResp.data?.parsed_data) {
+          extracted = resResp.data.parsed_data
+          setResult(prev => prev ? ({ ...prev, extracted_data: extracted }) : { extracted_data: extracted, resume_id: resumeId })
+        }
+      } catch (e) {
+        console.warn('Could not fetch resume details for enhancement preview', e)
+      }
+    }
+
     const currentScoreVal = result?.strict_ats_score ?? result?.strict_score ?? result?.match_score ?? 76
-    const initialBullets = (result?.extracted_data?.experience || []).flatMap(exp =>
+    const initialBullets = (extracted?.experience || []).flatMap(exp =>
       (exp.highlights || exp.bullets || []).map(b => ({
         section: exp.company || exp.title || 'Work Experience',
         original: b,
@@ -435,7 +448,7 @@ export default function Results() {
 
     setEnhancedStudioData({
       bullet_diffs: initialBullets.length > 0 ? initialBullets : fallbackBullets,
-      original_summary: result?.extracted_data?.summary || 'Experienced professional with background in software development and delivery.',
+      original_summary: extracted?.summary || 'Experienced professional with background in software development and delivery.',
       score_lift: {
         before: currentScoreVal,
         after: Math.min(96, Math.max(88, currentScoreVal + 18)),

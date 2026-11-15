@@ -136,10 +136,16 @@ function InvoiceReceiptModal({ invoice, user, onClose }) {
         <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-slate-800 font-sans">
           <div className="flex justify-between items-start pb-6 border-b border-slate-200">
             <div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">
-                  CS
-                </div>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/logo_t.webp"
+                  alt="CareerShala Logo"
+                  className="w-9 h-9 object-contain shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/logo.png";
+                  }}
+                />
                 <span className="text-xl font-black text-slate-900 tracking-tight">CareerShala</span>
               </div>
               <p className="text-xs text-slate-500 mt-1 font-medium">AI Career Acceleration Platform</p>

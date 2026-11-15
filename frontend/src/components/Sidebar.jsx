@@ -310,6 +310,24 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     }
   }, [location.pathname, mobile, onNavigate])
 
+  // Idle Preload high-priority routes (Gamification, Interview, ATS Results) for instantaneous 0ms transitions
+  useEffect(() => {
+    const idlePreload = () => {
+      prefetchRoute('/gamification')
+      prefetchRoute('/interview')
+      prefetchRoute('/results')
+      prefetchRoute('/portfolio-builder')
+    }
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(idlePreload, { timeout: 2000 })
+      return () => window.cancelIdleCallback?.(id)
+    } else {
+      const timer = setTimeout(idlePreload, 1200)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
   const handleItemClick = (path) => {
     setViewModeOpen(false)
     onNavigate?.()
@@ -771,6 +789,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     }}
                     onMouseEnter={() => prefetchRoute(item.to)}
                     onTouchStart={() => prefetchRoute(item.to)}
+                    onPointerDown={() => prefetchRoute(item.to)}
                     title={isCompact ? item.label : undefined}
                     className={`relative flex items-center justify-between px-3.5 h-11 rounded-xl text-[13px] font-semibold transition-all duration-200 group
                       ${isCompact ? 'justify-center px-0' : ''}
