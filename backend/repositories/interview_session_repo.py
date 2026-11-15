@@ -123,7 +123,9 @@ class InterviewSessionRepository:
             stmt = select(InterviewSessionModel)
             conditions = []
             for k, v in filter_dict.items():
-                if k == "user_id":
+                if k == "is_employer_scheduled":
+                    conditions.append(InterviewSessionModel.is_employer_scheduled == bool(v))
+                elif k == "user_id":
                     conditions.append(InterviewSessionModel.user_id == str(v))
                 elif k == "employer_id":
                     conditions.append(InterviewSessionModel.employer_id == str(v))
@@ -133,6 +135,8 @@ class InterviewSessionRepository:
                     conditions.append(InterviewSessionModel.application_id == str(v))
                 elif k == "status":
                     conditions.append(InterviewSessionModel.status == str(v))
+                elif hasattr(InterviewSessionModel, k):
+                    conditions.append(getattr(InterviewSessionModel, k) == v)
 
             if conditions:
                 stmt = stmt.where(and_(*conditions))

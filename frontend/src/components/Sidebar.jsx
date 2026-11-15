@@ -162,6 +162,12 @@ const EXEC_PRIMARY_SECTIONS = [
     ],
   },
   {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
+    ],
+  },
+  {
     title: 'Organization',
     items: [
       { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
@@ -186,6 +192,12 @@ const HIRING_MANAGER_PRIMARY_SECTIONS = [
     ],
   },
   {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
+    ],
+  },
+  {
     title: 'Organization',
     items: [
       { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
@@ -199,6 +211,12 @@ const RECRUITER_PRIMARY_SECTIONS = [
     items: [
       { to: '/recruiter/dashboard', label: 'Dashboard', icon: Icons.dashboard },
       { to: '/recruiter/jobs', label: 'Jobs & Pipelines', badge: 'Active', icon: Icons.briefcase },
+    ],
+  },
+  {
+    title: 'Interviews & Evaluations',
+    items: [
+      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
     ],
   },
   {

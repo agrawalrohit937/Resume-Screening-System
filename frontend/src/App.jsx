@@ -312,7 +312,7 @@ export default function App() {
                 <Route
                   path="interviewer/dashboard"
                   element={
-                    <RoleGuard allowedRoles={['interviewer', 'admin', 'recruiter', 'hiring_manager']} showAccessDeniedCard>
+                    <RoleGuard allowedRoles={['interviewer', 'admin', 'recruiter', 'hiring_manager', 'executive', 'exec', 'platform_admin']} showAccessDeniedCard>
                       <InterviewerDashboard />
                     </RoleGuard>
                   }

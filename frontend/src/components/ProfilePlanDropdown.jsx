@@ -466,6 +466,24 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
             </button>
             <button
               type="button"
+              onClick={() => handleNavigate('/interviewer/dashboard')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Target size={16} className="text-blue-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-blue-700 truncate">Evaluations</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Candidate Scorecards</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/recruiter/jobs')}
+              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
+            >
+              <Briefcase size={16} className="text-emerald-600 mb-1" />
+              <p className="text-xs font-extrabold text-slate-800 group-hover:text-emerald-700 truncate">Jobs Pipeline</p>
+              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Applicants &amp; Posts</p>
+            </button>
+            <button
+              type="button"
               onClick={() => handleNavigate('/settings/team')}
               className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
             >

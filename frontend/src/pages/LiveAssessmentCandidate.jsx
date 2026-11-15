@@ -774,18 +774,22 @@ export default function LiveAssessmentCandidate() {
 
   if (phase === CANDIDATE_PHASE.SYSTEM_CHECK) {
     return (
-      <SystemCheckStep
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        cameraReady={cameraReady}
-        cameraError={cameraError}
-        startCamera={startCamera}
-        detectionStatus={detectionStatus}
-        fsGate={fsGate}
-        onPrepareAi={() => setLoadModels(true)}
-        onBack={() => setPhase(CANDIDATE_PHASE.WELCOME)}
-        onComplete={handleStartFromSystemCheck}
-      />
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FAFC] via-[#EFF6FF] to-[#F1F5F9] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center font-sans">
+        <div className="max-w-6xl w-full mx-auto">
+          <SystemCheckStep
+            videoRef={videoRef}
+            canvasRef={canvasRef}
+            cameraReady={cameraReady}
+            cameraError={cameraError}
+            startCamera={startCamera}
+            detectionStatus={detectionStatus}
+            fsGate={fsGate}
+            onPrepareAi={() => setLoadModels(true)}
+            onBack={() => setPhase(CANDIDATE_PHASE.WELCOME)}
+            onComplete={handleStartFromSystemCheck}
+          />
+        </div>
+      </div>
     )
   }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   TrendingUp,
@@ -18,6 +19,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getExecAnalytics, getRequisitions, recordApprovalDecision } from '../../services/api'
@@ -519,6 +521,14 @@ export default function ExecDashboard() {
                 <FileText className="w-3.5 h-3.5 text-slate-300" />
                 <span>Board Deck</span>
               </button>
+
+              <Link
+                to="/interviewer/dashboard"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs hover:shadow-xs transition cursor-pointer"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                <span>Candidate Evaluations</span>
+              </Link>
             </div>
           </div>
         </div>
