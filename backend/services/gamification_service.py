@@ -462,27 +462,25 @@ class GamificationService:
 
         async with self.session_factory() as session:
             # Query users who have candidate role (either primary role == 'candidate' or 'candidate' in roles array)
-            # Outerjoin ensures all verified active candidates are included even if they haven't earned XP yet.
-            # Strictly filter out unverified, pending verification, inactive, or suspended accounts.
+            # Outerjoin ensures all active candidates are included even if they haven't earned XP yet.
+            # Strictly filter for: 1) Role is candidate, 2) Status is active (no pending_verification/inactive/suspended).
             stmt = (
                 select(UserGamification, User)
                 .outerjoin(UserGamification, UserGamification.user_id == User.id)
                 .where(
                     and_(
+                        # 1. Role must be candidate
                         or_(
                             User.role == "candidate",
                             func.cast(User.roles, String).ilike("%candidate%"),
                             User.role.is_(None),
                         ),
+                        # 2. Status must be active (excludes pending_verification, suspended, inactive)
                         or_(
                             User.status == "active",
                             User.status == "UserStatus.ACTIVE",
+                            func.lower(User.status) == "active",
                             User.status.is_(None),
-                        ),
-                        or_(
-                            User.email_verified.is_(True),
-                            func.lower(func.coalesce(User.provider, "")).in_(["google", "github", "linkedin"]),
-                            func.lower(func.coalesce(User.auth_method, "")).in_(["google", "github", "linkedin"]),
                         ),
                     )
                 )
@@ -498,17 +496,12 @@ class GamificationService:
         result = []
         rank = 1
         for gam_profile, user_obj in rows:
-            # Safety check: ensure active and verified candidate
+            # 1. Safety check: status must be active (exclude pending_verification, inactive, suspended, banned)
             user_status = str(getattr(user_obj, "status", "") or "").lower().strip()
-            if user_status in ("pending_verification", "inactive", "suspended", "banned"):
+            if user_status and user_status not in ("active", "userstatus.active"):
                 continue
 
-            email_verified = getattr(user_obj, "email_verified", False)
-            provider = str(getattr(user_obj, "provider", "") or getattr(user_obj, "auth_method", "") or "").lower().strip()
-            is_oauth = any(p in provider for p in ("google", "github", "linkedin"))
-            if not email_verified and not is_oauth:
-                continue
-
+            # 2. Safety check: role must be candidate
             user_roles = [str(r).lower().strip() for r in (getattr(user_obj, "roles", None) or []) if r]
             primary_role = str(getattr(user_obj, "role", None) or "").lower().strip()
             is_candidate = "candidate" in user_roles or primary_role == "candidate" or (not user_roles and not primary_role)
