@@ -8,7 +8,7 @@ from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any
 
 import structlog
-from sqlalchemy import select, func, desc, or_, cast, String
+from sqlalchemy import select, func, desc, or_, and_, cast, String
 
 from config.db import get_pg_session_factory
 from models import UserGamification, User, gen_uuid_str
@@ -462,15 +462,28 @@ class GamificationService:
 
         async with self.session_factory() as session:
             # Query users who have candidate role (either primary role == 'candidate' or 'candidate' in roles array)
-            # Outerjoin ensures all verified candidates are included even if they haven't earned XP yet
+            # Outerjoin ensures all verified active candidates are included even if they haven't earned XP yet.
+            # Strictly filter out unverified, pending verification, inactive, or suspended accounts.
             stmt = (
                 select(UserGamification, User)
                 .outerjoin(UserGamification, UserGamification.user_id == User.id)
                 .where(
-                    or_(
-                        User.role == "candidate",
-                        func.cast(User.roles, String).ilike("%candidate%"),
-                        User.role.is_(None),
+                    and_(
+                        or_(
+                            User.role == "candidate",
+                            func.cast(User.roles, String).ilike("%candidate%"),
+                            User.role.is_(None),
+                        ),
+                        or_(
+                            User.status == "active",
+                            User.status == "UserStatus.ACTIVE",
+                            User.status.is_(None),
+                        ),
+                        or_(
+                            User.email_verified.is_(True),
+                            func.lower(func.coalesce(User.provider, "")).in_(["google", "github", "linkedin"]),
+                            func.lower(func.coalesce(User.auth_method, "")).in_(["google", "github", "linkedin"]),
+                        ),
                     )
                 )
                 .order_by(
@@ -485,6 +498,17 @@ class GamificationService:
         result = []
         rank = 1
         for gam_profile, user_obj in rows:
+            # Safety check: ensure active and verified candidate
+            user_status = str(getattr(user_obj, "status", "") or "").lower().strip()
+            if user_status in ("pending_verification", "inactive", "suspended", "banned"):
+                continue
+
+            email_verified = getattr(user_obj, "email_verified", False)
+            provider = str(getattr(user_obj, "provider", "") or getattr(user_obj, "auth_method", "") or "").lower().strip()
+            is_oauth = any(p in provider for p in ("google", "github", "linkedin"))
+            if not email_verified and not is_oauth:
+                continue
+
             user_roles = [str(r).lower().strip() for r in (getattr(user_obj, "roles", None) or []) if r]
             primary_role = str(getattr(user_obj, "role", None) or "").lower().strip()
             is_candidate = "candidate" in user_roles or primary_role == "candidate" or (not user_roles and not primary_role)
