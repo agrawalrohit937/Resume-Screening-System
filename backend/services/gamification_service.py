@@ -3,6 +3,7 @@ Gamification Service — points, badges, streaks, levels, and leaderboard.
 100% Native PostgreSQL via SQLAlchemy 2.0.
 """
 
+import json
 import time
 from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional, Dict, Any
@@ -56,6 +57,28 @@ LEVEL_THRESHOLDS = [
 ]
 
 
+def _normalize_badges(raw_badges: Any) -> List[Dict[str, Any]]:
+    """Safely normalizes badges from string JSON, list of strings, or list of dicts."""
+    if not raw_badges:
+        return []
+    if isinstance(raw_badges, str):
+        try:
+            raw_badges = json.loads(raw_badges)
+        except Exception:
+            raw_badges = [raw_badges]
+    if not isinstance(raw_badges, list):
+        return []
+    normalized: List[Dict[str, Any]] = []
+    for b in raw_badges:
+        if isinstance(b, dict):
+            normalized.append(b)
+        elif isinstance(b, str) and b.strip():
+            badge_id = b.strip()
+            badge_info = BADGES.get(badge_id, {"name": badge_id, "icon": "🏅", "description": badge_id, "points": 0})
+            normalized.append({**badge_info, "id": badge_id})
+    return normalized
+
+
 def _profile_to_dict(profile: UserGamification) -> Dict[str, Any]:
     return {
         "_id": str(profile.id),
@@ -73,7 +96,7 @@ def _profile_to_dict(profile: UserGamification) -> Dict[str, Any]:
         "questions_answered": profile.questions_answered or 0,
         "average_score": float(profile.average_score or 0.0),
         "best_score": float(profile.best_score or 0.0),
-        "badges": profile.badges or [],
+        "badges": _normalize_badges(profile.badges),
         "recent_points": profile.recent_points or [],
         "created_at": profile.created_at.isoformat() if profile.created_at else None,
         "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
@@ -379,7 +402,8 @@ class GamificationService:
                     ("streak_7", new_streak >= 7),
                     ("streak_30", new_streak >= 30),
                 ]
-                existing_badges = set(b.get("id") for b in (profile.badges or []))
+                existing_badges_list = _normalize_badges(profile.badges)
+                existing_badges = set(b.get("id") for b in existing_badges_list if isinstance(b, dict) and b.get("id"))
                 for badge_id, condition in badge_checks:
                     if condition and badge_id not in existing_badges:
                         badge_data = {**BADGES[badge_id], "id": badge_id, "earned_at": now.isoformat()}
@@ -388,7 +412,7 @@ class GamificationService:
                         existing_badges.add(badge_id)
 
                 if new_badges:
-                    profile.badges = list(profile.badges or []) + new_badges
+                    profile.badges = existing_badges_list + new_badges
 
                 # Running average and best score
                 old_avg = float(profile.average_score or 0.0)
@@ -518,7 +542,7 @@ class GamificationService:
 
             active_dates = gam_profile.active_dates if (gam_profile and gam_profile.active_dates) else []
             streak_info = self._calculate_streak(active_dates) if gam_profile else {"current_streak": 0, "longest_streak": 0}
-            badges = gam_profile.badges if (gam_profile and gam_profile.badges) else []
+            badges = _normalize_badges(gam_profile.badges) if gam_profile else []
             avatar = getattr(user_obj, "profile_picture", None)
             total_points = gam_profile.total_points if (gam_profile and gam_profile.total_points) else 0
 

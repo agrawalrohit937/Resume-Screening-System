@@ -546,10 +546,8 @@ export default function LiveInterviewV2() {
   const session = useInterviewSession()
   const [briefStep, setBriefStep] = useState('guidelines')
 
-  // Detect mobile once — on phones we skip all heavy ML models entirely
-  // (MediaPipe, TF.js COCO-SSD, face-api) to keep the page fast.
-  const isMobile = typeof window !== 'undefined'
-    && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches)
+  // Screen width helper for mobile responsive UI adaptations
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
 
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -600,7 +598,7 @@ export default function LiveInterviewV2() {
 
   const detectionStatus = useAdvancedDetection({
     videoRef, canvasRef, onEvent: handleCheatingEvent,
-    active: !isMobile && (loadModels || session.phase === SESSION_PHASE.ACTIVE),
+    active: Boolean(loadModels || session.phase === SESSION_PHASE.ACTIVE),
     isLive: session.phase === SESSION_PHASE.ACTIVE,
     faceInterval: 650,
     objectInterval: 4000,

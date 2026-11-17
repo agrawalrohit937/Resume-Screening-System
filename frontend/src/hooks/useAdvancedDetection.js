@@ -130,16 +130,29 @@ export function useAdvancedDetection({
     }
   }, [])
 
-  // ── 1. Fast Dynamic Script Loader ──────────────────────────────────────────
+  // ── 1. Fast Dynamic Script Loader with Auto-Cleanup on Failure ──────────
   const loadScript = useCallback((src, id) => new Promise((resolve, reject) => {
-    if (document.getElementById(id)) { resolve(); return }
+    const existing = document.getElementById(id)
+    if (existing) {
+      if (existing.getAttribute('data-loaded') === 'true') {
+        resolve()
+        return
+      }
+      existing.remove()
+    }
     const s = document.createElement('script')
     s.id = id
     s.src = src
     s.async = true
     s.crossOrigin = 'anonymous'
-    s.onload = () => resolve()
-    s.onerror = (e) => reject(e)
+    s.onload = () => {
+      s.setAttribute('data-loaded', 'true')
+      resolve()
+    }
+    s.onerror = (e) => {
+      s.remove()
+      reject(e)
+    }
     document.head.appendChild(s)
   }), [])
 
@@ -370,10 +383,12 @@ export function useAdvancedDetection({
     const initEngine = async () => {
       try {
         // Step 1: Initialize FaceMesh instantly using fast reliable jsdelivr CDN with unpkg fallback
+        let cdnBase = `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}`
         try {
           await loadScript(`https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js`, 'mp-camera')
           await loadScript(`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/face_mesh.js`, 'mp-facemesh')
         } catch (_) {
+          cdnBase = `https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}`
           await loadScript(`https://unpkg.com/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js`, 'mp-camera')
           await loadScript(`https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/face_mesh.js`, 'mp-facemesh')
         }
@@ -388,7 +403,7 @@ export function useAdvancedDetection({
         if (!window.FaceMesh) throw new Error('FaceMesh library unavailable')
 
         const fm = new window.FaceMesh({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_VERSION}/${file.replace(/^\//, '')}`,
+          locateFile: (file) => `${cdnBase}/${file.replace(/^\//, '')}`,
         })
 
         fm.setOptions({
@@ -415,7 +430,12 @@ export function useAdvancedDetection({
 
         // Step 2: Background initialize COCO-SSD Object Detection for Phone/Device tracking
         try {
-          await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js', 'tfjs-cdn')
+          try {
+            await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js', 'tfjs-cdn')
+          } catch (_) {
+            await loadScript('https://unpkg.com/@tensorflow/tfjs@4.15.0/dist/tf.min.js', 'tfjs-cdn')
+          }
+
           let tfRetry = 0
           while (!window.tf && tfRetry < 20) {
             if (isCancelled) return
@@ -428,7 +448,13 @@ export function useAdvancedDetection({
               // Isolate TF.js to CPU so MediaPipe retains 100% exclusive WebGL acceleration
               await window.tf.setBackend('cpu')
             } catch (_) {}
-            await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js', 'coco-ssd-cdn')
+
+            try {
+              await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js', 'coco-ssd-cdn')
+            } catch (_) {
+              await loadScript('https://unpkg.com/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js', 'coco-ssd-cdn')
+            }
+
             let cocoRetry = 0
             while (!window.cocoSsd && cocoRetry < 20) {
               if (isCancelled) return
