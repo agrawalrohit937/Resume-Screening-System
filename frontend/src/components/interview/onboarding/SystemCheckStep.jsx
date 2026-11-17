@@ -116,12 +116,12 @@ export default function SystemCheckStep({
   const [isWaitingForModels, setIsWaitingForModels] = useState(false)
   const startedRef = useRef(false)
 
-  // Detect mobile: narrow screen OR touch-only (coarse pointer) device
+  // Detect mobile: narrow screen (<768px) and no precision pointing device (mouse/trackpad)
   const isMobile = useMemo(() => {
     if (typeof window === 'undefined') return false
+    const hasFinePointer = window.matchMedia('(pointer: fine)').matches
     const narrowScreen = window.innerWidth < 768
-    const touchOnly = window.matchMedia('(pointer: coarse)').matches
-    return narrowScreen || touchOnly
+    return narrowScreen && !hasFinePointer
   }, [])
 
   const mic = useMicLevelTest()

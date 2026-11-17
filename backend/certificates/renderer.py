@@ -332,14 +332,17 @@ def _render_over_image_background(background_path: str, layout: dict, fonts: dic
 def _render_over_pdf_background(background_path: str, layout: dict, fonts: dict,
                                  context: dict, page_width: float, page_height: float) -> bytes:
     overlay_bytes = _draw_overlay(layout, fonts, context, page_width, page_height)
-
-    background_reader = PdfReader(background_path)
     overlay_reader = PdfReader(io.BytesIO(overlay_bytes))
 
-    writer = PdfWriter()
-    bg_page = background_reader.pages[0]
-    bg_page.merge_page(overlay_reader.pages[0])
-    writer.add_page(bg_page)
+    try:
+        writer = PdfWriter(clone_from=background_path)
+        writer.pages[0].merge_page(overlay_reader.pages[0])
+    except Exception:
+        # Fallback: attach page to writer before calling merge_page (required by pypdf 7.0+)
+        background_reader = PdfReader(background_path)
+        writer = PdfWriter()
+        bg_page = writer.add_page(background_reader.pages[0])
+        bg_page.merge_page(overlay_reader.pages[0])
 
     out_buffer = io.BytesIO()
     writer.write(out_buffer)

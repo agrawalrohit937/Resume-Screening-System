@@ -140,8 +140,7 @@ export default function LiveAssessmentCandidate() {
   const timerRef = useRef(null)
   const qTimerRef = useRef(null)
 
-  const isMobile = typeof window !== 'undefined'
-    && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
 
   // Fetch session context on mount
   useEffect(() => {
@@ -283,7 +282,7 @@ export default function LiveAssessmentCandidate() {
     videoRef,
     canvasRef,
     onEvent: handleCheatingEvent,
-    active: !isMobile && (phase === CANDIDATE_PHASE.SYSTEM_CHECK || phase === CANDIDATE_PHASE.ACTIVE || loadModels || isLaunchingRoom),
+    active: Boolean(phase === CANDIDATE_PHASE.SYSTEM_CHECK || phase === CANDIDATE_PHASE.ACTIVE || loadModels || isLaunchingRoom),
     isLive: phase === CANDIDATE_PHASE.ACTIVE,
     faceInterval: 650,
     objectInterval: 8000,
