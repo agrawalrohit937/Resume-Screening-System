@@ -310,7 +310,7 @@ async def check_slug_availability(
     existing_user = await user_repo.get_by_portfolio_slug(clean_slug)
 
     if existing_user:
-        user_uid = str(existing_user.get("_id", ""))
+        user_uid = str(getattr(existing_user, "id", None) or (existing_user.get("_id") or existing_user.get("id") if isinstance(existing_user, dict) else ""))
         if user_id and user_uid == str(user_id):
             return {
                 "status": "success",

@@ -897,8 +897,8 @@ async def send_application_via_gmail_api(
     # Fallback to Brevo HTTP mailer
     svc = EmailService()
     user_doc = await user_repo.get_by_id(user_id) if hasattr(user_repo, "get_by_id") else None
-    candidate_email = user_doc.get("email") if user_doc else None
-    candidate_name = user_doc.get("full_name") if user_doc else None
+    candidate_email = getattr(user_doc, "email", None) or (user_doc.get("email") if isinstance(user_doc, dict) else None)
+    candidate_name = getattr(user_doc, "full_name", None) or (user_doc.get("full_name") if isinstance(user_doc, dict) else None)
 
     return await svc.send_hr_application(
         to_email=to,

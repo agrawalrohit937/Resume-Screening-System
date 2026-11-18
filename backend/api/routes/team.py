@@ -447,12 +447,13 @@ async def list_team_members(
     raw_members = [
         {
             "_id": u.id,
+            "id": u.id,
             "email": u.email,
             "full_name": u.full_name,
             "role": str(u.role or "").replace("UserRole.", "").lower().strip(),
             "roles": [str(r).replace("UserRole.", "").lower().strip() for r in (u.roles if isinstance(u.roles, list) else [u.role]) if r],
             "tenant_id": u.tenant_id,
-            "status": u.status,
+            "status": u.status.value if hasattr(u.status, "value") else str(u.status or "active").replace("UserStatus.", "").lower().strip(),
             "created_at": u.created_at,
             "last_login": u.last_login,
             "profile_picture": u.profile_picture,
@@ -465,6 +466,8 @@ async def list_team_members(
     members: List[TeamMemberItem] = []
     for m in raw_members:
         r_list = m.get("roles") or ([m.get("role")] if m.get("role") else ["recruiter"])
+        raw_status = m.get("status", "active")
+        clean_status = raw_status.value if hasattr(raw_status, "value") else str(raw_status).replace("UserStatus.", "").lower().strip()
         members.append(
             TeamMemberItem(
                 id=str(m.get("id") or m.get("_id")),
@@ -473,7 +476,7 @@ async def list_team_members(
                 role=str(m.get("role", "recruiter")),
                 roles=[str(r) for r in r_list],
                 tenant_id=m.get("tenant_id", tenant_id),
-                status=str(m.get("status", "active")),
+                status=clean_status or "active",
                 created_at=m.get("created_at"),
                 last_login=m.get("last_login"),
                 profile_picture=m.get("profile_picture"),
@@ -568,24 +571,41 @@ async def remove_team_member(
     updates = {
         "tenant_id": None,
         "company_name": None,
-        "company_id": None,
         "is_invited_staff": False,
         "roles": ["candidate"],
         "role": "candidate",
         "updated_at": datetime.now(timezone.utc),
     }
 
+    # If user was staff invited by company, safely revert company subscription
+    if getattr(target_user, "is_invited_staff", False):
+        updates["plan"] = "free"
+        updates["subscription_active"] = False
+        updates["subscription_status"] = "expired"
+        updates["subscription_start_date"] = None
+        updates["subscription_end_date"] = None
+
     await user_repo.update(str(user_id), updates)
+
+    # Revoke all active user tokens so access to tenant resources terminates immediately
+    try:
+        from services.token_service import TokenService
+        await TokenService.revoke_all_user_tokens(str(user_id), reason="removed_from_organization")
+    except Exception as exc:
+        logger.warning("Could not revoke user tokens on removal", user_id=str(user_id), error=str(exc))
+
+    target_email = getattr(target_user, "email", None) or (target_user.get("email") if isinstance(target_user, dict) else "")
+    target_name = getattr(target_user, "full_name", None) or (target_user.get("full_name") if isinstance(target_user, dict) else "") or target_email
 
     logger.info(
         "Team member removed from organization",
         removed_user_id=str(user_id),
-        removed_user_email=target_user.get("email"),
+        removed_user_email=target_email,
         tenant_id=tenant_id,
         removed_by=str(current_user.id),
     )
 
     return {
-        "message": f"Member {target_user.get('full_name') or target_user.get('email')} successfully removed from organization.",
+        "message": f"Member {target_name} successfully removed from organization.",
         "user_id": str(user_id),
     }
