@@ -311,4 +311,84 @@ async def test_candidate_accepts_interviewer_invite_appends_role_and_preserves_c
     mock_invite_repo.update_status.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_remove_team_member_success_with_usermodel():
+    """Verify an executive can remove a team member without UserModel AttributeError."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from api.routes.team import remove_team_member
+
+    exec_user = UserModel(
+        id="exec_123",
+        email="exec@company.com",
+        full_name="Executive Boss",
+        role=UserRole.EXECUTIVE,
+        roles=[UserRole.EXECUTIVE],
+        tenant_id="tenant_company",
+    )
+
+    member_user = UserModel(
+        id="member_456",
+        email="member@company.com",
+        full_name="Staff Member",
+        role=UserRole.INTERVIEWER,
+        roles=[UserRole.CANDIDATE, UserRole.INTERVIEWER],
+        tenant_id="tenant_company",
+        is_invited_staff=True,
+    )
+
+    updated_fields = {}
+    mock_user_repo = MagicMock()
+    mock_user_repo.get_by_id = AsyncMock(return_value=member_user)
+    async def mock_update(uid, updates):
+        updated_fields.update(updates)
+        for k, v in updates.items():
+            setattr(member_user, k, v)
+        return member_user
+    mock_user_repo.update = AsyncMock(side_effect=mock_update)
+
+    with patch("services.token_service.TokenService.revoke_all_user_tokens", new_callable=AsyncMock) as mock_revoke:
+        res = await remove_team_member(
+            user_id="member_456",
+            current_user=exec_user,
+            user_repo=mock_user_repo,
+        )
+
+        assert res["user_id"] == "member_456"
+        assert "Staff Member successfully removed" in res["message"]
+        assert updated_fields["tenant_id"] is None
+        assert updated_fields["roles"] == ["candidate"]
+        assert updated_fields["role"] == "candidate"
+        assert updated_fields["is_invited_staff"] is False
+        assert updated_fields["plan"] == "free"
+        mock_revoke.assert_called_once_with("member_456", reason="removed_from_organization")
+
+
+@pytest.mark.asyncio
+async def test_remove_team_member_self_removal_blocked():
+    """Verify an executive cannot remove themselves."""
+    from unittest.mock import MagicMock
+    from fastapi import HTTPException
+    from api.routes.team import remove_team_member
+
+    exec_user = UserModel(
+        id="exec_123",
+        email="exec@company.com",
+        full_name="Executive Boss",
+        role=UserRole.EXECUTIVE,
+        roles=[UserRole.EXECUTIVE],
+        tenant_id="tenant_company",
+    )
+
+    mock_user_repo = MagicMock()
+    with pytest.raises(HTTPException) as exc_info:
+        await remove_team_member(
+            user_id="exec_123",
+            current_user=exec_user,
+            user_repo=mock_user_repo,
+        )
+    assert exc_info.value.status_code == 400
+    assert "cannot remove yourself" in exc_info.value.detail
+
+
+
 
