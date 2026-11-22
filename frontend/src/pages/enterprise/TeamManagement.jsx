@@ -13,40 +13,31 @@ import {
   AlertCircle,
   RefreshCw,
   Sparkles,
-  ChevronRight,
-  ExternalLink,
   Lock,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { useTenant } from '../../context/TenantContext'
 import { getTeamMembers, inviteTeamMember, revokeTeamInvite, removeTeamMember } from '../../services/api'
-import Loader from '../../components/Loader'
 
 const ROLE_CONFIG = {
   recruiter: {
-    label: 'Recruiter',
+    label: 'HR Recruiter',
     color: 'bg-indigo-50 text-indigo-700 border-indigo-200',
     dot: 'bg-indigo-500',
-    desc: 'Candidate pipelines, ATS screening, job posting, and talent pools.',
-  },
-  hiring_manager: {
-    label: 'Hiring Manager',
-    color: 'bg-purple-50 text-purple-700 border-purple-200',
-    dot: 'bg-purple-500',
-    desc: 'Requisition headcount approvals and department pipeline evaluations.',
+    desc: 'Human Resources & Talent — Job postings, ATS screening, candidate pipeline, and offers.',
   },
   interviewer: {
-    label: 'Interviewer',
+    label: 'Technical Interviewer',
     color: 'bg-blue-50 text-blue-700 border-blue-200',
     dot: 'bg-blue-500',
-    desc: 'Structured interview kits, scorecards, and candidate evaluations.',
+    desc: 'Engineering Lead & Panelist — Live assessments, custom coding questions, and scorecards.',
   },
   executive: {
-    label: 'Executive (Owner)',
+    label: 'Company Executive',
     color: 'bg-amber-50 text-amber-800 border-amber-200',
     dot: 'bg-amber-500',
-    desc: 'Full company oversight, executive intelligence, and billing control.',
+    desc: 'Company leadership, team management, billing control, and executive oversight.',
   },
 }
 
@@ -63,7 +54,7 @@ export default function TeamManagement() {
   // Modal State for Invites
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('interviewer')
+  const [inviteRole, setInviteRole] = useState('recruiter')
   const [submittingInvite, setSubmittingInvite] = useState(false)
   const [generatedInvite, setGeneratedInvite] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
@@ -98,7 +89,7 @@ export default function TeamManagement() {
       const res = await getTeamMembers()
       const data = res.data || {}
       setMembers(data.members || [])
-      setPendingInvites(data.pending_invites || [])
+      setPendingInvites((data.pending_invites || []).filter((inv) => (inv.status || 'pending').toLowerCase() === 'pending'))
     } catch (err) {
       console.error('Failed to load team data:', err)
       toast.error(err.response?.data?.detail || 'Failed to fetch organization team members.')
@@ -148,12 +139,15 @@ export default function TeamManagement() {
     if (!window.confirm('Are you sure you want to revoke this invitation? The link will expire immediately.')) {
       return
     }
+    // Optimistic UI update: remove immediately from display
+    setPendingInvites((prev) => prev.filter((inv) => inv.id !== inviteId))
     try {
       await revokeTeamInvite(inviteId)
       toast.success('Invitation revoked.')
       fetchTeamData(true)
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to revoke invite.')
+      fetchTeamData(true)
     }
   }
 
@@ -197,7 +191,7 @@ export default function TeamManagement() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/70 text-blue-700 text-[11px] font-bold tracking-wider uppercase border border-blue-200/60">
                 <Building2 size={13} />
-                Tenant: <span className="font-mono">{tenantId || user?.tenant_id || 'default'}</span>
+                Workspace: <span className="font-semibold">{user?.company_name || (tenantId && tenantId !== 'default' ? tenantId : 'Organization')}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100/70 text-amber-800 text-[11px] font-bold tracking-wider uppercase border border-amber-200/60">
                 <Shield size={13} />
@@ -210,7 +204,7 @@ export default function TeamManagement() {
             </h1>
 
             <p className="text-sm text-slate-600 max-w-md leading-relaxed">
-              Invite recruiters, hiring managers, and interviewers to your organization. Each member receives scoped permissions tailored to their active roles.
+              Invite HR recruiters and technical interviewers to your organization. Each member receives scoped permissions tailored to their active roles.
             </p>
 
             {/* Actions: cleanly placed on the solid left side, leaving the right team image unobstructed */}
@@ -569,7 +563,7 @@ export default function TeamManagement() {
                 <div>
                   <h3 className="text-lg font-extrabold text-slate-900">Invite Team Member</h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    Grant scoped role access in <span className="font-mono font-semibold">{tenantId || 'Organization'}</span>
+                    Invite a new member to join <span className="font-semibold text-slate-700">{user?.company_name || (tenantId && tenantId !== 'default' ? tenantId : 'your workspace')}</span>
                   </p>
                 </div>
               </div>
@@ -604,13 +598,13 @@ export default function TeamManagement() {
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left text-xs text-slate-600 space-y-2">
-                    <div className="flex items-center gap-2 font-medium text-slate-700">
+                  <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-left text-xs text-slate-700 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-emerald-800">
                       <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Sent via Brevo Email Service</span>
+                      <span>Official Invitation Email Delivered</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 pl-6">
-                      The invitee can open the email, verify their account, and set their password to immediately access your workspace.
+                    <p className="text-[11px] text-slate-600 pl-6 leading-relaxed">
+                      The invitee will receive an email to verify their account, set their password, and immediately access your workspace.
                     </p>
                   </div>
 
@@ -669,8 +663,12 @@ export default function TeamManagement() {
                       Assign Role
                     </label>
                     <div className="grid grid-cols-1 gap-2.5">
-                      {['interviewer', 'hiring_manager', 'recruiter'].map((r) => {
-                        const cfg = ROLE_CONFIG[r]
+                      {['recruiter', 'interviewer'].map((r) => {
+                        const cfg = ROLE_CONFIG[r] || {
+                          label: r.charAt(0).toUpperCase() + r.slice(1),
+                          color: 'bg-slate-100 text-slate-700 border-slate-200',
+                          desc: 'Scoped role permissions for your company.',
+                        }
                         const isSelected = inviteRole === r
                         return (
                           <div

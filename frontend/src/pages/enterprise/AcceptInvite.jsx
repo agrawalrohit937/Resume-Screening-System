@@ -25,12 +25,12 @@ import Loader from '../../components/Loader'
 
 const ROLE_DISPLAY_MAP = {
   recruiter: { 
-    title: 'Talent Recruiter', 
+    title: 'HR Recruiter', 
     color: 'text-blue-700 border-blue-200 bg-blue-50/80',
     scope: [
-      'Create, manage, and publish job requisitions',
+      'Create, manage, and publish job postings',
       'Screen candidate applications and evaluate ATS matches',
-      'Manage pipeline stages and team candidate outreach'
+      'Manage pipeline stages and roll out candidate offers'
     ]
   },
   hiring_manager: { 
@@ -150,12 +150,8 @@ export default function AcceptInvite() {
       const assignedRole = (data.user?.role || inviteData?.role || '').toLowerCase()
       if (assignedRole === 'interviewer') {
         navigate('/interviewer/dashboard', { replace: true })
-      } else if (assignedRole === 'hiring_manager') {
-        navigate('/hiring-manager/dashboard', { replace: true })
-      } else if (assignedRole === 'recruiter') {
+      } else if (['recruiter', 'executive', 'exec', 'hiring_manager'].includes(assignedRole)) {
         navigate('/recruiter/dashboard', { replace: true })
-      } else if (assignedRole === 'executive' || assignedRole === 'exec') {
-        navigate('/exec/dashboard', { replace: true })
       } else {
         navigate('/dashboard', { replace: true })
       }
@@ -250,7 +246,7 @@ export default function AcceptInvite() {
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white text-indigo-700 border border-slate-200/80 shadow-2xs">
             <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="font-mono text-slate-600">Tenant: <strong className="text-indigo-900">{inviteData?.tenant_id || 'Organization'}</strong></span>
+            <span className="text-slate-600">Workspace: <strong className="text-indigo-900">{inviteData?.company_name || (inviteData?.tenant_id && inviteData?.tenant_id !== 'default' ? inviteData.tenant_id : 'Enterprise Workspace')}</strong></span>
           </div>
         </div>
 

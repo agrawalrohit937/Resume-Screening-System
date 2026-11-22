@@ -13,7 +13,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getJobs, getJobDetail, applyToJob, matchJobATS, getMyApplications } from '../services/api'
 import CustomDropdown from '../components/common/CustomDropdown'
-import EEOSurveyModal from '../components/common/EEOSurveyModal'
 import JobCard from '../components/jobs/JobCard'
 import JobDetailPane from '../components/jobs/JobDetailPane'
 import JobMatchModal from '../components/jobs/JobMatchModal'
@@ -67,8 +66,6 @@ export default function JobFeed() {
 
   const [appliedJobs, setAppliedJobs] = useState(() => new Set())
   const [applyingJobId, setApplyingJobId] = useState(null)
-  const [eeoTargetJob, setEeoTargetJob] = useState(null)
-  const [isEeoModalOpen, setIsEeoModalOpen] = useState(false)
 
   const [savedJobs, setSavedJobs] = useState(() => {
     try {
@@ -249,8 +246,6 @@ export default function JobFeed() {
       await applyToJob(job.id)
       markJobApplied(job.id)
       toast.success(`Applied to ${job.title} at ${job.company_name}! 🎉`)
-      setEeoTargetJob(job)
-      setIsEeoModalOpen(true)
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to submit application.'
       if (typeof msg === 'string' && msg.toLowerCase().includes('already applied')) {
@@ -481,17 +476,6 @@ export default function JobFeed() {
           setMatchTargetJob(null)
           handleApply(targetMatchJob)
         }}
-      />
-
-      <EEOSurveyModal
-        isOpen={isEeoModalOpen}
-        onClose={() => {
-          setIsEeoModalOpen(false)
-          setEeoTargetJob(null)
-        }}
-        jobId={eeoTargetJob?.id}
-        jobTitle={eeoTargetJob?.title}
-        companyName={eeoTargetJob?.company_name}
       />
     </div>
   )

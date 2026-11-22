@@ -34,7 +34,6 @@ from services.multi_tenancy.tenant_middleware import TenantMiddleware
 
 from api.routes import (
     admin,
-    admin_ontology,
     analytics,
     apply_assistant,
     ats,
@@ -45,12 +44,10 @@ from api.routes import (
     compliance,
     company,
     copilot,
-    eeo,
     enhance,
     github,
     gmail_oauth,
     health,
-    integrations,
     interview_ai,
     interview_kits,
     jobs,
@@ -59,13 +56,10 @@ from api.routes import (
     payment,
     pdf_gen,
     portfolio,
-    requisitions,
     resume,
-    revenue_recovery,
     support,
     team,
     users,
-    webhooks,
 )
 
 setup_logging()
@@ -284,7 +278,6 @@ def create_application() -> FastAPI:
 
     # Commerce, Billing & Growth
     app.include_router(payment.router, prefix=f"{p}/payment", tags=["Payment"])
-    app.include_router(revenue_recovery.router, prefix=f"{p}/revenue-recovery", tags=["Revenue Recovery"])
 
     # Operations & Administration
     app.include_router(analytics.router, prefix=f"{p}/analytics", tags=["Analytics"])
@@ -293,15 +286,10 @@ def create_application() -> FastAPI:
     app.include_router(careers.router, prefix=f"{p}/careers", tags=["Careers"])
     app.include_router(support.router, prefix=f"{p}", tags=["Support"])
     app.include_router(admin.router, prefix=f"{p}/admin", tags=["Admin"])
-    app.include_router(admin_ontology.router)
     app.include_router(compliance.router)
 
     # Phase 5 Enterprise Surface (B2B SaaS)
-    app.include_router(requisitions.router, prefix=f"{p}/requisitions", tags=["Enterprise ATS - Requisitions"])
     app.include_router(interview_kits.router, prefix=f"{p}/interview-kits", tags=["Enterprise ATS - Interview Kits & Scorecards"])
-    app.include_router(eeo.router, prefix=f"{p}/eeo", tags=["Enterprise ATS - EEO Vault"])
-    app.include_router(webhooks.router, prefix=f"{p}/webhooks", tags=["Enterprise ATS - Outbound Webhooks"])
-    app.include_router(integrations.router, prefix=f"{p}/integrations", tags=["Enterprise ATS - Ecosystem Integrations"])
     app.include_router(team.router, prefix=f"{p}/team", tags=["Enterprise ATS - Team Management"])
     app.include_router(company.router, prefix=f"{p}/company", tags=["Company Profile"])
 

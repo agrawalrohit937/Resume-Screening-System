@@ -358,18 +358,10 @@ export const changePassword = (current_password, new_password) =>
   api.post('/auth/change-password', { current_password, new_password })
 
 // ── Enterprise Phase 5 APIs ──────────────────────────────────────────────────
-// Requisition Management (Hiring Manager / Exec / Admin)
-export const getRequisitions = (params) => api.get('/requisitions', { params })
-export const createRequisition = (payload) => api.post('/requisitions', payload)
-export const submitRequisition = (id) => api.post(`/requisitions/${id}/submit`)
-export const recordApprovalDecision = (id, payload) => api.post(`/requisitions/${id}/decision`, payload)
-export const linkRequisitionJob = (id, jobId) => api.post(`/requisitions/${id}/link-job`, { job_id: jobId })
-export const getPipelineCandidates = (params) => api.get('/requisitions/pipeline/candidates', { params })
-
 // Interview Kits & Structured Scorecards (Interviewer / Coordinator / Admin)
 export const getInterviewKits = (jobId) => api.get(`/interview-kits`, { params: { job_id: jobId } })
 export const submitScorecard = (payload) => api.post('/interview-kits/scorecards', payload)
-export const getAssignedInterviews = () => api.get('/interview-kits/assigned')
+export const getAssignedInterviews = (params) => api.get('/interview-kits/assigned', { params })
 export const getScorecardsByApplication = (applicationId) => api.get(`/interview-kits/scorecards/${applicationId}`)
 export const getCalibrationReport = (applicationId, stageName) =>
   api.get(`/interview-kits/calibration`, { params: { application_id: applicationId, stage_name: stageName } })
@@ -395,8 +387,5 @@ export const exportEmployerEvaluationsExcel = (jobId) =>
     params: { job_id: jobId },
     responseType: 'blob',
   })
-
-// EEO Demographic Self-ID & Analytics API
-export const submitEEOSelfId = (payload) => api.post('/eeo/self-id', payload)
 
 export default api

@@ -82,6 +82,7 @@ ROLE_PERMISSIONS_MAP: Dict[str, FrozenSet[str]] = {
     UserRole.INTERVIEWER.value: frozenset({
         Permission.JOBS_READ.value,
         Permission.APPLICATIONS_READ.value,
+        Permission.INTERVIEWS_SCHEDULE.value,
         Permission.INTERVIEWS_SUBMIT_SCORECARD.value,
     }),
     UserRole.CANDIDATE.value: frozenset({

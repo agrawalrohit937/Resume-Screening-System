@@ -16,9 +16,9 @@ from services.multi_tenancy.tenant_context import (
 logger = structlog.get_logger(__name__)
 
 TENANT_SCOPED_TABLES = {
-    "jobs", "resumes", "applications", "ats_results", "requisitions",
+    "jobs", "resumes", "applications", "ats_results",
     "interview_kits", "scorecards", "talent_crm", "talent_pools",
-    "eeo_vault", "webhook_subscriptions", "audit_logs", "offers",
+    "audit_logs", "offers",
     "pipeline_events", "copilot_sessions"
 }
 TENANT_SCOPED_COLLECTIONS = TENANT_SCOPED_TABLES

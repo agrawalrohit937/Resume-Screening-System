@@ -26,11 +26,11 @@ const PAGE_TITLES = {
   '/gamification': { title: 'Rewards Hub', sub: 'Points, badges & leaderboard' },
   '/recruiter': { title: 'Recruiting Overview', sub: 'Executive talent pipeline & metrics' },
   '/recruiter/dashboard': { title: 'Recruiting Overview', sub: 'Executive talent pipeline & metrics' },
-  '/recruiter/jobs': { title: 'Jobs & Applicants', sub: 'Active requisitions & applicant pipeline' },
+  '/recruiter/jobs': { title: 'Jobs & Applicants', sub: 'Active job postings & applicant pipeline' },
   '/recruiter/company': { title: 'Employer Branding', sub: 'Company identity, culture & public presentation' },
   '/recruiter/settings': { title: 'Recruiter Settings', sub: 'Hiring lead preferences, alerts & security' },
   '/interviewer/dashboard': { title: 'Assigned Scorecards', sub: 'Candidate evaluations & scoring' },
-  '/hiring-manager/dashboard': { title: 'Pipeline & Approvals', sub: 'Active requisitions & offers' },
+  '/hiring-manager/dashboard': { title: 'Pipeline & Approvals', sub: 'Active job openings & offers' },
   '/exec/dashboard': { title: 'Executive Intelligence', sub: 'Strategic talent & workforce metrics' },
   '/admin': { title: 'Admin Console', sub: 'System oversight & administration' },
   '/jobs': { title: 'Job Marketplace', sub: 'Explore opportunities with AI vector matching' },
@@ -66,10 +66,7 @@ function MobileHeader({ onMenuToggle }) {
   let homeRoute = '/dashboard'
   if (isEmployerContext) {
     if (isPlatformAdmin) homeRoute = '/admin'
-    else if (isExecutive) homeRoute = '/exec/dashboard'
-    else if (isHiringManager) homeRoute = '/hiring-manager/dashboard'
-    else if (isInterviewerRole) homeRoute = '/interviewer/dashboard'
-    else if (isRecruiterRole) homeRoute = '/recruiter/dashboard'
+    else homeRoute = '/recruiter/dashboard'
   }
 
   const crownVariant = getCrownVariant(user)

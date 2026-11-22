@@ -10,7 +10,6 @@ from repositories.career_application_repo import CareerApplicationRepository
 from repositories.audit_log_repo import AuditLogRepository
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.task_job_repo import TaskJobRepository
-from repositories.revenue_recovery_repo import RevenueRecoveryRepository
 from repositories.company_repo import CompanyRepository
 from repositories.portfolio_repo import PortfolioRepository
 from repositories.gamification_repo import GamificationRepository
@@ -28,7 +27,6 @@ __all__ = [
     "AuditLogRepository",
     "SupportTicketRepository",
     "TaskJobRepository",
-    "RevenueRecoveryRepository",
     "CompanyRepository",
     "PortfolioRepository",
     "GamificationRepository",

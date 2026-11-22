@@ -13,8 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.tables import (
     CandidateApplication, Job, Resume, ATSResult,
-    Certificate, InterviewSessionModel, User, EeoResponse,
-    Requisition as RequisitionTable
+    Certificate, InterviewSessionModel, User
 )
 from repositories.base_repo import BaseRepository
 
@@ -184,10 +183,10 @@ class AnalyticsRepository(BaseRepository):
         is_admin_or_exec: bool,
         user_id: str,
     ) -> Dict[str, Any]:
-        """Fetches authentic internal job requisitions, confirmed applications, and EEO records for enterprise aggregation."""
+        """Fetches authentic internal job postings and confirmed applications for enterprise aggregation."""
         async with self._get_session() as session:
             # Exclude public external job board scrapes (is_external == True).
-            # Only count actual authorized internal requisitions created by this enterprise/recruiter.
+            # Only count actual authorized internal job postings created by this enterprise/recruiter.
             stmt = select(Job).where(
                 or_(Job.is_external.is_(False), Job.is_external == False),
                 Job.created_by.isnot(None),
@@ -214,36 +213,10 @@ class AnalyticsRepository(BaseRepository):
                     select(func.count(CandidateApplication.id)).where(CandidateApplication.job_id.in_(job_ids), CandidateApplication.stage.in_(["offer", "Offer", "hired", "Hired"]))
                 )).scalar() or 0
 
-            eeo_stmt = select(EeoResponse).order_by(EeoResponse.submitted_at.desc())
-            if tenant_id and tenant_id != "default":
-                eeo_stmt = eeo_stmt.where(EeoResponse.tenant_id == tenant_id)
-            eeo_res = await session.execute(eeo_stmt.limit(1000))
-            eeo_responses = [{"race_ethnicity": r.race_ethnicity, "gender": r.gender} for r in eeo_res.scalars().all()]
-
-            req_stmt = select(RequisitionTable).order_by(RequisitionTable.created_at.desc())
-            if tenant_id and tenant_id != "default":
-                req_stmt = req_stmt.where(RequisitionTable.tenant_id == tenant_id)
-            req_res = await session.execute(req_stmt.limit(100))
-            req_rows = req_res.scalars().all()
-            requisitions_list = []
-            for r in req_rows:
-                d = dict(r.data or {})
-                requisitions_list.append({
-                    "id": str(r.id),
-                    "title": r.title,
-                    "department": r.department or "General",
-                    "status": r.status,
-                    "headcount": int(d.get("headcount", 1) or 1),
-                    "filled_count": int(d.get("filled_count", 0) or 0),
-                    "created_at": r.created_at,
-                })
-
             return {
                 "jobs_list": jobs_list,
                 "job_ids": job_ids,
                 "hired_app_rows": [{"job_id": str(r.job_id), "created_at": r.created_at, "updated_at": r.updated_at} for r in hired_app_rows],
                 "total_offers": total_offers,
-                "eeo_responses": eeo_responses,
-                "requisitions_list": requisitions_list,
             }
 

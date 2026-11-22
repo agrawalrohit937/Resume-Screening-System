@@ -335,20 +335,6 @@ class TeamInvite(Base):
     inviter = relationship("User")
 
 
-class Requisition(Base):
-    __tablename__ = "requisitions"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    title = Column(String(255), nullable=False)
-    department = Column(String(255), nullable=True)
-    hiring_manager_id = Column(String(64), nullable=True, index=True)
-    status = Column(String(50), default="draft", index=True)
-    data = Column(JSONB, default=dict)
-    created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-
 class TalentPoolProfile(Base):
     __tablename__ = "talent_pool_profiles"
 
@@ -502,27 +488,6 @@ class TaskJob(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
-
-# ─── 11. Revenue Recovery ────────────────────────────────────────────────────
-class RevenueRecoveryCase(Base):
-    __tablename__ = "recovery_cases"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    case_id = Column(String(64), unique=True, nullable=False, index=True)
-    user_id = Column(String(64), nullable=False, index=True)
-    user_email = Column(String(255), nullable=True)
-    user_name = Column(String(255), nullable=True)
-    plan = Column(String(50), default="pro")
-    amount_due_inr = Column(Float, default=0.0)
-    status = Column(String(50), default="initiated", index=True)
-    strategy = Column(String(50), default="gentle")
-    current_step = Column(Integer, default=0)
-    attempts = Column(JSONB, default=list)
-    audit_trail = Column(JSONB, default=list)
-    created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-    recovered_at = Column(DateTime(timezone=True), nullable=True)
-    stopped_at = Column(DateTime(timezone=True), nullable=True)
 
 
 # ─── 12. Companies & Employer Branding ─────────────────────────────────────────
@@ -693,22 +658,6 @@ class JobAlertDelivery(Base):
     error = Column(Text, nullable=True)
 
 
-# ─── 17. EEO Compliance Self-Identification ────────────────────────────────────
-class EeoResponse(Base):
-    __tablename__ = "eeo_responses"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    candidate_id = Column(String(64), nullable=False, index=True)
-    tenant_id = Column(String(64), default="default", index=True)
-    gender = Column(String(50), nullable=True)
-    race_ethnicity = Column(String(100), nullable=True)
-    veteran_status = Column(String(100), nullable=True)
-    disability_status = Column(String(100), nullable=True)
-    application_id = Column(String(64), nullable=True, index=True)
-    job_id = Column(String(64), nullable=True, index=True)
-    submitted_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-
-
 # ─── 18. Security Tokens & Revocations ─────────────────────────────────────────
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
@@ -734,31 +683,6 @@ class RevokedToken(Base):
     revoked_at = Column(DateTime(timezone=True), default=now_utc, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     reason = Column(String(100), default="logout")
-
-
-# ─── 19. Webhook Subscriptions ────────────────────────────────────────────────
-class WebhookSubscription(Base):
-    __tablename__ = "webhook_subscriptions"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    tenant_id = Column(String(64), default="default", index=True)
-    url = Column(Text, nullable=False)
-    events = Column(JSONB, default=list)
-    secret = Column(Text, nullable=True)
-    status = Column(String(50), default="active", index=True)
-    created_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-
-# ─── 20. Distributed Locks ────────────────────────────────────────────────────
-class DistributedLockModel(Base):
-    __tablename__ = "distributed_locks"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    lock_key = Column(String(255), unique=True, nullable=False, index=True)
-    owner = Column(String(255), nullable=False)
-    acquired_at = Column(Float, nullable=False)
-    expires_at = Column(Float, nullable=False)
 
 
 # ─── 21. Live Interview Sessions ──────────────────────────────────────────────

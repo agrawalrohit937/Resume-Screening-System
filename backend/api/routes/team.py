@@ -56,11 +56,11 @@ INVITABLE_ROLES = {
 
 
 def _ensure_can_manage_team(user: UserModel):
-    """Ensure the user is a company owner (EXECUTIVE) or PLATFORM_ADMIN."""
-    if not user.has_role(UserRole.EXECUTIVE, UserRole.EXEC, UserRole.PLATFORM_ADMIN, UserRole.ADMIN):
+    """Ensure the user is a company owner (EXECUTIVE), RECRUITER, or PLATFORM_ADMIN."""
+    if not user.has_role(UserRole.EXECUTIVE, UserRole.EXEC, UserRole.PLATFORM_ADMIN, UserRole.ADMIN, UserRole.RECRUITER):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only company Executives and Admins can manage team members and invites.",
+            detail="Only company Executives, Recruiters, and Admins can manage team members and invites.",
         )
 
 
@@ -461,7 +461,7 @@ async def list_team_members(
         for u in users_list_models
         if getattr(u, "status", None) != "deleted" and _is_enterprise_staff(u.role, u.roles)
     ]
-    raw_invites = await invite_repo.list_by_tenant(tenant_id)
+    raw_invites = await invite_repo.list_by_tenant(tenant_id, status="pending")
 
     members: List[TeamMemberItem] = []
     for m in raw_members:
@@ -487,6 +487,8 @@ async def list_team_members(
     frontend_base = settings.FRONTEND_URL.rstrip("/")
 
     for inv in raw_invites:
+        if inv.get("status") != "pending":
+            continue
         token = inv.get("token", "")
         invite_link = f"{frontend_base}/accept-invite?token={token}" if token else None
         pending_invites.append(

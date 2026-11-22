@@ -156,50 +156,16 @@ const ADMIN_NAV_SECTIONS = [
 
 const EXEC_PRIMARY_SECTIONS = [
   {
-    title: 'Executive Intelligence',
+    title: 'Company Overview',
     items: [
-      { to: '/exec/dashboard', label: 'Talent & Headcount', icon: Icons.dashboard },
-    ],
-  },
-  {
-    title: 'Interviews & Evaluations',
-    items: [
-      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
+      { to: '/recruiter/dashboard', label: 'Dashboard', icon: Icons.dashboard },
+      { to: '/recruiter/jobs', label: 'Job Openings', badge: 'Active', icon: Icons.briefcase },
     ],
   },
   {
     title: 'Organization',
     items: [
       { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
-      { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
-    ],
-  },
-  {
-    title: 'Pipeline & Jobs',
-    items: [
-      { to: '/recruiter/dashboard', label: 'Recruiter Dashboard', icon: Icons.dashboard },
-      { to: '/recruiter/jobs', label: 'Jobs & Pipelines', badge: 'Active', icon: Icons.briefcase },
-    ],
-  },
-]
-
-const HIRING_MANAGER_PRIMARY_SECTIONS = [
-  {
-    title: 'Department Hiring',
-    items: [
-      { to: '/hiring-manager/dashboard', label: 'Requisitions & Pipeline', icon: Icons.briefcase },
-      { to: '/recruiter/jobs', label: 'Department Postings', icon: Icons.recruiter },
-    ],
-  },
-  {
-    title: 'Interviews & Evaluations',
-    items: [
-      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
-    ],
-  },
-  {
-    title: 'Organization',
-    items: [
       { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
     ],
   },
@@ -214,17 +180,9 @@ const RECRUITER_PRIMARY_SECTIONS = [
     ],
   },
   {
-    title: 'Interviews & Evaluations',
-    items: [
-      { to: '/interviewer/dashboard', label: 'Candidate Scorecards', icon: Icons.interview },
-    ],
-  },
-  {
     title: 'Organization',
     items: [
-      { to: '/settings/team', label: 'Team Management', badge: 'Invite', icon: Icons.recruiter },
       { to: '/recruiter/company', label: 'Company Profile', icon: Icons.building },
-      { to: '/profile', label: 'Recruiter Profile', icon: Icons.profile },
     ],
   },
 ]
@@ -233,7 +191,7 @@ const INTERVIEWER_PRIMARY_SECTIONS = [
   {
     title: 'Interviews & Evaluations',
     items: [
-      { to: '/interviewer/dashboard', label: 'Assigned Scorecards', icon: Icons.interview },
+      { to: '/interviewer/dashboard', label: 'AI Assessments & Proctoring', icon: Icons.interview },
       { to: '/live-interview', label: 'Live Session Mock', icon: Icons.liveInterview },
     ],
   },
@@ -258,10 +216,9 @@ const EMPLOYER_ACCOUNT_SECTION = {
 const VIEW_MODES = [
   { key: 'admin', label: 'Admin', icon: Shield, color: '#6366F1', defaultPath: '/admin' },
   { key: 'candidate', label: 'Candidate', icon: UserCircle, color: '#2E9BDA', defaultPath: '/dashboard' },
-  { key: 'recruiter', label: 'Recruiter', icon: UserSearch, color: '#10B981', defaultPath: '/recruiter/dashboard' },
-  { key: 'hiring_manager', label: 'Hiring Mgr', icon: Briefcase, color: '#8B5CF6', defaultPath: '/hiring-manager/dashboard' },
-  { key: 'interviewer', label: 'Interviewer', icon: Check, color: '#3B82F6', defaultPath: '/interviewer/dashboard' },
-  { key: 'exec', label: 'Exec', icon: LucideCrown, color: '#10B981', defaultPath: '/exec/dashboard' },
+  { key: 'exec', label: 'Executive', icon: LucideCrown, color: '#10B981', defaultPath: '/recruiter/dashboard' },
+  { key: 'recruiter', label: 'HR Recruiter', icon: UserSearch, color: '#059669', defaultPath: '/recruiter/dashboard' },
+  { key: 'interviewer', label: 'Tech Interviewer', icon: Check, color: '#3B82F6', defaultPath: '/interviewer/dashboard' },
 ]
 
 const ROUTE_PREFETCH = {
@@ -404,11 +361,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const hasCandidateRole = userRolesArray.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
   const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
   const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
-  const isHiringManager = userRoles.includes('hiring_manager')
-  const isRecruiterRole = userRoles.includes('recruiter')
+  const isRecruiterRole = userRoles.includes('recruiter') || userRoles.includes('hiring_manager')
   const isInterviewerRole = userRoles.includes('interviewer')
   const isAdmin = user?.role === 'admin' || isPlatformAdmin
-  const hasEmployerRole = isExecutive || isRecruiterRole || isHiringManager || isInterviewerRole || isAdmin
+  const hasEmployerRole = isExecutive || isRecruiterRole || isInterviewerRole || isAdmin
   const isEmployerUser = hasEmployerRole
   const isRecruiter = isEmployerUser
 
@@ -448,14 +404,13 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     onNavigate?.()
 
     if (newContext === 'candidate') {
-      const employerPrefixes = ['/recruiter', '/exec', '/hiring-manager', '/interviewer', '/settings/team', '/team', '/admin']
+      const employerPrefixes = ['/recruiter', '/exec', '/interviewer', '/settings/team', '/team', '/admin']
       if (employerPrefixes.some(p => location.pathname.startsWith(p))) {
         navigate('/dashboard')
       }
     } else {
-      if (isExecutive) navigate('/exec/dashboard')
+      if (isExecutive) navigate('/recruiter/dashboard')
       else if (isRecruiterRole) navigate('/recruiter/dashboard')
-      else if (isHiringManager) navigate('/hiring-manager/dashboard')
       else if (isAdmin) navigate('/admin')
       else if (isInterviewerRole) navigate('/interviewer/dashboard')
       else navigate('/recruiter/dashboard')
@@ -464,9 +419,8 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
   const getActiveDashboardRoute = () => {
     if (viewContext === 'candidate') return '/dashboard'
-    if (isExecutive) return '/exec/dashboard'
+    if (isExecutive) return '/recruiter/dashboard'
     if (isRecruiterRole) return '/recruiter/dashboard'
-    if (isHiringManager) return '/hiring-manager/dashboard'
     if (isAdmin) return '/admin'
     if (isInterviewerRole) return '/interviewer/dashboard'
     return '/recruiter/dashboard'
@@ -481,17 +435,26 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
       return CANDIDATE_NAV_SECTIONS
     }
 
+    const isExecutiveRole = isExecutive || adminViewMode === 'exec'
+    const profileLabel = isExecutiveRole
+      ? 'Executive Profile'
+      : isRecruiterRole || adminViewMode === 'recruiter'
+      ? 'Recruiter Profile'
+      : isInterviewerRole || adminViewMode === 'interviewer'
+      ? 'Interviewer Profile'
+      : 'Profile'
+
     const canAccessBillingAndSettings = isExecutive || (isAdmin && (adminViewMode === 'admin' || adminViewMode === 'exec'))
 
     const accountSection = {
       title: 'Management & Support',
       items: [
-        { to: '/profile', label: 'Profile', icon: Icons.profile },
+        { to: '/profile', label: profileLabel, icon: Icons.profile },
+        ...(isRecruiterRole && !isExecutiveRole
+          ? [{ to: '/recruiter/settings', label: 'Hiring Settings', icon: Icons.settings }]
+          : []),
         ...(canAccessBillingAndSettings
-          ? [
-              { to: '/recruiter/settings', label: 'Hiring Settings', icon: Icons.settings },
-              { to: '/billing', label: 'Billing & Plan', icon: Icons.billing },
-            ]
+          ? [{ to: '/billing', label: 'Billing & Plan', icon: Icons.billing }]
           : []),
         { to: '/support', label: 'Support Tickets', icon: Icons.support },
       ],
@@ -500,10 +463,9 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
     // Employer view for Admin:
     if (isAdmin) {
       if (adminViewMode === 'candidate') return CANDIDATE_NAV_SECTIONS
-      if (adminViewMode === 'recruiter') return [...RECRUITER_PRIMARY_SECTIONS, accountSection]
-      if (adminViewMode === 'hiring_manager') return [...HIRING_MANAGER_PRIMARY_SECTIONS, accountSection]
       if (adminViewMode === 'interviewer') return [...INTERVIEWER_PRIMARY_SECTIONS, accountSection]
       if (adminViewMode === 'exec') return [...EXEC_PRIMARY_SECTIONS, accountSection]
+      if (adminViewMode === 'recruiter') return [...RECRUITER_PRIMARY_SECTIONS, accountSection]
       return ADMIN_NAV_SECTIONS
     }
 
@@ -527,8 +489,6 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
 
     if (isExecutive) {
       EXEC_PRIMARY_SECTIONS.forEach(addSection)
-    } else if (isHiringManager) {
-      HIRING_MANAGER_PRIMARY_SECTIONS.forEach(addSection)
     } else if (isRecruiterRole) {
       RECRUITER_PRIMARY_SECTIONS.forEach(addSection)
     } else if (isInterviewerRole) {
@@ -1137,10 +1097,10 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
         <div 
           onClick={() => {
             if (viewContext === 'employer') {
-              if (isExecutive) handleItemClick('/exec/dashboard')
+              if (isExecutive) handleItemClick('/recruiter/dashboard')
               else if (isRecruiterRole) handleItemClick('/recruiter/dashboard')
-              else if (isHiringManager) handleItemClick('/hiring-manager/dashboard')
               else if (isAdmin) handleItemClick('/admin')
+              else if (isInterviewerRole) handleItemClick('/interviewer/dashboard')
               else handleItemClick('/recruiter/dashboard')
             } else {
               handleItemClick('/profile')
@@ -1185,17 +1145,13 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
                     <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-blue-800 bg-blue-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-blue-200 shadow-2xs">
                       EXECUTIVE
                     </span>
-                  ) : isHiringManager ? (
-                    <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-indigo-800 bg-indigo-50 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-indigo-200/80 shadow-2xs">
-                      HIRING MANAGER
-                    </span>
                   ) : isRecruiterRole ? (
                     <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-blue-800 bg-blue-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-blue-200 shadow-2xs">
-                      RECRUITER
+                      HR RECRUITER
                     </span>
                   ) : isInterviewerRole ? (
                     <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-indigo-800 bg-indigo-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-indigo-200 shadow-2xs">
-                      INTERVIEWER
+                      TECH INTERVIEWER
                     </span>
                   ) : (
                     <span className="inline-flex items-center mt-0.5 text-[9px] font-extrabold text-blue-800 bg-blue-100/90 px-2 py-[2px] rounded-md uppercase tracking-[0.06em] leading-none border border-blue-200 shadow-2xs">

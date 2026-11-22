@@ -4,92 +4,9 @@ CareerShala ATS v2.0.0.
 
 import pytest
 
-from schemas.requisition_schema import RequisitionStatus, ApprovalDecision, ApprovalStep
-from services.requisition_service import RequisitionService
 from schemas.interview_schema import Competency, RecommendationEnum
 from services.interview_kit_service import InterviewKitService
 from services.multi_tenancy.tenant_context import tenant_context
-
-
-@pytest.mark.asyncio
-async def test_requisition_lifecycle_and_approval_chain():
-    req_service = RequisitionService()
-
-    with tenant_context("enterprise_tenant_1"):
-        # 1. Create requisition in draft
-        approval_chain = [
-            ApprovalStep(step_order=1, approver_id="mgr_alice", approver_role="hiring_manager"),
-            ApprovalStep(step_order=2, approver_id="fin_bob", approver_role="finance")
-        ]
-        req = await req_service.create_requisition(
-            title="Senior Staff Platform Engineer",
-            department="Infrastructure",
-            hiring_manager_id="mgr_alice",
-            headcount=2,
-            budget_min=180000,
-            budget_max=220000,
-            approval_chain=approval_chain
-        )
-        assert req.status == RequisitionStatus.DRAFT
-        assert req.headcount == 2
-        assert len(req.approval_chain) == 2
-
-        # 2. Submit for approval
-        pending_req = await req_service.submit_for_approval(req.id)
-        assert pending_req.status == RequisitionStatus.PENDING_APPROVAL
-
-        # 3. First approver signs off -> still pending
-        req_step1 = await req_service.record_approval_decision(
-            requisition_id=req.id,
-            approver_id="mgr_alice",
-            decision=ApprovalDecision.APPROVED,
-            comments="Approved headcount"
-        )
-        assert req_step1.status == RequisitionStatus.PENDING_APPROVAL
-        assert req_step1.approval_chain[0].status == ApprovalDecision.APPROVED
-
-        # 4. Second approver signs off -> fully APPROVED
-        req_step2 = await req_service.record_approval_decision(
-            requisition_id=req.id,
-            approver_id="fin_bob",
-            decision=ApprovalDecision.APPROVED,
-            comments="Budget verified"
-        )
-        assert req_step2.status == RequisitionStatus.APPROVED
-
-        # 5. Link to created job and open
-        open_req = await req_service.link_to_job(req.id, job_id="job_platform_99")
-        assert open_req.status == RequisitionStatus.OPEN
-        assert open_req.linked_job_id == "job_platform_99"
-
-        # 6. Record hires
-        hired_req1 = await req_service.record_hire(req.id, count=1)
-        assert hired_req1.filled_count == 1
-        assert hired_req1.status == RequisitionStatus.OPEN
-
-        hired_req2 = await req_service.record_hire(req.id, count=1)
-        assert hired_req2.filled_count == 2
-        assert hired_req2.status == RequisitionStatus.FILLED
-
-
-@pytest.mark.asyncio
-async def test_requisition_rejection_flow():
-    req_service = RequisitionService()
-
-    with tenant_context("enterprise_tenant_1"):
-        req = await req_service.create_requisition(
-            title="Junior QA Engineer",
-            department="Quality",
-            hiring_manager_id="mgr_alice"
-        )
-        await req_service.submit_for_approval(req.id)
-        rejected = await req_service.record_approval_decision(
-            requisition_id=req.id,
-            approver_id="mgr_alice",
-            decision=ApprovalDecision.REJECTED,
-            comments="Hiring freeze active"
-        )
-        assert rejected.status == RequisitionStatus.REJECTED
 
 
 @pytest.mark.asyncio
