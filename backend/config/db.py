@@ -147,6 +147,14 @@ async def connect_db() -> None:
             import models  # noqa: F401
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # Self-healing migration: Ensure team_invites.token is TEXT to accommodate long JWT tokens
+                await conn.execute(
+                    text(
+                        "DO $$ BEGIN "
+                        "ALTER TABLE team_invites ALTER COLUMN token TYPE TEXT; "
+                        "EXCEPTION WHEN undefined_table THEN NULL; END $$;"
+                    )
+                )
             logger.info("PostgreSQL schema verified and tables ensured")
         except Exception as e:
             logger.warning("Auto table creation notice", error=str(e))
