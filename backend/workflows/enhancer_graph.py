@@ -154,7 +154,7 @@ def unmask_pii(obj: Any, pii_map: Dict[str, str]) -> Any:
 # ── Node 1: Enhance Resume via Gemini LLM ─────────────────────────────────────
 async def enhance_resume_content(state: EnhancementState) -> dict:
     """
-    Calls Google Gemini LLM (gemini-2.5-flash) with structured JSON output and
+    Calls Google Gemini LLM (gemini-3.8-flash) with structured JSON output and
     automatic 5-key pool rotation to enhance the resume.
     Applies PII masking before sending data to Gemini, restoring verified contact
     information deterministically post-generation.
@@ -222,7 +222,7 @@ Output ONLY valid JSON matching this exact schema:
             raise ValueError("No Gemini API key available")
         
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=prompt_text,
             config={"response_mime_type": "application/json"}
         )
