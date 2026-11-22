@@ -481,22 +481,6 @@ async def razorpay_webhook(
                 }
                 await user_repo.add_payment_history(str(user_doc.id), payment_record)
 
-            active_case = await recovery_repo.get_active_case_for_user(str(user_doc.id))
-            if active_case:
-                await recovery_repo.update_case(active_case.case_id, {
-                    "status": RecoveryStatus.RECOVERED.value,
-                    "recovered_at": datetime.now(timezone.utc),
-                    "payment_id": payment_entity.get("id"),
-                })
-                await recovery_repo.add_audit_log(
-                    case_id=active_case.case_id,
-                    action="PAYMENT_RECOVERED_WEBHOOK",
-                    actor=ActorType.SYSTEM,
-                    actor_name="Razorpay Webhook",
-                    details={"payment_id": payment_entity.get("id"), "event": event, "plan": resolved_plan},
-                    reasoning=f"Webhook event '{event}' confirmed payment settlement and provisioned {resolved_plan} plan."
-                )
-
         return {"status": "processed", "event": event}
 
     return {"status": "ignored", "event": event}
