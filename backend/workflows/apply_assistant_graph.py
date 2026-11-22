@@ -85,7 +85,7 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
     previous_issues=state.get("validation_issues", []) or "none",
 )}"""
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=formatted_prompt,
         )
 
@@ -131,7 +131,7 @@ async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
 )}"""
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=formatted_prompt,
         )
 
