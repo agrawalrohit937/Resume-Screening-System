@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo } from 'react'
+import { useState, useRef, useEffect, useMemo, memo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -45,10 +45,11 @@ const SEARCH_ROUTES = [
 const RECRUITER_SEARCH_ROUTES = [
   { name: 'Recruiting Overview', path: '/recruiter/dashboard', icon: LayoutDashboard, keywords: ['overview', 'dashboard', 'analytics', 'funnel', 'kpis'] },
   { name: 'Jobs & Applicants Pipeline', path: '/recruiter/jobs', icon: Briefcase, keywords: ['jobs', 'postings', 'applicants', 'pipeline', 'kanban'] },
+  { name: 'AI Assessments & Proctoring', path: '/interviewer/dashboard', icon: Zap, keywords: ['interviews', 'scorecards', 'proctoring', 'ai assessment', 'live interview'] },
   { name: 'Marketplace Job Feed', path: '/jobs', icon: Briefcase, keywords: ['market', 'feed', 'jobs', 'browse'] },
   { name: 'Employer Branding Profile', path: '/recruiter/company', icon: Globe, keywords: ['company', 'brand', 'culture', 'logo', 'benefits'] },
   { name: 'Recruiter Settings & Alerts', path: '/recruiter/settings', icon: Settings, keywords: ['settings', 'password', 'alerts', 'notifications'] },
-  { name: 'Recruiter Profile', path: '/profile', icon: User, keywords: ['profile', 'user', 'account'] },
+  { name: 'Profile', path: '/profile', icon: User, keywords: ['profile', 'user', 'account'] },
   { name: 'Support & Help Desk', path: '/support', icon: Settings, keywords: ['support', 'help', 'tickets'] },
 ]
 
@@ -98,10 +99,29 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   const searchInputRef = useRef(null)
   const mobileSearchInputRef = useRef(null)
 
-  const isRecruiter = user?.role === 'recruiter'
-  const activeSearchRoutes = isRecruiter ? RECRUITER_SEARCH_ROUTES : SEARCH_ROUTES
+  const userRoles = useMemo(() => {
+    const arr = Array.isArray(user?.roles) ? user.roles : []
+    const single = user?.role ? [user.role] : []
+    return [...arr, ...single].map((r) => String(r).toLowerCase().trim())
+  }, [user])
 
-  // Live Streak Count
+  const isStaffOrEmployer = useMemo(() => {
+    const staffRoles = ['recruiter', 'interviewer', 'executive', 'exec', 'admin', 'platform_admin', 'employer', 'hiring_manager']
+    const hasStaffRole = userRoles.some((r) => staffRoles.includes(r))
+    const savedContext = typeof window !== 'undefined'
+      ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context'))
+      : null
+    const hasCandidateRole = userRoles.includes('candidate') || userRoles.length === 0
+    if (savedContext === 'candidate' && hasCandidateRole) {
+      return false
+    }
+    return savedContext === 'employer' || (!savedContext && hasStaffRole) || (hasStaffRole && !hasCandidateRole)
+  }, [userRoles])
+
+  const isRecruiter = isStaffOrEmployer
+  const activeSearchRoutes = isStaffOrEmployer ? RECRUITER_SEARCH_ROUTES : SEARCH_ROUTES
+
+  // Live Streak Count (Only for Candidates)
   const [streakCount, setStreakCount] = useState(() => {
     try {
       const cached = localStorage.getItem('careershala_cached_stats')
@@ -114,7 +134,7 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   })
 
   useEffect(() => {
-    if (!user || isRecruiter) return
+    if (!user || isStaffOrEmployer) return
     let isMounted = true
 
     const syncStreak = () => {
@@ -345,8 +365,6 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   const isPremium = crownVariant === 'gold'
   const isPro = crownVariant === 'silver'
 
-  const userRolesArray = Array.isArray(user?.roles) ? user.roles.map(r => String(r).toLowerCase().trim()) : []
-  const userRoles = [...userRolesArray, String(user?.role || '').toLowerCase().trim()].filter(Boolean)
   const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
   const isHiringManager = userRoles.includes('hiring_manager')
   const isInterviewer = userRoles.includes('interviewer')
@@ -495,8 +513,8 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
           <span className="hidden sm:inline">CareerMitra</span>
         </button>
 
-        {/* Daily Streak Flame Pill (Candidate Gamification) */}
-        {!isRecruiter && (
+        {/* Daily Streak Flame Pill (Candidate Gamification ONLY - hidden for Recruiter / Interviewer / Executive / Admin) */}
+        {!isStaffOrEmployer && (
           <button
             type="button"
             onClick={() => navigate('/gamification')}

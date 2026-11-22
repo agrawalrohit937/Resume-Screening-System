@@ -28,7 +28,6 @@ import toast from 'react-hot-toast'
 import { getMyApplications } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import CompanyLogo from '../components/common/CompanyLogo'
-import EEOSurveyModal from '../components/common/EEOSurveyModal'
 
 // Stage badge styling definitions (Strictly Light Mode)
 const STAGE_CONFIG = {
@@ -78,7 +77,6 @@ export default function ApplicationTracker() {
   const [searchQuery, setSearchQuery] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [selectedApp, setSelectedApp] = useState(null)
-  const [selectedEeoApp, setSelectedEeoApp] = useState(null)
 
   const fetchApplications = async () => {
     setLoading(!hasCachedApplications.current && applications.length === 0)
@@ -358,14 +356,6 @@ export default function ApplicationTracker() {
                             <StageIcon size={12} />
                             {stageInfo.label}
                           </span>
-                          <button
-                            onClick={() => setSelectedEeoApp(app)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:text-blue-700 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-md transition cursor-pointer"
-                            title="Voluntary Equal Employment Opportunity Self-Identification"
-                          >
-                            <ShieldCheck size={10} className="text-blue-600" />
-                            <span>EEO Survey</span>
-                          </button>
                         </div>
 
                         {/* View Job Link */}
@@ -405,16 +395,6 @@ export default function ApplicationTracker() {
           )}
         </div>
       </div>
-
-      {/* Voluntary EEO Self-Identification Modal */}
-      <EEOSurveyModal
-        isOpen={Boolean(selectedEeoApp)}
-        onClose={() => setSelectedEeoApp(null)}
-        jobId={selectedEeoApp?.job_id}
-        applicationId={selectedEeoApp?.id}
-        jobTitle={selectedEeoApp?.job?.title}
-        companyName={selectedEeoApp?.job?.company_name}
-      />
     </div>
   )
 }

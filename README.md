@@ -77,7 +77,7 @@ To test CareerShala locally without creating accounts manually, run `python scri
 | Role | Email | Password | What You Can Test |
 | :--- | :--- | :--- | :--- |
 | **Candidate** | `candidate@careershala.com` | `Candidate123!` | Resume ATS scoring, skill radar charts, AI mock interview, portfolio editor, job outreach |
-| **Recruiter / HR** | `recruiter@careershala.com` | `Recruiter123!` | Create job requisitions, candidate Kanban board, candidate scorecards, hiring stages |
+| **Recruiter / HR** | `recruiter@careershala.com` | `Recruiter123!` | Create job postings, candidate Kanban board, candidate scorecards, hiring stages |
 | **Platform Admin** | `admin@careershala.com` | `Admin123!` | System settings, user accounts, system health metrics, subscription plans |
 
 > [!TIP]
@@ -223,9 +223,9 @@ In many web apps, if a third-party service (like an AI provider or email server)
    - Provide interviewers with structured rubrics (STAR methodology: Situation, Task, Action, Result) to evaluate candidates consistently.
    - Eliminates guesswork and ensures every applicant is rated on the same fair scale.
 
-5. **Blind Screening & Fair Hiring Compliance**:
+5. **Blind Screening & Fair Hiring**:
    - Hides sensitive candidate demographic information (name, gender, age, location) during early screening stages.
-   - Helps companies stay compliant with fair employment standards (EEOC/OFCCP) and hire purely based on merit.
+   - Helps companies eliminate unconscious bias and hire purely based on merit.
 
 ---
 
@@ -292,10 +292,8 @@ Resume-Screening-System/
 │   │       ├── portfolio.py           # Portfolio builder, themes, and public showcase
 │   │       ├── apply_assistant.py     # Screenshot OCR and cover letter drafting
 │   │       ├── certificates.py        # PDF certificate issuance and QR verification
-│   │       ├── requisitions.py        # Job requisitions and applicant pipeline
 │   │       ├── interview_kits.py      # Standardized candidate scorecards
 │   │       ├── team.py                # Workspace team members and role management
-│   │       ├── eeo.py                 # Blind hiring demographic privacy vault
 │   │       └── payment.py             # Razorpay order checkout and webhook verification
 │   │
 │   ├── core/                          # Core configuration and security

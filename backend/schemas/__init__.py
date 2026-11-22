@@ -139,22 +139,6 @@ from schemas.team_schema import (
     VerifyInviteResponse,
 )
 
-from schemas.requisition_schema import (
-    RequisitionStatus,
-    ApprovalDecision,
-    ApprovalStep,
-    RequisitionModel,
-)
-
-from schemas.eeo_schema import (
-    EEOGender,
-    EEORaceEthnicity,
-    EEOVeteranStatus,
-    EEODisabilityStatus,
-    EEOSelfIdentificationPayload,
-    EEOSelfIdentificationRecord,
-)
-
 from schemas.audit_schema import (
     AuditAction,
     AuditResourceType,
@@ -166,19 +150,6 @@ from schemas.support_schema import (
     TicketMessage,
     TicketStatusChange,
     SupportTicketModel,
-)
-
-from schemas.revenue_recovery_schema import (
-    RecoveryStatus,
-    RiskLevel,
-    RecoveryStrategy,
-    RecoveryChannel,
-    ActorType,
-    AuditLogEntry,
-    VoiceMessage,
-    VoiceRecoveryData,
-    WinBackOffer,
-    RecoveryCaseModel,
 )
 
 from schemas.task_job_schema import (

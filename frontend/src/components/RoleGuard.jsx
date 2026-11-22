@@ -38,14 +38,13 @@ export default function RoleGuard({ allowedRoles = [], fallbackPath = '/dashboar
     const resolvedFallback = fallbackPath !== '/dashboard'
       ? fallbackPath
       : isEmployer
-      ? (userRoles.some((r) => ['executive', 'exec'].includes(r))
-          ? '/exec/dashboard'
-          : userRoles.includes('hiring_manager')
-          ? '/hiring-manager/dashboard'
+      ? (userRoles.includes('interviewer') && !userRoles.some((r) => ['executive', 'exec', 'recruiter'].includes(r))
+          ? '/interviewer/dashboard'
           : '/recruiter/dashboard')
       : '/dashboard'
 
     if (showAccessDeniedCard) {
+      const activeRole = userRoles.find((r) => ['executive', 'exec', 'recruiter', 'interviewer', 'admin', 'platform_admin'].includes(r)) || user?.role || userRoles[0] || 'User'
       return (
         <div className="min-h-[70vh] flex items-center justify-center p-6">
           <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-5">
@@ -55,7 +54,7 @@ export default function RoleGuard({ allowedRoles = [], fallbackPath = '/dashboar
             <div>
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">Access Restricted</h2>
               <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-                Your role <span className="font-semibold text-slate-700 uppercase">({user?.role || userRoles[0] || 'User'})</span> does not possess the permissions required to view this enterprise portal.
+                Your role <span className="font-semibold text-slate-700 uppercase">({activeRole})</span> does not possess the permissions required to view this enterprise portal.
               </p>
               <div className="mt-3 inline-block px-3 py-1 rounded-full bg-slate-100 text-xs text-slate-600 font-medium">
                 Required: {allowedRoles.join(' / ').toUpperCase()}

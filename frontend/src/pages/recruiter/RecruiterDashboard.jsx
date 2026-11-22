@@ -267,7 +267,7 @@ export default function RecruiterDashboard() {
         <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-6 shadow-sm">
           <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">Active Job Requisitions</h2>
+              <h2 className="text-base font-extrabold text-slate-900">Active Job Postings</h2>
               <p className="text-xs text-slate-400 mt-0.5">Click into any role to manage candidates and view ATS scoring</p>
             </div>
             <Link
@@ -347,7 +347,7 @@ export default function RecruiterDashboard() {
           ) : (
             <div className="py-12 text-center">
               <Briefcase size={32} className="text-slate-300 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700">No active job requisitions</p>
+              <p className="text-sm font-bold text-slate-700">No active job openings</p>
               <p className="text-xs text-slate-400 mt-0.5 mb-4">Post your first opening to start receiving candidates</p>
               <button
                 onClick={() => navigate('/recruiter/jobs')}
@@ -368,7 +368,7 @@ export default function RecruiterDashboard() {
               <h3 className="text-sm font-extrabold text-slate-900">Recruiting Pipeline Funnel</h3>
               <span className="text-[11px] font-bold text-slate-400">{stats.total_candidates} total</span>
             </div>
-            <p className="text-xs text-slate-400 mb-5">Stage progression across all active requisitions</p>
+            <p className="text-xs text-slate-400 mb-5">Stage progression across all active jobs</p>
 
             {stats.total_candidates === 0 ? (
               <div className="py-8 text-center">

@@ -186,7 +186,7 @@ export default function LandingEnterpriseSection({ user }) {
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-900">Enterprise Talent Shortlist</h4>
-                      <p className="text-[10px] text-slate-400 font-medium">Requisition: Lead Backend Engineer</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Role: Lead Backend Engineer</p>
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">

@@ -390,5 +390,80 @@ async def test_remove_team_member_self_removal_blocked():
     assert "cannot remove yourself" in exc_info.value.detail
 
 
+@pytest.mark.asyncio
+async def test_revoke_team_invite_and_filter_pending_list():
+    """
+    Verify that revoking a team invitation:
+    1. Calls revoke_invite in repo with tenant isolation.
+    2. list_team_members excludes revoked and accepted invites, strictly returning only 'pending'.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from api.routes.team import revoke_team_invite, list_team_members
+
+    exec_user = UserModel(
+        id="exec_123",
+        email="exec@company.com",
+        full_name="Executive Boss",
+        role=UserRole.EXECUTIVE,
+        roles=[UserRole.EXECUTIVE],
+        tenant_id="tenant_company",
+    )
+
+    # 1. Test revoke endpoint
+    mock_invite_repo = MagicMock()
+    mock_invite_repo.revoke_invite = AsyncMock(return_value=True)
+
+    res = await revoke_team_invite(
+        invite_id="invite_abc_123",
+        current_user=exec_user,
+        invite_repo=mock_invite_repo,
+    )
+    assert res["message"] == "Invitation revoked successfully."
+    mock_invite_repo.revoke_invite.assert_called_once_with("invite_abc_123", "tenant_company")
+
+    # 2. Test list endpoint strictly filters for pending invites
+    mock_user_repo = MagicMock()
+    mock_user_repo.list_users = AsyncMock(return_value=([exec_user], 1))
+
+    # Repo returns 3 invites: 1 pending, 1 revoked, 1 accepted
+    mock_invite_repo.list_by_tenant = AsyncMock(return_value=[
+        {
+            "id": "inv_1",
+            "email": "pending@company.com",
+            "role": "recruiter",
+            "tenant_id": "tenant_company",
+            "status": "pending",
+        },
+        {
+            "id": "inv_2",
+            "email": "revoked@company.com",
+            "role": "interviewer",
+            "tenant_id": "tenant_company",
+            "status": "revoked",
+        },
+        {
+            "id": "inv_3",
+            "email": "accepted@company.com",
+            "role": "recruiter",
+            "tenant_id": "tenant_company",
+            "status": "accepted",
+        },
+    ])
+
+    list_res = await list_team_members(
+        current_user=exec_user,
+        user_repo=mock_user_repo,
+        invite_repo=mock_invite_repo,
+    )
+
+    # Strictly only the pending invite must be returned
+    assert len(list_res.pending_invites) == 1
+    assert list_res.pending_invites[0].id == "inv_1"
+    assert list_res.pending_invites[0].email == "pending@company.com"
+    assert list_res.pending_invites[0].status == "pending"
+    mock_invite_repo.list_by_tenant.assert_called_once_with("tenant_company", status="pending")
+
+
+
 
 

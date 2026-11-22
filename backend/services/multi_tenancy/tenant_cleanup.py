@@ -13,8 +13,8 @@ from sqlalchemy import select, update, delete, and_, or_
 from config.db import get_pg_session_factory
 from models.tables import (
     Company, Job, Resume, CandidateApplication, JobApplication,
-    InterviewKit, Scorecard, WebhookSubscription,
-    EeoResponse, User, TeamInvite, Requisition, AuditLog
+    InterviewKit, Scorecard,
+    User, TeamInvite, AuditLog
 )
 
 logger = structlog.get_logger(__name__)
@@ -38,11 +38,8 @@ async def cascade_delete_tenant(
                 (Company, "companies"),
                 (Job, "jobs"),
                 (TeamInvite, "team_invites"),
-                (Requisition, "requisitions"),
                 (InterviewKit, "interview_kits"),
                 (Scorecard, "scorecards"),
-                (WebhookSubscription, "webhook_subscriptions"),
-                (EeoResponse, "eeo_responses"),
             ]:
                 if hasattr(Model, "tenant_id"):
                     res = await session.execute(delete(Model).where(Model.tenant_id == str(tenant_id)))

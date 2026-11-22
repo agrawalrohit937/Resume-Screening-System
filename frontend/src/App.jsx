@@ -54,8 +54,6 @@ const CompanyProfile = lazy(() => import('./pages/CompanyProfile'))
 
 // Enterprise Surface Phase 5 Dashboards
 const InterviewerDashboard = lazy(() => import('./pages/enterprise/InterviewerDashboard'))
-const HiringManagerDashboard = lazy(() => import('./pages/enterprise/HiringManagerDashboard'))
-const ExecDashboard = lazy(() => import('./pages/enterprise/ExecDashboard'))
 const TeamManagement = lazy(() => import('./pages/enterprise/TeamManagement'))
 const AcceptInvite = lazy(() => import('./pages/enterprise/AcceptInvite'))
 
@@ -86,10 +84,9 @@ function PublicRoute({ children }) {
     if (isPureCandidate || isDualRoleCandidate) return '/dashboard'
     if (hasEnterprise) {
       if (userRoles.includes('admin') || userRoles.includes('platform_admin')) return '/admin'
-      if (userRoles.includes('executive') || userRoles.includes('exec')) return '/exec/dashboard'
-      if (userRoles.includes('recruiter')) return '/recruiter/dashboard'
-      if (userRoles.includes('hiring_manager')) return '/hiring-manager/dashboard'
-      if (userRoles.includes('interviewer')) return '/interviewer/dashboard'
+      if (userRoles.includes('interviewer') && !userRoles.some((r) => ['executive', 'exec', 'recruiter'].includes(r))) {
+        return '/interviewer/dashboard'
+      }
       return '/recruiter/dashboard'
     }
     return '/dashboard'
@@ -123,7 +120,9 @@ function RecruiterRoute({ children }) {
   const { user, hasRole } = useAuth()
   if (!user) return <Navigate to="/login" replace />
 
-  const allowedRoles = ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager', 'interviewer']
+  // RecruiterRoute protects job postings, applicant pipelines, and ATS settings.
+  // Technical Interviewers have their dedicated /interviewer/dashboard.
+  const allowedRoles = ['recruiter', 'admin', 'platform_admin', 'executive', 'exec']
   const userRoles = [
     ...(Array.isArray(user?.roles) ? user.roles : []),
     user?.role,
@@ -135,8 +134,15 @@ function RecruiterRoute({ children }) {
     userRoles.some((r) => allowedRoles.includes(r))
   const hasValidTenant = Boolean(user?.tenant_id && user.tenant_id !== 'default')
 
+  if (!hasEnterpriseRole) {
+    if (userRoles.includes('interviewer')) {
+      return <Navigate to="/interviewer/dashboard" replace />
+    }
+    return <Navigate to="/dashboard" replace />
+  }
+
   // If user only has candidate role or has no valid tenant, immediately redirect to /dashboard
-  if (!hasEnterpriseRole || (!isPlatformAdmin && !hasValidTenant)) {
+  if (!isPlatformAdmin && !hasValidTenant) {
     return <Navigate to="/dashboard" replace />
   }
 
@@ -319,24 +325,16 @@ export default function App() {
                 />
                 <Route
                   path="hiring-manager/dashboard"
-                  element={
-                    <RoleGuard allowedRoles={['hiring_manager', 'admin', 'recruiter', 'exec', 'executive']} showAccessDeniedCard>
-                      <HiringManagerDashboard />
-                    </RoleGuard>
-                  }
+                  element={<Navigate to="/recruiter/dashboard" replace />}
                 />
                 <Route
                   path="exec/dashboard"
-                  element={
-                    <RoleGuard allowedRoles={['exec', 'executive', 'admin', 'platform_admin']} showAccessDeniedCard>
-                      <ExecDashboard />
-                    </RoleGuard>
-                  }
+                  element={<Navigate to="/recruiter/dashboard" replace />}
                 />
                 <Route
                   path="settings/team"
                   element={
-                    <RoleGuard allowedRoles={['exec', 'executive', 'admin', 'platform_admin']} showAccessDeniedCard>
+                    <RoleGuard allowedRoles={['exec', 'executive', 'admin', 'platform_admin', 'recruiter']} showAccessDeniedCard>
                       <TeamManagement />
                     </RoleGuard>
                   }
@@ -344,7 +342,7 @@ export default function App() {
                 <Route
                   path="team"
                   element={
-                    <RoleGuard allowedRoles={['exec', 'executive', 'admin', 'platform_admin']} showAccessDeniedCard>
+                    <RoleGuard allowedRoles={['exec', 'executive', 'admin', 'platform_admin', 'recruiter']} showAccessDeniedCard>
                       <TeamManagement />
                     </RoleGuard>
                   }

@@ -22,7 +22,6 @@ import {
   APP_STATUSES,
   PRIORITY_LEVELS,
 } from '../services/adminApi'
-import RevenueRecoveryTab from '../components/recovery/RevenueRecoveryTab'
 import CustomDropdown from '../components/common/CustomDropdown'
 import { formatDate, formatDateTime } from '../utils/formatters'
 
@@ -205,7 +204,6 @@ function StatusDropdown({ current, statuses, onUpdate, loading }) {
 
 const TABS = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { key: 'revenue_recovery', label: 'AI Revenue Recovery', icon: TrendingUp },
   { key: 'tickets', label: 'Support Tickets', icon: Ticket },
   { key: 'applications', label: 'Career Applications', icon: Briefcase },
 ]
@@ -727,13 +725,6 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        </motion.div>
-      )}
-
-      {/* ── AI Revenue Recovery Tab ─────────────────────────────────────────── */}
-      {activeTab === 'revenue_recovery' && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <RevenueRecoveryTab />
         </motion.div>
       )}
 

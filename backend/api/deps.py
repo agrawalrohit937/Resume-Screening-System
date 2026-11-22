@@ -35,7 +35,6 @@ from services.email_service import EmailService
 from services.otp_service import OTPService
 from services.token_service import TokenService
 from services.interview_kit_service import InterviewKitService
-from services.requisition_service import RequisitionService
 from services.multi_tenancy.tenant_context import (
     get_current_tenant_id,
     set_current_tenant_id,
@@ -153,10 +152,6 @@ def get_interview_kit_service(
     app_repo: ApplicationRepository = Depends(get_app_repo),
 ) -> InterviewKitService:
     return InterviewKitService(kit_repo=kit_repo, app_repo=app_repo)
-
-
-def get_requisition_service() -> RequisitionService:
-    return RequisitionService()
 
 
 async def _check_and_apply_lazy_expiration(user: UserModel, user_repo: UserRepository) -> UserModel:

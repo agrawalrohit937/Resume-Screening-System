@@ -1184,19 +1184,19 @@ export default function JobApplicants() {
                         href={selectedApplicant.candidate?.file_url || `/api/v1/jobs/resume/${selectedApplicant.resume_id}/download`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 min-w-[120px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.99] text-slate-700 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer truncate"
+                        className="flex-1 min-w-[100px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.99] text-slate-700 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer truncate"
                       >
                         <Download size={15} className="text-slate-500 shrink-0" />
-                        <span className="truncate">Download Resume</span>
+                        <span className="truncate">Resume</span>
                       </a>
                     ) : (
                       <button
                         disabled
                         type="button"
-                        className="flex-1 min-w-[120px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-400 text-xs sm:text-sm font-semibold rounded-xl cursor-not-allowed truncate"
+                        className="flex-1 min-w-[100px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-400 text-xs sm:text-sm font-semibold rounded-xl cursor-not-allowed truncate"
                       >
                         <Download size={15} className="text-slate-400 shrink-0" />
-                        <span className="truncate">No Resume PDF</span>
+                        <span className="truncate">No Resume</span>
                       </button>
                     )}
 
@@ -1214,7 +1214,7 @@ export default function JobApplicants() {
                           className="w-full flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer truncate group"
                         >
                           <Github size={15} className="text-slate-300 group-hover:text-white shrink-0" />
-                          <span className="truncate">GitHub Profile</span>
+                          <span className="truncate">GitHub</span>
                         </a>
                       </GithubHoverCard>
                     )}
@@ -1232,8 +1232,8 @@ export default function JobApplicants() {
                       </a>
                     )}
 
-                    {/* Schedule Live AI Interview Button */}
-                    {canScheduleInterview ? (
+                    {/* Schedule Live AI Interview Button (Authorized interviewers/executives only) */}
+                    {canScheduleInterview && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1249,11 +1249,6 @@ export default function JobApplicants() {
                         <Sparkles size={14} className="text-blue-100 group-hover:rotate-12 transition-transform shrink-0" />
                         <span className="truncate">Schedule AI Interview</span>
                       </button>
-                    ) : (
-                      <div className="flex-1 min-w-[140px] flex justify-center items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 border border-slate-200 text-slate-600 text-xs sm:text-sm font-semibold rounded-xl truncate">
-                        <Users size={14} className="text-slate-400 shrink-0" />
-                        <span className="truncate">Pipeline: {selectedApplicant.stage || 'Applied'}</span>
-                      </div>
                     )}
                   </div>
                 </div>
@@ -1442,6 +1437,46 @@ export default function JobApplicants() {
                       </span>
                     </div>
                   </div>
+
+                  {/* AI Match Breakdown Card */}
+                  {selectedApplicant.details?.features && (
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" /> AI Scoring Breakdown
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                          Engine v{selectedApplicant.details.scoring_version || '2.3'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/60">
+                          <span className="text-slate-500 block text-[11px]">Required Skills</span>
+                          <span className="font-extrabold text-slate-900">
+                            {selectedApplicant.details.features.matched_skills_count || 0}/{selectedApplicant.details.features.total_required_skills || 0} Matched ({Math.round((selectedApplicant.details.features.skill_match_ratio || 0) * 100)}%)
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/60">
+                          <span className="text-slate-500 block text-[11px]">Semantic Similarity</span>
+                          <span className="font-extrabold text-indigo-600">
+                            {Math.round(selectedApplicant.details.features.vector_score || 0)}% Neural Match
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/60">
+                          <span className="text-slate-500 block text-[11px]">Experience Fit</span>
+                          <span className="font-extrabold text-emerald-600">
+                            {Math.round(selectedApplicant.details.features.experience_score || 100)}% Verified
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/60">
+                          <span className="text-slate-500 block text-[11px]">Education Parity</span>
+                          <span className="font-extrabold text-blue-600">
+                            {Math.round(selectedApplicant.details.features.education_score || 100)}% Verified
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Knockout Status Banner */}
                   {selectedApplicant.knockout_status && selectedApplicant.knockout_status.passed === false && (

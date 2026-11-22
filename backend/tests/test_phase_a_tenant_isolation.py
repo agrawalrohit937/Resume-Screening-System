@@ -90,9 +90,9 @@ async def test_platform_admin_bypass_tenant_filter():
 
 def test_tenant_scoped_collections_contain_all_critical_entities():
     required = {
-        "jobs", "resumes", "applications", "ats_results", "requisitions",
+        "jobs", "resumes", "applications", "ats_results",
         "interview_kits", "scorecards", "talent_crm", "talent_pools",
-        "eeo_vault", "webhook_subscriptions", "audit_logs", "offers",
+        "audit_logs", "offers",
         "pipeline_events", "copilot_sessions"
     }
     for entity in required:

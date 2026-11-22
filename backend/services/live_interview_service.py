@@ -1199,13 +1199,26 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
         )
 
         # Title block
-        ws.merge_cells("A1:N1")
-        ws["A1"] = "CareerShala AI — Live Assessment Evaluations & Proctoring Report"
+        total_sessions = len(sessions)
+        completed_count = sum(1 for s in sessions if s.get("status") == "completed")
+        aborted_count = sum(1 for s in sessions if s.get("session_aborted", False))
+        expired_count = sum(1 for s in sessions if s.get("is_expired", False) and s.get("status") != "completed")
+        pending_count = max(0, total_sessions - completed_count - aborted_count - expired_count)
+
+        job_name_label = ""
+        if job_id and sessions:
+            first_title = sessions[0].get("job_title")
+            if first_title:
+                job_name_label = f" — {first_title}"
+
+        ws.merge_cells("A1:S1")
+        ws["A1"] = f"CareerShala AI{job_name_label} — Live Assessment Evaluations & Proctoring Report"
         ws["A1"].font = title_font
         ws["A1"].alignment = left_align
-        ws.merge_cells("A2:N2")
+        ws.merge_cells("A2:S2")
         ws["A2"] = (
-            f"Generated on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Total Candidates Evaluated: {len(sessions)}"
+            f"Generated on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | "
+            f"Total Sessions: {total_sessions} | Completed: {completed_count} | Aborted: {aborted_count} | Expired: {expired_count} | Pending: {pending_count}"
         )
 
         ws["A2"].font = sub_font
@@ -1249,29 +1262,43 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
             row_num += 1
             ws.row_dimensions[row_num].height = 20
             score_val = s.get("overall_score")
-            score_display = f"{score_val}/10" if score_val is not None else "Pending"
             warnings = s.get("warning_count", 0)
             cheat_score = s.get("cheating_score", 0.0)
             aborted = s.get("session_aborted", False)
+            is_expired = s.get("is_expired", False)
+            raw_status = s.get("status", "Pending")
 
             if aborted:
+                status_str = "Aborted"
                 integrity_status = "ABORTED (Violations)"
-            elif warnings == 0:
-                integrity_status = "Clean (0 Flags)"
+                score_display = "Disqualified (Aborted)"
+                link_status_str = "Terminated"
+                summary = (
+                    s.get("improvement_summary")
+                    or s.get("summary")
+                    or f"Session auto-terminated due to {warnings} severe proctoring violations ({round(cheat_score * 100, 1)}% risk)"
+                )
+            elif raw_status == "completed":
+                status_str = "Completed"
+                integrity_status = "Clean (0 Flags)" if warnings == 0 else f"Flagged ({warnings} warnings)"
+                score_display = f"{score_val}/10" if score_val is not None else "Evaluated"
+                link_status_str = "Completed"
+                summary = s.get("improvement_summary") or s.get("summary") or "Assessment completed successfully"
+            elif is_expired:
+                status_str = "Expired"
+                integrity_status = "Clean (0 Flags)" if warnings == 0 else f"Flagged ({warnings} warnings)"
+                score_display = "N/A (Expired)"
+                link_status_str = "Expired"
+                summary = s.get("improvement_summary") or s.get("summary") or "Invitation expired before candidate completion"
             else:
-                integrity_status = f"Flagged ({warnings} warnings)"
+                status_str = "Pending"
+                integrity_status = "Clean (0 Flags)" if warnings == 0 else f"Flagged ({warnings} warnings)"
+                score_display = "Pending"
+                link_status_str = "Active"
+                summary = s.get("improvement_summary") or s.get("summary") or "Awaiting candidate submission"
 
             strengths = ", ".join(s.get("strength_areas") or s.get("strengths") or [])
             weaknesses = ", ".join(s.get("weakness_areas") or s.get("weaknesses") or [])
-            summary = s.get("improvement_summary") or s.get("summary") or ""
-            is_expired = s.get("is_expired", False)
-            status_str = (
-                "Completed"
-                if s.get("status") == "completed"
-                else "Expired"
-                if is_expired
-                else s.get("status", "Pending").capitalize()
-            )
 
             row_data = [
                 idx,
@@ -1290,8 +1317,8 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                 integrity_status,
                 strengths or "None noted",
                 weaknesses or "None noted",
-                summary or "N/A",
-                "Expired" if is_expired else "Active",
+                summary,
+                link_status_str,
                 s.get("completed_at", "")[:19].replace("T", " ")
                 if s.get("completed_at")
                 else "-",
@@ -1312,7 +1339,7 @@ Return ONLY valid JSON (no markdown fences, no explanatory text):
                         cell.fill = PatternFill(
                             start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"
                         )
-                    elif val == "Expired":
+                    elif val in ("Expired", "Aborted"):
                         cell.fill = PatternFill(
                             start_color="FEE2E2", end_color="FEE2E2", fill_type="solid"
                         )

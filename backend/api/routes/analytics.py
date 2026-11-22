@@ -162,17 +162,10 @@ async def get_enterprise_analytics(
     jobs_list = ent_data["jobs_list"]
     hired_apps = ent_data["hired_app_rows"]
     total_offers = ent_data["total_offers"]
-    eeo_responses = ent_data["eeo_responses"]
-    requisitions_list = ent_data.get("requisitions_list", [])
-
-    approved_reqs = [r for r in requisitions_list if str(r.get("status", "")).lower() == "approved"]
-    req_approved_headcount = sum(int(r.get("headcount", 1) or 1) for r in approved_reqs)
-    req_filled_hires = sum(int(r.get("filled_count", 0) or 0) for r in requisitions_list)
 
     open_jobs = [j for j in jobs_list if str(j.get("status", "open")).lower() in ("open", "active")]
-    job_approved_headcount = sum(int(j.get("openings", 1) or 1) for j in open_jobs)
-    approved_headcount = max(job_approved_headcount, req_approved_headcount)
-    filled_hires = max(len(hired_apps), req_filled_hires)
+    approved_headcount = sum(int(j.get("openings", 1) or 1) for j in open_jobs)
+    filled_hires = len(hired_apps)
 
     now = datetime.now(timezone.utc)
     months_meta = []
@@ -186,20 +179,12 @@ async def get_enterprise_analytics(
 
     # 3. Department breakdown
     dept_map: dict = {}
-    for r in requisitions_list:
-        dept = r.get("department") or "General"
-        if dept not in dept_map:
-            dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
-        if str(r.get("status", "")).lower() == "approved":
-            dept_map[dept]["approved"] += int(r.get("headcount", 1) or 1)
-        dept_map[dept]["filled"] += int(r.get("filled_count", 0) or 0)
-
     for j in jobs_list:
         dept = j.get("department") or "General"
         if dept not in dept_map:
             dept_map[dept] = {"department": dept, "approved": 0, "filled": 0}
         if str(j.get("status", "open")).lower() in ("open", "active"):
-            dept_map[dept]["approved"] = max(dept_map[dept]["approved"], int(j.get("openings", 1) or 1))
+            dept_map[dept]["approved"] += int(j.get("openings", 1) or 1)
 
     if hired_apps:
         job_dept_map = {str(j["id"]): (j.get("department") or "General") for j in jobs_list}
@@ -244,74 +229,6 @@ async def get_enterprise_analytics(
     for _, _, m_label in months_meta:
         velocity.append({"month": m_label, "hires": velocity_counts.get(m_label, 0), "target": monthly_target})
 
-    # 7. EEO / Diversity
-    total_eeo = len(eeo_responses or [])
-
-    def _normalize_race(val: Optional[str]) -> str:
-        if not val:
-            return "declined"
-        v = str(val).strip().lower()
-        if any(k in v for k in ["hispanic", "latino", "black", "african", "american indian", "alaska", "native hawaiian", "pacific", "two or more"]):
-            return "urm"
-        if any(k in v for k in ["white", "caucasian", "asian"]):
-            return "non_urm"
-        return "declined"
-
-    urm_count = sum(1 for e in eeo_responses if _normalize_race(e.get("race_ethnicity")) == "urm")
-    non_urm_count = sum(1 for e in eeo_responses if _normalize_race(e.get("race_ethnicity")) == "non_urm")
-    declined_count = sum(1 for e in eeo_responses if _normalize_race(e.get("race_ethnicity")) == "declined")
-
-    if total_eeo > 0:
-        diversity_dist = [
-            {"name": "Underrepresented Minority (URM)", "value": round((urm_count / total_eeo) * 100), "count": urm_count, "color": "#6366F1"},
-            {"name": "Non-URM Representation", "value": round((non_urm_count / total_eeo) * 100), "count": non_urm_count, "color": "#0284C7"},
-            {"name": "Declined / Undisclosed", "value": round((declined_count / total_eeo) * 100), "count": declined_count, "color": "#94A3B8"},
-        ]
-        diversity_dist = [d for d in diversity_dist if d["value"] > 0]
-        if not diversity_dist and total_eeo > 0:
-            diversity_dist = [{"name": "Self-Identified", "value": 100, "count": total_eeo, "color": "#6366F1"}]
-    else:
-        diversity_dist = []
-
-    gender_map: dict = {}
-    for e in eeo_responses:
-        g = e.get("gender") or "Decline to State"
-        gender_map[g] = gender_map.get(g, 0) + 1
-
-    gender_dist = []
-    gender_palette = {"Female": "#EC4899", "Male": "#3B82F6", "Non-Binary": "#8B5CF6", "Decline to State": "#94A3B8"}
-    for g_name, g_count in gender_map.items():
-        pct = round((g_count / total_eeo) * 100) if total_eeo > 0 else 0
-        gender_dist.append({
-            "name": g_name,
-            "value": pct,
-            "count": g_count,
-            "color": gender_palette.get(g_name, "#64748B")
-        })
-
-    race_map: dict = {}
-    for e in eeo_responses:
-        r = e.get("race_ethnicity") or "Decline to State"
-        race_map[r] = race_map.get(r, 0) + 1
-
-    race_dist = []
-    race_palette = {
-        "Asian": "#06B6D4",
-        "Black or African American": "#8B5CF6",
-        "Hispanic or Latino": "#F59E0B",
-        "White (Not Hispanic or Latino)": "#3B82F6",
-        "Two or More Races": "#10B981",
-        "Decline to State": "#94A3B8",
-    }
-    for r_name, r_count in race_map.items():
-        pct = round((r_count / total_eeo) * 100) if total_eeo > 0 else 0
-        race_dist.append({
-            "name": r_name,
-            "value": pct,
-            "count": r_count,
-            "color": race_palette.get(r_name, "#64748B")
-        })
-
     attainment_pct = round((filled_hires / max(1, approved_headcount)) * 100, 1) if approved_headcount > 0 else 0.0
 
     return {
@@ -324,11 +241,9 @@ async def get_enterprise_analytics(
             "avg_time_to_fill_days": avg_time_to_fill,
         },
         "headcount_by_department": headcount_data,
-        "diversity_distribution": diversity_dist,
-        "total_eeo_responses": total_eeo,
-        "gender_distribution": gender_dist,
-        "race_distribution": race_dist,
         "hiring_velocity": velocity,
+        "pipeline_stages": pipeline_stages,
+        "critical_alerts": critical_alerts,
     }
 
 

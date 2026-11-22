@@ -70,11 +70,10 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
 
   const isAdmin = userRoles.includes('admin') || userRoles.includes('platform_admin')
   const isExecutive = userRoles.includes('exec') || userRoles.includes('executive')
-  const isHiringManager = userRoles.includes('hiring_manager')
   const isInterviewer = userRoles.includes('interviewer')
-  const isRecruiter = userRoles.includes('recruiter')
+  const isRecruiter = userRoles.includes('recruiter') || userRoles.includes('hiring_manager')
   const hasCandidateRole = userRoles.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
-  const hasEmployerRole = isAdmin || isExecutive || isHiringManager || isInterviewer || isRecruiter
+  const hasEmployerRole = isAdmin || isExecutive || isInterviewer || isRecruiter
 
   const savedContext = typeof window !== 'undefined' ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')) : null
   const isCandidateView = savedContext === 'candidate' && hasCandidateRole
@@ -83,9 +82,8 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
   if (!isCandidateView) {
     if (isAdmin) effectiveRole = 'admin'
     else if (isExecutive) effectiveRole = 'exec'
-    else if (isHiringManager) effectiveRole = 'hiring_manager'
-    else if (isInterviewer) effectiveRole = 'interviewer'
     else if (isRecruiter) effectiveRole = 'recruiter'
+    else if (isInterviewer) effectiveRole = 'interviewer'
     else effectiveRole = 'candidate'
   }
 
@@ -148,8 +146,8 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
     if (nextContext === 'candidate') {
       navigate('/dashboard')
     } else {
-      if (isExecutive) navigate('/exec/dashboard')
-      else if (isHiringManager) navigate('/hiring-manager/dashboard')
+      if (isExecutive) navigate('/recruiter/dashboard')
+      else if (isRecruiter) navigate('/recruiter/dashboard')
       else if (isInterviewer) navigate('/interviewer/dashboard')
       else if (isAdmin) navigate('/admin')
       else navigate('/recruiter/dashboard')
@@ -183,8 +181,6 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
                   ? 'bg-slate-100 text-slate-800 border-slate-300'
                   : effectiveRole === 'exec'
                   ? 'bg-amber-50 text-amber-800 border-amber-200'
-                  : effectiveRole === 'hiring_manager'
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   : effectiveRole === 'interviewer'
                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                   : effectiveRole === 'recruiter'
@@ -199,12 +195,10 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
                   ? 'Admin'
                   : effectiveRole === 'exec'
                   ? 'Executive'
-                  : effectiveRole === 'hiring_manager'
-                  ? 'Hiring Manager'
                   : effectiveRole === 'interviewer'
-                  ? 'Interviewer'
+                  ? 'Tech Interviewer'
                   : effectiveRole === 'recruiter'
-                  ? 'Recruiter'
+                  ? 'HR Recruiter'
                   : isPremium
                   ? 'VIP'
                   : isPro
@@ -428,29 +422,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
           </div>
         )}
 
-        {/* Hiring Manager 2x2 Grid */}
-        {effectiveRole === 'hiring_manager' && (
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleNavigate('/hiring-manager/dashboard')}
-              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
-            >
-              <Briefcase size={16} className="text-indigo-600 mb-1" />
-              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Requisitions</p>
-              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Headcount &amp; Budget</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleNavigate('/hiring-manager/dashboard')}
-              className="p-2.5 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/70 text-left transition-all group cursor-pointer shadow-2xs"
-            >
-              <Target size={16} className="text-indigo-600 mb-1" />
-              <p className="text-xs font-extrabold text-slate-800 group-hover:text-indigo-700 truncate">Candidates</p>
-              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">Pipeline &amp; Offers</p>
-            </button>
-          </div>
-        )}
+
 
         {/* Executive 2x2 Grid */}
         {effectiveRole === 'exec' && (

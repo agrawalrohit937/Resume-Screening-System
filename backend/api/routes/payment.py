@@ -270,28 +270,6 @@ async def cancel_subscription(
         except Exception as e:
             logger.error("Failed to propagate subscription cancellation to tenant members", error=str(e))
 
-    # If user had an active recovery case, close it as churned
-    try:
-        from repositories.revenue_recovery_repo import RevenueRecoveryRepository
-        from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
-        recovery_repo = RevenueRecoveryRepository()
-        active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
-        if active_case:
-            await recovery_repo.update_case(active_case.case_id, {
-                "status": RecoveryStatus.CHURNED.value,
-                "closed_at": datetime.now(timezone.utc),
-            })
-            await recovery_repo.add_audit_log(
-                case_id=active_case.case_id,
-                action="SUBSCRIPTION_CANCELLED_BY_USER",
-                actor=ActorType.USER,
-                actor_name=current_user.full_name,
-                details={"reason": reason, "prev_plan": prev_plan},
-                reasoning="User cancelled subscription directly from billing page."
-            )
-    except Exception:
-        pass
-
     return MessageResponse(message="Subscription cancelled successfully. Your plan has been reverted to Free.")
 
 
@@ -381,29 +359,6 @@ async def verify_payment(
     }
     await user_repo.add_payment_history(str(current_user.id), payment_record)
 
-    # If user had an active recovery case, close it as recovered
-    try:
-        from repositories.revenue_recovery_repo import RevenueRecoveryRepository
-        from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
-        recovery_repo = RevenueRecoveryRepository()
-        active_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
-        if active_case:
-            await recovery_repo.update_case(active_case.case_id, {
-                "status": RecoveryStatus.RECOVERED.value,
-                "recovered_at": datetime.now(timezone.utc),
-                "payment_id": payload.razorpay_payment_id,
-            })
-            await recovery_repo.add_audit_log(
-                case_id=active_case.case_id,
-                action="PAYMENT_RECOVERED_SUCCESS",
-                actor=ActorType.USER,
-                actor_name=current_user.full_name,
-                details={"order_id": payload.razorpay_order_id, "payment_id": payload.razorpay_payment_id, "plan": plan},
-                reasoning="Payment successfully verified through gateway checkout."
-            )
-    except Exception as e:
-        pass
-        
     return MessageResponse(message=f"Payment verified. Successfully upgraded to {plan}!")
 
 
@@ -423,96 +378,16 @@ async def report_payment_failure(
     user_repo=Depends(get_user_repo),
 ):
     """
-    Client or gateway failure report endpoint.
-    Initializes or updates a recovery case and triggers the LangGraph recovery workflow.
+    Client failure report endpoint. Records payment failure for troubleshooting.
     """
-    plan = _normalize(payload.plan)
-    amount = 299.0 if plan == 'pro' else 499.0
-
-    from repositories.revenue_recovery_repo import RevenueRecoveryRepository
-    from workflows.revenue_recovery_graph import revenue_recovery_pipeline
-    from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
-
-    recovery_repo = RevenueRecoveryRepository()
-
-    # Check for existing active recovery case
-    existing_case = await recovery_repo.get_active_case_for_user(str(current_user.id))
-    attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
-
-    # Fetch user gamification and profile
-    async with get_pg_session_factory()() as session:
-        g_row = (await session.execute(select(UserGamification).where(UserGamification.user_id == str(current_user.id)))).scalar_one_or_none()
-        gamification_profile = {c.name: getattr(g_row, c.name) for c in UserGamification.__table__.columns} if g_row else {}
-
-    # Run LangGraph pipeline
-    init_state = {
-        "case_id": existing_case.case_id if existing_case else "",
-        "user_id": str(current_user.id),
-        "user_name": current_user.full_name,
-        "user_email": current_user.email,
-        "user_phone": current_user.phone,
-        "plan": plan,
-        "amount": amount,
-        "currency": "INR",
-        "renewal_date": datetime.now(timezone.utc),
-        "failure_reason": payload.failure_reason,
-        "failure_code": payload.failure_code,
-        "attempt_count": attempt_count,
-        "user_dict": current_user.model_dump() if hasattr(current_user, "model_dump") else current_user.dict(),
-        "gamification_dict": gamification_profile,
-        "payment_history": current_user.payment_history or [],
-        "communication_history": [],
-        "simulation_mode": False,
-    }
-
-    graph_result = await revenue_recovery_pipeline.ainvoke(init_state)
-
-    case_updates = {
-        "user_id": str(current_user.id),
-        "user_name": current_user.full_name,
-        "user_email": current_user.email,
-        "user_phone": current_user.phone,
-        "plan": plan,
-        "amount": amount,
-        "currency": "INR",
-        "order_id": payload.order_id,
-        "failure_reason": payload.failure_reason,
-        "failure_code": payload.failure_code,
-        "failed_at": datetime.now(timezone.utc),
-        "risk_score": graph_result.get("risk_score", 50),
-        "risk_level": graph_result.get("risk_level", "MEDIUM"),
-        "risk_factors": graph_result.get("risk_factors", []),
-        "explanation": graph_result.get("risk_explanation", ""),
-        "selected_strategy": graph_result.get("selected_strategy", "SEND_EMAIL"),
-        "selected_channel": graph_result.get("selected_channel", "EMAIL"),
-        "status": graph_result.get("recovery_status", RecoveryStatus.RECOVERY_ACTIVE.value),
-        "attempt_count": attempt_count,
-        "human_review_required": graph_result.get("human_review_required", False),
-        "human_review_reason": graph_result.get("human_review_reason"),
-        "offer": graph_result.get("offer", {}),
-        "message_subject": graph_result.get("generated_message_subject"),
-        "message_content": graph_result.get("generated_message_body"),
-        "agent_reasoning": graph_result.get("strategy_reasoning"),
-    }
-
-    if existing_case:
-        await recovery_repo.update_case(existing_case.case_id, case_updates)
-        case_id = existing_case.case_id
-    else:
-        created = await recovery_repo.create_case(case_updates)
-        case_id = created.case_id
-
-    # Append audit log
-    for audit in graph_result.get("audit_logs_to_append", []):
-        await recovery_repo.add_audit_log(
-            case_id=case_id,
-            action=audit.get("action", "AI_ACTION_EXECUTED"),
-            actor=ActorType.AI_AGENT,
-            details=audit.get("details", {}),
-            reasoning=audit.get("reasoning")
-        )
-
-    return MessageResponse(message=f"Payment failure registered. Recovery case {case_id} is active.")
+    logger.warning(
+        "Payment failure reported",
+        user_id=str(current_user.id),
+        plan=payload.plan,
+        reason=payload.failure_reason,
+        order_id=payload.order_id,
+    )
+    return MessageResponse(message="Payment failure recorded.")
 
 
 @router.post('/webhook')
@@ -545,114 +420,23 @@ async def razorpay_webhook(
     payload_obj = data.get("payload", {})
     payment_entity = payload_obj.get("payment", {}).get("entity", {})
 
-    from repositories.revenue_recovery_repo import RevenueRecoveryRepository
     from repositories.user_repo import UserRepository
-    from workflows.revenue_recovery_graph import revenue_recovery_pipeline
-    from schemas.revenue_recovery_schema import RecoveryStatus, ActorType
-
-    recovery_repo = RevenueRecoveryRepository()
     user_repo = UserRepository()
 
     # 1. Handle Payment Failure Events
     if event in ("payment.failed", "subscription.halted", "subscription.charge_failed"):
         notes = payment_entity.get("notes") or {}
         user_email = payment_entity.get("email") or notes.get("email") or ""
-        notes_user_id = notes.get("user_id")
-        notes_full_name = notes.get("full_name")
-
-        amount = float(payment_entity.get("amount", 29900)) / 100.0
         error_desc = payment_entity.get("error_description") or "Gateway charge failed"
-        error_code = payment_entity.get("error_code") or "payment_failed"
         order_id = payment_entity.get("order_id")
 
-        user_doc = None
-        if notes_user_id:
-            user_doc = await user_repo.get_by_id(notes_user_id)
-        if not user_doc and user_email:
-            user_doc = await user_repo.get_by_email(user_email)
-
-        user_id = str(user_doc.id) if user_doc else (notes_user_id or "unlinked_customer")
-        user_name = user_doc.full_name if user_doc else (notes_full_name or "Valued Learner")
-        if not user_email and user_doc:
-            user_email = user_doc.email
-
-        logger.info(
-            "Handling Razorpay payment failure event",
-            user_id=user_id,
+        logger.warning(
+            "Razorpay payment failure event received",
             user_email=user_email,
             order_id=order_id,
             error=error_desc,
         )
-
-        existing_case = await recovery_repo.get_active_case_for_user(user_id) if user_doc else None
-        attempt_count = (existing_case.attempt_count + 1) if existing_case else 0
-
-        async with get_pg_session_factory()() as session:
-            g_row = (await session.execute(select(UserGamification).where(UserGamification.user_id == str(user_id)))).scalar_one_or_none()
-            gamification_profile = {c.name: getattr(g_row, c.name) for c in UserGamification.__table__.columns} if g_row else {}
-
-        init_state = {
-            "case_id": existing_case.case_id if existing_case else "",
-            "user_id": user_id,
-            "user_name": user_name,
-            "user_email": user_email,
-            "plan": "pro" if amount < 400 else "premium",
-            "amount": amount,
-            "currency": "INR",
-            "renewal_date": datetime.now(timezone.utc),
-            "failure_reason": error_desc,
-            "failure_code": error_code,
-            "attempt_count": attempt_count,
-            "user_dict": user_doc.model_dump() if user_doc else {},
-            "gamification_dict": gamification_profile,
-            "payment_history": user_doc.payment_history if user_doc else [],
-            "communication_history": [],
-            "simulation_mode": False,
-        }
-
-        graph_result = await revenue_recovery_pipeline.ainvoke(init_state)
-
-        case_data = {
-            "user_id": user_id,
-            "user_name": user_name,
-            "user_email": user_email,
-            "plan": "pro" if amount < 400 else "premium",
-            "amount": amount,
-            "order_id": order_id,
-            "failure_reason": error_desc,
-            "failure_code": error_code,
-            "failed_at": datetime.now(timezone.utc),
-            "risk_score": graph_result.get("risk_score", 70),
-            "risk_level": graph_result.get("risk_level", "HIGH"),
-            "risk_factors": graph_result.get("risk_factors", []),
-            "explanation": graph_result.get("risk_explanation", ""),
-            "selected_strategy": graph_result.get("selected_strategy", "SEND_EMAIL"),
-            "selected_channel": graph_result.get("selected_channel", "EMAIL"),
-            "status": graph_result.get("recovery_status", RecoveryStatus.RECOVERY_ACTIVE.value),
-            "attempt_count": attempt_count,
-            "human_review_required": graph_result.get("human_review_required", False),
-            "human_review_reason": graph_result.get("human_review_reason"),
-            "offer": graph_result.get("offer", {}),
-            "agent_reasoning": graph_result.get("strategy_reasoning"),
-        }
-
-        if existing_case:
-            await recovery_repo.update_case(existing_case.case_id, case_data)
-            cid = existing_case.case_id
-        else:
-            c = await recovery_repo.create_case(case_data)
-            cid = c.case_id
-
-        for audit in graph_result.get("audit_logs_to_append", []):
-            await recovery_repo.add_audit_log(
-                case_id=cid,
-                action=audit.get("action", "WEBHOOK_FAILURE_PROCESSED"),
-                actor=ActorType.AI_AGENT,
-                details=audit.get("details", {}),
-                reasoning=audit.get("reasoning")
-            )
-
-        return {"status": "processed", "event": event, "case_id": cid}
+        return {"status": "processed", "event": event}
 
     # 2. Handle Payment Success Events
     elif event in ("payment.captured", "order.paid"):

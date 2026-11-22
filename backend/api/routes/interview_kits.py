@@ -7,13 +7,17 @@ Fully decoupled into repository architecture.
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import (
     get_current_user,
     get_interview_kit_repo,
     get_job_repo,
     get_interview_kit_service,
+    get_db,
 )
+from models.tables import User, InterviewSessionModel
 from repositories.interview_kit_repo import InterviewKitRepository
 from repositories.job_repo import JobRepository
 from schemas.user_schema import UserModel
@@ -110,63 +114,102 @@ async def compute_calibration_route(
 
 @router.get("/assigned", response_model=List[Dict[str, Any]])
 async def get_assigned_interviews_route(
+    job_id: Optional[str] = Query(default=None),
     current_user: UserModel = Depends(get_current_user),
     kit_repo: InterviewKitRepository = Depends(get_interview_kit_repo),
     job_repo: JobRepository = Depends(get_job_repo),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Retrieves interviews scheduled/assigned for the current user and tenant."""
+    """Retrieves candidates in the 'Interview' pipeline stage scheduled/assigned for evaluation, enriched with AI session state."""
     tenant_id = getattr(current_user, "tenant_id", "default")
-    apps = await job_repo.list_candidate_applications_by_tenant(tenant_id=tenant_id, limit=50)
+    apps = await job_repo.list_candidate_applications_by_tenant(
+        tenant_id=tenant_id, stage="Interview", job_id=job_id, limit=100
+    )
+    if not apps:
+        return []
+
+    app_ids = [str(a.get("id") or a.get("_id")) for a in apps]
+    cand_ids = [str(a.get("candidate_id") or a.get("user_id")) for a in apps if (a.get("candidate_id") or a.get("user_id"))]
+
+    # Batch fetch Users for profile picture
+    user_pic_map = {}
+    if cand_ids:
+        user_stmt = select(User.id, User.profile_picture).where(User.id.in_(cand_ids))
+        user_rows = (await db.execute(user_stmt)).all()
+        for uid, pic in user_rows:
+            if pic:
+                user_pic_map[str(uid)] = pic
+
+    # Batch fetch InterviewSessionModel for application_ids
+    session_map = {}
+    if app_ids:
+        sess_stmt = (
+            select(InterviewSessionModel)
+            .where(InterviewSessionModel.application_id.in_(app_ids))
+            .order_by(InterviewSessionModel.created_at.desc())
+        )
+        sess_rows = (await db.execute(sess_stmt)).scalars().all()
+        for s in sess_rows:
+            aid = str(s.application_id)
+            if aid not in session_map:  # Keep latest session per application
+                session_map[aid] = {
+                    "session_id": str(s.id),
+                    "status": s.status,
+                    "magic_token": s.magic_token,
+                    "magic_link_url": s.magic_link_url,
+                    "overall_score": s.overall_score,
+                    "warning_count": s.warning_count,
+                    "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+                    "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+                    "questions_count": len(s.questions or []),
+                    "answers_count": len(s.answers or []),
+                    "improvement_summary": s.improvement_summary,
+                    "strength_areas": s.strength_areas or [],
+                    "weakness_areas": s.weakness_areas or [],
+                }
+
+    # Cache jobs by job_id to prevent redundant queries
+    job_cache = {}
+    for app in apps:
+        jid = app.get("job_id")
+        if jid and jid not in job_cache:
+            job_cache[jid] = await job_repo.get_by_id(jid)
+
     results: List[Dict[str, Any]] = []
 
     for app in apps:
         app_id_str = str(app.get("id") or app.get("_id"))
-        job_id = app.get("job_id")
-        job = None
-        if job_id:
-            job = await job_repo.get_by_id(job_id)
-
-        kit = await kit_repo.get_kit_by_job(job_id, tenant_id) if job_id else None
-        competencies = kit.get("competencies", []) if kit else [
-            {"name": "Technical Problem Solving", "description": "Core engineering knowledge and architecture", "rubric": {1: "Sub-par", 3: "Solid", 5: "Mastery"}},
-            {"name": "System Architecture", "description": "Scalability, fault-tolerance, data modeling", "rubric": {1: "Basic", 3: "Proficient", 5: "Expert"}},
-            {"name": "Communication & Alignment", "description": "Crisp communication and engineering collaboration", "rubric": {1: "Unclear", 3: "Adequate", 5: "Exceptional"}}
-        ]
+        cand_id_str = str(app.get("candidate_id") or app.get("user_id") or "unknown_cand")
+        app_job_id = app.get("job_id")
+        job = job_cache.get(app_job_id)
 
         resume_snapshot = app.get("resume_snapshot") or {}
         resume_url = app.get("resume_url") or resume_snapshot.get("file_url") or "#"
 
-        scorecards_list = await kit_repo.get_scorecards_by_application(app_id_str)
-        scorecard_doc = scorecards_list[0] if scorecards_list else None
-
-        scorecard_data = None
-        is_submitted = False
-        if scorecard_doc:
-            is_submitted = True
-            rec_val = scorecard_doc.get("recommendation")
-            if hasattr(rec_val, "value"):
-                rec_val = rec_val.value
-            scorecard_data = {
-                "id": str(scorecard_doc.get("id") or scorecard_doc.get("_id", "")),
-                "ratings": scorecard_doc.get("ratings", {}),
-                "recommendation": rec_val or "yes",
-                "notes": scorecard_doc.get("notes", "") or "",
-                "submitted_at": str(scorecard_doc.get("submitted_at", "")),
-            }
+        ai_sess = session_map.get(app_id_str)
+        is_ai_completed = bool(ai_sess and ai_sess.get("status") == "completed")
+        is_ai_scheduled = bool(ai_sess is not None)
 
         results.append({
             "id": app_id_str,
             "application_id": app_id_str,
-            "candidate_id": str(app.get("candidate_id") or app.get("user_id") or "unknown_cand"),
+            "candidate_id": cand_id_str,
             "candidate_name": app.get("candidate_name") or app.get("full_name") or "Candidate",
+            "candidate_email": app.get("candidate_email") or app.get("email") or "",
+            "profile_picture": user_pic_map.get(cand_id_str) or app.get("profile_picture") or None,
+            "job_id": app_job_id,
             "role_title": app.get("job_title") or (job.get("title") if job else None) or "Candidate Interview",
             "department": app.get("department") or (job.get("department") if job else None) or "General",
+            "required_skills": job.get("required_skills", []) if job else [],
             "stage": app.get("stage") or "Technical Interview",
-            "scheduled_time": app.get("scheduled_time") or "Scheduled Interview",
+            "match_score": app.get("match_score"),
             "resume_url": resume_url,
-            "competencies": competencies,
-            "is_submitted": is_submitted,
-            "scorecard": scorecard_data
+            "competencies": [],
+            "is_submitted": False,
+            "scorecard": None,
+            "is_ai_scheduled": is_ai_scheduled,
+            "is_ai_completed": is_ai_completed,
+            "ai_session": ai_sess,
         })
 
     return results

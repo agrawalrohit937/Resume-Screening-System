@@ -364,12 +364,16 @@ class JobRepository(BaseRepository):
                 apps.append(d)
             return apps
 
-    async def list_candidate_applications_by_tenant(self, tenant_id: str = "default", limit: int = 50) -> List[dict]:
+    async def list_candidate_applications_by_tenant(self, tenant_id: str = "default", stage: Optional[str] = None, job_id: Optional[str] = None, limit: int = 50) -> List[dict]:
         async with self.session_factory() as session:
             stmt = select(CandidateApplication)
             if tenant_id and tenant_id != "default":
                 stmt = stmt.where(CandidateApplication.tenant_id == tenant_id)
-            stmt = stmt.limit(limit)
+            if job_id:
+                stmt = stmt.where(CandidateApplication.job_id == job_id)
+            if stage:
+                stmt = stmt.where(CandidateApplication.stage.ilike(f"%{stage}%"))
+            stmt = stmt.order_by(CandidateApplication.created_at.desc()).limit(limit)
             rows = (await session.execute(stmt)).scalars().all()
             results = []
             for r in rows:

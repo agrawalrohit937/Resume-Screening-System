@@ -638,6 +638,29 @@ async def get_job_applications(
     missing_resume_ids = [str(app["resume_id"]) for app in app_docs if app.get("resume_id")]
     fallback_resumes_map = await resume_repo.get_multiple_by_ids(list(set(missing_resume_ids))) if missing_resume_ids else {}
 
+    # Batch fetch candidate User profiles to attach their authentic profile picture
+    cand_ids = list({str(app["candidate_id"]) for app in app_docs if app.get("candidate_id")})
+    cand_emails = list({str(app["candidate_email"]).lower().strip() for app in app_docs if app.get("candidate_email")})
+    user_pictures_map = {}
+    if cand_ids or cand_emails:
+        try:
+            factory = get_pg_session_factory()
+            async with factory() as sess:
+                filters = []
+                if cand_ids:
+                    filters.append(User.id.in_(cand_ids))
+                if cand_emails:
+                    filters.append(func.lower(User.email).in_(cand_emails))
+                user_stmt = select(User).where(or_(*filters))
+                found_users = (await sess.execute(user_stmt)).scalars().all()
+                for u in found_users:
+                    pic = getattr(u, "profile_picture", None)
+                    if pic:
+                        user_pictures_map[str(u.id)] = pic
+                        user_pictures_map[str(u.email).lower().strip()] = pic
+        except Exception as exc:
+            logger.warning("Failed to batch fetch candidate user pictures", error=str(exc))
+
     enriched_applications = []
     for app in app_docs:
         resume_id = app.get("resume_id")
@@ -653,6 +676,9 @@ async def get_job_applications(
         cand_name = app.get("candidate_name") or parsed_data.get("full_name") or contact.get("name") or "Applicant"
         cand_email = app.get("candidate_email") or contact.get("email") or ""
 
+        cand_id_str = str(app.get("candidate_id", ""))
+        cand_profile_pic = user_pictures_map.get(cand_id_str) or user_pictures_map.get(cand_email.lower().strip())
+
         raw_match_score = app.get("match_score")
         raw_recruiter_score = app.get("recruiter_score")
         if (raw_recruiter_score is None or raw_recruiter_score <= 0.0) and (skills or summary):
@@ -667,7 +693,7 @@ async def get_job_applications(
             "id": app_id_str,
             "_id": app_id_str,
             "job_id": job_id,
-            "candidate_id": str(app.get("candidate_id", "")),
+            "candidate_id": cand_id_str,
             "resume_id": str(resume_id) if resume_id else None,
             "resume_snapshot": resume_snapshot,
             "match_score": raw_match_score,
@@ -677,7 +703,12 @@ async def get_job_applications(
             "candidate_name": cand_name,
             "candidate_email": cand_email,
             "notes": app.get("notes"),
+            "details": app.get("details"),
             "created_at": app.get("created_at").isoformat() if hasattr(app.get("created_at"), "isoformat") else str(app.get("created_at", "")),
+            "user": {
+                "profile_picture": cand_profile_pic,
+                "avatar_url": cand_profile_pic,
+            },
             "candidate": {
                 "name": cand_name,
                 "email": cand_email,
@@ -686,6 +717,8 @@ async def get_job_applications(
                 "linkedin": contact.get("linkedin"),
                 "github": contact.get("github"),
                 "portfolio": contact.get("portfolio"),
+                "profile_picture": cand_profile_pic,
+                "avatar_url": cand_profile_pic,
                 "skills": skills,
                 "experience_years": float(parsed_data.get("total_experience_years") or 0.0),
                 "summary": summary,

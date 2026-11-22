@@ -40,9 +40,12 @@ class TeamInviteRepository:
             res = await session.execute(stmt)
             return _invite_to_dict(res.scalar_one_or_none())
 
-    async def list_by_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
+    async def list_by_tenant(self, tenant_id: str, status: Optional[str] = "pending") -> List[Dict[str, Any]]:
         async with self.session_factory() as session:
-            stmt = select(TeamInvite).where(TeamInvite.tenant_id == tenant_id).order_by(TeamInvite.created_at.desc())
+            stmt = select(TeamInvite).where(TeamInvite.tenant_id == tenant_id)
+            if status:
+                stmt = stmt.where(TeamInvite.status == status)
+            stmt = stmt.order_by(TeamInvite.created_at.desc())
             res = await session.execute(stmt)
             return [_invite_to_dict(r) for r in res.scalars().all()]
 
