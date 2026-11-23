@@ -13,6 +13,9 @@ except Exception:
 
 from core.llm_client import gemini_key_pool, get_groq_client
 from utils.json_utils import parse_llm_json
+import structlog
+
+logger = structlog.get_logger(__name__)
 # ─── STATE DEFINITION ────────────────────────────────────────────────────────
 
 class ApplyAssistantState(TypedDict, total=False):
@@ -104,8 +107,12 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
         return {"email_subject": subject, "email_body": clean_body}
 
     try:
-        return await gemini_key_pool.execute_async_with_fallback(_generate)
+        return await asyncio.wait_for(
+            gemini_key_pool.execute_async_with_fallback(_generate),
+            timeout=12.0
+        )
     except Exception as gemini_err:
+        logger.warning("Gemini cover letter generation failed or timed out, using Groq fallback...", error=str(gemini_err))
         # Fallback to Groq if Gemini has 503 or quota outages
         try:
             llm = get_groq_client()
@@ -170,8 +177,12 @@ async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
         raise ValueError("Empty response from Gemini")
 
     try:
-        return await gemini_key_pool.execute_async_with_fallback(_generate)
+        return await asyncio.wait_for(
+            gemini_key_pool.execute_async_with_fallback(_generate),
+            timeout=12.0
+        )
     except Exception as gemini_err:
+        logger.warning("Gemini cover letter generation failed or timed out, using Groq fallback...", error=str(gemini_err))
         # Fallback to Groq if Gemini has 503 or quota outages
         try:
             llm = get_groq_client()

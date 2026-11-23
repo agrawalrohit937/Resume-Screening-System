@@ -151,13 +151,25 @@ class ApplicationRepository:
         if not application_id:
             return None
 
-        edits = {k: v for k, v in edits.items() if v is not None}
+        clean_edits = {k: v for k, v in edits.items() if v is not None}
         now = datetime.now(timezone.utc)
 
-        if not edits:
+        if not clean_edits:
             return await self.get_by_id(application_id, user_id)
 
         async with self.session_factory() as session:
+            stmt_sel = select(JobApplication).where(
+                JobApplication.id == str(application_id),
+                JobApplication.user_id == str(user_id),
+            )
+            res_sel = await session.execute(stmt_sel)
+            existing = res_sel.scalar_one_or_none()
+            if not existing:
+                return None
+
+            base_draft = dict(existing.edited_draft or existing.generated_draft or {})
+            merged_draft = {**base_draft, **clean_edits, "edited_at": now.isoformat()}
+
             stmt = (
                 update(JobApplication)
                 .where(
@@ -165,7 +177,7 @@ class ApplicationRepository:
                     JobApplication.user_id == str(user_id),
                 )
                 .values(
-                    edited_draft={**edits, "edited_at": now.isoformat()},
+                    edited_draft=merged_draft,
                     updated_at=now,
                 )
                 .returning(JobApplication)
