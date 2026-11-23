@@ -244,7 +244,7 @@ export default function Profile() {
     }
   }, [refreshUser])
 
-  const { getRootProps: getResumeRootProps, getInputProps: getResumeInputProps, isDragActive: resumeDrag } = useDropzone({
+  const { getRootProps: getResumeRootProps, getInputProps: getResumeInputProps, open: openResumePicker, isDragActive: resumeDrag } = useDropzone({
     onDrop: onResumeDrop, multiple: false, disabled: uploadingResume,
     accept: { 'application/pdf': ['.pdf'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] },
     maxSize: 10 * 1024 * 1024,
@@ -657,8 +657,7 @@ export default function Profile() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        const input = document.querySelector('input[type="file"]')
-                        if (input) input.click()
+                        openResumePicker()
                       }}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
                     >

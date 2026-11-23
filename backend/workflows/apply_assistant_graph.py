@@ -103,7 +103,37 @@ async def email_generator_node(state: ApplyAssistantState) -> dict:
         clean_body = re.sub(r"<br\s*/?>", "\n", body, flags=re.IGNORECASE).strip()
         return {"email_subject": subject, "email_body": clean_body}
 
-    return await gemini_key_pool.execute_async_with_fallback(_generate)
+    try:
+        return await gemini_key_pool.execute_async_with_fallback(_generate)
+    except Exception as gemini_err:
+        # Fallback to Groq if Gemini has 503 or quota outages
+        try:
+            llm = get_groq_client()
+            raw_prompt_text = _load_prompt("email_generation.txt")
+            formatted_prompt = f"""You are an expert AI career assistant. Output ONLY the requested professional text. Do not include any meta-commentary.
+
+{raw_prompt_text.format(
+    resume_text=state.get("resume_text", "No resume provided."),
+    company_name=company_name,
+    job_title=job_title,
+    job_description=state.get("job_description", "No JD provided."),
+    jd_analysis=state.get("jd_analysis", {}),
+    ats_result=state.get("ats_result", {}),
+    previous_issues=state.get("validation_issues", []) or "none",
+)}"""
+            res = await llm.ainvoke(formatted_prompt)
+            content = str(res.content).strip()
+            if content.lower().startswith("subject:"):
+                first_line, _, rest = content.partition("\n")
+                subject = first_line.split(":", 1)[1].strip()
+                body = rest.strip()
+            else:
+                subject = f"Application for {job_title} at {company_name}"
+                body = content
+            clean_body = re.sub(r"<br\s*/?>", "\n", body, flags=re.IGNORECASE).strip()
+            return {"email_subject": subject, "email_body": clean_body}
+        except Exception:
+            raise gemini_err
 
 
 
@@ -139,7 +169,29 @@ async def cover_letter_generator_node(state: ApplyAssistantState) -> dict:
             return {"cover_letter_text": response.text.strip()}
         raise ValueError("Empty response from Gemini")
 
-    return await gemini_key_pool.execute_async_with_fallback(_generate)
+    try:
+        return await gemini_key_pool.execute_async_with_fallback(_generate)
+    except Exception as gemini_err:
+        # Fallback to Groq if Gemini has 503 or quota outages
+        try:
+            llm = get_groq_client()
+            raw_prompt_text = _load_prompt("cover_letter.txt")
+            formatted_prompt = f"""You are an expert AI career assistant. Output ONLY the requested professional text. Do not include any meta-commentary.
+
+{raw_prompt_text.format(
+    resume_text=state.get("resume_text", "No resume provided."),
+    company_name=company_name,
+    job_title=job_title,
+    job_description=state.get("job_description", "No JD provided."),
+    jd_analysis=state.get("jd_analysis", {}),
+)}"""
+            res = await llm.ainvoke(formatted_prompt)
+            content = str(res.content).strip()
+            if content:
+                return {"cover_letter_text": content}
+            raise ValueError("Empty response from Groq")
+        except Exception:
+            raise gemini_err
 
 
 # ─── NODE 4: QUALITY VALIDATOR (GROQ) ────────────────────────────────────────

@@ -7,6 +7,8 @@ Provides thread-safe round-robin key rotation and fallback logic for:
 """
 
 import threading
+import asyncio
+import time
 import structlog
 from typing import List, Optional, Callable, Any, Awaitable
 from langchain_groq import ChatGroq
@@ -141,19 +143,20 @@ class GeminiKeyPool:
                 return result
             except Exception as e:
                 err_str = str(e).lower()
-                is_rate_limit = any(
+                is_transient = any(
                     term in err_str
-                    for term in ["429", "rate limit", "rate_limit", "quota", "resourceexhausted", "too many requests"]
+                    for term in ["429", "503", "unavailable", "high demand", "overloaded", "rate limit", "rate_limit", "quota", "resourceexhausted", "too many requests"]
                 )
-                if is_rate_limit and len(keys) > 1:
+                if is_transient and len(keys) > 1:
                     logger.warning(
-                        "Gemini API key rate-limited or exhausted. Rotating to next key in pool...",
+                        "Gemini API key transient error (429/503/quota). Rotating to next key in pool...",
                         failed_key_prefix=key[:8] + "...",
                         attempt=attempt + 1,
                         total_keys=len(keys),
                         error=str(e),
                     )
                     last_exception = e
+                    await asyncio.sleep(0.5)
                     continue
                 else:
                     raise e
@@ -183,19 +186,20 @@ class GeminiKeyPool:
                 return result
             except Exception as e:
                 err_str = str(e).lower()
-                is_rate_limit = any(
+                is_transient = any(
                     term in err_str
-                    for term in ["429", "rate limit", "rate_limit", "quota", "resourceexhausted", "too many requests"]
+                    for term in ["429", "503", "unavailable", "high demand", "overloaded", "rate limit", "rate_limit", "quota", "resourceexhausted", "too many requests"]
                 )
-                if is_rate_limit and len(keys) > 1:
+                if is_transient and len(keys) > 1:
                     logger.warning(
-                        "Gemini API key rate-limited or exhausted. Rotating to next key in pool...",
+                        "Gemini API key transient error (429/503/quota). Rotating to next key in pool...",
                         failed_key_prefix=key[:8] + "...",
                         attempt=attempt + 1,
                         total_keys=len(keys),
                         error=str(e),
                     )
                     last_exception = e
+                    time.sleep(0.5)
                     continue
                 else:
                     raise e
