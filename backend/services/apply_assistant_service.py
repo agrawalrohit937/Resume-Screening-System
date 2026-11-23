@@ -285,9 +285,12 @@ class ApplyAssistantService:
         resume_data = resume_doc.get("parsed_data", {})
         full_name = resume_data.get("full_name") or "Candidate"
 
-        draft = application.get("edited_draft") or application.get("generated_draft") or {}
+        gen_draft = application.get("generated_draft") or {}
+        edit_draft = application.get("edited_draft") or {}
+        cover_letter_text = (edit_draft.get("cover_letter_text") or "").strip() or gen_draft.get("cover_letter_text") or ""
+
         return await self._render_cover_letter_pdf(
-            application_id, draft.get("cover_letter_text", ""), application["company_name"], full_name
+            application_id, cover_letter_text, application["company_name"], full_name
         )
 
     async def send_application(self, *, application_id: str, user_id: str, user_repo: UserRepository) -> dict:
@@ -324,15 +327,28 @@ class ApplyAssistantService:
             resume_data = resume_doc.get("parsed_data", {})
             full_name = resume_data.get("full_name") or "Candidate"
 
-            draft = application.get("edited_draft") or application.get("generated_draft") or {}
+            gen_draft = application.get("generated_draft") or {}
+            edit_draft = application.get("edited_draft") or {}
+
+            email_subject = (edit_draft.get("email_subject") or "").strip() or gen_draft.get("email_subject") or "Application"
+            email_body_raw = (edit_draft.get("email_body") or "").strip() or gen_draft.get("email_body") or ""
+            cover_letter_text = (edit_draft.get("cover_letter_text") or "").strip() or gen_draft.get("cover_letter_text") or ""
+
+            # Format email body cleanly into paragraphs if plain text
+            if email_body_raw and not any(tag in email_body_raw.lower() for tag in ("<p>", "<br", "<div>")):
+                paras = [p.strip().replace("\n", "<br>") for p in email_body_raw.split("\n\n") if p.strip()]
+                html_body = "".join(f"<p style='margin: 0 0 14px 0; font-size: 14px; line-height: 1.6; color: #1e293b;'>{p}</p>" for p in paras)
+            else:
+                html_body = email_body_raw
+
             cover_letter_pdf_path = await self._render_cover_letter_pdf(
-                application_id, draft.get("cover_letter_text", ""), application["company_name"], full_name
+                application_id, cover_letter_text, application["company_name"], full_name
             )
 
             provider_message_id = await send_application_via_gmail_api(
                 to=application["hr_email"],
-                subject=draft.get("email_subject", ""),
-                html_body=draft.get("email_body", ""),
+                subject=email_subject,
+                html_body=html_body,
                 attachments=[resume_pdf_path, cover_letter_pdf_path],
                 user_id=user_id,
                 user_repo=user_repo,

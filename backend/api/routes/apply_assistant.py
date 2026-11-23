@@ -103,16 +103,21 @@ async def extract_from_screenshot(
 
 def _to_draft_response(doc: dict) -> ApplyDraftResponse:
     from datetime import datetime, timezone
-    draft = doc.get("edited_draft") or doc.get("generated_draft") or {}
+    gen_draft = doc.get("generated_draft") or {}
+    edit_draft = doc.get("edited_draft") or {}
+    email_subject = (edit_draft.get("email_subject") or "").strip() or gen_draft.get("email_subject")
+    email_body = (edit_draft.get("email_body") or "").strip() or gen_draft.get("email_body")
+    cover_letter_text = (edit_draft.get("cover_letter_text") or "").strip() or gen_draft.get("cover_letter_text")
+
     ats_ref = doc.get("ats_result_ref") or {}
     app_id = str(doc.get("_id") or doc.get("id") or "")
     now = datetime.now(timezone.utc)
     return ApplyDraftResponse(
         application_id=app_id,
         status=doc.get("status", "draft"),
-        email_subject=draft.get("email_subject"),
-        email_body=draft.get("email_body"),
-        cover_letter_text=draft.get("cover_letter_text"),
+        email_subject=email_subject,
+        email_body=email_body,
+        cover_letter_text=cover_letter_text,
         ats_result=ATSResultSummary(**ats_ref) if ats_ref.get("result_id") else None,
         needs_manual_review=doc.get("needs_manual_review", False),
         created_at=doc.get("created_at") or now,

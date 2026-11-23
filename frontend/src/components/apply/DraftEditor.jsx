@@ -13,14 +13,28 @@ export default function DraftEditor({ draft, onSave, onApproveSend, isSubmitting
   const [copiedField, setCopiedField] = useState(null);
 
   useEffect(() => {
-    setSubject(draft?.email_subject || '');
-    setBody(cleanText(draft?.email_body || ''));
-    setCoverLetter(cleanText(draft?.cover_letter_text || ''));
-  }, [draft]);
-
+    if (draft?.email_subject !== undefined) setSubject(draft.email_subject || '');
+    if (draft?.email_body !== undefined) setBody(cleanText(draft.email_body || ''));
+    if (draft?.cover_letter_text !== undefined) setCoverLetter(cleanText(draft.cover_letter_text || ''));
+  }, [draft?.email_subject, draft?.email_body, draft?.cover_letter_text]);
 
   const handleBlurSave = (field, value) => {
-    if (onSave) onSave({ [field]: value });
+    if (onSave && value !== undefined && value !== null) {
+      onSave({ [field]: value });
+    }
+  };
+
+  const handleApprove = () => {
+    if (onSave) {
+      onSave({
+        email_subject: subject,
+        email_body: body,
+        cover_letter_text: coverLetter,
+      });
+    }
+    if (onApproveSend) {
+      onApproveSend();
+    }
   };
 
   const copyToClipboard = (text, fieldName) => {
@@ -176,7 +190,7 @@ export default function DraftEditor({ draft, onSave, onApproveSend, isSubmitting
         </p>
         <button
           type="button"
-          onClick={onApproveSend}
+          onClick={handleApprove}
           disabled={isSubmitting}
           className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-sm shadow-md shadow-emerald-600/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
         >
