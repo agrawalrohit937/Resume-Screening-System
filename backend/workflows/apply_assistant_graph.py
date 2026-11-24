@@ -34,6 +34,8 @@ class ApplyAssistantState(TypedDict, total=False):
     cover_letter_text: str
 
     validation_issues: List[str]
+    email_issues: List[str]
+    cl_issues: List[str]
     retry_count: int
     needs_manual_review: bool
 
@@ -218,25 +220,26 @@ MIN_EMAIL_BODY_LENGTH = 100
 MIN_COVER_LETTER_LENGTH = 250
 MAX_RETRIES = 2
 
-def _deterministic_checks(state: ApplyAssistantState) -> list:
-    issues = []
+def _deterministic_checks(state: ApplyAssistantState) -> tuple[list, list]:
+    email_issues = []
+    cl_issues = []
     email_body = state.get("email_body", "")
     cover_letter = state.get("cover_letter_text", "")
 
     if any(re.search(p, email_body, re.IGNORECASE) for p in PLACEHOLDER_PATTERNS):
-        issues.append("Email body contains unfilled placeholder text")
+        email_issues.append("Email body contains unfilled placeholder text")
 
     if any(re.search(p, cover_letter, re.IGNORECASE) for p in PLACEHOLDER_PATTERNS):
-        issues.append("Cover letter contains unfilled placeholder text")
+        cl_issues.append("Cover letter contains unfilled placeholder text")
 
     if len(email_body) < MIN_EMAIL_BODY_LENGTH:
-        issues.append("Email body is too short")
+        email_issues.append("Email body is too short")
     if len(cover_letter) < MIN_COVER_LETTER_LENGTH:
-        issues.append("Cover letter is too short")
+        cl_issues.append("Cover letter is too short")
     if not state.get("email_subject", "").strip():
-        issues.append("Email subject is empty")
+        email_issues.append("Email subject is empty")
 
-    return issues
+    return email_issues, cl_issues
 
 async def _llm_tone_check(state: ApplyAssistantState) -> list:
     """Only reached when deterministic checks pass. Uses Groq for fast JSON validation."""
@@ -255,59 +258,77 @@ async def _llm_tone_check(state: ApplyAssistantState) -> list:
 
 async def quality_validator_node(state: ApplyAssistantState) -> dict:
     """Validates the generated draft before it reaches the user."""
-    issues = _deterministic_checks(state)
-    if not issues:
-        issues = await _llm_tone_check(state)
+    email_issues, cl_issues = _deterministic_checks(state)
+    all_issues = list(email_issues) + list(cl_issues)
+    if not all_issues:
+        llm_issues = await _llm_tone_check(state)
+        for iss in llm_issues:
+            all_issues.append(iss)
+            if "cover letter" in iss.lower():
+                cl_issues.append(iss)
+            else:
+                email_issues.append(iss)
 
     retry_count = state.get("retry_count", 0)
-    if issues:
+    if all_issues:
         retry_count += 1
 
     return {
-        "validation_issues": issues,
+        "validation_issues": all_issues,
+        "email_issues": email_issues,
+        "cl_issues": cl_issues,
         "retry_count": retry_count,
-        "needs_manual_review": bool(issues) and retry_count >= MAX_RETRIES,
+        "needs_manual_review": bool(all_issues) and retry_count >= MAX_RETRIES,
     }
 
 # ─── GRAPH WIRING ────────────────────────────────────────────────────────────
 
-def _route_after_validation(state: ApplyAssistantState) -> str:
+def _route_after_validation(state: ApplyAssistantState):
     if not state.get("validation_issues"):
         return "end"
     if state.get("needs_manual_review"):
         return "give_up"
-    return "retry"
 
-async def concurrent_drafting_node(state: ApplyAssistantState) -> dict:
-    """Executes Email and Cover Letter generation concurrently using asyncio.gather for ultra-low latency."""
-    email_res, cl_res = await asyncio.gather(
-        email_generator_node(state),
-        cover_letter_generator_node(state),
-    )
-    result = {}
-    result.update(email_res)
-    result.update(cl_res)
-    return result
+    has_email_err = bool(state.get("email_issues"))
+    has_cl_err = bool(state.get("cl_issues"))
+
+    # Selective targeted retry: only re-run the node that had errors!
+    if has_email_err and has_cl_err:
+        return ["email_generator", "cover_letter_generator"]
+    elif has_email_err:
+        return "email_generator"
+    elif has_cl_err:
+        return "cover_letter_generator"
+    return ["email_generator", "cover_letter_generator"]
 
 
 def build_apply_assistant_graph():
     graph = StateGraph(ApplyAssistantState)
 
+    # 1. Register Nodes
     graph.add_node("jd_analyzer", jd_analyzer_node)
-    graph.add_node("drafting_engine", concurrent_drafting_node)
+    graph.add_node("email_generator", email_generator_node)
+    graph.add_node("cover_letter_generator", cover_letter_generator_node)
     graph.add_node("quality_validator", quality_validator_node)
 
+    # 2. Entry & Native Parallel Fan-Out
     graph.set_entry_point("jd_analyzer")
-    graph.add_edge("jd_analyzer", "drafting_engine")
-    graph.add_edge("drafting_engine", "quality_validator")
+    graph.add_edge("jd_analyzer", "email_generator")
+    graph.add_edge("jd_analyzer", "cover_letter_generator")
 
+    # 3. Native Parallel Fan-In to Validator
+    graph.add_edge("email_generator", "quality_validator")
+    graph.add_edge("cover_letter_generator", "quality_validator")
+
+    # 4. Selective Self-Correction Loop
     graph.add_conditional_edges(
         "quality_validator",
         _route_after_validation,
         {
+            "email_generator": "email_generator",
+            "cover_letter_generator": "cover_letter_generator",
             "end": END,
-            "retry": "drafting_engine",   
-            "give_up": END,               
+            "give_up": END,
         },
     )
 

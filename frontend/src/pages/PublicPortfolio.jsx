@@ -15,6 +15,7 @@ import NeonDeveloperTheme from '../components/portfolio/themes/NeonDeveloperThem
 import ThreeDInteractiveTheme from '../components/portfolio/themes/ThreeDInteractiveTheme';
 import BentoGridTheme from '../components/portfolio/themes/BentoGridTheme';
 import { cleanSkillsDict } from '../components/portfolio/Step3Skills';
+import SEO from '../components/common/SEO';
 
 export default function PublicPortfolio() {
   const { username } = useParams();
@@ -180,11 +181,35 @@ export default function PublicPortfolio() {
     }
   };
 
+  const personSchema = profile ? {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    mainEntity: {
+      '@type': 'Person',
+      name: profile.full_name || username,
+      jobTitle: profile.headline || 'Software Engineer',
+      description: profile.bio || `${profile.full_name || username}'s verified developer portfolio on CareerShala.`,
+      image: profile.avatar_url || 'https://www.careershala.tech/logo.png',
+      sameAs: [
+        profile.github_url,
+        profile.linkedin_url,
+        profile.website_url,
+      ].filter(Boolean),
+    },
+  } : null;
+
   return (
     <div 
       id="portfolio-scroll-container" 
       className="w-full min-h-screen relative"
     >
+      <SEO
+        title={`${profile.full_name || username} — Developer Portfolio`}
+        description={profile.bio || `Explore ${profile.full_name || username}'s verified developer projects, skills, and resume on CareerShala.`}
+        ogImage={profile.avatar_url || 'https://www.careershala.tech/logo.png'}
+        canonical={`https://www.careershala.tech/portfolio/${username}`}
+        schema={personSchema}
+      />
       {renderTheme()}
     </div>
   );

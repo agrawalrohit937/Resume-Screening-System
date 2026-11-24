@@ -7,6 +7,7 @@ import { isMobileViewport } from '../utils/motionUtils'
 import LandingNavbar from '../components/landing/LandingNavbar'
 import LandingHeroSection from '../components/landing/LandingHeroSection'
 import LandingFeaturesSection from '../components/landing/LandingFeaturesSection'
+import SEO from '../components/common/SEO'
 
 const AmbientMotionBg = lazy(() => import('../components/landing/AmbientMotionBg'))
 const LandingCertificateSection = lazy(() => import('../components/landing/LandingCertificateSection'))
@@ -19,11 +20,18 @@ const LandingFaqSection = lazy(() => import('../components/landing/LandingFaqSec
 const LandingFinalCtaSection = lazy(() => import('../components/landing/LandingFinalCtaSection'))
 const LandingFooter = lazy(() => import('../components/landing/LandingFooter'))
 
+const isCrawlerBot = () => {
+  if (typeof window === 'undefined' || !window.navigator) return false
+  const ua = window.navigator.userAgent || ''
+  return /bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|facebookexternalhit|ia_archiver|twitterbot|linkedinbot|slackbot|telegrambot|whatsapp|gptbot|chatgpt|perplexitybot|claudebot|anthropic-ai|bytespider/i.test(ua)
+}
+
 function DeferredLandingSection({ children, minHeight = 'min-h-[520px]' }) {
   const sectionRef = useRef(null)
-  const [shouldRender, setShouldRender] = useState(false)
+  const [shouldRender, setShouldRender] = useState(isCrawlerBot)
 
   useEffect(() => {
+    if (shouldRender) return undefined
     const node = sectionRef.current
     if (!node) return undefined
 
@@ -42,7 +50,7 @@ function DeferredLandingSection({ children, minHeight = 'min-h-[520px]' }) {
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [])
+  }, [shouldRender])
 
   return (
     <div ref={sectionRef} className={shouldRender ? '' : minHeight}>
@@ -177,6 +185,11 @@ export default function CareerShalaLanding() {
 
   return (
     <MotionConfig reducedMotion={isMobile ? 'always' : 'user'}>
+      <SEO
+        title="CareerShala — Turn Your Resume into Job Offers with AI"
+        description="CareerShala is your AI career co-pilot. Optimize resumes for ATS filters, practice live AI mock interviews, and launch verified developer portfolios."
+        canonical="https://www.careershala.tech/"
+      />
       <div className="landing-page min-h-screen w-full bg-slate-50 text-slate-900 font-sans relative overflow-x-hidden selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA] pt-14 sm:pt-16">
         {/* Background Ambient Lighting & Mesh (Lazy Loaded with Instant Fallback) */}
         <Suspense fallback={<AmbientFallback />}>

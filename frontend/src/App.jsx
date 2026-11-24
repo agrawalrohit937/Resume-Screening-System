@@ -265,9 +265,11 @@ export default function App() {
               <Route path="/accept-invite" element={<AcceptInvite />} />
 
 
-              {/* ── Public Landing, Careers & Portfolios ── */}
+              {/* ── Public Landing, Careers, Portfolios & Jobs ── */}
               <Route path="/" element={<CareerShalaLanding />} />
               <Route path="/careers" element={<Careers />} />
+              <Route path="/jobs" element={<JobFeed />} />
+              <Route path="/results" element={<Results />} />
               <Route path="/portfolio/:username" element={<PublicPortfolio />} />
               <Route path="/portfolio/public/:username" element={<PublicPortfolio />} />
               <Route path="/company/:companyName" element={<CompanyProfile />} />
@@ -284,7 +286,6 @@ export default function App() {
                 <Route path="portfolio-builder" element={<PortfolioBuilder />} />
                 <Route path="portfolio" element={<Navigate to="/portfolio-builder" replace />} />
 
-                <Route path="results" element={<Results />} />
                 <Route path="billing" element={<Billing />} />
                 <Route path="support" element={<SupportTickets />} />
                 <Route path="support/:id" element={<TicketDetail />} />
@@ -308,7 +309,6 @@ export default function App() {
                 <Route path="recruiter/jobs/:jobId/applicants" element={<RecruiterRoute><JobApplicants /></RecruiterRoute>} />
                 <Route path="recruiter/company" element={<RecruiterRoute><ManageCompany /></RecruiterRoute>} />
                 <Route path="recruiter/settings" element={<RecruiterRoute><RecruiterSettings /></RecruiterRoute>} />
-                <Route path="jobs" element={<JobFeed />} />
                 <Route path="applications" element={<ApplicationTracker />} />
 
                 {/* Admin Dashboard */}

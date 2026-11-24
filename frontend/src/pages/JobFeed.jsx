@@ -9,13 +9,15 @@ import {
   Loader2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import AppLayout from '../components/AppLayout'
 import { getJobs, getJobDetail, applyToJob, matchJobATS, getMyApplications } from '../services/api'
 import CustomDropdown from '../components/common/CustomDropdown'
 import JobCard from '../components/jobs/JobCard'
 import JobDetailPane from '../components/jobs/JobDetailPane'
 import JobMatchModal from '../components/jobs/JobMatchModal'
+import SEO from '../components/common/SEO'
 import {
   normalizeJob,
   resolveJobLogo,
@@ -200,6 +202,11 @@ export default function JobFeed() {
 
   const handleCalculateMatch = async (job) => {
     if (!job) return
+    if (!user) {
+      toast.error('Please sign in to calculate your ATS resume match %!')
+      navigate('/login?redirect=/jobs')
+      return
+    }
     setMatchLoading(true)
     setMatchTargetJob(job)
     setIsMatchModalOpen(true)
@@ -225,6 +232,11 @@ export default function JobFeed() {
 
   const handleApply = async (job) => {
     if (!job?.id) return
+    if (!user) {
+      toast.error('Please sign in to apply to this job! 🚀')
+      navigate('/login?redirect=/jobs')
+      return
+    }
     const safeJob = normalizeJob(job)
 
     if (safeJob.is_external) {
@@ -267,8 +279,13 @@ export default function JobFeed() {
 
   const targetMatchJob = matchTargetJob || activeJobDetail
 
-  return (
+  const feedContent = (
     <div className="w-full space-y-3 sm:space-y-6 font-sans text-slate-800 antialiased pb-20">
+      <SEO
+        title="Explore Tech Jobs & Developer Openings — CareerShala"
+        description="Search thousands of verified remote, hybrid, and onsite tech jobs. Compare your resume with AI ATS matching and apply directly."
+        canonical="https://www.careershala.tech/jobs"
+      />
       {/* Top Header & Filter Toolbar */}
       <div className="w-full bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs p-3 sm:p-6">
         <div className="flex items-center justify-between gap-3">
@@ -477,6 +494,81 @@ export default function JobFeed() {
           handleApply(targetMatchJob)
         }}
       />
+    </div>
+  )
+
+  // If user is logged in, wrap inside the dashboard AppLayout
+  if (user) {
+    return (
+      <AppLayout>
+        {feedContent}
+      </AppLayout>
+    )
+  }
+
+  // If unauthenticated (or search crawler), render clean public Job Board view with top navigation
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
+      {/* ── Public Sticky Header ── */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1.5 group-hover:scale-105 transition-transform">
+              <img src="/logo_t.webp" alt="CareerShala" className="w-full h-full object-contain" />
+            </div>
+            <span className="text-xl font-extrabold tracking-tight text-slate-900">
+              Career<span className="text-[#2E9BDA]">Shala</span>
+            </span>
+            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60 ml-2">
+              Jobs
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <Link
+              to="/careers"
+              className="hidden md:inline-flex text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              We're Hiring
+            </Link>
+            <Link
+              to="/login?redirect=/jobs"
+              className="px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/signup?redirect=/jobs"
+              className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition"
+            >
+              Get Started Free
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Public Banner Alert ── */}
+      <div className="bg-gradient-to-r from-sky-50 via-indigo-50/50 to-white border-b border-sky-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>
+              <strong>Public Job Board:</strong> You are browsing live tech opportunities. Sign in to apply in 1-click and get your instant AI ATS resume match score!
+            </span>
+          </div>
+          <Link
+            to="/signup?redirect=/jobs"
+            className="text-[#2E9BDA] hover:underline font-bold whitespace-nowrap self-start sm:self-auto"
+          >
+            Create Free Account &rarr;
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Job Feed Container ── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {feedContent}
+      </main>
     </div>
   )
 }

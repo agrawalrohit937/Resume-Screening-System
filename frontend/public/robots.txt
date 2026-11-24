@@ -1,0 +1,54 @@
+# robots.txt for CareerShala (https://www.careershala.tech)
+User-agent: *
+Allow: /
+Allow: /jobs
+Allow: /results
+Allow: /careers
+Allow: /portfolio/*
+Allow: /verify/*
+Allow: /company/*
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+# Disallow authenticated, private, and internal callback routes
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /settings
+Disallow: /portfolio-builder
+Disallow: /billing
+Disallow: /support
+Disallow: /apply-assistant
+Disallow: /interview
+Disallow: /live-interview
+Disallow: /gamification
+Disallow: /premium
+Disallow: /recruiter/
+Disallow: /admin/
+Disallow: /interviewer/
+Disallow: /team
+Disallow: /linkedin-callback
+Disallow: /github-callback
+Disallow: /gmail-callback
+Disallow: /accept-invite
+Disallow: /api/
+
+# Explicitly welcome AI Search Crawlers for Generative Engine Optimization (GEO)
+User-agent: GPTBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://www.careershala.tech/sitemap.xml
