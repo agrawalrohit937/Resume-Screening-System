@@ -14,6 +14,7 @@ import {
     Sparkles,
 } from 'lucide-react'
 import { verifyCertificate } from '../services/certificateApi'
+import SEO from '../components/common/SEO'
 
 function Row({ icon: Icon, label, value }) {
     if (!value) return null
@@ -48,8 +49,30 @@ export default function VerifyCertificate() {
         return () => { cancelled = true }
     }, [certificateId])
 
+    const credentialSchema = data?.valid ? {
+        '@context': 'https://schema.org',
+        '@type': 'EducationalOccupationalCredential',
+        name: data.skill_name || 'Verified AI Mock Interview Credential',
+        credentialCategory: 'Certificate of Competence',
+        validIn: {
+            '@type': 'AdministrativeArea',
+            name: 'Worldwide',
+        },
+        recognizedBy: {
+            '@type': 'Organization',
+            name: 'CareerShala',
+            url: 'https://www.careershala.tech',
+        },
+    } : null;
+
     return (
         <div className="min-h-screen bg-slate-50 [background-image:radial-gradient(circle_at_1px_1px,theme(colors.slate.200)_1px,transparent_0)] [background-size:24px_24px] px-6 py-12 font-sans text-slate-900">
+            <SEO
+                title={`Verify Certificate ${certificateId || ''} — CareerShala`}
+                description="Official verification portal for CareerShala proctored interview certificates and verified skill achievements."
+                canonical={`https://www.careershala.tech/verify/${certificateId || ''}`}
+                schema={credentialSchema}
+            />
             <div className="mx-auto max-w-lg">
 
                 <div className="mb-8 text-center">

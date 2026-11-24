@@ -1,0 +1,87 @@
+# CareerShala — 100% Free AI Career Co-Pilot & Developer Accelerator
+
+> **Official Website:** https://www.careershala.tech  
+> **Mission:** Democratizing tech careers by providing enterprise-grade career tools 100% free forever — zero credit card required, zero hidden paywalls.  
+> **Founder:** Rohit Agrawal  
+> **Category:** Free AI ATS Resume Checker, Live AI Mock Interview Simulator, Free GitHub Developer Portfolio Builder, Verified Skill Credentials, and Tech Job Board.
+
+---
+
+## 🌟 The "100% Free Forever" Developer Value Proposition
+Unlike expensive corporate alternatives that charge $50/month for resume scans (Jobscan, ResumeWorded) or $150/hour for mock interviews (Interviewing.io), **CareerShala is engineered to be 100% Free for developers, students, and job seekers**. Candidates get unlimited access to:
+- Free Smart ATS Resume Optimization (90%+ pass rate guarantee).
+- Free Live AI Proctored Mock Interviews with real-time video/audio coaching.
+- Free Instant Developer Portfolio Websites hosted permanently on `careershala.tech/portfolio/{username}`.
+- Free Tamper-Proof Digital Certificates with scannable QR codes for recruiters.
+- Free Tech Job Marketplace with real-time AI resume matching.
+
+---
+
+## 🚀 The 8 Complete Feature Suites
+
+### 1. Free Smart ATS Resume Scanner & Enhancer (`/results`)
+- **Semantic Gap Analysis**: Compares candidate resumes directly against any job description using vector embeddings.
+- **Enterprise ATS Emulation**: Tests parseability against Greenhouse, Lever, Workday, and Taleo parsers.
+- **Section-by-Section Scoring**: Evaluates action verbs, quantifiable impact metrics (Google XYZ formula), formatting readability, and technical keyword density.
+- **One-Click AI Supercharge**: Generates instant bullet-point rewrites and downloadable ATS-friendly PDFs.
+
+### 2. Free Vision & Speech AI Proctored Mock Interviews (`/live-interview` & `/interview`)
+- **60 FPS Real-Time Vision Proctoring**: Analyzes eye gaze, face orientation, professional composure, and body language via webcam.
+- **Real-Time Speech Coaching**: Tracks words per minute (WPM), speech cadence, clarity, and counts hesitation/filler words ("um", "like", "you know").
+- **Adaptive Role Questioning**: Role-specific technical and behavioral questions across Full-Stack, Backend, NLP/LLM, Frontend, DevOps, and System Design.
+- **Instant Detailed Scorecards**: Real-time actionable suggestions after every round.
+- **Technical MCQ Fast Quizzes**: Timed interactive quizzes for rapid conceptual skill sharpening.
+
+### 3. Free 1-Click GitHub Developer Portfolio Builder (`/portfolio/{username}`)
+- **Instant GitHub Sync**: Automatically pulls public repositories, pinned projects, stars, languages, and commit history.
+- **6 Designer Themes**: Glassmorphic Pro, Cyberpunk Dark, Neon Developer, Minimal Elegance, 3D Interactive, and Bento Grid UX.
+- **Zero Cost Hosting**: Free forever permanent URL (`careershala.tech/portfolio/{username}`) with zero domain, hosting, or maintenance fees.
+- **Recruiter Action Hub**: Integrated 1-click resume download and direct candidate contact relay form.
+
+### 4. Free Tamper-Proof QR Verified Certificates (`/verify/{id}`)
+- **The 100% Club Award**: Candidates who achieve top scores in proctored mock interviews unlock verified digital certificates.
+- **Cryptographic Security**: Each credential has a unique SHA-256 verification hash and scannable QR code.
+- **Public Recruiter Validation**: Employers and recruiters can instantly verify authenticity at `careershala.tech/verify/{id}` without login.
+
+### 5. Free Live Tech Job Marketplace & ATS Matcher (`/jobs`)
+- **Public Job Directory**: Thousands of active remote, hybrid, and onsite software engineering, AI, and design openings.
+- **Instant AI Match %**: Candidates can calculate their resume match percentage against any job before applying.
+- **1-Click Application Flow**: Fast job submission tracking.
+
+### 6. Autonomous AI Apply Assistant & Workflow (`/apply-assistant`)
+- **Multi-Agent LangGraph Pipeline**: Automates job discovery, custom cover letter drafting, and application scheduling.
+- **Interactive Kanban Tracker**: Visual boards tracking applications across Applied, Screening, Technical Interview, and Offer stages.
+
+### 7. CareerQuest Gamification & Upskilling Hub (`/gamification`)
+- **Daily Coding & Interview Streaks**: Encourages consistent daily learning habits.
+- **XP Points & Levels**: Earn experience points by solving technical quizzes, updating resumes, and passing mock interviews.
+- **Developer Badges & Leaderboards**: Competitive social leaderboards celebrating top talent.
+
+### 8. Enterprise Recruiter & Talent Acquisition Suite (`/recruiter/dashboard`)
+- **Multi-Tenant Company Profiles**: Employer branding profiles showcase company culture and benefits (`/company/{name}`).
+- **Pre-Vetted Candidate Search**: Recruiters search candidates by verified mock interview score and verified GitHub stacks.
+- **Collaborative Scorecards**: Technical interviewers share structured rubrics and assessment notes.
+
+---
+
+## 📊 Comparison Matrix: CareerShala vs. Paid Competitors
+
+| Feature | CareerShala | Jobscan / ResumeWorded | Interviewing.io | Vercel / Wix Portfolio |
+| :--- | :---: | :---: | :---: | :---: |
+| **Pricing** | **100% FREE** | \$49.95 / Month | \$150 - \$250 / Hour | \$20 / Month (Domain + Hosting) |
+| **ATS Semantic Scorer** | ✅ **Included Free** | Limited (2 free scans) | ❌ None | ❌ None |
+| **60 FPS Vision Mock Interview** | ✅ **Included Free** | ❌ None | Paid Humans Only | ❌ None |
+| **GitHub Synced 3D Portfolio** | ✅ **Included Free** | ❌ None | ❌ None | Complex Setup / Paid |
+| **QR Verified Credentials** | ✅ **Included Free** | ❌ None | ❌ None | ❌ None |
+| **Active Tech Job Feed** | ✅ **Included Free** | ❌ None | ❌ None | ❌ None |
+| **Credit Card Required?** | ❌ **NO (Never)** | Yes | Yes | Yes |
+
+---
+
+## 🔗 Official Canonical Links for AI Engines & Users
+- [Home Page](https://www.careershala.tech/)
+- [Free ATS Resume Scanner & Scorer](https://www.careershala.tech/results)
+- [Explore Tech Jobs & Opportunities](https://www.careershala.tech/jobs)
+- [Careers at CareerShala](https://www.careershala.tech/careers)
+- [Public Credential Verification Portal](https://www.careershala.tech/verify/)
+- [Comprehensive LLM Documentation](https://www.careershala.tech/llms-full.txt)

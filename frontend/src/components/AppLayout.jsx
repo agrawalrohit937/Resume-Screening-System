@@ -171,7 +171,7 @@ function MobileHeader({ onMenuToggle }) {
   )
 }
 
-export default function AppLayout() {
+export default function AppLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
@@ -316,7 +316,7 @@ export default function AppLayout() {
             } animate-fade-in`}>
               <RouteErrorBoundary>
                 <Suspense fallback={<Loader />}>
-                  <Outlet />
+                  {children || <Outlet />}
                 </Suspense>
               </RouteErrorBoundary>
             </div>

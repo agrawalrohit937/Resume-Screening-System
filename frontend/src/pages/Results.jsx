@@ -5,11 +5,13 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDropzone } from 'react-dropzone'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
+import AppLayout from '../components/AppLayout'
+import SEO from '../components/common/SEO'
 import {
   Loader2,
   FileText,
@@ -207,6 +209,12 @@ export default function Results() {
     const file = accepted[0]
     if (!file) return
 
+    if (!user) {
+      toast.error('Please sign in with Google to analyze your resume and get your free ATS score! 🚀')
+      navigate('/login?redirect=/results')
+      return
+    }
+
     setResumeFile(file)
     setUploading(true)
     setUploadProgress(15)
@@ -315,6 +323,11 @@ export default function Results() {
   })
 
   const handleAnalyze = async () => {
+    if (!user) {
+      toast.error('Please sign in with Google to analyze your resume and get your free ATS score! 🚀')
+      navigate('/login?redirect=/results')
+      return
+    }
     if (!resumeId) {
       toast.error('Please upload or select a resume first')
       return
@@ -501,8 +514,13 @@ export default function Results() {
 
   const isJdReady = jdText.trim().length >= 50 || !!jdFile
 
-  return (
+  const resultsContent = (
     <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-24 sm:pb-20 font-sans text-slate-900 antialiased relative px-3 sm:px-6 lg:px-8">
+      <SEO
+        title="Free AI ATS Resume Checker & Scanner — CareerShala"
+        description="Check your resume's ATS compatibility score against any job description with CareerShala's AI scanner. Identify missing skills and boost interview callbacks."
+        canonical="https://www.careershala.tech/results"
+      />
       <div className="absolute top-0 right-0 w-[500px] h-[350px] bg-blue-500/5 blur-3xl rounded-full -z-10 pointer-events-none" />
 
       <div className="w-full relative z-10 space-y-4 sm:space-y-6">
@@ -830,6 +848,80 @@ export default function Results() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  )
+
+  // If user is logged in, wrap inside the dashboard AppLayout
+  if (user) {
+    return (
+      <AppLayout>
+        {resultsContent}
+      </AppLayout>
+    )
+  }
+
+  // If unauthenticated (or search crawler), render clean public ATS Scanner view with top navigation
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
+      {/* ── Public Sticky Header ── */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center p-1.5 group-hover:scale-105 transition-transform">
+              <img src="/logo_t.webp" alt="CareerShala" className="w-full h-full object-contain" />
+            </div>
+            <span className="text-xl font-extrabold tracking-tight text-slate-900">
+              Career<span className="text-[#2E9BDA]">Shala</span>
+            </span>
+            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60 ml-2">
+              ATS Scanner
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <Link
+              to="/jobs"
+              className="hidden md:inline-flex text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              Explore Jobs
+            </Link>
+            <Link
+              to="/login?redirect=/results"
+              className="px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/signup?redirect=/results"
+              className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition"
+            >
+              Get Started Free
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Public Banner Alert ── */}
+      <div className="bg-gradient-to-r from-sky-50 via-indigo-50/50 to-white border-b border-sky-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>
+              <strong>Free AI ATS Scanner:</strong> Drop your resume PDF and test it against any target role to find missing skills and formatting errors for free!
+            </span>
+          </div>
+          <Link
+            to="/signup?redirect=/results"
+            className="text-[#2E9BDA] hover:underline font-bold whitespace-nowrap self-start sm:self-auto"
+          >
+            Create Free Account &rarr;
+          </Link>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {resultsContent}
+      </main>
     </div>
   )
 }

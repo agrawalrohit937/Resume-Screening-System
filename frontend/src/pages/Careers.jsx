@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { submitCareerApplication } from '../services/careersApi';
 import CustomDropdown from '../components/common/CustomDropdown';
+import SEO from '../components/common/SEO';
 
 // Available Positions
 const JOB_LISTINGS = [
@@ -327,8 +328,37 @@ export default function Careers() {
     }
   };
 
+  const jobPostingSchema = {
+    '@context': 'https://schema.org',
+    '@graph': JOB_LISTINGS.map((job) => ({
+      '@type': 'JobPosting',
+      title: job.title,
+      description: `${job.description} Required skills: ${job.skills.join(', ')}.`,
+      datePosted: '2026-01-01',
+      validThrough: '2026-12-31',
+      employmentType: 'FULL_TIME',
+      hiringOrganization: {
+        '@type': 'Organization',
+        name: 'CareerShala',
+        sameAs: 'https://www.careershala.tech',
+        logo: 'https://www.careershala.tech/logo.png',
+      },
+      jobLocationType: 'TELECOMMUTE',
+      applicantLocationRequirements: {
+        '@type': 'Country',
+        name: 'Worldwide',
+      },
+    })),
+  };
+
   return (
     <div className="fixed inset-0 overflow-y-auto overscroll-y-contain custom-scrollbar bg-slate-50 text-slate-900 font-sans selection:bg-[#2E9BDA]/20 selection:text-[#2E9BDA]">
+      <SEO
+        title="Careers at CareerShala — Join the AI Career Platform Team"
+        description="Explore high-impact engineering, AI research, and product roles at CareerShala. Build real-time AI mock interview engines, ATS optimizers, and verified developer portfolios."
+        canonical="https://www.careershala.tech/careers"
+        schema={jobPostingSchema}
+      />
       {/* Ambient background decoration */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-96 bg-gradient-to-b from-sky-200/50 via-indigo-100/30 to-transparent blur-3xl pointer-events-none -z-10" />
 
