@@ -36,86 +36,10 @@ from schemas.copilot_schema import (
 from repositories.resume_repo import ResumeRepository
 from repositories.result_repo import ResultRepository
 from repositories.copilot_repo import CopilotRepository
-from services.copilot_service import CopilotService
+from services.copilot.service import CopilotService
 
 router = APIRouter()
 _copilot_svc = CopilotService()
-
-
-# ─── Deprecated v1 Payloads & Endpoints ────────────────────────────────────────
-
-class ChatMessage(BaseModel):
-    role: str = Field(..., description="'user' or 'bot'")
-    text: str = Field(..., description="Content of the message")
-
-
-class CopilotChatPayload(BaseModel):
-    message: str = Field(..., description="Current user query")
-    history: List[dict] = Field(default_factory=list, description="Recent conversation history")
-    quick_action: Optional[str] = Field(default=None, description="Optional quick action key")
-    force_refresh: bool = Field(default=False, description="Bypass cache and load fresh data")
-
-
-@router.post("/chat", deprecated=True)
-async def chat_copilot(
-    request: Request,
-    payload: CopilotChatPayload,
-    background_tasks: BackgroundTasks,
-    current_user: UserModel = Depends(get_current_active_user),
-    db=Depends(get_db),
-    resume_repo: ResumeRepository = Depends(get_resume_repo),
-    result_repo: ResultRepository = Depends(get_result_repo),
-    copilot_repo: CopilotRepository = Depends(get_copilot_repo),
-):
-    """
-    [DEPRECATED] v1 streaming conversation endpoint.
-    Maintained for backward compatibility. Powered entirely by CopilotRouter under the hood.
-    """
-    tenant_id = getattr(current_user, "tenant_id", "default")
-    user_id = str(current_user.id)
-
-    stream_gen = _copilot_svc.chat_copilot_v2_stream(
-        request=request,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        user_name=current_user.full_name,
-        session_id=None,
-        message=payload.message,
-        history=payload.history,
-        quick_action=payload.quick_action,
-        force_refresh=payload.force_refresh,
-        copilot_repo=copilot_repo,
-        db=db,
-        resume_repo=resume_repo,
-        result_repo=result_repo,
-        background_tasks=background_tasks,
-    )
-
-    async def v1_adapter():
-        try:
-            async for sse_chunk in stream_gen:
-                for line in sse_chunk.splitlines():
-                    if line.startswith("data: "):
-                        try:
-                            ev = json.loads(line[6:])
-                            ev_type = ev.get("type")
-                            if ev_type == "navigate":
-                                to_route = ev.get("to")
-                                nav_payload = {"navigate": to_route, "response": f"Navigating to {to_route}!"}
-                                yield f"data: {json.dumps(nav_payload)}\n\n"
-                            elif ev_type == "token":
-                                yield f"data: {json.dumps({'text': ev.get('delta')})}\n\n"
-                        except Exception:
-                            pass
-        except Exception as e:
-            err_payload = {"text": f"\n[Error: {str(e)}]"}
-            yield f"data: {json.dumps(err_payload)}\n\n"
-
-    return StreamingResponse(
-        v1_adapter(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
-    )
 
 
 from slowapi import Limiter

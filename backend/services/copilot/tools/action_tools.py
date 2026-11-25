@@ -249,40 +249,7 @@ class BuildLearningRoadmapTool(BaseTool):
         return ToolResult(ok=True, data={"milestones": milestones}, summary=summary, ui_card=ui_card)
 
 
-# ─── 5. draft_outreach_email ──────────────────────────────────────────────────
-
-class DraftOutreachEmailArgs(BaseModel):
-    job_id: Optional[str] = Field(default=None, description="Optional job ID to tailor email for")
-    jd_text: Optional[str] = Field(default=None, description="Job description text")
-    company_name: Optional[str] = Field(default=None, description="Company name")
-
-
-class DraftOutreachEmailTool(BaseTool):
-    name = "draft_outreach_email"
-    description = "Drafts a personalized recruiter outreach email tailored to a target role and company."
-    args_schema = DraftOutreachEmailArgs
-    side_effect = True
-    requires = ["resume"]
-
-    async def execute(self, ctx: ToolExecutionContext, args: DraftOutreachEmailArgs) -> ToolResult:
-        company = args.company_name or "the engineering team"
-        role_label = f"{args.job_id} role" if args.job_id else "engineering opening"
-        subject = f"Application: {ctx.user_name} — Impactful Contribution to {company}"
-        body = (
-            f"Dear Hiring Team at {company},\n\n"
-            f"I came across the {role_label} at {company} and was energized by your team's technical vision. "
-            f"With proven hands-on experience designing reliable systems, optimizing latency, and shipping customer-focused software, "
-            f"I am confident I can immediately contribute to your engineering objectives.\n\n"
-            f"I have attached my verified resume and portfolio for your review. Would you be open to a brief 10-minute introductory conversation this week?\n\n"
-            f"Best regards,\n{ctx.user_name}"
-        )
-
-        data = {"subject": subject, "body": body, "company": company, "role_context": role_label}
-        summary = f"Drafted tailored recruiter outreach message for {company}"
-        return ToolResult(ok=True, data=data, summary=summary)
-
-
-# ─── 6. navigate ──────────────────────────────────────────────────────────────
+# ─── 5. navigate ──────────────────────────────────────────────────────────────
 
 class NavigateArgs(BaseModel):
     route: str = Field(..., description="Target application route (e.g. '/interview', '/results', '/upload')")
@@ -330,5 +297,4 @@ tool_registry.register(RunATSMatchTool())
 tool_registry.register(EnhanceBulletsTool())
 tool_registry.register(GenerateInterviewQuestionsTool())
 tool_registry.register(BuildLearningRoadmapTool())
-tool_registry.register(DraftOutreachEmailTool())
 tool_registry.register(NavigateTool())

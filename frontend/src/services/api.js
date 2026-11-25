@@ -290,61 +290,6 @@ export const updateApplicationStage = (appId, stage) => api.patch(`/jobs/applica
 export const setPrimaryResume = (payload) =>
   api.put('/users/me/set-primary-resume', payload)
 
-export const chatCopilotStream = async (message, history = [], quickAction = null, forceRefresh = false) => {
-  let token = localStorage.getItem("access_token");
-  if (!token) {
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'access_token') {
-        token = value;
-        break;
-      }
-    }
-  }
-
-  const tenantId = localStorage.getItem("tenant_id") || "default";
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-tenant-id': tenantId,
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${BASE}/copilot/chat`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      message,
-      history,
-      quick_action: quickAction,
-      force_refresh: forceRefresh,
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    let friendlyMessage = 'Failed to connect to CareerMitra.';
-    try {
-      const errJson = JSON.parse(errText);
-      if (errJson.detail) {
-        if (response.status === 401 || String(errJson.detail).toLowerCase().includes('authenticated') || String(errJson.detail).toLowerCase().includes('credential')) {
-          friendlyMessage = 'Please sign in to chat with CareerMitra.';
-        } else {
-          friendlyMessage = errJson.detail;
-        }
-      }
-    } catch {
-      if (errText) friendlyMessage = errText;
-    }
-    throw new Error(friendlyMessage);
-  }
-
-  return response;
-};
-
 
 // Payment APIs
 export const createCheckout = (plan) => api.post('/payment/checkout', { plan })

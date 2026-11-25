@@ -157,12 +157,12 @@ def test_tool_registry_contains_all_15_tools():
     }
     expected_action_tools = {
         "run_ats_match", "enhance_bullets", "generate_interview_questions",
-        "build_learning_roadmap", "draft_outreach_email", "navigate",
+        "build_learning_roadmap", "navigate",
     }
 
     assert expected_read_tools.issubset(tool_names), f"Missing read tools: {expected_read_tools - tool_names}"
     assert expected_action_tools.issubset(tool_names), f"Missing action tools: {expected_action_tools - tool_names}"
-    assert len(tool_names) >= 15
+    assert len(tool_names) >= 14
 
 
 # ─── 2. Grounded Read Tools Tests ─────────────────────────────────────────────
