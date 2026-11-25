@@ -22,7 +22,6 @@ const DASHBOARD_ROUTES = new Set([
   '/recruiter',
   '/recruiter/dashboard',
   '/interviewer/dashboard',
-  '/hiring-manager/dashboard',
   '/exec/dashboard',
   '/admin',
 ])
@@ -42,17 +41,16 @@ function resolveEffectiveRole(user, pathname) {
 
   const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
   const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
-  const isHiringManager = userRoles.includes('hiring_manager')
   const isRecruiterRole = userRoles.includes('recruiter')
   const isInterviewerRole = userRoles.includes('interviewer')
   const isAdmin = isPlatformAdmin
-  const hasEmployerRole = isExecutive || isRecruiterRole || isHiringManager || isInterviewerRole || isAdmin
+  const hasEmployerRole = isExecutive || isRecruiterRole || isInterviewerRole || isAdmin
   const hasCandidateRole = userRolesArray.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
 
   // If Admin, check adminViewMode simulation
   if (isAdmin) {
     const adminMode = typeof window !== 'undefined' ? (localStorage.getItem('admin_view_mode') || 'admin') : 'admin'
-    if (['candidate', 'recruiter', 'hiring_manager', 'interviewer', 'exec', 'executive', 'admin'].includes(adminMode)) {
+    if (['candidate', 'recruiter', 'interviewer', 'exec', 'executive', 'admin'].includes(adminMode)) {
       if (adminMode === 'exec') return 'executive'
       return adminMode
     }
@@ -67,7 +65,6 @@ function resolveEffectiveRole(user, pathname) {
   const isEmployerRoute = pathname && (
     pathname.startsWith('/interviewer') ||
     pathname.startsWith('/recruiter') ||
-    pathname.startsWith('/hiring-manager') ||
     pathname.startsWith('/exec') ||
     pathname.startsWith('/admin')
   )
@@ -100,7 +97,6 @@ function resolveEffectiveRole(user, pathname) {
 
   // Active employer role resolution
   if (isInterviewerRole) return 'interviewer'
-  if (isHiringManager) return 'hiring_manager'
   if (isExecutive) return 'executive'
   if (isRecruiterRole) return 'recruiter'
 
@@ -125,17 +121,6 @@ function getNavItemsForRole(effectiveRole) {
         left: [
           { to: '/interviewer/dashboard', label: 'Scorecards', icon: ClipboardCheck },
           { to: '/live-interview', label: 'Live Mock', icon: Video },
-        ],
-        right: [
-          { to: '/recruiter/company', label: 'Company', icon: Building2 },
-        ],
-      }
-
-    case 'hiring_manager':
-      return {
-        left: [
-          { to: '/hiring-manager/dashboard', label: 'Pipeline', icon: LayoutDashboard },
-          { to: '/recruiter/jobs', label: 'Jobs', icon: Briefcase },
         ],
         right: [
           { to: '/recruiter/company', label: 'Company', icon: Building2 },

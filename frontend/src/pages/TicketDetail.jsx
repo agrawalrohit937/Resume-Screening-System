@@ -109,7 +109,7 @@ export default function TicketDetail() {
   const isEnterprise =
     user?.plan === 'enterprise' ||
     userRoles.some((r) =>
-      ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(r)
+      ['recruiter', 'admin', 'platform_admin', 'executive', 'exec'].includes(r)
     )
 
   const fetchTicket = useCallback(async (isSilent = false) => {

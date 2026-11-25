@@ -57,8 +57,7 @@ def test_negation_regression_suite():
     assert "Kubernetes" in skills5
 
 
-def test_spacy_dep_negation_flag(monkeypatch):
-    monkeypatch.setattr(ff, "FEATURE_DEP_NEGATION", True)
+def test_spacy_dep_negation_flag():
     skills = extract_skills_deterministic("Seeking engineer with Python, Java, but no Docker.")
     assert "Python" in skills
     assert "Java" in skills

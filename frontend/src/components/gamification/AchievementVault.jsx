@@ -13,9 +13,18 @@ const TIER_STYLES = {
 
 const TIER_ORDER = ['legendary', 'platinum', 'gold', 'silver', 'bronze']
 
+function isValidReactComponent(icon) {
+  if (typeof icon === 'function') return true
+  if (typeof icon === 'object' && icon !== null && '$$typeof' in icon) {
+    // Exclude already-created React elements; accept forwardRef / memo component types
+    return icon.$$typeof !== Symbol.for('react.element') && icon.$$typeof !== Symbol.for('react.transitional.element')
+  }
+  return false
+}
+
 function BadgeIcon({ badge, earned }) {
   if (!earned) return <Lock className="w-6 h-6 text-slate-400" />
-  if (typeof badge.icon === 'function' || (typeof badge.icon === 'object' && badge.icon !== null)) {
+  if (isValidReactComponent(badge.icon)) {
     return createElement(badge.icon, { className: 'w-8 h-8 text-white drop-shadow-md' })
   }
   if (typeof badge.icon === 'string' && badge.icon.length > 0) return <span className="text-2xl">{badge.icon}</span>

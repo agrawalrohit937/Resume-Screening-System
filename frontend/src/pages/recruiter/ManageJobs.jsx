@@ -193,7 +193,6 @@ function SalaryRangeControl({ salary, onChange }) {
 export default function ManageJobs() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const isHiringManager = (user?.role || '').toLowerCase() === 'hiring_manager' || (Array.isArray(user?.roles) && user.roles.includes('hiring_manager'))
   const cacheKey = `careershala_recruiter_jobs:${user?.id || user?._id || user?.email || 'anonymous'}`
   const hasCachedJobs = useRef(false)
 
@@ -674,19 +673,17 @@ Requirements & Qualifications:
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded-full px-3 py-1 text-xs font-semibold">
                   <Briefcase size={13} className="text-indigo-600" />
-                  {isHiringManager ? 'Department Hiring Portal' : 'Recruiter Control Center'}
+                  Recruiter Control Center
                 </span>
                 <span className="bg-slate-100 text-slate-600 border border-slate-200/60 rounded-full px-3 py-1 text-xs font-medium">
-                  {user?.full_name || user?.name || (isHiringManager ? 'Hiring Manager' : 'Recruiter')}
+                  {user?.full_name || user?.name || 'Recruiter'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                {isHiringManager ? 'Department Job Postings' : 'Manage Job Postings'}
+                Manage Job Postings
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xl">
-                {isHiringManager
-                  ? 'Monitor active department openings, review candidates in your talent pipeline, and configure job requirements.'
-                  : 'Oversee active openings, monitor incoming candidate submissions, and publish new positions indexed into the AI semantic matcher.'}
+                Oversee active openings, monitor incoming candidate submissions, and publish new positions indexed into the AI semantic matcher.
               </p>
             </div>
 
@@ -698,7 +695,7 @@ Requirements & Qualifications:
                 className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 text-sm font-semibold shadow-xs hover:shadow shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={16} />
-                <span>{isHiringManager ? 'Create Department Posting' : 'Post New Job'}</span>
+                <span>Post New Job</span>
               </button>
             </div>
           </div>

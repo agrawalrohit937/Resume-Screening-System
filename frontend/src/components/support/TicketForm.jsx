@@ -94,7 +94,7 @@ export default function TicketForm({ category = 'other', subcategory, onSuccess,
     user?.plan === 'premium' ||
     user?.plan === 'enterprise' ||
     userRoles.some((r) =>
-      ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(r)
+      ['recruiter', 'admin', 'platform_admin', 'executive', 'exec'].includes(r)
     )
 
   const availablePriorities = PRIORITIES.filter((p) => !p.premiumOnly || isPremium)

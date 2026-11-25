@@ -359,7 +359,7 @@ async def link_or_create_user(
         primary_role = UserRole.CANDIDATE.value
 
     resolved_tenant = "default"
-    if any(r in ("executive", "exec", "employer", "recruiter", "hiring_manager") for r in roles_list) and "@" in email:
+    if any(r in ("executive", "exec", "employer", "recruiter") for r in roles_list) and "@" in email:
         domain = email.split("@")[1].split(".")[0].lower()
         common = {"gmail", "yahoo", "hotmail", "outlook", "icloud", "proton", "mail", "aol"}
         if domain in common:

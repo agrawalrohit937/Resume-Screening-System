@@ -75,7 +75,7 @@ function PublicRoute({ children }) {
   ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
   const savedCtx = localStorage.getItem('careershala_view_context')
-  const ENTERPRISE = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
+  const ENTERPRISE = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'interviewer']
   const hasEnterprise = userRoles.some((r) => ENTERPRISE.includes(r))
   const isPureCandidate = !hasEnterprise
   const isDualRoleCandidate = hasEnterprise && userRoles.includes('candidate') && savedCtx === 'candidate'
@@ -110,7 +110,7 @@ function AdminRoute({ children }) {
     userRoles.some((r) => allowedRoles.includes(r))
 
   if (!isAllowed) {
-    const isEmployer = userRoles.some((r) => ['executive', 'exec', 'recruiter', 'hiring_manager'].includes(r))
+    const isEmployer = userRoles.some((r) => ['executive', 'exec', 'recruiter'].includes(r))
     return <Navigate to={isEmployer ? '/recruiter/dashboard' : '/dashboard'} replace />
   }
   return children
@@ -318,14 +318,10 @@ export default function App() {
                 <Route
                   path="interviewer/dashboard"
                   element={
-                    <RoleGuard allowedRoles={['interviewer', 'admin', 'recruiter', 'hiring_manager', 'executive', 'exec', 'platform_admin']} showAccessDeniedCard>
+                    <RoleGuard allowedRoles={['interviewer', 'admin', 'recruiter', 'executive', 'exec', 'platform_admin']} showAccessDeniedCard>
                       <InterviewerDashboard />
                     </RoleGuard>
                   }
-                />
-                <Route
-                  path="hiring-manager/dashboard"
-                  element={<Navigate to="/recruiter/dashboard" replace />}
                 />
                 <Route
                   path="exec/dashboard"

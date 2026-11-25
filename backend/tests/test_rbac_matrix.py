@@ -26,12 +26,6 @@ def test_rbac_roles_permissions_completeness():
     assert not has_permission(UserRole.RECRUITER, Permission.REQUISITIONS_APPROVE)
     assert not has_permission(UserRole.RECRUITER, Permission.SETTINGS_MANAGE)
 
-    # Hiring Manager has scorecard submission and requisition approvals
-    assert has_permission(UserRole.HIRING_MANAGER, Permission.REQUISITIONS_APPROVE)
-    assert has_permission(UserRole.HIRING_MANAGER, Permission.INTERVIEWS_SUBMIT_SCORECARD)
-    assert not has_permission(UserRole.HIRING_MANAGER, Permission.JOBS_WRITE)
-    assert not has_permission(UserRole.HIRING_MANAGER, Permission.APPLICATIONS_STAGE_UPDATE)
-
     # Interviewer is restricted evaluator
     assert has_permission(UserRole.INTERVIEWER, Permission.INTERVIEWS_SUBMIT_SCORECARD)
     assert not has_permission(UserRole.INTERVIEWER, Permission.JOBS_WRITE)

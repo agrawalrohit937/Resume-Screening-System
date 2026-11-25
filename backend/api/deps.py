@@ -349,7 +349,7 @@ def get_admin_user(current_user: UserModel = Depends(get_current_user)) -> UserM
 
 def get_recruiter_or_admin(current_user: UserModel = Depends(get_current_user)) -> UserModel:
     user_roles = {r.value if hasattr(r, "value") else str(r).lower() for r in (current_user.roles or [current_user.role])}
-    allowed = {"recruiter", "hiring_manager", "platform_admin", "admin", "executive", "exec"}
+    allowed = {"recruiter", "platform_admin", "admin", "executive", "exec"}
     if not user_roles.intersection(allowed):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter access required")
     return current_user

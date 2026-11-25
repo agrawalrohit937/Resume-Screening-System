@@ -14,25 +14,15 @@ class UserRole(str, Enum):
     PLATFORM_ADMIN = "platform_admin"
     EXECUTIVE = "executive"
     RECRUITER = "recruiter"
-    HIRING_MANAGER = "hiring_manager"
     INTERVIEWER = "interviewer"
-    COORDINATOR = "coordinator"
     CANDIDATE = "candidate"
-    ADMIN = "admin"  # Backward-compatibility alias for platform_admin
-    EXEC = "exec"    # Backward-compatibility alias for executive
-    EMPLOYER = "employer"  # Signup alias for company founder / executive
 
 
 ENTERPRISE_ROLES = {
     UserRole.PLATFORM_ADMIN,
-    UserRole.ADMIN,
     UserRole.EXECUTIVE,
-    UserRole.EXEC,
-    UserRole.EMPLOYER,
     UserRole.RECRUITER,
-    UserRole.HIRING_MANAGER,
     UserRole.INTERVIEWER,
-    UserRole.COORDINATOR,
 }
 
 

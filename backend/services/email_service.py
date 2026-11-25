@@ -309,10 +309,8 @@ class EmailService:
     ) -> bool:
         """Sends an enterprise team invitation email via Brevo HTTP API with an acceptance CTA button."""
         role_label_map = {
-            "recruiter": "Talent Recruiter",
-            "hiring_manager": "Hiring Manager",
+            "recruiter": "HR Recruiter",
             "interviewer": "Technical Interviewer",
-            "coordinator": "Interview Coordinator",
             "executive": "Executive Owner",
         }
         role_name = role_label_map.get(role.lower(), role.title().replace("_", " "))

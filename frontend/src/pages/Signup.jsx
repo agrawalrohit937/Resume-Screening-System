@@ -92,7 +92,7 @@ export default function Signup() {
         ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
         const isEmployer = userRoles.some((r) =>
-          ['executive', 'exec', 'recruiter', 'admin', 'hiring_manager'].includes(r)
+          ['executive', 'exec', 'recruiter', 'admin'].includes(r)
         )
         navigate(isEmployer ? '/recruiter/company' : '/profile')
       } catch (err) {
@@ -211,7 +211,7 @@ export default function Signup() {
           <div className="relative mt-4 sm:mt-5 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Select role">
             {[
               { id: 'candidate', label: 'Candidate', icon: User },
-              { id: 'employer', label: 'Employer / Company', icon: Building2 },
+              { id: 'executive', label: 'Employer / Company', icon: Building2 },
             ].map(({ id, label, icon: Icon }) => {
               const active = selectedRole === id
               return (
@@ -270,7 +270,7 @@ export default function Signup() {
             </div>
 
             {/* COMPANY NAME (Shown if Employer / Company is selected) */}
-            {selectedRole === 'employer' && (
+            {selectedRole === 'executive' && (
               <div>
                 <div className="mb-2.5 p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/60 text-[11px] text-blue-800 flex items-start gap-2">
                   <Building2 className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
@@ -288,7 +288,7 @@ export default function Signup() {
                     aria-label="Company Name"
                     disabled={loading}
                     {...register('company_name', {
-                      required: selectedRole === 'employer' ? 'Company name is required' : false,
+                      required: selectedRole === 'executive' ? 'Company name is required' : false,
                       minLength: { value: 2, message: 'Company name must be at least 2 characters' }
                     })}
                     className={`h-[42px] sm:h-[44px] w-full rounded-xl border bg-white pl-11 pr-4 text-[13.5px] shadow-sm outline-none transition-all placeholder:text-slate-400 ${
@@ -305,14 +305,14 @@ export default function Signup() {
             {/* EMAIL */}
             <div>
               <label htmlFor="email" className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
-                {selectedRole === 'employer' ? 'Work Email Address' : 'Email Address'}
+                {selectedRole === 'executive' ? 'Work Email Address' : 'Email Address'}
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400" />
                 <input
                   id="email"
                   type="email"
-                  placeholder={selectedRole === 'employer' ? 'you@company.com' : 'you@example.com'}
+                  placeholder={selectedRole === 'executive' ? 'you@company.com' : 'you@example.com'}
                   aria-label="Email Address"
                   disabled={loading}
                   {...register('email', {
@@ -322,7 +322,7 @@ export default function Signup() {
                       message: "Invalid email address"
                     },
                     validate: (value) => {
-                      if (selectedRole === 'employer') {
+                      if (selectedRole === 'executive') {
                         const domain = value.split('@')[1]?.toLowerCase()
                         const generic = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'proton.me', 'mail.com', 'aol.com']
                         if (domain && generic.includes(domain)) {

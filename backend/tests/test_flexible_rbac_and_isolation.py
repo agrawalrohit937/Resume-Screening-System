@@ -187,11 +187,11 @@ async def test_platform_admin_query_bypass():
         assert doc_a["tenant_id"] == "company_a"
 
 
-def test_employer_role_in_enterprise_roles():
-    """Verify EMPLOYER is recognized in UserRole and ENTERPRISE_ROLES."""
+def test_executive_role_in_enterprise_roles():
+    """Verify EXECUTIVE is recognized in UserRole and ENTERPRISE_ROLES."""
     from schemas.user_schema import ENTERPRISE_ROLES
-    assert UserRole.EMPLOYER == "employer"
-    assert UserRole.EMPLOYER in ENTERPRISE_ROLES
+    assert UserRole.EXECUTIVE == "executive"
+    assert UserRole.EXECUTIVE in ENTERPRISE_ROLES
 
 
 def test_employer_signup_default_roles_assignment():

@@ -354,7 +354,7 @@ export default function JobApplicants() {
 
   // Interview scheduling authority is granted to Interviewers, Hiring Managers, Executives, and Admins
   const canScheduleInterview = useMemo(() => {
-    const allowed = ['interviewer', 'hiring_manager', 'executive', 'exec', 'employer', 'admin', 'platform_admin']
+    const allowed = ['interviewer', 'executive', 'exec', 'employer', 'admin', 'platform_admin']
     return userRoles.some(r => allowed.includes(r))
   }, [userRoles])
 

@@ -335,21 +335,6 @@ class TeamInvite(Base):
     inviter = relationship("User")
 
 
-class TalentPoolProfile(Base):
-    __tablename__ = "talent_pool_profiles"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    candidate_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
-    opted_in = Column(Boolean, default=False, index=True)
-    visibility_tier = Column(String(50), default="public")
-    years_experience = Column(Float, default=0.0)
-    profile_data = Column(JSONB, default=dict)
-    created_at = Column(DateTime(timezone=True), default=now_utc)
-    updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
-
-    candidate = relationship("User")
-
-
 # ─── 8. Audit Logs, Support & System ───────────────────────────────────────────
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -617,45 +602,6 @@ class UserGamification(Base):
     updated_at = Column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
     user = relationship("User", back_populates="gamification")
-
-
-# ─── 16. Cron & Job Alert Deliveries ──────────────────────────────────────────
-class CronJobRun(Base):
-    __tablename__ = "cron_job_runs"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    job_name = Column(String(100), default="job_alerts", index=True)
-    slot_id = Column(String(100), nullable=False, index=True)
-    slot_type = Column(String(50), default="morning")
-    status = Column(String(50), default="running", index=True)
-    started_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    duration_ms = Column(Integer, nullable=True)
-    candidates_scanned = Column(Integer, default=0)
-    candidates_claimed = Column(Integer, default=0)
-    emails_delivered = Column(Integer, default=0)
-    emails_uncertain = Column(Integer, default=0)
-    emails_failed_permanent = Column(Integer, default=0)
-    retries_count = Column(Integer, default=0)
-    triggered_by = Column(String(50), default="scheduler")
-    sample_deliveries = Column(JSONB, default=list)
-    error_summary = Column(Text, nullable=True)
-
-
-class JobAlertDelivery(Base):
-    __tablename__ = "job_alert_deliveries"
-
-    id = Column(String(64), primary_key=True, default=gen_uuid_str)
-    candidate_id = Column(String(64), nullable=False, index=True)
-    slot_id = Column(String(100), nullable=False, index=True)
-    email = Column(String(255), nullable=False)
-    status = Column(String(50), default="CLAIMED", index=True)
-    matched_job_ids = Column(JSONB, default=list)
-    brevo_message_id = Column(Text, nullable=True)
-    attempt_count = Column(Integer, default=1)
-    claimed_at = Column(DateTime(timezone=True), default=now_utc, index=True)
-    delivered_at = Column(DateTime(timezone=True), nullable=True)
-    error = Column(Text, nullable=True)
 
 
 # ─── 18. Security Tokens & Revocations ─────────────────────────────────────────

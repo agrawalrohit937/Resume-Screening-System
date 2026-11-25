@@ -48,16 +48,14 @@ router = APIRouter()
 
 INVITABLE_ROLES = {
     UserRole.RECRUITER,
-    UserRole.HIRING_MANAGER,
     UserRole.INTERVIEWER,
-    UserRole.COORDINATOR,
     UserRole.EXECUTIVE,
 }
 
 
 def _ensure_can_manage_team(user: UserModel):
     """Ensure the user is a company owner (EXECUTIVE), RECRUITER, or PLATFORM_ADMIN."""
-    if not user.has_role(UserRole.EXECUTIVE, UserRole.EXEC, UserRole.PLATFORM_ADMIN, UserRole.ADMIN, UserRole.RECRUITER):
+    if not user.has_role(UserRole.EXECUTIVE, UserRole.PLATFORM_ADMIN, UserRole.RECRUITER):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only company Executives, Recruiters, and Admins can manage team members and invites.",
@@ -89,7 +87,7 @@ async def invite_team_member(
         )
 
     tenant_id = current_user.tenant_id or "default"
-    if tenant_id == "default" and not current_user.has_role(UserRole.PLATFORM_ADMIN, UserRole.ADMIN):
+    if tenant_id == "default" and not current_user.has_role(UserRole.PLATFORM_ADMIN):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Your organization must have an active tenant ID to invite team members.",
@@ -431,7 +429,7 @@ async def list_team_members(
     users_list_models, _ = await user_repo.list_users(tenant_id=tenant_id, skip=0, limit=100)
 
     # Strictly filter for enterprise/staff members (exclude regular candidates)
-    enterprise_staff_roles = {"recruiter", "hiring_manager", "interviewer", "executive", "admin", "platform_admin"}
+    enterprise_staff_roles = {"recruiter", "interviewer", "executive", "admin", "platform_admin"}
 
     def _is_enterprise_staff(u_role: Any, u_roles: Any) -> bool:
         clean_primary = str(u_role or "").lower().replace("userrole.", "").strip()
@@ -563,7 +561,7 @@ async def remove_team_member(
         )
 
     # Verify target belongs to the same tenant (unless platform admin)
-    if getattr(target_user, "tenant_id", None) != tenant_id and not current_user.has_role(UserRole.PLATFORM_ADMIN, UserRole.ADMIN):
+    if getattr(target_user, "tenant_id", None) != tenant_id and not current_user.has_role(UserRole.PLATFORM_ADMIN):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Team member does not belong to your organization.",

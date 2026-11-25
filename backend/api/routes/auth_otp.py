@@ -101,7 +101,7 @@ async def signup(
 
     # Resolve tenant_id for enterprise accounts
     is_enterprise = any(
-        r in ("executive", "exec", "employer", "recruiter", "hiring_manager", "interviewer")
+        r in ("executive", "exec", "employer", "recruiter", "interviewer")
         for r in roles_list
     )
 

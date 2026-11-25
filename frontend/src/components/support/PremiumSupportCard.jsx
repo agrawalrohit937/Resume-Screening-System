@@ -67,7 +67,7 @@ export default function PremiumSupportCard({ onGetSupport }) {
 
   const isEnterprise =
     user?.plan === 'enterprise' ||
-    userRoles.some((r) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(r))
+    userRoles.some((r) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec'].includes(r))
 
   const planKey = isEnterprise
     ? 'enterprise'

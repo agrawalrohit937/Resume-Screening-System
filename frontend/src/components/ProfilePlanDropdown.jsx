@@ -71,7 +71,7 @@ function ProfilePlanDropdown({ user: propUser, onClose }) {
   const isAdmin = userRoles.includes('admin') || userRoles.includes('platform_admin')
   const isExecutive = userRoles.includes('exec') || userRoles.includes('executive')
   const isInterviewer = userRoles.includes('interviewer')
-  const isRecruiter = userRoles.includes('recruiter') || userRoles.includes('hiring_manager')
+  const isRecruiter = userRoles.includes('recruiter')
   const hasCandidateRole = userRoles.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
   const hasEmployerRole = isAdmin || isExecutive || isInterviewer || isRecruiter
 

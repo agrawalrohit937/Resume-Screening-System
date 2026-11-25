@@ -23,20 +23,14 @@ router = APIRouter()
 
 ENTERPRISE_VIEW_ROLES = {
     UserRole.PLATFORM_ADMIN,
-    UserRole.ADMIN,
     UserRole.EXECUTIVE,
-    UserRole.EXEC,
-    UserRole.EMPLOYER,
     UserRole.RECRUITER,
-    UserRole.HIRING_MANAGER,
     UserRole.INTERVIEWER,
 }
 
 MANAGE_ROLES = {
     UserRole.PLATFORM_ADMIN,
-    UserRole.ADMIN,
     UserRole.EXECUTIVE,
-    UserRole.EXEC,
     "executive",
     "exec",
     "admin",

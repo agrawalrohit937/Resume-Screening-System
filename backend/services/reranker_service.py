@@ -5,7 +5,6 @@ Phase 1.3:
 - Provides thread-safe Singleton for local CrossEncoder (`BAAI/bge-reranker-v2-m3`).
 - Applies token-level bidirectional cross-attention on top-50 items after first-stage vector retrieval.
 - Input pairs are formatted deterministically as (requirement_digest, candidate_evidence_digest) capped at 512 tokens.
-- Guarded behind FEATURE_CROSS_ENCODER_RERANK feature flag.
 - Batch size 16 on CPU with latency monitoring (auto-throttles to top-25 if > 400ms).
 """
 
@@ -17,8 +16,6 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-
-from core.feature_flags import FEATURE_CROSS_ENCODER_RERANK
 
 logger = structlog.get_logger(__name__)
 
@@ -161,43 +158,6 @@ class RerankerServiceSingleton:
         except Exception as e:
             logger.error("Cross-encoder predict failed, returning neutral scores", error=str(e))
             return [0.5] * len(pairs)
-
-    def rerank_candidate_jobs(
-        self,
-        candidate_summary: str,
-        jobs: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
-        """
-        Reranks top candidate jobs using cross-attention if FEATURE_CROSS_ENCODER_RERANK is enabled.
-        """
-        if not jobs:
-            return []
-
-        if not FEATURE_CROSS_ENCODER_RERANK:
-            return jobs
-
-        top_candidates = jobs[:self._max_candidates]
-        tail_candidates = jobs[self._max_candidates:]
-
-        pairs = [
-            (
-                str(job.get("jd_text_raw") or job.get("title") or "")[:512],
-                candidate_summary[:512],
-            )
-            for job in top_candidates
-        ]
-
-        scores = self.rerank_pairs(pairs)
-
-        for job, rerank_score in zip(top_candidates, scores):
-            job["reranker_score"] = round(rerank_score * 100.0, 1)
-            # Blend 70% base match score + 30% reranker score
-            base_score = float(job.get("match_score", 50.0))
-            blended = round(base_score * 0.70 + (rerank_score * 100.0) * 0.30, 1)
-            job["match_score"] = blended
-
-        top_candidates.sort(key=lambda j: j.get("match_score", 0.0), reverse=True)
-        return top_candidates + tail_candidates
 
 
 def get_reranker_service() -> RerankerServiceSingleton:
