@@ -26,14 +26,14 @@ export default function RoleGuard({ allowedRoles = [], fallbackPath = '/dashboar
     (typeof hasRole === 'function' && hasRole(allowedRoles)) ||
     userRoles.some((r) => normalizedAllowed.includes(r)) ||
     (userRoles.some((r) => ['executive', 'exec', 'admin', 'platform_admin'].includes(r)) &&
-      normalizedAllowed.some((r) => ['recruiter', 'hiring_manager', 'interviewer', 'exec', 'executive'].includes(r)))
+      normalizedAllowed.some((r) => ['recruiter', 'interviewer', 'exec', 'executive'].includes(r)))
 
   if (!isAuthorized) {
     // Smart fallback: don't boot an employer user with an active tenant to candidate dashboard
     const hasValidTenant = Boolean(user?.tenant_id && user.tenant_id !== 'default')
     const isPlatformAdmin = userRoles.some((r) => ['admin', 'platform_admin'].includes(r))
     const isEmployer = (isPlatformAdmin || hasValidTenant) &&
-      userRoles.some((r) => ['executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer', 'admin'].includes(r))
+      userRoles.some((r) => ['executive', 'exec', 'recruiter', 'interviewer', 'admin'].includes(r))
 
     const resolvedFallback = fallbackPath !== '/dashboard'
       ? fallbackPath

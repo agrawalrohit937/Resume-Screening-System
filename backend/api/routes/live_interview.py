@@ -415,11 +415,7 @@ async def get_history(
 # ══════════════════════════════════════════════════════════════════════════════
 SCHEDULE_AUTHORITY_ROLES = {
     UserRole.INTERVIEWER,
-    UserRole.HIRING_MANAGER,
     UserRole.EXECUTIVE,
-    UserRole.EXEC,
-    UserRole.EMPLOYER,
-    UserRole.ADMIN,
     UserRole.PLATFORM_ADMIN,
 }
 

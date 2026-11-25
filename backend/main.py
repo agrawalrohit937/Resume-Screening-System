@@ -37,11 +37,9 @@ from api.routes import (
     analytics,
     apply_assistant,
     ats,
-    audit,
     auth,
     careers,
     certificates,
-    compliance,
     company,
     copilot,
     enhance,
@@ -281,12 +279,10 @@ def create_application() -> FastAPI:
 
     # Operations & Administration
     app.include_router(analytics.router, prefix=f"{p}/analytics", tags=["Analytics"])
-    app.include_router(audit.router, prefix=f"{p}/audit", tags=["Enterprise ATS - Audit Log"])
     app.include_router(notifications.router, prefix=f"{p}/notifications", tags=["Notifications"])
     app.include_router(careers.router, prefix=f"{p}/careers", tags=["Careers"])
     app.include_router(support.router, prefix=f"{p}", tags=["Support"])
     app.include_router(admin.router, prefix=f"{p}/admin", tags=["Admin"])
-    app.include_router(compliance.router)
 
     # Phase 5 Enterprise Surface (B2B SaaS)
     app.include_router(interview_kits.router, prefix=f"{p}/interview-kits", tags=["Enterprise ATS - Interview Kits & Scorecards"])

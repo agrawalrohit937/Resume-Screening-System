@@ -59,7 +59,7 @@ export default function Dashboard() {
       user?.role,
     ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
-    const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
+    const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'interviewer']
     const hasEnterpriseRole = userRoles.some((r) => ENTERPRISE_ROLES.includes(r))
     const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
 
@@ -68,8 +68,6 @@ export default function Dashboard() {
         navigate('/admin', { replace: true })
       } else if (userRoles.includes('executive') || userRoles.includes('exec')) {
         navigate('/exec/dashboard', { replace: true })
-      } else if (userRoles.includes('hiring_manager')) {
-        navigate('/hiring-manager/dashboard', { replace: true })
       } else if (userRoles.includes('interviewer')) {
         navigate('/interviewer/dashboard', { replace: true })
       } else {

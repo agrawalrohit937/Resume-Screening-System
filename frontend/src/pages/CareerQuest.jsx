@@ -35,7 +35,6 @@ export default function CareerQuest() {
         if (data && data.profile) {
           setProfile(data.profile)
           if (data.leaderboard?.length) setLeaderboard(data.leaderboard)
-          if (data.catalog?.length) setCatalog(data.catalog)
           setLoading(false)
         }
       }
@@ -55,7 +54,6 @@ export default function CareerQuest() {
             localStorage.setItem(cacheKey, JSON.stringify({
               ...existing,
               profile: p.data,
-              catalog: existing.catalog || BADGE_CATALOG_FALLBACK,
             }))
           } catch (_) {}
         }
@@ -124,7 +122,6 @@ export default function CareerQuest() {
       localStorage.setItem(cacheKey, JSON.stringify({
         profile: nextProfile,
         leaderboard: nextLeaderboard,
-        catalog,
       }))
     } catch (error) {
       console.error('Failed to refresh gamification data after daily reward claim', error)

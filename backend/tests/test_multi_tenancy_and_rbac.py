@@ -205,44 +205,33 @@ async def test_cross_tenant_mutations_and_counts():
 # 2. GRANULAR RBAC CAPABILITIES MATRIX TESTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def test_admin_role_has_full_permissions():
-    perms = get_role_permissions(UserRole.ADMIN)
+def test_platform_admin_role_has_full_permissions():
+    perms = get_role_permissions(UserRole.PLATFORM_ADMIN)
     assert len(perms) == len(Permission)
-    assert has_permission(UserRole.ADMIN, Permission.SETTINGS_MANAGE)
-    assert has_permission(UserRole.ADMIN, Permission.JOBS_DELETE)
-    assert has_permission(UserRole.ADMIN, Permission.REQUISITIONS_APPROVE)
+    assert has_permission(UserRole.PLATFORM_ADMIN, Permission.SETTINGS_MANAGE)
+    assert has_permission(UserRole.PLATFORM_ADMIN, Permission.JOBS_DELETE)
+    assert has_permission(UserRole.PLATFORM_ADMIN, Permission.REQUISITIONS_APPROVE)
 
 
-def test_exec_role_is_read_only():
-    assert has_permission(UserRole.EXEC, Permission.JOBS_READ) is True
-    assert has_permission(UserRole.EXEC, Permission.APPLICATIONS_READ) is True
-    assert has_permission(UserRole.EXEC, Permission.AUDIT_LOG_READ) is True
-    # Cannot mutate
-    assert has_permission(UserRole.EXEC, Permission.JOBS_WRITE) is False
-    assert has_permission(UserRole.EXEC, Permission.JOBS_DELETE) is False
-    assert has_permission(UserRole.EXEC, Permission.APPLICATIONS_SCORE) is False
+def test_executive_role_has_full_permissions():
+    perms = get_role_permissions(UserRole.EXECUTIVE)
+    assert len(perms) == len(Permission)
+    assert has_permission(UserRole.EXECUTIVE, Permission.JOBS_READ) is True
+    assert has_permission(UserRole.EXECUTIVE, Permission.JOBS_WRITE) is True
+    assert has_permission(UserRole.EXECUTIVE, Permission.SETTINGS_MANAGE) is True
 
 
-def test_recruiter_and_hiring_manager_differential():
+def test_recruiter_and_interviewer_differential():
     # Recruiter can manage jobs and candidate pipelines, but cannot approve requisitions
     assert has_permission(UserRole.RECRUITER, Permission.JOBS_WRITE) is True
     assert has_permission(UserRole.RECRUITER, Permission.APPLICATIONS_STAGE_UPDATE) is True
     assert has_permission(UserRole.RECRUITER, Permission.REQUISITIONS_APPROVE) is False
 
-    # Hiring Manager can approve requisitions and submit scorecards, but cannot delete jobs
-    assert has_permission(UserRole.HIRING_MANAGER, Permission.REQUISITIONS_APPROVE) is True
-    assert has_permission(UserRole.HIRING_MANAGER, Permission.INTERVIEWS_SUBMIT_SCORECARD) is True
-    assert has_permission(UserRole.HIRING_MANAGER, Permission.JOBS_DELETE) is False
-
-
-def test_coordinator_and_interviewer_isolation():
-    # Coordinator schedules interviews but does not submit scorecards
-    assert has_permission(UserRole.COORDINATOR, Permission.INTERVIEWS_SCHEDULE) is True
-    assert has_permission(UserRole.COORDINATOR, Permission.INTERVIEWS_SUBMIT_SCORECARD) is False
-
-    # Interviewer submits scorecards but does not schedule interviews
+    # Interviewer submits scorecards and schedules interviews, but cannot write/delete jobs
     assert has_permission(UserRole.INTERVIEWER, Permission.INTERVIEWS_SUBMIT_SCORECARD) is True
-    assert has_permission(UserRole.INTERVIEWER, Permission.INTERVIEWS_SCHEDULE) is False
+    assert has_permission(UserRole.INTERVIEWER, Permission.INTERVIEWS_SCHEDULE) is True
+    assert has_permission(UserRole.INTERVIEWER, Permission.JOBS_WRITE) is False
+    assert has_permission(UserRole.INTERVIEWER, Permission.JOBS_DELETE) is False
 
 
 def test_check_rbac_access_forbidden():

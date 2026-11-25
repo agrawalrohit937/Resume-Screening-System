@@ -2,8 +2,8 @@
 Granular Role-Based Access Control (RBAC) & Capabilities Matrix.
 
 Phase 5, Task 5.1:
-Defines fine-grained permission tokens and maps them across the expanded enterprise roles:
-Admin, Executive (Read-only), Recruiter, Hiring Manager, Coordinator, Interviewer, Candidate.
+Defines fine-grained permission tokens and maps them across the 5 core roles:
+Platform Admin, Executive, Recruiter, Interviewer, Candidate.
 """
 
 from __future__ import annotations
@@ -46,15 +46,8 @@ class Permission(str, Enum):
 # Granular permission mapping per enterprise role
 ROLE_PERMISSIONS_MAP: Dict[str, FrozenSet[str]] = {
     UserRole.PLATFORM_ADMIN.value: frozenset(p.value for p in Permission),
-    UserRole.ADMIN.value: frozenset(p.value for p in Permission),
     # Company founder / owner inherits all permissions within their tenant
     UserRole.EXECUTIVE.value: frozenset(p.value for p in Permission),
-    # Legacy read-only executive role (C-suite reporting)
-    UserRole.EXEC.value: frozenset({
-        Permission.JOBS_READ.value,
-        Permission.APPLICATIONS_READ.value,
-        Permission.AUDIT_LOG_READ.value,
-    }),
     UserRole.RECRUITER.value: frozenset({
         Permission.JOBS_READ.value,
         Permission.JOBS_WRITE.value,
@@ -65,19 +58,6 @@ ROLE_PERMISSIONS_MAP: Dict[str, FrozenSet[str]] = {
         Permission.TALENT_CRM_ACCESS.value,
         Permission.TALENT_POOLS_SEARCH.value,
         Permission.REQUISITIONS_CREATE.value,
-    }),
-    UserRole.HIRING_MANAGER.value: frozenset({
-        Permission.JOBS_READ.value,
-        Permission.APPLICATIONS_READ.value,
-        Permission.APPLICATIONS_SCORE.value,
-        Permission.INTERVIEWS_SUBMIT_SCORECARD.value,
-        Permission.REQUISITIONS_CREATE.value,
-        Permission.REQUISITIONS_APPROVE.value,
-    }),
-    UserRole.COORDINATOR.value: frozenset({
-        Permission.JOBS_READ.value,
-        Permission.APPLICATIONS_READ.value,
-        Permission.INTERVIEWS_SCHEDULE.value,
     }),
     UserRole.INTERVIEWER.value: frozenset({
         Permission.JOBS_READ.value,

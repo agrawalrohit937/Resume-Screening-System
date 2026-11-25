@@ -150,7 +150,6 @@ export default function Premium() {
     'exec',
     'recruiter',
     'employer',
-    'hiring_manager',
     'interviewer',
     'company_admin',
   ].some(r => userRoles.includes(r) || userRole === r)

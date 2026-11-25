@@ -358,7 +358,7 @@ export const changePassword = (current_password, new_password) =>
   api.post('/auth/change-password', { current_password, new_password })
 
 // ── Enterprise Phase 5 APIs ──────────────────────────────────────────────────
-// Interview Kits & Structured Scorecards (Interviewer / Coordinator / Admin)
+// Interview Kits & Structured Scorecards (Interviewer / Recruiter / Executive / Admin)
 export const getInterviewKits = (jobId) => api.get(`/interview-kits`, { params: { job_id: jobId } })
 export const submitScorecard = (payload) => api.post('/interview-kits/scorecards', payload)
 export const getAssignedInterviews = (params) => api.get('/interview-kits/assigned', { params })

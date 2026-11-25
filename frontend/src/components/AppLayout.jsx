@@ -30,7 +30,6 @@ const PAGE_TITLES = {
   '/recruiter/company': { title: 'Employer Branding', sub: 'Company identity, culture & public presentation' },
   '/recruiter/settings': { title: 'Recruiter Settings', sub: 'Hiring lead preferences, alerts & security' },
   '/interviewer/dashboard': { title: 'Assigned Scorecards', sub: 'Candidate evaluations & scoring' },
-  '/hiring-manager/dashboard': { title: 'Pipeline & Approvals', sub: 'Active job openings & offers' },
   '/exec/dashboard': { title: 'Executive Intelligence', sub: 'Strategic talent & workforce metrics' },
   '/admin': { title: 'Admin Console', sub: 'System oversight & administration' },
   '/jobs': { title: 'Job Marketplace', sub: 'Explore opportunities with AI vector matching' },
@@ -53,14 +52,13 @@ function MobileHeader({ onMenuToggle }) {
   const userRoles = [...userRolesArray, user?.role].filter(Boolean).map((r) => String(r).toLowerCase().trim())
   const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
   const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
-  const isHiringManager = userRoles.includes('hiring_manager')
   const isInterviewerRole = userRoles.includes('interviewer')
   const isRecruiterRole = userRoles.includes('recruiter')
 
   const savedContext = typeof window !== 'undefined'
     ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context'))
     : null
-  const hasEmployerRole = isExecutive || isRecruiterRole || isHiringManager || isInterviewerRole || isPlatformAdmin
+  const hasEmployerRole = isExecutive || isRecruiterRole || isInterviewerRole || isPlatformAdmin
   const isEmployerContext = savedContext === 'employer' || (!savedContext && hasEmployerRole)
 
   let homeRoute = '/dashboard'
@@ -189,7 +187,7 @@ export default function AppLayout({ children }) {
       ...(Array.isArray(user?.roles) ? user.roles : []),
       user?.role,
     ].map((role) => String(role || '').toLowerCase())
-    const isRecruiter = roles.some((role) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec', 'hiring_manager'].includes(role))
+    const isRecruiter = roles.some((role) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec'].includes(role))
     
     if (isRecruiter) {
       import('../pages/recruiter/RecruiterDashboard').catch(() => {})

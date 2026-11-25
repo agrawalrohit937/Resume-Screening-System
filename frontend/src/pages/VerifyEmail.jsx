@@ -86,7 +86,7 @@ export default function VerifyEmail() {
         ].filter(Boolean).map((r) => String(r).toLowerCase().trim())
 
         const isEmployer = userRoles.some((r) =>
-          ['executive', 'exec', 'recruiter', 'admin', 'hiring_manager'].includes(r)
+          ['executive', 'exec', 'recruiter', 'admin'].includes(r)
         )
         navigate(isEmployer ? '/recruiter/company' : '/profile')
       }

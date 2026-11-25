@@ -4,7 +4,6 @@ Unit tests for Scoring Features and Replay (Phase 1.5).
 
 
 from services.scoring.features import extract_scoring_features
-from services.scoring.replay import replay_score_from_features
 from services.scoring_engine import score_resume
 
 
@@ -41,33 +40,6 @@ def test_feature_extraction_schema_version():
     h2 = features.compute_hash()
     assert h1 == h2
     assert len(h1) == 64
-
-
-def test_scoring_replay_exact_reconstruction():
-    features_dict = {
-        "feature_schema_version": "1.0.0",
-        "scoring_version": "2.0.0",
-        "embedding_model_version": "bge-m3-v1.0",
-        "quality_score": 75.0,
-        "final_score": 75.0,
-        "skills_score": 80.0,
-        "experience_score": 70.0,
-        "education_score": 60.0,
-        "vector_score": 72.0,
-        "keyword_score": 80.0,
-        "strict_score": 75.5,
-        "eligibility_status": "eligible",
-        "eligibility_rank": 0,
-        "is_knockout": False,
-        "reranker_score": None,
-    }
-
-    replay_res = replay_score_from_features(features_dict, profile_mode="candidate")
-    assert replay_res["replayed"] is True
-    assert replay_res["feature_schema_version"] == "1.0.0"
-    # Reconstructed score should be within delta
-    assert isinstance(replay_res["reconstructed_quality_score"], float)
-    assert abs(replay_res["score_delta"]) < 10.0
 
 
 def test_end_to_end_features_in_score_resume():

@@ -331,9 +331,7 @@ export function AuthProvider({ children }) {
   const isPlatformAdmin = roles.includes('platform_admin') || roles.includes('admin')
   const isExecutive = roles.includes('executive') || roles.includes('exec') || isPlatformAdmin
   const isRecruiter = roles.includes('recruiter') || isExecutive
-  const isHiringManager = roles.includes('hiring_manager') || isExecutive
   const isInterviewer = roles.includes('interviewer') || isExecutive
-  const isCoordinator = roles.includes('coordinator') || isExecutive
   const isAdmin = isPlatformAdmin
   const isExec = isExecutive
   const isCandidate = roles.includes('candidate')
@@ -358,16 +356,8 @@ export function AuthProvider({ children }) {
 
     // Executive inherits all permissions for their tenant
     if (currentRoles.includes('executive') || currentRoles.includes('exec')) {
-      const enterpriseRoles = ['executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
+      const enterpriseRoles = ['executive', 'exec', 'recruiter', 'interviewer']
       if (allowed.some((r) => enterpriseRoles.includes(r))) {
-        return true
-      }
-    }
-
-    // Hiring manager inherits recruiter and interviewer permissions for employer routes
-    if (currentRoles.includes('hiring_manager')) {
-      const hmAllowedRoles = ['hiring_manager', 'recruiter', 'interviewer']
-      if (allowed.some((r) => hmAllowedRoles.includes(r))) {
         return true
       }
     }
@@ -379,7 +369,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, loading,
       role, roles, tenantId,
-      isCandidate, isRecruiter, isHiringManager, isCoordinator, isInterviewer,
+      isCandidate, isRecruiter, isInterviewer,
       isAdmin, isExec, isPlatformAdmin, isExecutive,
       hasRole,
       login, signup, logout, googleLogin, linkedinLoginSuccess,

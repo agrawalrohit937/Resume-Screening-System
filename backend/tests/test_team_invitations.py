@@ -51,7 +51,7 @@ def test_invite_token_expiration():
     expired_token = create_invite_token(
         email="late@innovate.co",
         tenant_id="tenant_innovate_123",
-        role="hiring_manager",
+        role="recruiter",
         invited_by="user_exec_999",
         expires_days=-1,  # Expired in past
     )
@@ -66,12 +66,12 @@ async def test_team_invite_and_accept_workflow():
     """Simulate end-to-end team invite and acceptance logic."""
     from api.routes.team import INVITABLE_ROLES
 
-    # 1. Verify invitable roles include enterprise roles but exclude platform admin
-    assert UserRole.HIRING_MANAGER in INVITABLE_ROLES
+    # 1. Verify invitable roles include enterprise roles but exclude platform admin and candidate
     assert UserRole.INTERVIEWER in INVITABLE_ROLES
     assert UserRole.RECRUITER in INVITABLE_ROLES
-    assert UserRole.COORDINATOR in INVITABLE_ROLES
+    assert UserRole.EXECUTIVE in INVITABLE_ROLES
     assert UserRole.PLATFORM_ADMIN not in INVITABLE_ROLES
+    assert UserRole.CANDIDATE not in INVITABLE_ROLES
 
     # 2. Executive inviter
     exec_user = UserModel(
@@ -82,11 +82,11 @@ async def test_team_invite_and_accept_workflow():
         tenant_id="tenant_acme",
     )
 
-    # 3. Create token for Hiring Manager
+    # 3. Create token for Interviewer
     token = create_invite_token(
-        email="bob.hm@acme.com",
+        email="bob.int@acme.com",
         tenant_id=exec_user.tenant_id,
-        role=UserRole.HIRING_MANAGER.value,
+        role=UserRole.INTERVIEWER.value,
         invited_by=str(exec_user.id or "user_alice"),
         extra_claims={"invited_by_name": exec_user.full_name},
     )
@@ -94,12 +94,12 @@ async def test_team_invite_and_accept_workflow():
     # 4. Decoded payload check
     payload = decode_token(token)
     assert payload["tenant_id"] == "tenant_acme"
-    assert payload["role"] == "hiring_manager"
+    assert payload["role"] == "interviewer"
 
     # 5. Accepted user model creation
     new_user = UserModel(
         email=payload["sub"],
-        full_name="Bob Hiring Manager",
+        full_name="Bob Interviewer",
         role=UserRole(payload["role"]),
         roles=[UserRole(payload["role"])],
         tenant_id=payload["tenant_id"],
@@ -108,8 +108,8 @@ async def test_team_invite_and_accept_workflow():
     )
 
     assert new_user.tenant_id == "tenant_acme"
-    assert new_user.role == UserRole.HIRING_MANAGER
-    assert new_user.roles == [UserRole.HIRING_MANAGER]
+    assert new_user.role == UserRole.INTERVIEWER
+    assert new_user.roles == [UserRole.INTERVIEWER]
     assert new_user.status == UserStatus.ACTIVE
 
 

@@ -106,7 +106,7 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   }, [user])
 
   const isStaffOrEmployer = useMemo(() => {
-    const staffRoles = ['recruiter', 'interviewer', 'executive', 'exec', 'admin', 'platform_admin', 'employer', 'hiring_manager']
+    const staffRoles = ['recruiter', 'interviewer', 'executive', 'exec', 'admin', 'platform_admin', 'employer']
     const hasStaffRole = userRoles.some((r) => staffRoles.includes(r))
     const savedContext = typeof window !== 'undefined'
       ? (localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context'))
@@ -366,7 +366,6 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   const isPro = crownVariant === 'silver'
 
   const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
-  const isHiringManager = userRoles.includes('hiring_manager')
   const isInterviewer = userRoles.includes('interviewer')
   const isRecruiterRole = isRecruiter || userRoles.includes('recruiter')
   const isAdmin = userRoles.includes('admin') || userRoles.includes('platform_admin')
@@ -374,7 +373,6 @@ const Navbar = memo(function Navbar({ onMenuToggle, sidebarCollapsed }) {
   let roleLabel = 'Candidate'
   if (isAdmin) roleLabel = 'Admin'
   else if (isExecutive) roleLabel = 'Executive'
-  else if (isHiringManager) roleLabel = 'Hiring Manager'
   else if (isRecruiterRole) roleLabel = 'Recruiter'
   else if (isInterviewer) roleLabel = 'Interviewer'
   else if (hasCrown) roleLabel = isPremium ? 'VIP Member' : 'Pro Member'

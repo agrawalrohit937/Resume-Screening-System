@@ -23,7 +23,7 @@ export function getSmartRedirectPath(userRoles, preferredRole = null) {
     .filter(Boolean)
     .map((r) => String(r).toLowerCase().trim())
 
-  const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'hiring_manager', 'interviewer']
+  const ENTERPRISE_ROLES = ['admin', 'platform_admin', 'executive', 'exec', 'recruiter', 'interviewer']
   const hasEnterpriseRole = normalised.some((r) => ENTERPRISE_ROLES.includes(r))
   const savedCtx = localStorage.getItem('careershala_view_context') || localStorage.getItem('careerpilot_view_context')
 
@@ -31,7 +31,6 @@ export function getSmartRedirectPath(userRoles, preferredRole = null) {
     if (normalised.includes('admin') || normalised.includes('platform_admin')) return '/admin'
     if (normalised.includes('executive') || normalised.includes('exec')) return '/exec/dashboard'
     if (normalised.includes('recruiter')) return '/recruiter/dashboard'
-    if (normalised.includes('hiring_manager')) return '/hiring-manager/dashboard'
     if (normalised.includes('interviewer')) return '/interviewer/dashboard'
     return '/recruiter/dashboard'
   }

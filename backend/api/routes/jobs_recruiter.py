@@ -70,7 +70,7 @@ async def create_job(
 ):
     """Recruiters / Admins post a new job."""
     user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE}
+    allowed_roles = {UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE}
     if not any(r in allowed_roles for r in user_roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -203,8 +203,8 @@ async def get_my_posted_jobs(
     """Fetch all jobs created under the authenticated recruiter's tenant."""
     user_roles = getattr(current_user, "roles", [current_user.role])
     allowed_roles = {
-        UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN,
-        UserRole.EXECUTIVE, UserRole.HIRING_MANAGER, UserRole.INTERVIEWER,
+        UserRole.RECRUITER, UserRole.PLATFORM_ADMIN,
+        UserRole.EXECUTIVE, UserRole.INTERVIEWER,
     }
     if not any(r in allowed_roles for r in user_roles):
         raise HTTPException(
@@ -213,7 +213,7 @@ async def get_my_posted_jobs(
         )
 
     current_tenant = getattr(current_user, "tenant_id", "default") or "default"
-    is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN} for r in user_roles)
+    is_platform_admin_user = any(r in {UserRole.PLATFORM_ADMIN} for r in user_roles)
 
     async def _fetch_jobs(sess: AsyncSession):
         stmt = select(Job).where(Job.is_external == False).order_by(Job.created_at.desc())  # noqa: E712
@@ -277,12 +277,12 @@ async def get_recruiter_pipeline_stats(
 ):
     """Return live pipeline funnel counts for the authenticated recruiter."""
     user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER}
+    allowed_roles = {UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE}
     if not any(r in allowed_roles for r in user_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter or Administrator access required.")
 
     current_tenant = getattr(current_user, "tenant_id", "default") or "default"
-    is_platform_admin_user = any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN} for r in user_roles)
+    is_platform_admin_user = any(r in {UserRole.PLATFORM_ADMIN} for r in user_roles)
 
     async with get_pg_session_factory()() as sess:
         stmt = select(Job.id, Job.status).where(Job.is_external == False)  # noqa: E712
@@ -339,11 +339,11 @@ async def download_applicant_resume(
 ):
     """Secure applicant resume download via signed Cloudinary URL or local file."""
     user_id_str = str(current_user.id)
-    is_admin = current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN)
+    is_admin = current_user.has_role(UserRole.PLATFORM_ADMIN)
     doc = await resume_repo.get_by_id(str(resume_id))
 
     is_candidate_owner = bool(doc and str(doc.get("user_id")) == user_id_str)
-    is_job_owner = is_admin or current_user.has_role(UserRole.RECRUITER, UserRole.HIRING_MANAGER, UserRole.INTERVIEWER, UserRole.EXECUTIVE)
+    is_job_owner = is_admin or current_user.has_role(UserRole.RECRUITER, UserRole.INTERVIEWER, UserRole.EXECUTIVE)
 
     if not is_candidate_owner and not is_job_owner:
         raise HTTPException(
@@ -384,7 +384,7 @@ async def update_application_stage(
     db: Optional[Any] = None,
 ):
     """Update hiring pipeline stage for an applicant (Recruiter/Admin)."""
-    if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
+    if not current_user.has_role(UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter or Administrator access required.")
 
     # 1. Primary lookup: CandidateApplication (for job applicants on recruiter Kanban)
@@ -407,7 +407,7 @@ async def update_application_stage(
     target_stage = valid_stages_map[raw_stage.lower()]
     now = datetime.now(timezone.utc)
 
-    if not current_user.has_role(UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
+    if not current_user.has_role(UserRole.PLATFORM_ADMIN):
         try:
             job_doc = await job_repo.get_by_id(str(app_doc.get("job_id", "")))
             if job_doc:
@@ -540,7 +540,7 @@ async def save_company_profile(
     session: Optional[AsyncSession] = Depends(get_db),
 ):
     """Recruiters / Admins save employer branding profile and sync open jobs."""
-    if not current_user.has_role(UserRole.EXECUTIVE, UserRole.EXEC, UserRole.ADMIN, UserRole.PLATFORM_ADMIN):
+    if not current_user.has_role(UserRole.EXECUTIVE, UserRole.PLATFORM_ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Company profile is read-only for invited team members. Only Executive/Admin can update company branding.",
@@ -618,7 +618,7 @@ async def get_job_applications(
 ):
     """Return all applicants for a specific job enriched with parsed resume snapshots."""
     user_roles = getattr(current_user, "roles", [current_user.role])
-    allowed_roles = {UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER, UserRole.INTERVIEWER}
+    allowed_roles = {UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.INTERVIEWER}
     if not any(r in allowed_roles for r in user_roles):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter, Interviewer, or Administrator access required.")
     if not DocumentId.is_valid(job_id):
@@ -628,7 +628,7 @@ async def get_job_applications(
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job posting not found.")
 
-    if not any(r in {UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE} for r in user_roles):
+    if not any(r in {UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE} for r in user_roles):
         job_tenant = job_doc.get("tenant_id") or "default"
         user_tenant = getattr(current_user, "tenant_id", "default") or "default"
         if str(job_doc.get("created_by")) != str(current_user.id) and job_tenant != user_tenant and user_tenant != "default" and job_tenant != "default":
@@ -757,7 +757,7 @@ async def toggle_job_status(
     db: Optional[Any] = None,
 ):
     """Toggle job status between open, closed, and draft."""
-    if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
+    if not current_user.has_role(UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE):
         raise HTTPException(status_code=403, detail="Recruiter access required.")
     if not DocumentId.is_valid(job_id):
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
@@ -783,7 +783,7 @@ async def update_job(
     db: Optional[Any] = None,
 ):
     """Update a job posting and optionally rescore active applicants."""
-    if not current_user.has_role(UserRole.RECRUITER, UserRole.ADMIN, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE, UserRole.HIRING_MANAGER):
+    if not current_user.has_role(UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE):
         raise HTTPException(status_code=403, detail="Recruiter access required.")
     if not hasattr(job_repo, "get_by_id"):
         job_repo = get_job_repo()

@@ -361,7 +361,7 @@ const Sidebar = memo(function Sidebar({ collapsed, onToggle, mobile = false, onN
   const hasCandidateRole = userRolesArray.includes('candidate') || (!user?.roles && String(user?.role).toLowerCase().trim() === 'candidate')
   const isPlatformAdmin = userRoles.includes('platform_admin') || userRoles.includes('admin') || user?.role === 'admin'
   const isExecutive = userRoles.includes('executive') || userRoles.includes('exec')
-  const isRecruiterRole = userRoles.includes('recruiter') || userRoles.includes('hiring_manager')
+  const isRecruiterRole = userRoles.includes('recruiter')
   const isInterviewerRole = userRoles.includes('interviewer')
   const isAdmin = user?.role === 'admin' || isPlatformAdmin
   const hasEmployerRole = isExecutive || isRecruiterRole || isInterviewerRole || isAdmin

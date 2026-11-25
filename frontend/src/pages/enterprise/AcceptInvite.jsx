@@ -33,15 +33,6 @@ const ROLE_DISPLAY_MAP = {
       'Manage pipeline stages and roll out candidate offers'
     ]
   },
-  hiring_manager: { 
-    title: 'Hiring Manager', 
-    color: 'text-purple-700 border-purple-200 bg-purple-50/80',
-    scope: [
-      'Review qualified applicant pipelines and scorecards',
-      'Collaborate on team hiring decisions and candidate notes',
-      'Coordinate interview schedules and rubric evaluations'
-    ]
-  },
   interviewer: { 
     title: 'Technical Interviewer', 
     color: 'text-indigo-700 border-indigo-200 bg-indigo-50/80',
@@ -150,7 +141,7 @@ export default function AcceptInvite() {
       const assignedRole = (data.user?.role || inviteData?.role || '').toLowerCase()
       if (assignedRole === 'interviewer') {
         navigate('/interviewer/dashboard', { replace: true })
-      } else if (['recruiter', 'executive', 'exec', 'hiring_manager'].includes(assignedRole)) {
+      } else if (['recruiter', 'executive', 'exec'].includes(assignedRole)) {
         navigate('/recruiter/dashboard', { replace: true })
       } else {
         navigate('/dashboard', { replace: true })
