@@ -7,8 +7,7 @@ Copilot Hybrid RAG Retriever.
 
 Pipeline:
 1. Stage 1a (Vector Search, top-k=20) + Stage 1b (BM25 / Keyword Search, top-k=20).
-2. Stage 2 (Reciprocal Rank Fusion - RRF, k=60).
-3. Stage 3 (Cross-Encoder Deep Reranker, top-6).
+2. Stage 2 (Reciprocal Rank Fusion - RRF, k=60) + top-k selection.
 
 Strictly enforces multi-tenant boundary: all queries scoped by `tenant_id` and `user_id`.
 """
@@ -21,7 +20,6 @@ import structlog
 
 from schemas.copilot_schema import RetrievedChunk
 from services.embedding_service import embedding_model
-from services.reranker_service import RerankerServiceSingleton
 
 logger = structlog.get_logger(__name__)
 
@@ -269,26 +267,17 @@ class CopilotRetriever:
         min_score: float,
     ) -> List[RetrievedChunk]:
         """
-        Reranks top fused candidates using CrossEncoder if available, otherwise RRF/Vector score.
+        Ranks top fused candidates using normalized vector/RRF score.
         """
         if not candidates:
             return []
 
         results: List[RetrievedChunk] = []
 
-        # Try cross-encoder
-        try:
-            reranker = RerankerServiceSingleton()
-            pairs = [(query, c.get("text", "")[:1000]) for c in candidates]
-            scores = reranker.rerank(pairs)
-            for idx, c in enumerate(candidates):
-                c["_rerank_score"] = float(scores[idx]) if idx < len(scores) else 0.0
-        except Exception:
-            # If cross-encoder isn't active, use normalized vector score or RRF
-            for c in candidates:
-                c["_rerank_score"] = float(c.get("_vector_score") or c.get("_rrf_score") or 0.5)
+        for c in candidates:
+            c["_rerank_score"] = float(c.get("_vector_score") or c.get("_rrf_score") or 0.5)
 
-        # Sort by rerank score
+        # Sort by fused score
         candidates.sort(key=lambda x: x.get("_rerank_score", 0.0), reverse=True)
 
         for c in candidates[:top_k]:

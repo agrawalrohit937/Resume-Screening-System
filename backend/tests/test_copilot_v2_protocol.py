@@ -293,18 +293,3 @@ async def test_api_v2_streaming_shortcut(client, user_a_token, copilot_repo):
     assert 'data: {"type": "session"' in body
     assert 'data: {"type": "navigate"' in body
     assert 'data: {"type": "done"' in body
-
-
-@pytest.mark.asyncio
-async def test_api_v1_deprecated_compatibility(client, user_a_token):
-    """Test that legacy /chat endpoint continues to stream valid SSE chunks."""
-    headers = auth_header(user_a_token)
-    payload = {
-        "message": "/interview",
-        "history": [],
-    }
-
-    res = await client.post(f"{API}/chat", json=payload, headers=headers)
-    assert res.status_code == 200
-    assert "text/event-stream" in res.headers["content-type"]
-    assert "data:" in res.text

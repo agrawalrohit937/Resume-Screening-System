@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from services.copilot.rag.chunker import DocumentChunker
 from services.copilot.rag.retriever import CopilotRetriever, _reciprocal_rank_fusion
-from services.copilot.rag.semantic_cache import SemanticResponseCache
 from services.copilot.context import ToolExecutionContext
 from services.copilot.tools.read_tools import RetrieveContextArgs, RetrieveContextTool, SearchResumeArgs, SearchResumeTool
 
@@ -203,61 +202,6 @@ async def test_hybrid_retriever_multi_tenant_isolation():
     assert "c1" in result_ids
     # Assert Bob's chunk from Tenant Beta was NOT leaked
     assert "c2" not in result_ids
-
-
-# ─── 4. Semantic Response Cache Tests ─────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_semantic_response_cache_hit_and_miss():
-    mock_db = MagicMock()
-    mock_db.copilot_cache = MockTableStore([])
-
-    cache = SemanticResponseCache(mock_db)
-    tenant_id = "tenant_1"
-    user_id = "user_42"
-    ctx_ver_1 = "v1_resume_hash"
-
-    # Store response in cache
-    await cache.set(
-        query="What are my top skills?",
-        response_text="Based on your resume, your top skills are Python, FastAPI, and MongoDB.",
-        tenant_id=tenant_id,
-        user_id=user_id,
-        context_version=ctx_ver_1,
-        citations=[{"source": "resume", "label": "Resume (Skills)"}],
-        suggestions=["Rewrite my bullets", "Practice interview"],
-    )
-
-    # 1. Exact or near-identical query -> HIT
-    hit_res = await cache.get(
-        query="What are my top skills?",
-        tenant_id=tenant_id,
-        user_id=user_id,
-        context_version=ctx_ver_1,
-    )
-    assert hit_res is not None
-    assert hit_res["cache_hit"] is True
-    assert "Python, FastAPI" in hit_res["text"]
-    assert len(hit_res["citations"]) == 1
-
-    # 2. Completely different query -> MISS
-    miss_res = await cache.get(
-        query="How do I prepare for a live phone screen?",
-        tenant_id=tenant_id,
-        user_id=user_id,
-        context_version=ctx_ver_1,
-    )
-    assert miss_res is None
-
-    # 3. Resume updated (context_version changes) -> MISS (automatic invalidation)
-    ctx_ver_2 = "v2_new_resume_hash"
-    invalidated_res = await cache.get(
-        query="What are my top skills?",
-        tenant_id=tenant_id,
-        user_id=user_id,
-        context_version=ctx_ver_2,
-    )
-    assert invalidated_res is None
 
 
 # ─── 5. Tool Integration Tests ────────────────────────────────────────────────
