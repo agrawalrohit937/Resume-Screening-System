@@ -110,8 +110,8 @@ def test_quality_validator_flags_placeholder_text():
         "cover_letter_text": "y" * 500,
         "email_subject": "Application",
     }
-    issues = _deterministic_checks(state)
-    assert any("placeholder" in issue.lower() for issue in issues)
+    email_issues, cl_issues = _deterministic_checks(state)
+    assert any("placeholder" in issue.lower() for issue in email_issues + cl_issues)
 
 
 

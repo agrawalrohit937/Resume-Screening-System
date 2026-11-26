@@ -3,7 +3,7 @@ Data models for the Multi-Domain Occupation and Skill Graph.
 """
 
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 
 
@@ -28,8 +28,7 @@ class SkillNode(BaseModel):
     source: str = "curated_overlay"  # curated_overlay | esco | onet | nco | lightcast
     embedding: Optional[List[float]] = None
 
-    class Config:
-        frozen = False
+    model_config = ConfigDict(frozen=False)
 
 
 class OccupationNode(BaseModel):

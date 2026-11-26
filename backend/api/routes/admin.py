@@ -126,7 +126,7 @@ async def update_ticket_status(
     valid_statuses = {"open", "in_progress", "waiting_for_customer", "resolved", "closed"}
     if new_status not in valid_statuses:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
         )
 
@@ -224,7 +224,7 @@ async def update_application_status(
     valid_statuses = {"applied", "shortlisted", "interviewed", "rejected", "hired"}
     if new_status not in valid_statuses:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
         )
 

@@ -5,10 +5,12 @@ import { Check, AlertCircle, AlertTriangle, Info, Loader2, X } from 'lucide-reac
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { TenantProvider } from './context/TenantContext'
 
-import AppLayout from './components/AppLayout'
+import CareerShalaLanding from './pages/CareerShalaLanding'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import Loader from './components/Loader'
 import RoleGuard from './components/RoleGuard'
+
+const AppLayout = lazy(() => import('./components/AppLayout'))
 
 // Ensure consistent light theme across all browsers and operating system settings
 if (typeof document !== 'undefined') {
@@ -17,7 +19,6 @@ if (typeof document !== 'undefined') {
 
 const Login = lazy(() => import('./pages/Login'))
 const Signup = lazy(() => import('./pages/Signup'))
-const CareerShalaLanding = lazy(() => import('./pages/CareerShalaLanding'))
 const Careers = lazy(() => import('./pages/Careers'))
 const LinkedinCallback = lazy(() => import('./pages/LinkedinCallback'))
 const GitHubCallback = lazy(() => import('./pages/GithubCallback'))

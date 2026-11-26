@@ -179,7 +179,7 @@ async def handle_gmail_callback(
             user_id=str(current_user.id),
         )
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 "Google did not return a refresh token. "
                 "Please revoke app access in your Google Account settings and try again."

@@ -55,13 +55,13 @@ async def create_ticket(
     valid_categories = {"billing", "account", "resume", "ai_features", "bug", "feature_request", "other"}
     if category not in valid_categories:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Invalid category. Must be one of: {', '.join(valid_categories)}",
         )
 
     if not subject or not description:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Subject and description are required",
         )
 
@@ -200,7 +200,7 @@ async def update_ticket_status(
         return result
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(e),
         )
 
