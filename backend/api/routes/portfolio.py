@@ -5,7 +5,7 @@ from models.tables import User, Resume
 Portfolio API Routes — Resume auto-parsing, AI enhancer, portfolio CRUD, analytics, and contact relay
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import html
 import re
@@ -367,7 +367,7 @@ async def save_portfolio(
         profile_dict["user_id"] = uid
     profile_dict["is_published"] = True
     profile_dict["email"] = str(current_user.email)
-    profile_dict["updated_at"] = datetime.utcnow()
+    profile_dict["updated_at"] = datetime.now(timezone.utc)
 
     # Preserve and sanitize dynamic domain-agnostic skills dictionary
     profile_dict["skills"] = sanitize_portfolio_skills(profile.skills)

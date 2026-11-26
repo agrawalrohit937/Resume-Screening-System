@@ -2,7 +2,6 @@
 CareerShala AI Copilot API Router
 ================================
 Provides endpoints for conversational assistance:
-- Deprecated v1 shim: POST /api/v1/copilot/chat
 - Copilot v2 Typed Streaming: POST /api/v1/copilot/v2/chat
 - Sessions CRUD & cursor-based pagination
 - Session transcript messages
@@ -12,11 +11,9 @@ Provides endpoints for conversational assistance:
 - Durable memory (learned user facts)
 """
 
-import json
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from fastapi.sse import EventSourceResponse
 
 from api.deps import (
     get_current_active_user,
@@ -55,27 +52,13 @@ def get_copilot_rate_key(request: Request) -> str:
         return f"copilot_token:{auth[:32]}"
     return f"copilot_ip:{get_remote_address(request)}"
 
-def get_copilot_rate_limit(request: Optional[Request] = None) -> str:
-    """
-    Tiered Rate Limiter:
-    - 200 requests/hour for Pro / Enterprise users
-    - 30 requests/hour for Free users
-    """
-    if request:
-        user = getattr(request.state, "user", None)
-        tier = getattr(user, "tier", "free") if user else "free"
-        role = getattr(user, "role", "candidate") if user else "candidate"
-        if str(tier).lower() in ("pro", "enterprise", "premium") or str(role).lower() in ("recruiter", "admin"):
-            return "200/hour"
-    return "30/hour"
-
 limiter = Limiter(key_func=get_copilot_rate_key)
 
 
 # ─── Copilot v2 Typed Streaming Protocol ──────────────────────────────────────
 
 @router.post("/v2/chat")
-@limiter.limit(get_copilot_rate_limit)
+@limiter.limit("60/hour")
 async def chat_copilot_v2(
     request: Request,
     payload: CopilotV2ChatPayload,
@@ -113,9 +96,8 @@ async def chat_copilot_v2(
         background_tasks=background_tasks,
     )
 
-    return StreamingResponse(
+    return EventSourceResponse(
         stream_gen,
-        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
@@ -298,9 +280,8 @@ async def regenerate_last_turn(
         result_repo=result_repo,
     )
 
-    return StreamingResponse(
+    return EventSourceResponse(
         stream_gen,
-        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",

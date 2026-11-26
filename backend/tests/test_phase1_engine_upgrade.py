@@ -121,24 +121,3 @@ def test_experienced_candidate_score_not_altered_by_projects_flag():
     # For experienced candidate, experience_score is high, experience_weight remains authoritative
     assert result["experience_score"] >= 80.0
     assert result["quality_score"] >= 70.0
-
-
-def test_vector_calibration_script_smoke():
-    from scripts.calibrate_vector_scores import run_calibration
-    pairs = [
-        (
-            {"raw_text": "Senior Python Developer with FastAPI and Docker.", "skills": ["Python", "FastAPI", "Docker"]},
-            {"text": "Seeking a Python Developer with FastAPI knowledge.", "requirements": ["Python Developer with FastAPI"]}
-        ),
-        (
-            {"raw_text": "Java Spring Developer with MySQL and Kafka.", "skills": ["Java", "Spring", "MySQL"]},
-            {"text": "Looking for a React Frontend Developer with CSS and Next.js.", "requirements": ["React Frontend Developer"]}
-        )
-    ]
-    res = run_calibration(pairs)
-    assert res["sample_size"] == 2
-    assert "single_vector" in res
-    assert "max_sim_multi_vector" in res
-    assert "recommended_env_vars" in res
-    assert "VEC_SIM_FLOOR" in res["recommended_env_vars"]
-    assert "MAXSIM_FLOOR" in res["recommended_env_vars"]

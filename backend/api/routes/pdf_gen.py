@@ -43,7 +43,7 @@ async def generate_resume_pdf(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
     if resume.status != ResumeStatus.PARSED:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Resume must be parsed before PDF generation.",
         )
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, lazy, Suspense } from 'react'
-import { motion, MotionConfig } from 'framer-motion'
+import { LazyMotion, domAnimation, MotionConfig } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { isMobileViewport } from '../utils/motionUtils'
@@ -184,7 +184,8 @@ export default function CareerShalaLanding() {
   const isMobile = isMobileViewport()
 
   return (
-    <MotionConfig reducedMotion={isMobile ? 'always' : 'user'}>
+    <LazyMotion features={domAnimation}>
+      <MotionConfig reducedMotion={isMobile ? 'always' : 'user'}>
       <SEO
         title="CareerShala — Turn Your Resume into Job Offers with AI"
         description="CareerShala is your AI career co-pilot. Optimize resumes for ATS filters, practice live AI mock interviews, and launch verified developer portfolios."
@@ -260,5 +261,6 @@ export default function CareerShalaLanding() {
         </DeferredLandingSection>
       </div>
     </MotionConfig>
+    </LazyMotion>
   )
 }

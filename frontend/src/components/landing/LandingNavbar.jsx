@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { ArrowRight, Sparkles, Menu, X, Flame } from 'lucide-react'
 
 export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuOpen }) {
@@ -114,7 +114,7 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
       {/* Mobile Drawer Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
@@ -199,7 +199,7 @@ export default function LandingNavbar({ user, isMobileMenuOpen, setIsMobileMenuO
                 </>
               )}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </header>

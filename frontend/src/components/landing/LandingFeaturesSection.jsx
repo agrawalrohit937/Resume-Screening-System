@@ -1,5 +1,5 @@
 import React from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import {
   FileText,
   Video,
@@ -62,7 +62,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch">
           
           {/* Card 1: Large Featured Spotlight (Span 2 cols on LG) - AI Vision */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6, transition: { duration: 0.25 } }}
@@ -133,10 +133,10 @@ export default function LandingFeaturesSection({ fadeInUp }) {
                 <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-500" /> Instant answer score</span>
               </div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 2: 90%+ ATS Scanner */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6, transition: { duration: 0.25 } }}
@@ -164,10 +164,10 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Workday &amp; Greenhouse parsed</p>
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Actionable XYZ bullet rewrites</p>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 3: Free Instant Developer Portfolio */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6, transition: { duration: 0.25 } }}
@@ -195,10 +195,10 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> 1-Click GitHub repository sync</p>
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Global ultra-fast CDN hosting</p>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 4: Recruiter Shortlist & Candidate Ranker */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6, transition: { duration: 0.25 } }}
@@ -226,10 +226,10 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Batch JD-to-resume matching</p>
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Direct interview invite dispatch</p>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 5: Auto Outreach & Recruiter Copilot */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6, transition: { duration: 0.25 } }}
@@ -257,10 +257,10 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Tailored JD metric alignment</p>
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> 1-Click direct Gmail dispatch</p>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Card 6: CareerQuest Gamification & XP Streaks */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             whileHover={{ y: -6, transition: { duration: 0.25 } }}
@@ -288,7 +288,7 @@ export default function LandingFeaturesSection({ fadeInUp }) {
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Daily practice streaks &amp; levels</p>
               <p className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> Public rank badge verification</p>
             </div>
-          </motion.div>
+          </m.div>
 
         </div>
       </div>

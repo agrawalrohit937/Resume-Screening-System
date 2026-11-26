@@ -58,7 +58,7 @@ async def test_certificate_persist_populates_topic_if_missing():
         topic=None,  # Not provided initially
     )
 
-    with patch("config.db.get_pg_session_factory", return_value=mock_factory):
+    with patch("repositories.base_repo.get_pg_session_factory", return_value=mock_factory):
         await record.persist()
 
     mock_session.add.assert_called_once()
@@ -85,7 +85,7 @@ async def test_certificate_persist_relational_session_execution():
         topic="react",
     )
 
-    with patch("config.db.get_pg_session_factory", return_value=mock_factory):
+    with patch("repositories.base_repo.get_pg_session_factory", return_value=mock_factory):
         await record.persist()
 
     mock_session.add.assert_called_once()
