@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import { Mail, Lock, Eye, EyeOff, User, Briefcase, Building2, ArrowRight, CheckCircle2 } from 'lucide-react'
+import SEO from '../components/common/SEO'
 
 const illustration = '/illustration.webp';
 
@@ -136,6 +137,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen lg:h-screen w-full max-w-full bg-white font-sans lg:grid lg:grid-cols-[1.25fr_1fr] lg:overflow-hidden">
+      <SEO
+        title="Sign In — CareerShala"
+        description="Sign in to CareerShala to access your AI ATS resume scanner, mock interviews, developer portfolio, and job applications."
+        canonical="https://www.careershala.tech/login"
+      />
 
       {/* LEFT — BRAND PANEL */}
       <div className="relative hidden h-full flex-col justify-start overflow-hidden bg-gradient-to-b from-[#E8F5FA] via-[#D6EFF8] to-[#BCE2F1] px-16 pt-14 lg:flex">

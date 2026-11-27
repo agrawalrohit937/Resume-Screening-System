@@ -333,4 +333,93 @@ export const exportEmployerEvaluationsExcel = (jobId) =>
     responseType: 'blob',
   })
 
-export default api
+// ── Safe In-Memory SWR GET Cache for Instant Tab Switching ───────────────────
+const GET_CACHE_FRESH_MS = 15_000
+const GET_CACHE_STALE_MS = 120_000
+const GET_CACHE_MAX_ENTRIES = 80
+const _getCache = new Map()
+const _revalidatingKeys = new Set()
+const _CACHE_SKIP_PATHS = [
+  '/auth/',
+  '/oauth',
+  '/callback',
+  '/billing',
+  '/payment',
+  '/live-interview',
+  '/live-assessment',
+  '/health',
+  '/support',
+]
+
+export const clearApiGetCache = () => {
+  _getCache.clear()
+  _revalidatingKeys.clear()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('careershala:logout', clearApiGetCache)
+  window.addEventListener('careershala:auth-change', clearApiGetCache)
+}
+
+const _storeCacheEntry = (key, response) => {
+  if (_getCache.size >= GET_CACHE_MAX_ENTRIES) {
+    const oldestKey = _getCache.keys().next().value
+    if (oldestKey !== undefined) _getCache.delete(oldestKey)
+  }
+  _getCache.set(key, { ts: Date.now(), response })
+}
+
+const _rawGet = api.get.bind(api)
+api.get = (url, config = {}) => {
+  const shouldSkip =
+    config?.cache === false ||
+    config?.responseType === 'blob' ||
+    config?.responseType === 'arraybuffer' ||
+    _CACHE_SKIP_PATHS.some((p) => String(url || '').includes(p))
+
+  if (shouldSkip) {
+    return _rawGet(url, config)
+  }
+
+  const tenantId = (typeof localStorage !== 'undefined' && localStorage.getItem('tenant_id')) || 'default'
+  const key = `${tenantId}:${url}:${JSON.stringify(config?.params || {})}`
+  const cached = _getCache.get(key)
+  const age = cached ? Date.now() - cached.ts : Infinity
+
+  if (cached && age < GET_CACHE_FRESH_MS) {
+    return Promise.resolve(cached.response)
+  }
+
+  if (cached && age < GET_CACHE_STALE_MS) {
+    if (!_revalidatingKeys.has(key)) {
+      _revalidatingKeys.add(key)
+      _rawGet(url, config)
+        .then((fresh) => {
+          _storeCacheEntry(key, fresh)
+          if (typeof config?.onRevalidate === 'function') {
+            config.onRevalidate(fresh)
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          _revalidatingKeys.delete(key)
+        })
+    }
+    return Promise.resolve(cached.response)
+  }
+
+  return _rawGet(url, config).then((response) => {
+    _storeCacheEntry(key, response)
+    return response
+  })
+}
+
+;['post', 'put', 'patch', 'delete'].forEach((method) => {
+  const rawMethod = api[method].bind(api)
+  api[method] = (...args) => {
+    _getCache.clear()
+    return rawMethod(...args)
+  }
+})
+
+export default api

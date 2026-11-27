@@ -105,6 +105,7 @@ async def run_nightly_job_alerts(
             user_stmt = user_stmt.where(User.email == target_email.strip().lower())
         else:
             user_stmt = user_stmt.where(
+                User.status == "active",
                 or_(User.role == "candidate", User.role.is_(None)),
                 User.job_alerts_enabled.isnot(False),
             )

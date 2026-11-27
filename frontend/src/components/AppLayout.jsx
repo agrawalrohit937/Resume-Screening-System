@@ -9,7 +9,20 @@ import MobileBottomNav from './MobileBottomNav'
 import RouteErrorBoundary from './RouteErrorBoundary'
 import AvatarRing from './AvatarRing'
 import { resolveAvatarUrl } from '../utils/avatarUtils'
-import Loader from './Loader'
+
+function PageContentSkeleton() {
+  return (
+    <div className="w-full space-y-5 animate-pulse" aria-busy="true" aria-label="Loading page content">
+      <div className="h-24 w-full rounded-2xl bg-slate-200/70" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="h-28 rounded-2xl bg-slate-200/60" />
+        <div className="h-28 rounded-2xl bg-slate-200/60" />
+        <div className="h-28 rounded-2xl bg-slate-200/60" />
+      </div>
+      <div className="h-64 w-full rounded-2xl bg-slate-200/50" />
+    </div>
+  )
+}
 
 import ProfilePlanDropdown from './ProfilePlanDropdown'
 import { CopilotProvider } from '../features/copilot'
@@ -171,6 +184,7 @@ function MobileHeader({ onMenuToggle }) {
 
 export default function AppLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [copilotReady, setCopilotReady] = useState(false)
   const { user } = useAuth()
   const location = useLocation()
 
@@ -190,10 +204,24 @@ export default function AppLayout({ children }) {
     const isRecruiter = roles.some((role) => ['recruiter', 'admin', 'platform_admin', 'executive', 'exec'].includes(role))
     
     if (isRecruiter) {
-      import('../pages/recruiter/RecruiterDashboard').catch(() => {})
+      const preloadRecruiterRoutes = () => {
+        import('../pages/recruiter/RecruiterDashboard').catch(() => {})
+        import('../pages/recruiter/ManageJobs').catch(() => {})
+        import('../pages/recruiter/ManageCompany').catch(() => {})
+      }
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        const id = window.requestIdleCallback(preloadRecruiterRoutes, { timeout: 2500 })
+        return () => window.cancelIdleCallback?.(id)
+      }
+      const timer = setTimeout(preloadRecruiterRoutes, 1500)
+      return () => clearTimeout(timer)
     } else {
       // Idle preload candidate-critical lazy routes for instantaneous 0ms page transitions
       const preloadCandidateRoutes = () => {
+        import('../pages/JobFeed').catch(() => {})
+        import('../pages/ApplicationTracker').catch(() => {})
+        import('../pages/ApplyAssistant').catch(() => {})
+        import('../pages/Profile').catch(() => {})
         import('../pages/CareerQuest').catch(() => {})
         import('../pages/Interview').catch(() => {})
         import('../pages/Results').catch(() => {})
@@ -208,6 +236,16 @@ export default function AppLayout({ children }) {
       }
     }
   }, [user])
+
+  useEffect(() => {
+    if (copilotReady) return undefined
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(() => setCopilotReady(true), { timeout: 2000 })
+      return () => window.cancelIdleCallback?.(id)
+    }
+    const timer = setTimeout(() => setCopilotReady(true), 1500)
+    return () => clearTimeout(timer)
+  }, [copilotReady])
 
   useEffect(() => {
     if (!isMobileMenuOpen) return undefined
@@ -305,15 +343,15 @@ export default function AppLayout({ children }) {
                 ? 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-4 lg:px-6 py-3 pb-20 md:pb-6'
                 : 'overflow-y-auto overscroll-y-contain custom-scrollbar px-3 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-6 pb-20 md:pb-6'
             }`}>
-            <div key={location.pathname} className={`mx-auto w-full min-w-0 ${
+            <div className={`mx-auto w-full min-w-0 ${
               isFullscreenActive || location.pathname === '/live-interview' || location.pathname === '/github'
                 ? 'max-w-none'
                 : location.pathname === '/results'
                   ? 'max-w-[1600px]'
                   : 'max-w-7xl'
-            } animate-fade-in`}>
-              <RouteErrorBoundary>
-                <Suspense fallback={<Loader />}>
+            }`}>
+              <RouteErrorBoundary key={location.pathname}>
+                <Suspense fallback={<PageContentSkeleton />}>
                   {children || <Outlet />}
                 </Suspense>
               </RouteErrorBoundary>
@@ -321,7 +359,7 @@ export default function AppLayout({ children }) {
           </main>
           {!isFullscreenActive && <MobileBottomNav onMenuToggle={() => setIsMobileMenuOpen(true)} />}
         </div>
-        {!isFullscreenActive && (
+        {copilotReady && !isFullscreenActive && (
           <Suspense fallback={null}>
             <CopilotSurface />
           </Suspense>
