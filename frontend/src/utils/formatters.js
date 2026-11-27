@@ -29,25 +29,6 @@ export function formatDate(dateInput, options = {}) {
 }
 
 /**
- * Formats an ISO date string or Date object into a readable localized time.
- * Default format: "01:04 PM".
- *
- * @param {string | number | Date | null | undefined} dateInput
- * @param {string} [locale='en-IN']
- * @returns {string} Formatted time string or empty string on invalid/missing input
- */
-export function formatTime(dateInput, locale = 'en-IN') {
-  if (!dateInput) return ''
-  try {
-    const d = new Date(dateInput)
-    if (isNaN(d.getTime())) return ''
-    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return ''
-  }
-}
-
-/**
  * Formats an ISO date string or Date object into a full date and time string.
  * Example: "Sep 20, 2026, 01:04 PM".
  *

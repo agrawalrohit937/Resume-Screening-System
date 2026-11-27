@@ -273,7 +273,6 @@ async def get_my_posted_jobs(
 async def get_recruiter_pipeline_stats(
     current_user: UserModel = Depends(get_current_user),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Return live pipeline funnel counts for the authenticated recruiter."""
     user_roles = getattr(current_user, "roles", [current_user.role])
@@ -335,7 +334,6 @@ async def download_applicant_resume(
     current_user: UserModel = Depends(get_current_user),
     resume_repo: ResumeRepository = Depends(get_resume_repo),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Secure applicant resume download via signed Cloudinary URL or local file."""
     user_id_str = str(current_user.id)
@@ -381,7 +379,6 @@ async def update_application_stage(
     app_repo: ApplicationRepository = Depends(get_app_repo),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Update hiring pipeline stage for an applicant (Recruiter/Admin)."""
     if not current_user.has_role(UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE):
@@ -614,7 +611,6 @@ async def get_job_applications(
     current_user: UserModel = Depends(get_current_user),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Return all applicants for a specific job enriched with parsed resume snapshots."""
     user_roles = getattr(current_user, "roles", [current_user.role])
@@ -754,7 +750,6 @@ async def toggle_job_status(
     current_user: UserModel = Depends(get_current_user),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Toggle job status between open, closed, and draft."""
     if not current_user.has_role(UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE):
@@ -780,7 +775,6 @@ async def update_job(
     current_user: UserModel = Depends(get_current_user),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Update a job posting and optionally rescore active applicants."""
     if not current_user.has_role(UserRole.RECRUITER, UserRole.PLATFORM_ADMIN, UserRole.EXECUTIVE):
@@ -888,7 +882,6 @@ async def override_application_eligibility(
     current_user: UserModel = Depends(get_recruiter_or_admin),
     job_repo: JobRepository = Depends(get_job_repo),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Recruiter/Admin discretion override for automated eligibility status."""
     if payload.new_status not in ("eligible", "ineligible", "unverified"):

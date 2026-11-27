@@ -1,22 +1,6 @@
 import api from './api';
 
 /**
- * Upload and parse resume PDF into structured portfolio data
- * @param {File} file 
- */
-export async function parseResumeForPortfolio(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await api.post('/portfolio/parse-resume', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-  return response.data;
-}
-
-/**
  * Upload candidate profile photo
  * @param {File} file 
  */
@@ -51,11 +35,6 @@ export async function enhancePortfolioContent(rawText, targetRole = 'Software En
  */
 export async function savePortfolio(profileData) {
   const response = await api.post('/portfolio/save', profileData);
-  return response.data;
-}
-
-export async function unpublishPortfolio() {
-  const response = await api.post('/portfolio/unpublish');
   return response.data;
 }
 

@@ -235,10 +235,6 @@ export const uploadResume = (file, onProgress) => {
 export const getResumes = (p, config) => api.get('/resume/', { params: p, ...config })
 export const getResumeById = (id) => api.get(`/resume/${id}`)
 
-export const deleteResume = (id) => api.delete(`/resume/${id}`)
-
-export const reparseResume = (id) => api.post(`/resume/${id}/reparse`)
-
 export const extractJDText = (file) => {
   const formData = new FormData()
   formData.append('file', file)
@@ -251,12 +247,8 @@ export const matchATS = (p) => {
 
 export const getATSHistory = (p, config) => api.get('/ats/history', { params: p, ...config })
 export const getLatestATSResult = () => api.get('/ats/latest')
-export const getATSResult = (id) => api.get(`/ats/result/${id}`)
 
-export const enhanceResume = (p) => api.post('enhance/enhance-and-download', p)
 export const recompileResumePdf = (p) => api.post('/enhance/recompile-pdf', p)
-
-export const generateQuickPractice = (p) => api.post('/interview/quick-practice', p)
 
 export const analyzeGitHub = (p) => api.post('/github/analyze', p)
 
@@ -275,7 +267,6 @@ export const updateJob = (jobId, payload) => api.put(`/jobs/${jobId}`, payload)
 export const applyToJob = (jobId, payload, params) => api.post(`/jobs/${jobId}/apply`, payload || null, { params })
 export const matchJobATS = (jobId, params) => api.post(`/jobs/${jobId}/match`, null, { params })
 export const getMyApplications = () => api.get('/jobs/applications/my')
-export const getRecommendedJobs = (params) => api.get('/jobs/recommended', { params })
 export const getMyPostedJobs = () => api.get('/jobs/me')
 export const getRecruiterStats = () => api.get('/jobs/recruiter/stats')
 export const toggleJobStatus = (jobId, status) => api.patch(`/jobs/${jobId}/status`, { status })
@@ -294,7 +285,6 @@ export const setPrimaryResume = (payload) =>
 // Payment APIs
 export const createCheckout = (plan) => api.post('/payment/checkout', { plan })
 export const verifyPayment = (payload) => api.post('/payment/verify', payload)
-export const choosePlan = (plan) => api.post('/payment/choose', { plan })
 export const cancelSubscription = (payload) => api.post('/payment/cancel', payload || {})
 export const reportPaymentFailure = (payload) => api.post('/payment/report-failure', payload)
 
@@ -304,15 +294,7 @@ export const changePassword = (current_password, new_password) =>
 
 // ── Enterprise Phase 5 APIs ──────────────────────────────────────────────────
 // Interview Kits & Structured Scorecards (Interviewer / Recruiter / Executive / Admin)
-export const getInterviewKits = (jobId) => api.get(`/interview-kits`, { params: { job_id: jobId } })
-export const submitScorecard = (payload) => api.post('/interview-kits/scorecards', payload)
 export const getAssignedInterviews = (params) => api.get('/interview-kits/assigned', { params })
-export const getScorecardsByApplication = (applicationId) => api.get(`/interview-kits/scorecards/${applicationId}`)
-export const getCalibrationReport = (applicationId, stageName) =>
-  api.get(`/interview-kits/calibration`, { params: { application_id: applicationId, stage_name: stageName } })
-
-// Exec Analytics (Exec / Admin read-only)
-export const getExecAnalytics = () => api.get('/analytics/enterprise')
 
 // ── Team Management & Invitations (Enterprise B2B SaaS) ──────────────────────
 export const getTeamMembers = () => api.get('/team/members')
@@ -326,7 +308,6 @@ export const removeTeamMember = (userId) => api.delete(`/team/members/${userId}`
 export const scheduleLiveInterview = (payload) => api.post('/live-interview/schedule', payload)
 export const scheduleBulkLiveInterviews = (payload) => api.post('/live-interview/schedule/bulk', payload)
 export const getEmployerLiveSessions = (params) => api.get('/live-interview/employer/sessions', { params })
-export const getEmployerLiveScorecard = (sessionId) => api.get(`/live-interview/employer/scorecard/${sessionId}`)
 export const exportEmployerEvaluationsExcel = (jobId) =>
   api.get('/live-interview/employer/export-excel', {
     params: { job_id: jobId },
@@ -351,7 +332,7 @@ const _CACHE_SKIP_PATHS = [
   '/support',
 ]
 
-export const clearApiGetCache = () => {
+const clearApiGetCache = () => {
   _getCache.clear()
   _revalidatingKeys.clear()
 }

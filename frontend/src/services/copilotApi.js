@@ -113,19 +113,6 @@ export async function streamChatV2({
 }
 
 /**
- * Fetch paginated list of user sessions
- */
-export async function fetchSessions(cursor = null, limit = 20) {
-  const headers = getAuthHeaders();
-  let url = `${BASE}/copilot/sessions?limit=${limit}`;
-  if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
-
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error('Failed to load chat sessions');
-  return await res.json();
-}
-
-/**
  * Create a new session
  */
 export async function createSession(title = 'New Conversation') {
@@ -140,34 +127,6 @@ export async function createSession(title = 'New Conversation') {
 }
 
 /**
- * Soft delete or remove a session
- */
-export async function deleteSession(sessionId) {
-  const headers = getAuthHeaders();
-  const res = await fetch(`${BASE}/copilot/sessions/${sessionId}`, {
-    method: 'DELETE',
-    headers,
-  });
-  if (!res.ok) throw new Error('Failed to delete session');
-  return await res.json();
-}
-
-/**
- * Fetch full transcript messages for a session
- */
-export async function fetchSessionMessages(sessionId, limit = 50) {
-  if (!sessionId || sessionId === 'undefined' || sessionId === 'null') {
-    return { messages: [] };
-  }
-  const headers = getAuthHeaders();
-  const res = await fetch(`${BASE}/copilot/sessions/${sessionId}/messages?limit=${limit}`, {
-    headers,
-  });
-  if (!res.ok) throw new Error('Failed to load messages');
-  return await res.json();
-}
-
-/**
  * Submit feedback on an assistant message (1 = thumbs up, -1 = thumbs down)
  */
 export async function submitMessageFeedback(messageId, rating, comment = null) {
@@ -178,43 +137,5 @@ export async function submitMessageFeedback(messageId, rating, comment = null) {
     body: JSON.stringify({ rating, comment }),
   });
   if (!res.ok) throw new Error('Failed to record feedback');
-  return await res.json();
-}
-
-/**
- * Migrate legacy localStorage chat history into server sessions
- */
-export async function migrateLocalStorage(messages) {
-  if (!messages || !messages.length) return null;
-  const headers = getAuthHeaders();
-  const res = await fetch(`${BASE}/copilot/migrate-local`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ messages }),
-  });
-  if (!res.ok) return null;
-  return await res.json();
-}
-
-/**
- * Fetch durable user memory
- */
-export async function fetchMemory() {
-  const headers = getAuthHeaders();
-  const res = await fetch(`${BASE}/copilot/memory`, { headers });
-  if (!res.ok) return { memories: [] };
-  return await res.json();
-}
-
-/**
- * Delete a specific learned memory
- */
-export async function deleteMemory(key) {
-  const headers = getAuthHeaders();
-  const res = await fetch(`${BASE}/copilot/memory?key=${encodeURIComponent(key)}`, {
-    method: 'DELETE',
-    headers,
-  });
-  if (!res.ok) throw new Error('Failed to delete memory');
   return await res.json();
 }

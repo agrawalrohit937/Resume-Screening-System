@@ -2,7 +2,7 @@
  * Centralized profile avatar resolution & Cloudinary helper for CareerShala.
  */
 
-export function optimizeCloudinaryUrl(url, width = 100) {
+function optimizeCloudinaryUrl(url, width = 100) {
   if (!url || typeof url !== 'string') return null
   const trimmed = url.trim()
   if (trimmed.startsWith('data:')) {
