@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy } from 'react'
 import toast, { Toaster, ToastBar } from 'react-hot-toast'
 import { Check, AlertCircle, AlertTriangle, Info, Loader2, X } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -61,7 +61,8 @@ const AcceptInvite = lazy(() => import('./pages/enterprise/AcceptInvite'))
 // ── Route guards ────────────────────────────────────────────────────────────
 
 function ProtectedRoute({ children }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  if (!user && loading) return <Loader />
   return user ? children : <Navigate to="/login" replace />
 }
 
@@ -97,7 +98,8 @@ function PublicRoute({ children }) {
 }
 
 function AdminRoute({ children }) {
-  const { user, hasRole } = useAuth()
+  const { user, loading, hasRole } = useAuth()
+  if (!user && loading) return <Loader />
   if (!user) return <Navigate to="/login" replace />
 
   const allowedRoles = ['admin', 'platform_admin']
@@ -118,7 +120,8 @@ function AdminRoute({ children }) {
 }
 
 function RecruiterRoute({ children }) {
-  const { user, hasRole } = useAuth()
+  const { user, loading, hasRole } = useAuth()
+  if (!user && loading) return <Loader />
   if (!user) return <Navigate to="/login" replace />
 
   // RecruiterRoute protects job postings, applicant pipelines, and ATS settings.
@@ -150,24 +153,13 @@ function RecruiterRoute({ children }) {
   return children
 }
 
-function BootLoaderGate({ children }) {
-  const { loading } = useAuth()
-
-  if (loading) {
-    return <Loader />
-  }
-
-  return children
-}
-
 // ── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <TenantProvider>
-          <BootLoaderGate>
-            <Toaster
+          <Toaster
               position="top-right"
               containerStyle={{
                 top: 76,
@@ -350,9 +342,8 @@ export default function App() {
               </Route>
             </Routes>
           </Suspense>
-            </BootLoaderGate>
-          </TenantProvider>
-        </AuthProvider>
-      </BrowserRouter>
+        </TenantProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

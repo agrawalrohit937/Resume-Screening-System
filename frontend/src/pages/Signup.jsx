@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import { Mail, Lock, User, Eye, EyeOff, Briefcase, Building2, ArrowRight, CheckCircle2 } from 'lucide-react'
+import SEO from '../components/common/SEO'
 
 const illustration = '/illustration.webp';
 
@@ -116,6 +117,11 @@ export default function Signup() {
   return (
     // FIX 1: Fluid layout on mobile, absolute single-page constraints on desktop templates
     <div className="min-h-screen lg:h-screen w-full max-w-full bg-white font-sans lg:grid lg:grid-cols-[1.25fr_1fr] lg:overflow-hidden">
+      <SEO
+        title="Create Free Account — CareerShala"
+        description="Join CareerShala for free. Optimize your resume for ATS, practice live AI mock interviews, and launch your verified developer portfolio."
+        canonical="https://www.careershala.tech/signup"
+      />
 
       {/* LEFT — BRAND PANEL */}
       <div className="relative hidden h-full flex-col justify-start overflow-hidden bg-gradient-to-b from-[#E8F5FA] via-[#D6EFF8] to-[#BCE2F1] px-16 pt-14 lg:flex">

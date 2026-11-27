@@ -143,7 +143,7 @@ function InvoiceReceiptModal({ invoice, user, onClose }) {
                   className="w-9 h-9 object-contain shrink-0"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/logo.png";
+                    e.currentTarget.src = "/logo_t.webp";
                   }}
                 />
                 <span className="text-xl font-black text-slate-900 tracking-tight">CareerShala</span>
