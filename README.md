@@ -8,7 +8,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20Neon-336791.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3.4.6-38B2AC.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/Tests-397%20Passed-brightgreen.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
+[![Tests](https://img.shields.io/badge/Tests-412%20Passed-brightgreen.svg?style=flat-square)](https://github.com/agrawalrohit937/Resume-Screening-System)
 
 > [!IMPORTANT]
 > 🌐 **Try it Live**: **[https://www.careershala.tech](https://www.careershala.tech)**  
@@ -139,7 +139,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 | :--- | :--- | :--- | :--- |
 | **AI Responses (LLM)** | Primary Groq / Gemini API key | Automatically rotates through a pool of backup keys | Returns a curated local response template |
 | **PDF Resume Reading** | Cloud OCR (Azure Document Intelligence) | Local `pdfplumber` layout-aware text extractor | Clean raw text extraction |
-| **Resume Matching Score** | Local BGE-M3 Neural Embedding model | Google Gemini Cloud Vector Embeddings | Deterministic skill & keyword overlap calculation |
+| **Resume Matching Score** | Local BGE Neural Embedding model (`bge-small-en-v1.5` / `bge-m3`) | Google Gemini Cloud Vector Embeddings | Deterministic skill & keyword overlap calculation |
 | **AI Output Parsing** | Standard `json.loads` | Auto-repairing `json-repair` tool (fixes markdown blocks) | Safe default response bank |
 | **Task Synchronization** | Database atomic row lock (`SELECT ... FOR UPDATE`) | In-memory atomic lock | Aborts duplicate overlapping jobs safely |
 | **Background Scheduling** | Azure Cloud Timer Triggers | Admin Webhook endpoints (`/admin/trigger-*`) | Built-in fallback task sweep |
@@ -207,7 +207,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 
 1. **Multi-Tenant Organization Workspaces**:
    - Create separate company workspaces where team members can collaborate without mixing data.
-   - Supports enterprise workspace roles: *Executive / Employer* (Company Lead), *Admin*, *Recruiter*, *Hiring Manager*, *Interviewer*, and *Coordinator*.
+   - Supports 5-role RBAC across workspaces: *Platform Admin*, *Executive* (Company Lead), *Recruiter*, *Interviewer*, and *Candidate*.
 
 2. **Visual Candidate Kanban Pipeline**:
    - Manage job openings with a 6-stage drag-and-drop board:
@@ -259,7 +259,7 @@ In many web apps, if a third-party service (like an AI provider or email server)
 | **Backend API** | **FastAPI** (Python 3.10+) | High-performance asynchronous API with interactive Swagger documentation |
 | **Database** | **PostgreSQL 16** + **SQLAlchemy 2.0 Async** | Scalable relational & document-entity database engine on Neon Cloud |
 | **AI / LLMs** | **Groq**, **Google Gemini 2.5 Flash** | Multi-provider AI key rotation for resume analysis and chat |
-| **Vector Embeddings** | **BAAI BGE-M3** & **BGE-Reranker** | State-of-the-art semantic matching between resumes and job requirements |
+| **Vector Embeddings** | **BAAI BGE** (`bge-small-en-v1.5` / `bge-m3`) | Semantic matching between resumes and job requirements |
 | **PDF Extraction** | **Azure Document Intelligence** & **pdfplumber** | 2-tier document parser for PDF and Word resumes |
 | **PDF Generation** | **ReportLab** | Generates verified PDF skill certificates and cover letters locally |
 | **Email Service** | **Brevo REST API** + **Gmail OAuth 2.0** | Reliable email delivery for job alerts and application outreach |
@@ -308,15 +308,14 @@ Resume-Screening-System/
 │   ├── services/                      # Business logic and AI engines
 │   │   ├── scoring_engine.py          # Resume scoring algorithms & fresher models
 │   │   ├── document_parser_service.py # 2-tier PDF & Word resume extraction
-│   │   ├── embedding_service.py       # BGE-M3 vector embedding generation
-│   │   ├── reranker_service.py        # Cross-encoder match reranker
+│   │   ├── embedding_service.py       # BGE semantic vector embedding generation
 │   │   ├── copilot_service.py         # Copilot conversation context builder
 │   │   ├── email_service.py           # Brevo HTTP & Gmail OAuth dispatcher
 │   │   └── live_interview_service.py  # Adaptive AI mock interview question generator
 │   │
 │   ├── utils/                         # Helper functions (json-repair, NLP tools, file handling)
 │   ├── workflows/                     # LangGraph AI workflows (multi-agent cover letters)
-│   └── tests/                         # Automated test suite (397+ tests)
+│   └── tests/                         # Automated test suite (412+ tests)
 │
 └── frontend/                          # React 18 + Vite Frontend
     ├── package.json                   # Frontend npm packages
@@ -492,7 +491,7 @@ CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 CareerShala includes a full automated test suite to ensure that resume scoring, security permissions, and email pipelines work reliably:
 
 ```bash
-# Run all backend automated tests (397+ tests)
+# Run all backend automated tests (412+ tests)
 cd backend && pytest
 
 # Run specific tests for ATS resume scoring
@@ -514,7 +513,7 @@ The resume scoring engine was benchmarked across hundreds of candidate-job pairs
 | **NDCG@10 (Ranking Quality)** | **0.9927** | $> 0.85$ | 🟢 Enterprise Grade | The most qualified candidates are reliably ranked at the very top of the list. |
 | **MAP (Mean Average Precision)** | **1.0000** | $> 0.90$ | 🟢 Perfect Precision | Accurately identifies relevant candidate skills without false positives. |
 | **Spearman Rank Correlation** | **0.9327** | $> 0.80$ | 🟢 High Consistency | Scoring remains fair and repeatable across different resume formats. |
-| **Automated Test Coverage** | **397 / 397** | $100\%$ | 🟢 All Pass | 100% of unit and integration test suites pass successfully. |
+| **Automated Test Coverage** | **412 / 412** | $100\%$ | 🟢 All Pass | 100% of unit and integration test suites pass successfully. |
 
 ---
 
