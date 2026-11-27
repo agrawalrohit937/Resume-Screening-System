@@ -32,11 +32,6 @@ export const updateAdminTicketStatus = async (ticketId, status) => {
   return data
 }
 
-export const getAdminTicketStats = async () => {
-  const { data } = await api.get('/admin/support/stats')
-  return data
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // CAREER APPLICATIONS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -55,11 +50,6 @@ export const updateAdminApplicationStatus = async (appId, status, adminNotes = n
   const payload = { status }
   if (adminNotes !== null) payload.admin_notes = adminNotes
   const { data } = await api.patch(`/admin/careers/applications/${appId}/status`, payload)
-  return data
-}
-
-export const getAdminCareerStats = async () => {
-  const { data } = await api.get('/admin/careers/stats')
   return data
 }
 

@@ -455,7 +455,7 @@ def _resume_to_response(resume: ResumeModel) -> ResumeDetailResponse:
     )
 
 
-async def sweep_stuck_pending_resumes(db: Optional[Any] = None) -> Dict[str, Any]:
+async def sweep_stuck_pending_resumes() -> Dict[str, Any]:
     """Mark resumes stuck in pending/processing for >10 minutes as failed."""
     now = datetime.now(timezone.utc)
     threshold = now - timedelta(minutes=10)

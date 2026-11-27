@@ -670,7 +670,6 @@ async def get_task_status(
     task_id: str,
     current_user: UserModel = Depends(get_current_user),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Polls live execution status, progress percentage, and results for a background job."""
     tenant_id = getattr(current_user, "tenant_id", None) or "default"

@@ -254,7 +254,6 @@ async def get_recommended_jobs(
     limit: int = Query(default=5, ge=1, le=20),
     current_user: UserModel = Depends(get_current_user),
     resume_repo=Depends(get_resume_repo),
-    job_repo: JobRepository = Depends(get_job_repo),
 ):
     """On-demand job recommendation engine cached privately per user for 5 minutes."""
     user_role = getattr(getattr(current_user, "role", None), "value", getattr(current_user, "role", None))
@@ -366,8 +365,6 @@ async def get_job_detail(
     current_user: Optional[UserModel] = Depends(get_optional_current_user),
     job_repo: JobRepository = Depends(get_job_repo),
     company_repo: CompanyRepository = Depends(get_company_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Return full job details enriched with company profile and has_applied state."""
     if not hasattr(job_repo, "get_by_id"):
@@ -395,8 +392,6 @@ async def match_job_ats(
     current_user: UserModel = Depends(get_current_user),
     resume_repo=Depends(get_resume_repo),
     job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Calculate instant ATS Profile Fit score between candidate resume and job."""
     if not hasattr(job_repo, "get_by_id"):
@@ -460,8 +455,6 @@ async def apply_to_job(
     current_user: UserModel = Depends(get_current_user),
     resume_repo=Depends(get_resume_repo),
     job_repo: JobRepository = Depends(get_job_repo),
-    session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Submit an internal candidate application with resume snapshot & dual ATS scoring."""
     if not DocumentId.is_valid(job_id):

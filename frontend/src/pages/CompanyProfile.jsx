@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ExternalLink, ArrowLeft, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getJobsByCompany } from '../services/api'
-import { getCompanyWebsiteUrl } from './JobFeed'
+import { getCompanyWebsiteUrl } from '../components/jobs/jobHelpers'
 
 /**
  * Direct Company Portal Redirector.

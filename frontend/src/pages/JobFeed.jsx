@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
   Briefcase,
   Search,
@@ -12,7 +12,7 @@ import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AppLayout from '../components/AppLayout'
-import { getJobs, getJobDetail, applyToJob, matchJobATS, getMyApplications } from '../services/api'
+import { getJobs, getJobDetail, applyToJob, matchJobATS } from '../services/api'
 import CustomDropdown from '../components/common/CustomDropdown'
 import JobCard from '../components/jobs/JobCard'
 import JobDetailPane from '../components/jobs/JobDetailPane'
@@ -20,12 +20,8 @@ import JobMatchModal from '../components/jobs/JobMatchModal'
 import SEO from '../components/common/SEO'
 import {
   normalizeJob,
-  resolveJobLogo,
-  getCompanyWebsiteUrl,
   shareJobListing,
 } from '../components/jobs/jobHelpers'
-
-export { JobCard, resolveJobLogo, getCompanyWebsiteUrl }
 
 const WORK_MODE_OPTIONS = [
   { value: 'all', label: 'All Modes' },
@@ -85,6 +81,7 @@ export default function JobFeed() {
       search: searchQuery.trim() || undefined,
       work_mode: modeVal,
       min_years: maxYearsVal ?? undefined,
+      limit: 20,
       ...extra,
     }
   }
@@ -135,48 +132,59 @@ export default function JobFeed() {
       .catch(() => {})
   }, [jobs])
 
-  // Load candidate's applied job IDs
+  // Reset applied state on logout
   useEffect(() => {
     if (!user) {
       setAppliedJobs(new Set())
-      return
     }
-    getMyApplications()
-      .then((res) => {
-        const ids = (res.data?.applications || []).map((a) => a.job_id).filter(Boolean)
-        const appSet = new Set(ids)
-        setAppliedJobs(appSet)
-        setJobs((prev) => prev.map((j) => (appSet.has(j.id) ? { ...j, has_applied: true } : j)))
-      })
-      .catch(() => {})
   }, [user?.id])
 
-  // Fetch job listings on filter changes (debounced 250ms)
+  const prevSearchRef = useRef(searchQuery)
+
+  // Fetch job listings: 0ms on initial mount & dropdown changes, 250ms debounce only for searchQuery typing
   useEffect(() => {
-    const timer = setTimeout(async () => {
+    let isCancelled = false
+    const isSearchChange = prevSearchRef.current !== searchQuery
+    prevSearchRef.current = searchQuery
+
+    const fetchJobs = async () => {
       setLoading((prev) => prev || jobs.length === 0)
       try {
         const res = await getJobs(buildFilterParams())
+        if (isCancelled) return
         const fetchedJobs = (res?.data?.jobs || []).map(normalizeJob)
         setJobs(fetchedJobs)
         setTotal(res?.data?.total ?? fetchedJobs.length)
         syncServerApplied(fetchedJobs)
       } catch {
+        if (isCancelled) return
         toast.error('Unable to fetch jobs. Please try refreshing.')
         setJobs([])
         setTotal(0)
       } finally {
-        setLoading(false)
+        if (!isCancelled) setLoading(false)
       }
-    }, 250)
-    return () => clearTimeout(timer)
+    }
+
+    if (!isSearchChange) {
+      fetchJobs()
+      return () => {
+        isCancelled = true
+      }
+    }
+
+    const timer = setTimeout(fetchJobs, 250)
+    return () => {
+      isCancelled = true
+      clearTimeout(timer)
+    }
   }, [searchQuery, selectedMode, selectedExp])
 
   const handleLoadMore = async () => {
     if (loadingMore || jobs.length >= total) return
     setLoadingMore(true)
     try {
-      const res = await getJobs(buildFilterParams({ skip: jobs.length, limit: 30 }))
+      const res = await getJobs(buildFilterParams({ skip: jobs.length, limit: 20 }))
       const fetchedJobs = (res?.data?.jobs || []).map(normalizeJob)
       setJobs((prev) => {
         const existingIds = new Set(prev.map((j) => j.id))

@@ -38,33 +38,6 @@ export async function issueCertificate({ assessmentName, score, difficulty }) {
     return data
 }
 
-export async function claimCertificate({ topic, score, difficulty }) {
-    const { data } = await api.post('/certificates/claim', {
-        topic,
-        score,
-        difficulty,
-    })
-
-    if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-            new CustomEvent('trigger-notification', {
-                detail: {
-                    title: 'New Certificate Issued! 🏆',
-                    message: `Congratulations! Your ${topic || 'Skill Assessment'} Certificate has been claimed.`,
-                    type: 'badge',
-                    created_at: new Date().toISOString(),
-                },
-            })
-        )
-    }
-    return data
-}
-
-export async function getMyCertificates() {
-    const { data } = await api.get('/certificates/my')
-    return data
-}
-
 export async function resendCertificate(certificateId) {
     const { data } = await api.post(`/certificates/resend/${certificateId}`)
     return data

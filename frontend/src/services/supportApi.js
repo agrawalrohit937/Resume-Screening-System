@@ -53,22 +53,6 @@ export const updateTicketStatus = async (ticketId, status) => {
 }
 
 /**
- * Get all support categories
- */
-export const getSupportCategories = async () => {
-  const { data } = await api.get('/support/categories')
-  return data
-}
-
-/**
- * Get ticket statistics (admin)
- */
-export const getSupportStats = async () => {
-  const { data } = await api.get('/support/stats')
-  return data
-}
-
-/**
  * Auto-collect system metadata for support tickets
  */
 export function collectSystemMetadata() {

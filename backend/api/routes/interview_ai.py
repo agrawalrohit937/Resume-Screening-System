@@ -174,7 +174,6 @@ async def submit_cheating_report(
     payload: CheatingReportRequest,
     current_user: UserModel = Depends(get_current_user),
     session: Optional[AsyncSession] = Depends(get_db),
-    db: Optional[Any] = None,
 ):
     """Submit cheating events and receive a risk assessment."""
     report = _cheating_svc.analyze_session(payload.session_id, payload.events)
