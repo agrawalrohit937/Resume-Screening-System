@@ -13,12 +13,12 @@ import {
 } from 'lucide-react'
 
 const LINKS = [
-  { label: 'Frequently Asked Questions', icon: FileQuestion, href: '/faq' },
-  { label: 'Documentation', icon: BookOpen, href: '/docs' },
-  { label: 'Privacy Policy', icon: Shield, href: '/privacy' },
-  { label: 'Terms of Service', icon: FileText, href: '/terms' },
+  { label: 'Frequently Asked Questions', icon: FileQuestion, href: null },
+  { label: 'Documentation', icon: BookOpen, href: null },
+  { label: 'Privacy Policy', icon: Shield, href: null },
+  { label: 'Terms of Service', icon: FileText, href: null },
   { label: 'Contact Email', icon: Mail, href: 'mailto:support@careershala.tech' },
-  { label: 'Status Page', icon: Activity, href: 'https://status.careershala.tech' },
+  { label: 'Status Page', icon: Activity, href: null },
 ]
 
 export default function HelpCenterLinks() {
@@ -34,14 +34,32 @@ export default function HelpCenterLinks() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
         {LINKS.map((link, idx) => {
           const Icon = link.icon
-          const isExternal = link.href.startsWith('http') || link.href.startsWith('mailto:')
+
+          if (!link.href) {
+            return (
+              <div
+                key={idx}
+                aria-disabled="true"
+                className="flex items-center gap-2.5 px-3.5 py-2.5 sm:py-3 rounded-xl bg-slate-50 border border-slate-100 opacity-75 cursor-default select-none"
+              >
+                <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                  <Icon size={15} strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-600 truncate">
+                    {link.label}
+                  </p>
+                </div>
+              </div>
+            )
+          }
 
           return (
             <a
               key={idx}
               href={link.href}
-              target={isExternal ? '_blank' : undefined}
-              rel={isExternal ? 'noopener noreferrer' : undefined}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center gap-2.5 px-3.5 py-2.5 sm:py-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:border-slate-200 transition-all group"
             >
               <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-all shrink-0">

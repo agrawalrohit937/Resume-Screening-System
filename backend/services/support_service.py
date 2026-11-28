@@ -12,7 +12,6 @@ from schemas.support_schema import SupportTicketModel, TicketMessage
 from schemas.user_schema import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
-from services.cloudinary_service import upload_file
 from services.email_service import EmailService
 
 logger = structlog.get_logger(__name__)
@@ -115,38 +114,9 @@ class SupportService:
         attachments: Optional[List[Dict[str, Any]]] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Create a new support ticket with auto-filled metadata."""
+        """Create a new support ticket and dispatch notification email."""
         ticket_id = generate_ticket_id()
 
-        billing_data = {}
-        bug_data = {}
-        console_errors = []
-
-        # Auto-attach billing data for billing category
-        if category == "billing":
-            billing_data = {
-                "plan": user.plan,
-                "subscription_active": user.subscription_active,
-                "plan_updated_at": user.plan_updated_at.isoformat() if user.plan_updated_at else None,
-                "total_resumes": user.total_resumes,
-                "total_ats_checks": user.total_ats_checks,
-            }
-
-        # Auto-collect bug data
-        if category == "bug" and metadata:
-            bug_data = {
-                "browser": metadata.get("browser"),
-                "device": metadata.get("device"),
-                "os": metadata.get("os"),
-                "resolution": metadata.get("resolution"),
-                "page_url": metadata.get("current_url"),
-                "frontend_version": metadata.get("app_version"),
-                "backend_version": metadata.get("backend_version"),
-            }
-            if metadata.get("console_errors"):
-                console_errors = metadata["console_errors"]
-
-        # Enforce priority limits for non-premium users
         if priority == "critical" and user.plan != "premium":
             priority = "high"
 
@@ -169,21 +139,8 @@ class SupportService:
             }],
             "attachments": attachments or [],
             "messages": [],
-            "browser": metadata.get("browser") if metadata else None,
-            "os": metadata.get("os") if metadata else None,
-            "route": metadata.get("route") if metadata else None,
-            "current_url": metadata.get("current_url") if metadata else None,
-            "app_version": metadata.get("app_version") if metadata else None,
-            "login_provider": metadata.get("login_provider") if metadata else None,
             "plan": user.plan,
             "subscription_active": user.subscription_active,
-            "billing_data": billing_data,
-            "bug_data": bug_data,
-            "console_errors": console_errors,
-            "screen_resolution": metadata.get("resolution") if metadata else None,
-            "device": metadata.get("device") if metadata else None,
-            "frontend_version": metadata.get("frontend_version") if metadata else None,
-            "backend_version": metadata.get("backend_version") if metadata else None,
         }
 
         ticket = await self.ticket_repo.create(ticket_dict)
@@ -308,20 +265,10 @@ class SupportService:
         if not updated:
             return None
 
-        # If user replied and ticket was waiting_for_customer, set back to in_progress
-        # If admin replied, set status to waiting_for_customer
-        if not is_admin and ticket.status == "waiting_for_customer":
+        if is_admin and ticket.status == "open":
             updated = await self.ticket_repo.update_status(
                 ticket.id,
                 "in_progress",
-                changed_by=user.id,
-                changed_by_role=user.role,
-                changed_by_name=user.full_name,
-            )
-        elif is_admin and ticket.status not in ("resolved", "closed"):
-            updated = await self.ticket_repo.update_status(
-                ticket.id,
-                "waiting_for_customer",
                 changed_by=user.id,
                 changed_by_role=user.role,
                 changed_by_name="CareerShala Support",
@@ -338,7 +285,7 @@ class SupportService:
         if ticket.user_id != user.id and not self._is_admin(user):
             return None
 
-        valid_statuses = {"open", "in_progress", "waiting_for_customer", "resolved", "closed"}
+        valid_statuses = {"open", "in_progress", "resolved", "closed"}
         if status not in valid_statuses:
             raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
 
@@ -347,11 +294,8 @@ class SupportService:
             if status == "resolved":
                 if ticket.status in ("resolved", "closed"):
                     raise ValueError("Ticket is already resolved or closed")
-            elif status == "open":
-                if ticket.status not in ("resolved", "closed"):
-                    raise ValueError("Only resolved or closed tickets can be reopened")
             else:
-                raise ValueError("Candidates can only resolve or reopen their own tickets")
+                raise ValueError("Candidates can only mark their own tickets as resolved")
 
         updated = await self.ticket_repo.update_status(
             ticket.id,
@@ -366,20 +310,3 @@ class SupportService:
 
     async def get_ticket_stats(self) -> Dict[str, Any]:
         return await self.ticket_repo.get_ticket_stats()
-
-    async def upload_attachment(
-        self, file_bytes: bytes, filename: str, content_type: str
-    ) -> Dict[str, Any]:
-        """Upload an attachment to Cloudinary."""
-        url, public_id = await upload_file(
-            file_bytes,
-            folder="careerpilot/support_attachments",
-            resource_type="auto",
-        )
-        return {
-            "filename": filename,
-            "url": url,
-            "public_id": public_id,
-            "content_type": content_type,
-            "size_bytes": len(file_bytes),
-        }

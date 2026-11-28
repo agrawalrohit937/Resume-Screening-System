@@ -1753,7 +1753,6 @@ def _apply_profile(
         "parsing_warnings": components.parsing_health["warnings"],
         "feedback_suggestions": suggestions,
         "extracted_data": clean_extracted,
-        "reranker_score": None,
         "projects_score": round(getattr(components, "projects_score", 0.0) * 100, 1),
         "projects_breakdown": getattr(components, "projects_breakdown", []),
         "skill_evidence": getattr(components, "skill_evidence", []),

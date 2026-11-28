@@ -53,25 +53,6 @@ export const updateTicketStatus = async (ticketId, status) => {
 }
 
 /**
- * Auto-collect system metadata for support tickets
- */
-export function collectSystemMetadata() {
-  return {
-    browser: navigator.userAgent,
-    os: navigator.platform,
-    route: window.location.pathname,
-    current_url: window.location.href,
-    app_version: '3.0.0',
-    login_provider: localStorage.getItem('last_login_method') || 'email',
-    device: navigator.maxTouchPoints > 0 ? 'mobile' : 'desktop',
-    resolution: `${window.screen.width}x${window.screen.height}`,
-    console_errors: JSON.stringify([]), // Can't access actual console errors
-    frontend_version: '3.0.0',
-    backend_version: '2.0.0',
-  }
-}
-
-/**
  * Format ticket status for display
  */
 export const STATUS_CONFIG = {
@@ -139,28 +120,6 @@ export const CATEGORY_LABELS = {
   bug: 'Report a Bug',
   feature_request: 'Feature Request',
   other: 'Other',
-}
-
-export const SUBCATEGORY_LABELS = {
-  upgrade_plan: 'Upgrade Plan',
-  cancel_subscription: 'Cancel Subscription',
-  refund_request: 'Refund Request',
-  failed_payment: 'Failed Payment',
-  gst_invoice: 'GST Invoice',
-  password_reset: 'Password Reset',
-  email_verification: 'Email Verification',
-  google_login: 'Google Login',
-  github_login: 'GitHub Login',
-  linkedin_login: 'LinkedIn Login',
-  delete_account: 'Delete Account',
-  resume_upload: 'Resume Upload',
-  ats_score: 'ATS Score',
-  resume_parsing: 'Resume Parsing',
-  pdf_generation: 'PDF Generation',
-  ai_copilot: 'AI Copilot',
-  mock_interview: 'Mock Interview',
-  resume_enhancer: 'Resume Enhancer',
-  career_recommendations: 'Career Recommendations',
 }
 
 export const RESPONSE_TIMES = {

@@ -1,130 +1,161 @@
-"""Deterministic local tool selection and safe tool execution for CareerMitra."""
+"""LLM-driven tool selection (Function Calling) and safe parallel execution for CareerMitra."""
 
 import asyncio
+import json
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import httpx
 import structlog
 
-from dataclasses import dataclass
+from core.config import settings
 from services.copilot.context import ToolExecutionContext
 from services.copilot.registry import BaseTool, ToolResult, tool_registry
-import services.copilot.tools  # Ensure all read and action tools are registered
+import services.copilot.tools  # noqa: F401 - register all tools
 
 logger = structlog.get_logger(__name__)
+
+PER_TOOL_TIMEOUT_SECONDS = 8.0
+MAX_TOTAL_TOOL_CALLS = 4
+
+SLASH_NAV_MAP = {
+    "/ats": ("/results", "Opening ATS Matcher"),
+    "/interview": ("/interview", "Opening Interview Practice"),
+    "/upload": ("/upload", "Opening Resume Library"),
+    "/enhance": ("/enhance", "Opening Resume Enhancer"),
+    "/github": ("/github", "Opening GitHub Analysis"),
+    "/fake-detect": ("/fake-detect", "Opening Authenticity Check"),
+    "/gamification": ("/gamification", "Opening Rewards Hub"),
+    "/billing": ("/billing", "Opening Billing & Premium"),
+    "/profile": ("/profile", "Opening Profile settings"),
+    "/dashboard": ("/dashboard", "Opening Career Dashboard"),
+    "/portfolio": ("/portfolio", "Opening Developer Portfolio"),
+    "/certificates": ("/certificates", "Opening Certifications"),
+    "/jobs": ("/jobs", "Opening Job Marketplace"),
+}
+
+QUICK_ACTION_TOOL_MAP = {
+    "review-resume": [("get_resume_summary", {})],
+    "improve-ats": [("get_ats_breakdown", {}), ("get_resume_summary", {})],
+    "mock-interview": [("get_interview_history", {"limit": 3})],
+    "analyze-github": [("get_github_profile", {})],
+    "job-suggestions": [("search_jobs", {"query": "software"})],
+}
 
 
 @dataclass
 class NormalizedToolCall:
-    """Standardized tool call extracted from any LLM provider."""
+    """Standardized tool call extracted from an LLM provider."""
     id: str
     name: str
     args: Dict[str, Any]
 
 
-PER_TOOL_TIMEOUT_SECONDS = 8.0
-MAX_TOTAL_TOOL_CALLS = 4
-
 class CopilotRouter:
-    """Selects and executes grounded tools without an extra provider call."""
+    """Plans tool calls via native LLM Function Calling and executes them concurrently."""
 
     def __init__(self):
         self.registry = tool_registry
 
+    def _build_openai_tool_schemas(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": {k: v for k, v in t.get_json_schema().items() if k != "title"},
+                },
+            }
+            for t in self.registry.list_tools()
+        ]
+
+    async def _plan_tools_with_llm(
+        self, message: str, history: Optional[List[Dict[str, Any]]] = None
+    ) -> List[NormalizedToolCall]:
+        """Select tools via native LLM Function Calling (Groq -> OpenRouter) with recent chat context."""
+        tool_schemas = self._build_openai_tool_schemas()
+        if not tool_schemas:
+            return []
+
+        messages: List[Dict[str, str]] = [{
+            "role": "system",
+            "content": (
+                "You are the CareerMitra tool planner. Call only the tools strictly needed "
+                "to answer the user's request. For greetings or general chat, call no tools."
+            ),
+        }]
+        for turn in (history or [])[-4:]:
+            role = turn.get("role", "user")
+            content = str(turn.get("content") or "")[:400]
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": message})
+
+        providers = [
+            (
+                "https://api.groq.com/openai/v1/chat/completions",
+                getattr(settings, "GROQ_API_KEY", None),
+                getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile"),
+            ),
+            (
+                "https://openrouter.ai/api/v1/chat/completions",
+                getattr(settings, "OPENROUTER_API_KEY", None),
+                "openai/gpt-4o-mini",
+            ),
+        ]
+
+        for url, api_key, model in providers:
+            if not api_key:
+                continue
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        url,
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": model,
+                            "messages": messages,
+                            "tools": tool_schemas,
+                            "tool_choice": "auto",
+                            "temperature": 0.0,
+                            "max_tokens": 512,
+                        },
+                    )
+                    resp.raise_for_status()
+                    choices = resp.json().get("choices") or []
+                    raw_calls = (choices[0].get("message", {}).get("tool_calls") or []) if choices else []
+                    parsed: List[NormalizedToolCall] = []
+                    for idx, tc in enumerate(raw_calls[:MAX_TOTAL_TOOL_CALLS]):
+                        fn = tc.get("function") or {}
+                        name = fn.get("name")
+                        if not name:
+                            continue
+                        raw_args = fn.get("arguments") or "{}"
+                        try:
+                            args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+                        except (json.JSONDecodeError, TypeError):
+                            args = {}
+                        parsed.append(NormalizedToolCall(id=tc.get("id") or f"tc_{idx + 1}", name=name, args=args))
+                    return parsed
+            except Exception as exc:
+                logger.warning("LLM function calling failed", url=url, error=str(exc))
+
+        return []
+
     async def execute_tool_safe(
-        self,
-        tool: BaseTool,
-        ctx: ToolExecutionContext,
-        raw_args: Dict[str, Any],
+        self, tool: BaseTool, ctx: ToolExecutionContext, raw_args: Dict[str, Any]
     ) -> ToolResult:
-        """
-        Executes a single tool with an 8-second hard timeout and robust exception handling.
-        """
+        """Execute a single tool with an 8-second hard timeout and exception handling."""
         try:
-            # Validate args against tool schema
             args_model = tool.args_schema(**raw_args)
-            result = await asyncio.wait_for(
-                tool.execute(ctx, args_model),
-                timeout=PER_TOOL_TIMEOUT_SECONDS,
-            )
-            return result
+            return await asyncio.wait_for(tool.execute(ctx, args_model), timeout=PER_TOOL_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             logger.warning("Tool execution timed out", tool=tool.name, timeout=PER_TOOL_TIMEOUT_SECONDS)
-            return ToolResult(
-                ok=False,
-                data=None,
-                summary=f"{tool.name} timed out",
-                reason=f"Operation exceeded {PER_TOOL_TIMEOUT_SECONDS}s timeout.",
-            )
+            return ToolResult(ok=False, data=None, summary=f"{tool.name} timed out", reason=f"Exceeded {PER_TOOL_TIMEOUT_SECONDS}s timeout.")
         except Exception as e:
             logger.warning("Tool execution error", tool=tool.name, error=str(e))
-            return ToolResult(
-                ok=False,
-                data=None,
-                summary=f"{tool.name} failed",
-                reason=str(e),
-            )
-
-    def select_tools_heuristically(self, message: str, quick_action: Optional[str] = None) -> List[Tuple[str, Dict[str, Any]]]:
-        """
-        Resilient fast-path fallback when cloud LLMs fail to call tools natively.
-        Determines targeted tools from message semantics.
-        """
-        msg_l = message.lower().strip()
-        selected: List[Tuple[str, Dict[str, Any]]] = []
-
-        # Navigation shortcuts
-        nav_map = {
-            "/ats": ("/results", "Opening ATS Matcher"),
-            "/jobs": ("/jobs", "Opening Job Feed & Recommendations"),
-            "/interview": ("/interview", "Taking you to Interview Practice"),
-            "/upload": ("/upload", "Opening Resume Library"),
-            "/enhance": ("/enhance", "Opening Resume Enhancer"),
-            "/github": ("/github", "Opening GitHub Analysis"),
-            "/gamification": ("/gamification", "Opening Rewards Hub"),
-            "/billing": ("/billing", "Opening Billing & Premium"),
-            "/portfolio": ("/portfolio", "Opening Developer Portfolio"),
-            "/certificates": ("/certificates", "Opening Certifications"),
-        }
-        for cmd, (route, reason) in nav_map.items():
-            if msg_l.startswith(cmd) or f" {cmd} " in f" {msg_l} ":
-                selected.append(("navigate", {"route": route, "reason": reason}))
-
-        # Quick actions
-        if quick_action == "review-resume":
-            selected.append(("get_resume_summary", {}))
-        elif quick_action == "improve-ats":
-            selected.append(("get_ats_breakdown", {}))
-            selected.append(("get_resume_summary", {}))
-        elif quick_action == "mock-interview":
-            selected.append(("get_interview_history", {"limit": 3}))
-        elif quick_action == "analyze-github":
-            selected.append(("get_github_profile", {}))
-        elif quick_action == "job-suggestions":
-            selected.append(("search_jobs", {"query": "software"}))
-
-        # Semantic keywords
-        if any(w in msg_l for w in ["resume", "cv", "skills", "experience", "education"]):
-            if not any(t[0] == "get_resume_summary" for t in selected):
-                selected.append(("get_resume_summary", {}))
-        if any(w in msg_l for w in ["ats", "match score", "matched keywords", "missing keywords"]):
-            if not any(t[0] == "get_ats_breakdown" for t in selected):
-                selected.append(("get_ats_breakdown", {}))
-        if any(w in msg_l for w in ["interview", "mock", "practice question"]):
-            if not any(t[0] == "get_interview_history" for t in selected):
-                selected.append(("get_interview_history", {"limit": 3}))
-        if any(w in msg_l for w in ["github", "repos", "commit", "contribution"]):
-            if not any(t[0] == "get_github_profile" for t in selected):
-                selected.append(("get_github_profile", {}))
-        if any(w in msg_l for w in ["cert", "credential", "badge"]):
-            if not any(t[0] == "get_certificates" for t in selected):
-                selected.append(("get_certificates", {}))
-        if any(w in msg_l for w in ["streak", "points", "xp", "level", "reward"]):
-            if not any(t[0] == "get_gamification_state" for t in selected):
-                selected.append(("get_gamification_state", {}))
-        if any(w in msg_l for w in ["job", "opening", "hiring", "vacancy"]):
-            if not any(t[0] == "search_jobs" for t in selected):
-                selected.append(("search_jobs", {"query": message[:40]}))
-
-        return selected[:MAX_TOTAL_TOOL_CALLS]
+            return ToolResult(ok=False, data=None, summary=f"{tool.name} failed", reason=str(e))
 
     async def plan_and_execute_tools(
         self,
@@ -132,130 +163,58 @@ class CopilotRouter:
         message: str,
         quick_action: Optional[str],
         emit_event: Callable[[Dict[str, Any]], Any],
+        history: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Executes tool-calling decisions:
-        1. Attempts LLM function calling with Groq.
-        2. If unavailable, falls back to semantic heuristic tool planner.
-        3. Executes scheduled tools in parallel with asyncio.gather.
-        4. Emits tool_call and tool_result SSE events.
-        """
+        """Plan tools via slash command, quick action, or LLM Function Calling, then run concurrently."""
         tools_to_run: List[NormalizedToolCall] = []
-
-        # 0. Slash commands route directly to the navigate tool
         msg_strip = message.strip()
+
         if msg_strip.startswith("/"):
             slash_cmd = msg_strip.split()[0].lower()
-            slash_map = {
-                "/ats": ("/results", "Opening ATS Matcher"),
-                "/interview": ("/interview", "Opening Interview Practice"),
-                "/upload": ("/upload", "Opening Resume Library"),
-                "/enhance": ("/enhance", "Opening Resume Enhancer"),
-                "/github": ("/github", "Opening GitHub Analysis"),
-                "/fake-detect": ("/fake-detect", "Opening Authenticity Check"),
-                "/gamification": ("/gamification", "Opening Rewards Hub"),
-                "/billing": ("/billing", "Opening Billing & Premium"),
-                "/profile": ("/profile", "Opening Profile settings"),
-                "/dashboard": ("/dashboard", "Opening Career Dashboard"),
-                "/portfolio": ("/portfolio", "Opening Developer Portfolio"),
-                "/certificates": ("/certificates", "Opening Certifications"),
-                "/jobs": ("/jobs", "Opening Job Marketplace"),
-            }
-            if slash_cmd in slash_map:
-                route, reason = slash_map[slash_cmd]
-                tools_to_run = [NormalizedToolCall(
-                    id="tc_nav_1",
-                    name="navigate",
-                    args={"route": route, "reason": reason},
-                )]
+            if slash_cmd in SLASH_NAV_MAP:
+                route, reason = SLASH_NAV_MAP[slash_cmd]
+                tools_to_run = [NormalizedToolCall(id="tc_nav_1", name="navigate", args={"route": route, "reason": reason})]
 
-        # Use the local planner so tool selection does not require another provider call.
-        if not tools_to_run:
-            heuristic_plans = self.select_tools_heuristically(message, quick_action)
-            for idx, (t_name, t_args) in enumerate(heuristic_plans):
-                tools_to_run.append(NormalizedToolCall(
-                    id=f"tc_{idx + 1}",
-                    name=t_name,
-                    args=t_args,
-                ))
+        if not tools_to_run and quick_action in QUICK_ACTION_TOOL_MAP:
+            tools_to_run = [
+                NormalizedToolCall(id=f"tc_qa_{i + 1}", name=name, args=args)
+                for i, (name, args) in enumerate(QUICK_ACTION_TOOL_MAP[quick_action])
+            ]
+
+        if not tools_to_run and msg_strip:
+            tools_to_run = await self._plan_tools_with_llm(msg_strip, history=history)
 
         if not tools_to_run:
             return []
 
-        # Cap total tools to MAX_TOTAL_TOOL_CALLS
         tools_to_run = tools_to_run[:MAX_TOTAL_TOOL_CALLS]
-
-        # 3. Emit tool_call events for all planned tools
         for call in tools_to_run:
-            await emit_event({
-                "type": "tool_call",
-                "id": call.id,
-                "tool": call.name,
-                "name": call.name,
-                "args": call.args,
-            })
+            await emit_event({"type": "tool_call", "id": call.id, "tool": call.name, "name": call.name, "args": call.args})
 
-        # 4. Execute all independent tools concurrently
         async def _run_single(call: NormalizedToolCall) -> Tuple[NormalizedToolCall, ToolResult]:
             tool = self.registry.get(call.name)
-            if not tool:
-                res = ToolResult(ok=False, data=None, summary="Unknown tool", reason=f"Tool {call.name} not registered")
-            else:
-                res = await self.execute_tool_safe(tool, ctx, call.args)
-            return (call, res)
+            res = await self.execute_tool_safe(tool, ctx, call.args) if tool else ToolResult(
+                ok=False, data=None, summary="Unknown tool", reason=f"Tool {call.name} not registered"
+            )
+            return call, res
 
-        results = await asyncio.gather(*[_run_single(call) for call in tools_to_run], return_exceptions=True)
+        results = await asyncio.gather(*[_run_single(c) for c in tools_to_run], return_exceptions=True)
 
         tool_outputs = []
         for item in results:
             if isinstance(item, Exception):
-                logger.warning("Uncaught exception in tool gather", error=str(item))
+                logger.error("Unexpected tool gather exception", error=str(item))
                 continue
-
             call, res = item
-
-            # Emit tool_result event
             await emit_event({
-                "type": "tool_result",
-                "id": call.id,
-                "tool": call.name,
-                "name": call.name,
-                "ok": res.ok,
-                "summary": res.summary,
+                "type": "tool_result", "id": call.id, "tool": call.name,
+                "ok": res.ok, "summary": res.summary, "ui_card": res.ui_card, "citation": res.citation,
             })
-
-            # Emit optional UI card
-            if res.ui_card:
-                await emit_event({
-                    "type": "ui_card",
-                    "card": res.ui_card.get("card"),
-                    "data": res.ui_card.get("data"),
-                })
-
-            # Emit optional citation
-            if res.citation:
-                await emit_event({
-                    "type": "citation",
-                    "id": f"cit_{call.id}",
-                    "source": res.citation.get("source"),
-                    "label": res.citation.get("label"),
-                    "href": res.citation.get("href"),
-                })
-
-            # Emit navigate if navigate tool
-            if call.name == "navigate" and res.ok and res.data:
-                await emit_event({
-                    "type": "navigate",
-                    "to": res.data.get("route"),
-                    "reason": res.data.get("reason", "Navigation shortcut"),
-                })
-
+            if res.ok and call.name == "navigate" and res.data:
+                await emit_event({"type": "navigate", "to": res.data.get("route"), "reason": res.data.get("reason")})
             tool_outputs.append({
-                "tool": call.name,
-                "ok": res.ok,
-                "summary": res.summary,
-                "data": res.data if res.ok else None,
-                "reason": res.reason,
+                "tool": call.name, "ok": res.ok, "data": res.data, "summary": res.summary,
+                "reason": res.reason, "citation": res.citation, "ui_card": res.ui_card,
             })
 
         return tool_outputs

@@ -19,7 +19,8 @@ pydantic>=2.9.0
 pydantic-settings>=2.5.0
 email-validator>=2.2.0
 
-# ─── AI & LLM Engine (Groq + Gemini + OpenRouter) ────────────────
+# ─── AI & LLM Engine (Groq + Gemini + OpenRouter + MCP) ────────
+mcp>=2.0.0
 langchain-core>=0.1.52
 langchain-groq>=0.1.0
 langgraph>=0.0.50

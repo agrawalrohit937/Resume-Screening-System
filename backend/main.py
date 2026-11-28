@@ -117,7 +117,10 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error("Startup failed", error=str(exc))
         raise
-    yield
+
+    from mcp_server import mcp as mcp_server
+    async with mcp_server.session_manager.run():
+        yield
 
     try:
         await disconnect_db()
@@ -288,6 +291,10 @@ def create_application() -> FastAPI:
     app.include_router(interview_kits.router, prefix=f"{p}/interview-kits", tags=["Enterprise ATS - Interview Kits & Scorecards"])
     app.include_router(team.router, prefix=f"{p}/team", tags=["Enterprise ATS - Team Management"])
     app.include_router(company.router, prefix=f"{p}/company", tags=["Company Profile"])
+
+    # Model Context Protocol (MCP) Streamable HTTP endpoint
+    from mcp_server import mcp as mcp_server
+    app.mount("/mcp", mcp_server.streamable_http_app())
 
     return app
 

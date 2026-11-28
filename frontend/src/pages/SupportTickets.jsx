@@ -39,7 +39,6 @@ const STATUS_FILTERS = [
   { value: '', label: 'All Tickets' },
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'waiting_for_customer', label: 'Waiting' },
   { value: 'resolved', label: 'Resolved' },
   { value: 'closed', label: 'Closed' },
 ]
