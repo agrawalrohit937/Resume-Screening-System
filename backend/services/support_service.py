@@ -285,7 +285,7 @@ class SupportService:
         if ticket.user_id != user.id and not self._is_admin(user):
             return None
 
-        valid_statuses = {"open", "in_progress", "waiting_for_customer", "resolved", "closed"}
+        valid_statuses = {"open", "in_progress", "resolved", "closed"}
         if status not in valid_statuses:
             raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
 
@@ -294,11 +294,8 @@ class SupportService:
             if status == "resolved":
                 if ticket.status in ("resolved", "closed"):
                     raise ValueError("Ticket is already resolved or closed")
-            elif status == "open":
-                if ticket.status not in ("resolved", "closed"):
-                    raise ValueError("Only resolved or closed tickets can be reopened")
             else:
-                raise ValueError("Candidates can only resolve or reopen their own tickets")
+                raise ValueError("Candidates can only mark their own tickets as resolved")
 
         updated = await self.ticket_repo.update_status(
             ticket.id,

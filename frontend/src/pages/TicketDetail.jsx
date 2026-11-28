@@ -247,7 +247,6 @@ export default function TicketDetail() {
   const messages = ticket.messages || []
   const attachments = ticket.attachments || []
   const canResolve = ticket.status !== 'resolved' && ticket.status !== 'closed'
-  const canReopen = ticket.status === 'resolved' || ticket.status === 'closed'
   const slaResponseTime = isEnterprise ? '< 30 Minutes' : (RESPONSE_TIMES[ticket.plan] || '24-48 Hours')
 
   // Creator details
@@ -747,17 +746,6 @@ export default function TicketDetail() {
                       ? `Closed on ${formatDateTime(ticket.closed_at)}.`
                       : 'This ticket has been concluded.'}
                 </p>
-              </div>
-
-              {/* If user needs more help, allow sending a follow up or reopening */}
-              <div className="pt-2">
-                <button
-                  onClick={() => canReopen && handleStatusChange('open')}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs"
-                >
-                  <RefreshCw size={14} />
-                  <span>Reopen This Ticket</span>
-                </button>
               </div>
             </motion.div>
           )}

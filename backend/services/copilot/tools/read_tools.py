@@ -476,7 +476,7 @@ class RetrieveContextArgs(BaseModel):
 
 class RetrieveContextTool(BaseTool):
     name = "retrieve_context"
-    description = "Performs hybrid RAG search (Vector + BM25 + Cross-Encoder rerank) across candidate documents, resumes, and platform knowledge."
+    description = "Performs hybrid RAG search (Vector + BM25 + RRF) across candidate documents, resumes, and platform knowledge."
     args_schema = RetrieveContextArgs
     side_effect = False
     requires = ["rag"]

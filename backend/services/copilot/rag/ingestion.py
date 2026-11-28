@@ -79,7 +79,6 @@ async def ingest_resume_chunks(
     try:
         # Persisted to CopilotMemory
         logger.info("Ingested resume chunks successfully", count=len(docs_to_insert), user_id=user_id)
-        logger.info("Ingested resume chunks successfully", count=len(docs_to_insert), user_id=user_id)
         return len(docs_to_insert)
     except Exception as e:
         logger.error("Failed to persist resume chunks", error=str(e), user_id=user_id)

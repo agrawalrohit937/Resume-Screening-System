@@ -94,6 +94,10 @@ async def chat_copilot_v2(
         resume_repo=resume_repo,
         result_repo=result_repo,
         background_tasks=background_tasks,
+        user_plan=getattr(current_user, "plan", "free"),
+        subscription_active=bool(getattr(current_user, "subscription_active", False)),
+        subscription_status=getattr(current_user, "subscription_status", "expired"),
+        subscription_end_date=getattr(current_user, "subscription_end_date", None),
     )
 
     return EventSourceResponse(

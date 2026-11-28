@@ -315,7 +315,7 @@ async def test_router_parallel_execution_and_resilience(mock_context):
     async def emit_event(ev):
         events.append(ev)
 
-    # Test heuristic planning with /ats shortcut
+    # Test slash command routing with /ats shortcut
     outputs = await router.plan_and_execute_tools(
         ctx=mock_context,
         message="/ats",
@@ -356,3 +356,32 @@ async def test_router_tool_timeout_resilience(mock_context):
         assert "timed out" in res.summary.lower()
     finally:
         r_mod.PER_TOOL_TIMEOUT_SECONDS = orig_timeout
+
+
+@pytest.mark.asyncio
+async def test_router_uses_llm_function_calling(mock_context, monkeypatch):
+    """Verify CopilotRouter uses native LLM function calling and has no heuristic fallback."""
+    from services.copilot.router import NormalizedToolCall
+
+    router = CopilotRouter()
+    assert not hasattr(router, "select_tools_heuristically")
+
+    async def fake_llm_planner(message: str, history=None):
+        return [NormalizedToolCall(id="tc_llm_1", name="get_resume_summary", args={})]
+
+    monkeypatch.setattr(router, "_plan_tools_with_llm", fake_llm_planner)
+    events = []
+
+    async def emit_event(ev):
+        events.append(ev)
+
+    outputs = await router.plan_and_execute_tools(
+        ctx=mock_context,
+        message="Review my resume strengths",
+        quick_action=None,
+        emit_event=emit_event,
+    )
+
+    assert len(outputs) == 1
+    assert outputs[0]["tool"] == "get_resume_summary"
+    assert [e["type"] for e in events] == ["tool_call", "tool_result"]
