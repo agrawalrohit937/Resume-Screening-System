@@ -92,7 +92,6 @@ export default function TicketDetail() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [replyText, setReplyText] = useState('')
-  const [replyFiles, setReplyFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   const [copiedId, setCopiedId] = useState(false)
@@ -140,18 +139,16 @@ export default function TicketDetail() {
 
   const handleReply = async (e) => {
     if (e) e.preventDefault()
-    if (!replyText.trim() && replyFiles.length === 0) return
+    if (!replyText.trim()) return
 
     setSubmitting(true)
     try {
       const formData = new FormData()
       formData.append('body', replyText.trim())
-      replyFiles.forEach((f) => formData.append('attachments', f))
 
       const updated = await replyToSupportTicket(id, formData)
       setTicket(updated)
       setReplyText('')
-      setReplyFiles([])
       toast.success('Reply posted successfully!')
 
       // Dispatch global ticket created event so ticket lists refresh if needed
@@ -168,7 +165,7 @@ export default function TicketDetail() {
   const handleKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault()
-      if (replyText.trim() || replyFiles.length > 0) {
+      if (replyText.trim()) {
         handleReply()
       }
     }
@@ -186,12 +183,6 @@ export default function TicketDetail() {
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to update status.')
     }
-  }
-
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || [])
-    setReplyFiles((prev) => [...prev, ...files].slice(0, 5))
-    e.target.value = ''
   }
 
   const copyTicketId = () => {
@@ -696,56 +687,21 @@ export default function TicketDetail() {
                 </span>
               </div>
 
-              {/* File preview chips */}
-              {replyFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {replyFiles.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs font-bold text-indigo-700"
-                    >
-                      <Paperclip size={12} />
-                      <span className="max-w-[140px] truncate">{file.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setReplyFiles((prev) => prev.filter((_, i) => i !== idx))}
-                        className="ml-1 text-indigo-400 hover:text-rose-500 transition-colors cursor-pointer"
-                        title="Remove file"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               <form onSubmit={handleReply} className="space-y-3">
                 <textarea
                   ref={replyRef}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Provide additional details, answer follow-up questions, or upload screenshots..."
+                  placeholder="Provide additional details or answer follow-up questions..."
                   rows={4}
                   className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-sm font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all resize-none leading-relaxed"
                 />
 
-                <div className="flex items-center justify-between gap-3 pt-1">
-                  <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all cursor-pointer">
-                    <Paperclip size={15} strokeWidth={2.2} />
-                    <span>Attach Files</span>
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.zip"
-                    />
-                  </label>
-
+                <div className="flex items-center justify-end gap-3 pt-1">
                   <button
                     type="submit"
-                    disabled={submitting || (!replyText.trim() && replyFiles.length === 0)}
+                    disabled={submitting || !replyText.trim()}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
                   >
                     {submitting ? (
