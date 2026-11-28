@@ -293,8 +293,16 @@ def create_application() -> FastAPI:
     app.include_router(company.router, prefix=f"{p}/company", tags=["Company Profile"])
 
     # Model Context Protocol (MCP) Streamable HTTP endpoint
+    from mcp.server.transport_security import TransportSecuritySettings
     from mcp_server import mcp as mcp_server
-    app.mount("/mcp", mcp_server.streamable_http_app())
+    app.mount(
+        "/",
+        mcp_server.streamable_http_app(
+            streamable_http_path="/mcp",
+            stateless_http=True,
+            transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+        ),
+    )
 
     return app
 
