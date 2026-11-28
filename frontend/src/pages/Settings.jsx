@@ -19,6 +19,8 @@ import {
   ExternalLink,
   Check,
   Zap,
+  Copy,
+  Terminal,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -37,6 +39,21 @@ export default function Settings() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [copiedMcp, setCopiedMcp] = useState(null)
+
+  const mcpUrl = 'https://www.careershala.tech/mcp'
+  const cursorInstallUrl = `cursor://anysphere.cursor-deeplink/mcp/install?name=careershala&config=${encodeURIComponent(
+    btoa(JSON.stringify({ url: mcpUrl }))
+  )}`
+  const vscodeInstallUrl = `vscode:mcp/install?${encodeURIComponent(
+    JSON.stringify({ name: 'careershala', type: 'http', url: mcpUrl })
+  )}`
+  const handleCopyMcp = (key, text, label) => {
+    navigator.clipboard.writeText(text)
+    setCopiedMcp(key)
+    toast.success(`${label} copied!`)
+    setTimeout(() => setCopiedMcp(null), 2000)
+  }
 
   // Determine auth nature
   const isSocialAuth = user?.provider && user?.provider !== 'email' && !user?.has_password
@@ -387,6 +404,53 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* MCP Integration Card */}
+            <div className="bg-white rounded-[2rem] border border-slate-200/70 p-6 md:p-8 shadow-sm space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Terminal size={16} className="text-indigo-600" /> Connect via MCP (Claude / Cursor / VS Code)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Use CareerShala&apos;s ATS scoring, format checker, skill ontology, and job search directly inside external AI apps.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <code className="text-xs font-mono text-slate-800 truncate">{mcpUrl}</code>
+                <button
+                  type="button"
+                  onClick={() => handleCopyMcp('url', mcpUrl, 'MCP URL')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors"
+                >
+                  {copiedMcp === 'url' ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{copiedMcp === 'url' ? 'Copied' : 'Copy URL'}</span>
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2.5">
+                <a
+                  href={cursorInstallUrl}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  <ExternalLink size={13} />
+                  <span>Add to Cursor</span>
+                </a>
+
+                <a
+                  href={vscodeInstallUrl}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 text-xs font-bold transition-colors"
+                >
+                  <ExternalLink size={13} />
+                  <span>Install in VS Code</span>
+                </a>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Using Claude or ChatGPT? Copy the URL above and paste it under <strong>Settings → Connectors → Add Custom Connector</strong>.
+              </p>
             </div>
 
           </div>

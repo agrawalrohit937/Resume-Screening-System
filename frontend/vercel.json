@@ -2,6 +2,14 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/mcp",
+      "destination": "https://careershala-hghwgae4ebesdsb3.centralindia-01.azurewebsites.net/mcp"
+    },
+    {
+      "source": "/mcp/(.*)",
+      "destination": "https://careershala-hghwgae4ebesdsb3.centralindia-01.azurewebsites.net/mcp/$1"
+    },
+    {
       "source": "/((?!.*\\.).*)",
       "destination": "/index.html"
     }
