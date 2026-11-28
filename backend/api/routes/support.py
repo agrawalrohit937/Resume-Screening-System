@@ -2,10 +2,9 @@
 Support Ticket API Routes — Create, list, reply, and manage support tickets
 """
 
-from typing import List, Optional
-import structlog
+from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 
 from api.deps import (
     get_admin_user,
@@ -13,7 +12,6 @@ from api.deps import (
     get_email_service,
     get_user_repo,
 )
-from core.config import settings
 from schemas.user_schema import UserModel
 from repositories.support_ticket_repo import SupportTicketRepository
 from repositories.user_repo import UserRepository
@@ -34,87 +32,30 @@ async def create_ticket(
     subject: str = Form(...),
     description: str = Form(...),
     priority: str = Form(default="low"),
-    subcategory: Optional[str] = Form(None),
-    browser: Optional[str] = Form(None),
-    os: Optional[str] = Form(None),
-    route: Optional[str] = Form(None),
-    current_url: Optional[str] = Form(None),
-    app_version: Optional[str] = Form(None),
-    login_provider: Optional[str] = Form(None),
-    device: Optional[str] = Form(None),
-    resolution: Optional[str] = Form(None),
-    console_errors: Optional[str] = Form(None),
-    frontend_version: Optional[str] = Form(None),
-    backend_version: Optional[str] = Form(None),
-    attachments: Optional[List[UploadFile]] = File(None),
     user: UserModel = Depends(get_current_user),
     service: SupportService = Depends(get_support_service),
 ):
-    """Create a new support ticket with auto-collected metadata."""
-    # Validate category
+    """Create a new support ticket."""
     valid_categories = {"billing", "account", "resume", "ai_features", "bug", "feature_request", "other"}
     if category not in valid_categories:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"Invalid category. Must be one of: {', '.join(valid_categories)}",
+            detail=f"Invalid category. Must be one of: {', '.join(sorted(valid_categories))}",
         )
 
-    if not subject or not description:
+    if not subject.strip() or not description.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Subject and description are required",
         )
 
-    # Upload attachments if provided
-    attachment_list = []
-    if attachments:
-        for file in attachments:
-            if file.filename:
-                try:
-                    file_bytes = await file.read()
-                    attachment = await service.upload_attachment(
-                        file_bytes, file.filename, file.content_type or "application/octet-stream"
-                    )
-                    attachment_list.append(attachment)
-                except Exception as e:
-                    logger.exception("Failed to upload attachment", filename=file.filename)
-                    raise HTTPException(status_code=502, detail=f"Attachment upload failed: {file.filename}") from e
-
-    # Parse console errors from JSON string
-    parsed_console_errors = []
-    if console_errors:
-        try:
-            import json
-            parsed_console_errors = json.loads(console_errors)
-        except (json.JSONDecodeError, TypeError):
-            parsed_console_errors = [console_errors]
-
-    metadata = {
-        "browser": browser,
-        "os": os,
-        "route": route,
-        "current_url": current_url,
-        "app_version": app_version or settings.APP_VERSION,
-        "login_provider": login_provider,
-        "device": device,
-        "resolution": resolution,
-        "console_errors": parsed_console_errors,
-        "frontend_version": frontend_version or settings.APP_VERSION,
-        "backend_version": backend_version or settings.APP_VERSION,
-    }
-
-    result = await service.create_ticket(
+    return await service.create_ticket(
         user=user,
         category=category,
-        subject=subject,
-        description=description,
+        subject=subject.strip(),
+        description=description.strip(),
         priority=priority,
-        subcategory=subcategory,
-        attachments=attachment_list,
-        metadata=metadata,
     )
-
-    return result
 
 
 @router.get("/tickets")
@@ -154,26 +95,11 @@ async def get_ticket(
 async def reply_to_ticket(
     ticket_id: str,
     body: str = Form(...),
-    attachments: Optional[List[UploadFile]] = File(None),
     user: UserModel = Depends(get_current_user),
     service: SupportService = Depends(get_support_service),
 ):
     """Add a reply to an existing ticket."""
-    attachment_list = []
-    if attachments:
-        for file in attachments:
-            if file.filename:
-                try:
-                    file_bytes = await file.read()
-                    attachment = await service.upload_attachment(
-                        file_bytes, file.filename, file.content_type or "application/octet-stream"
-                    )
-                    attachment_list.append(attachment)
-                except Exception as e:
-                    logger.exception("Failed to upload attachment", filename=file.filename)
-                    raise HTTPException(status_code=502, detail=f"Attachment upload failed: {file.filename}") from e
-
-    result = await service.add_reply(ticket_id, user, body, attachment_list)
+    result = await service.add_reply(ticket_id, user, body)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

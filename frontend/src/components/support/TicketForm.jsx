@@ -1,32 +1,18 @@
 /**
- * TicketForm — Modern Linear / Zendesk-style Support Ticket Creation Form
- * Compact multi-column layout, interactive segmented priority pills, integrated file attachments
+ * TicketForm — Clean Support Ticket Creation Form
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Send,
-  Paperclip,
-  X,
   AlertTriangle,
-  File,
-  Image,
-  FileText,
-  Archive,
   ArrowLeft,
-  Tag,
   Flag,
   Sparkles,
   RefreshCw,
-  Check,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import {
-  createSupportTicket,
-  collectSystemMetadata,
-  SUBCATEGORY_LABELS,
-} from '../../services/supportApi'
-import CustomDropdown from '../common/CustomDropdown'
+import { createSupportTicket } from '../../services/supportApi'
 
 const PRIORITIES = [
   {
@@ -60,28 +46,12 @@ const PRIORITIES = [
   },
 ]
 
-const SUBCATEGORIES = {
-  billing: ['upgrade_plan', 'cancel_subscription', 'refund_request', 'failed_payment', 'gst_invoice'],
-  account: ['password_reset', 'email_verification', 'google_login', 'github_login', 'linkedin_login', 'delete_account'],
-  resume: ['resume_upload', 'ats_score', 'resume_parsing', 'pdf_generation'],
-  ai_features: ['ai_copilot', 'mock_interview', 'resume_enhancer', 'career_recommendations'],
-  bug: ['ui_glitch', 'broken_link', 'login_error', 'data_not_saving', 'other_bug'],
-  feature_request: ['new_integration', 'workflow_automation', 'export_options', 'other_idea'],
-  other: ['general_inquiry', 'partnership', 'feedback', 'enterprise_sales'],
-}
-
-const ACCEPTED_FILE_TYPES = '.png,.jpg,.jpeg,.gif,.webp,.pdf,.zip,.doc,.docx'
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-
-export default function TicketForm({ category = 'other', subcategory, onSuccess, onBack }) {
+export default function TicketForm({ category = 'other', onSuccess, onBack }) {
   const { user } = useAuth()
-  const fileInputRef = useRef(null)
 
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('low')
-  const [selectedSubcategory, setSelectedSubcategory] = useState(subcategory || '')
-  const [files, setFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -98,25 +68,6 @@ export default function TicketForm({ category = 'other', subcategory, onSuccess,
     )
 
   const availablePriorities = PRIORITIES.filter((p) => !p.premiumOnly || isPremium)
-  const availableSubcategories = SUBCATEGORIES[category] || []
-
-  const handleFileSelect = useCallback((e) => {
-    const selectedFiles = Array.from(e.target.files || [])
-    const validFiles = selectedFiles.filter((f) => f.size <= MAX_FILE_SIZE)
-    setFiles((prev) => [...prev, ...validFiles].slice(0, 5))
-    e.target.value = ''
-  }, [])
-
-  const removeFile = (index) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const getFileIcon = (type) => {
-    if (type?.startsWith('image/')) return Image
-    if (type?.includes('pdf')) return FileText
-    if (type?.includes('zip') || type?.includes('rar')) return Archive
-    return File
-  }
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault()
@@ -139,20 +90,6 @@ export default function TicketForm({ category = 'other', subcategory, onSuccess,
       formData.append('subject', subject.trim())
       formData.append('description', description.trim())
       formData.append('priority', priority)
-      if (selectedSubcategory) {
-        formData.append('subcategory', selectedSubcategory)
-      }
-
-      // Auto-collected environment metadata
-      const metadata = collectSystemMetadata()
-      Object.entries(metadata).forEach(([key, value]) => {
-        formData.append(key, value)
-      })
-
-      // Append files
-      files.forEach((file) => {
-        formData.append('attachments', file)
-      })
 
       const result = await createSupportTicket(formData)
       onSuccess(result)
@@ -226,60 +163,36 @@ export default function TicketForm({ category = 'other', subcategory, onSuccess,
         />
       </div>
 
-      {/* 3. Two-Column Properties Row: Subcategory & Priority Segmented Chips */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-left">
-        {/* Subcategory */}
-        <div className="space-y-1.5 text-left">
-          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 text-left">
-            <Tag size={13} className="text-slate-400" />
-            <span>Specific Topic</span>
-          </label>
-          <CustomDropdown
-            value={selectedSubcategory}
-            onChange={(val) => setSelectedSubcategory(val)}
-            options={[
-              { value: '', label: `General ${category.replace(/_/g, ' ')}` },
-              ...availableSubcategories.map((sc) => ({
-                value: sc,
-                label: SUBCATEGORY_LABELS[sc] || sc.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-              })),
-            ]}
-            className="w-full text-left"
-            buttonClassName="h-10 text-xs font-medium rounded-xl border-slate-200 bg-white"
-          />
-        </div>
-
-        {/* Priority Segmented Pills */}
-        <div className="space-y-1.5 text-left">
-          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 text-left">
-            <Flag size={13} className="text-slate-400" />
-            <span>Priority Level</span>
-          </label>
-          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100/80 rounded-xl border border-slate-200/70">
-            {availablePriorities.map((p) => {
-              const isActive = priority === p.value
-              return (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPriority(p.value)}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? `${p.activeBg} shadow-2xs border`
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 border border-transparent'
-                  }`}
-                  title={p.description}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${p.dot} shrink-0`} />
-                  <span className="truncate">{p.label}</span>
-                </button>
-              )
-            })}
-          </div>
+      {/* 3. Priority Segmented Pills */}
+      <div className="space-y-1.5 text-left">
+        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 text-left">
+          <Flag size={13} className="text-slate-400" />
+          <span>Priority Level</span>
+        </label>
+        <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100/80 rounded-xl border border-slate-200/70">
+          {availablePriorities.map((p) => {
+            const isActive = priority === p.value
+            return (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setPriority(p.value)}
+                className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  isActive
+                    ? `${p.activeBg} shadow-2xs border`
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 border border-transparent'
+                }`}
+                title={p.description}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${p.dot} shrink-0`} />
+                <span className="truncate">{p.label}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* 4. Description Container with Integrated Attachment Toolbar */}
+      {/* 4. Description */}
       <div className="space-y-1.5 text-left">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold text-slate-700 flex items-center gap-1 text-left">
@@ -293,61 +206,12 @@ export default function TicketForm({ category = 'other', subcategory, onSuccess,
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Please describe your issue in detail. Include what you were trying to do, error messages, and steps to reproduce..."
+            placeholder="Please describe your issue in detail..."
             rows={4}
             className="w-full p-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none resize-none leading-relaxed text-left block"
             maxLength={5000}
             required
           />
-
-          {/* Uploaded File Chips */}
-          {files.length > 0 && (
-            <div className="px-3.5 pb-2.5 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2 bg-slate-50/50">
-              {files.map((file, idx) => {
-                const FileIcon = getFileIcon(file.type)
-                return (
-                  <div
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs"
-                  >
-                    <FileIcon size={12} className="text-indigo-600 shrink-0" />
-                    <span className="max-w-[130px] truncate text-[11px] font-bold">{file.name}</span>
-                    <span className="text-[10px] text-slate-400">({Math.round(file.size / 1024)}KB)</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(idx)}
-                      className="text-slate-400 hover:text-rose-500 ml-0.5 p-0.5 cursor-pointer transition-colors"
-                      title="Remove file"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Integrated File Upload Toolbar */}
-          <div className="px-3.5 py-2 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept={ACCEPTED_FILE_TYPES}
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={files.length >= 5}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-white px-2.5 py-1 rounded-lg border border-transparent hover:border-slate-200 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Paperclip size={13} strokeWidth={2.2} />
-              <span>Attach Screenshots or Logs {files.length > 0 ? `(${files.length}/5)` : ''}</span>
-            </button>
-            <span className="text-[11px] text-slate-400 hidden sm:inline-block">Max 5 files · Up to 10MB</span>
-          </div>
         </div>
       </div>
 
